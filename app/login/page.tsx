@@ -5,19 +5,6 @@ import Image from 'next/image'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { DEMO_EMAIL, DEMO_PASSWORD } from '@/lib/auth'
 
-const ERROR_MAP: Record<string, string> = {
-  'Invalid login credentials': 'E-Mail oder Passwort ist falsch.',
-  'Email not confirmed': 'Bitte bestätigen Sie Ihre E-Mail-Adresse.',
-  'Too many requests': 'Zu viele Anmeldeversuche. Bitte warten Sie kurz.',
-}
-
-function toGerman(msg: string): string {
-  for (const [key, val] of Object.entries(ERROR_MAP)) {
-    if (msg.includes(key)) return val
-  }
-  return 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.'
-}
-
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -31,7 +18,7 @@ export default function LoginPage() {
     setError('')
 
     if (!isSupabaseConfigured()) {
-      setError('Supabase ist nicht konfiguriert. Bitte Umgebungsvariablen prüfen.')
+      setError('Supabase ist nicht konfiguriert. Bitte NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY setzen.')
       isDemo ? setDemoLoading(false) : setLoading(false)
       return
     }
@@ -44,7 +31,8 @@ export default function LoginPage() {
       })
 
       if (authError) {
-        setError(toGerman(authError.message))
+        // Show the real Supabase error – helps diagnose issues
+        setError(authError.message)
         return
       }
 
@@ -78,10 +66,10 @@ export default function LoginPage() {
       }} />
 
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }} className="fade-in">
+        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{
-            width: 80, height: 80, borderRadius: 20, margin: '0 auto 18px',
-            overflow: 'hidden', position: 'relative',
+            width: 80, height: 80, borderRadius: 20, margin: '0 auto 18px', overflow: 'hidden',
             border: '2px solid rgba(22,132,255,.4)',
             boxShadow: '0 0 40px rgba(22,132,255,.35), 0 0 80px rgba(22,132,255,.12)',
           }}>
@@ -122,8 +110,15 @@ export default function LoginPage() {
               <div style={{
                 marginBottom: 16, padding: '10px 14px', borderRadius: 10,
                 background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)',
-                color: '#ff8080', fontSize: 13,
-              }}>{error}</div>
+                color: '#ff8080', fontSize: 13, lineHeight: 1.5,
+              }}>
+                {error}
+                {error.includes('Email not confirmed') && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#ffb0b0' }}>
+                    → Bitte bestätigen Sie Ihre E-Mail-Adresse (Link in der Registrierungs-E-Mail).
+                  </div>
+                )}
+              </div>
             )}
 
             <button type="submit" className="pk-btn" disabled={loading || demoLoading}
@@ -132,12 +127,25 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0' }}>
+          {/* Register link */}
+          <div style={{ marginTop: 16, textAlign: 'center' }}>
+            <span style={{ fontSize: 13, color: '#aeb9c8' }}>Noch kein Konto?{' '}</span>
+            <button onClick={() => router.push('/register')} style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#6cb6ff', fontSize: 13, fontWeight: 700, textDecoration: 'underline',
+            }}>
+              Konto erstellen
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 16px' }}>
             <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
             <span style={{ fontSize: 12, color: '#4a5568' }}>oder</span>
             <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
           </div>
 
+          {/* Demo button */}
           <button onClick={handleDemo} disabled={loading || demoLoading} className="pk-btn-ghost"
             style={{ width: '100%', minHeight: 44, fontWeight: 700, fontSize: 14 }}>
             {demoLoading ? <Spinner text="Demo wird geladen…" /> : '🎯 Demo-Zugang verwenden'}

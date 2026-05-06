@@ -8,6 +8,7 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
   const isDashboard = path.startsWith('/dashboard')
   const isLogin = path === '/login'
+  const isRegister = path === '/register'
 
   // Supabase not configured → protect routes via simple pass-through
   // (client-side guard in layout.tsx takes over)
@@ -51,8 +52,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Already logged in → skip login page
-  if (isLogin && session) {
+  // Already logged in → skip login/register pages
+  if ((isLogin || isRegister) && session) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
@@ -62,5 +63,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
+  matcher: ['/dashboard/:path*', '/login', '/register'],
 }
