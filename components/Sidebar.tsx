@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
-import { createSupabaseClient } from '@/lib/supabase'
+import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { isDemoUser } from '@/lib/auth'
 
 const pilots = [
@@ -28,15 +28,22 @@ export default function Sidebar() {
   const [isDemo, setIsDemo] = useState(false)
 
   useEffect(() => {
-    const supabase = createSupabaseClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsDemo(isDemoUser(session?.user?.email))
-    })
+    if (!isSupabaseConfigured()) return
+    try {
+      const supabase = createSupabaseClient()
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setIsDemo(isDemoUser(session?.user?.email))
+      }).catch(() => {})
+    } catch {}
   }, [])
 
   const logout = async () => {
-    const supabase = createSupabaseClient()
-    await supabase.auth.signOut()
+    try {
+      if (isSupabaseConfigured()) {
+        const supabase = createSupabaseClient()
+        await supabase.auth.signOut()
+      }
+    } catch {}
     router.push('/login')
   }
 
@@ -47,7 +54,6 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      {/* Logo */}
       <div style={{ padding: '18px 16px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
         <button onClick={() => router.push('/dashboard')} style={{
           display: 'flex', alignItems: 'center', gap: 10, width: '100%',
@@ -59,14 +65,8 @@ export default function Sidebar() {
             boxShadow: '0 0 16px rgba(22,132,255,.25)',
             position: 'relative',
           }}>
-            <Image
-              src="/logo.jpg"
-              alt="Petersen KI Logo"
-              width={42}
-              height={42}
-              style={{ objectFit: 'cover', borderRadius: 12 }}
-              priority
-            />
+            <Image src="/logo.jpg" alt="Petersen KI Logo" width={42} height={42}
+              style={{ objectFit: 'cover', borderRadius: 12 }} priority />
           </div>
           <div style={{ textAlign: 'left' }}>
             <div style={{ fontSize: 14, fontWeight: 900, lineHeight: 1.1, color: '#f8fbff' }}>
@@ -88,24 +88,20 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Main nav */}
       <div style={{ padding: '10px 10px 4px' }}>
         <div style={{ fontSize: 10, color: '#4a5568', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: 700, padding: '4px 8px', marginBottom: 4 }}>
           Navigation
         </div>
         {navItems.map(item => (
-          <button
-            key={item.href}
-            onClick={() => router.push(item.href)}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-              padding: '9px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
-              background: isActive(item.href) ? 'rgba(22,132,255,.15)' : 'transparent',
-              color: isActive(item.href) ? '#6cb6ff' : '#aeb9c8',
-              fontSize: 13, fontWeight: isActive(item.href) ? 700 : 500,
-              textAlign: 'left', transition: 'background .15s, color .15s',
-              borderLeft: isActive(item.href) ? '2px solid #1684ff' : '2px solid transparent',
-            }}
+          <button key={item.href} onClick={() => router.push(item.href)} style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+            padding: '9px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
+            background: isActive(item.href) ? 'rgba(22,132,255,.15)' : 'transparent',
+            color: isActive(item.href) ? '#6cb6ff' : '#aeb9c8',
+            fontSize: 13, fontWeight: isActive(item.href) ? 700 : 500,
+            textAlign: 'left', transition: 'background .15s, color .15s',
+            borderLeft: isActive(item.href) ? '2px solid #1684ff' : '2px solid transparent',
+          }}
             onMouseEnter={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.05)' }}
             onMouseLeave={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
           >
@@ -115,24 +111,20 @@ export default function Sidebar() {
         ))}
       </div>
 
-      {/* Pilots */}
       <div style={{ padding: '4px 10px', flex: 1 }}>
         <div style={{ fontSize: 10, color: '#4a5568', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: 700, padding: '4px 8px', marginBottom: 4 }}>
           KI-Piloten
         </div>
         {pilots.map(pilot => (
-          <button
-            key={pilot.id}
-            onClick={() => router.push(pilot.href)}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-              padding: '9px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
-              background: isActive(pilot.href) ? 'rgba(22,132,255,.15)' : 'transparent',
-              color: isActive(pilot.href) ? '#6cb6ff' : '#d0d9e8',
-              fontSize: 13, fontWeight: isActive(pilot.href) ? 700 : 500,
-              textAlign: 'left', transition: 'background .15s',
-              borderLeft: isActive(pilot.href) ? '2px solid #1684ff' : '2px solid transparent',
-            }}
+          <button key={pilot.id} onClick={() => router.push(pilot.href)} style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+            padding: '9px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
+            background: isActive(pilot.href) ? 'rgba(22,132,255,.15)' : 'transparent',
+            color: isActive(pilot.href) ? '#6cb6ff' : '#d0d9e8',
+            fontSize: 13, fontWeight: isActive(pilot.href) ? 700 : 500,
+            textAlign: 'left', transition: 'background .15s',
+            borderLeft: isActive(pilot.href) ? '2px solid #1684ff' : '2px solid transparent',
+          }}
             onMouseEnter={e => { if (!isActive(pilot.href)) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.05)' }}
             onMouseLeave={e => { if (!isActive(pilot.href)) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
           >
@@ -142,16 +134,13 @@ export default function Sidebar() {
         ))}
       </div>
 
-      {/* Logout */}
       <div style={{ padding: '12px 10px', borderTop: '1px solid rgba(255,255,255,.08)' }}>
-        <button
-          onClick={logout}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-            padding: '9px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: 'transparent', color: '#aeb9c8', fontSize: 13,
-            textAlign: 'left', transition: 'background .15s',
-          }}
+        <button onClick={logout} style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+          padding: '9px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
+          background: 'transparent', color: '#aeb9c8', fontSize: 13,
+          textAlign: 'left', transition: 'background .15s',
+        }}
           onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,80,80,.08)'}
           onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}
         >

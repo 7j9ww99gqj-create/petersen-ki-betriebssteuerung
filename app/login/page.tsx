@@ -2,17 +2,17 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { createSupabaseClient } from '@/lib/supabase'
+import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { DEMO_EMAIL, DEMO_PASSWORD } from '@/lib/auth'
 
-const ERROR_MESSAGES: Record<string, string> = {
+const ERROR_MAP: Record<string, string> = {
   'Invalid login credentials': 'E-Mail oder Passwort ist falsch.',
   'Email not confirmed': 'Bitte bestätigen Sie Ihre E-Mail-Adresse.',
   'Too many requests': 'Zu viele Anmeldeversuche. Bitte warten Sie kurz.',
 }
 
 function toGerman(msg: string): string {
-  for (const [key, val] of Object.entries(ERROR_MESSAGES)) {
+  for (const [key, val] of Object.entries(ERROR_MAP)) {
     if (msg.includes(key)) return val
   }
   return 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.'
@@ -30,28 +30,37 @@ export default function LoginPage() {
     isDemo ? setDemoLoading(true) : setLoading(true)
     setError('')
 
-    const supabase = createSupabaseClient()
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: loginEmail,
-      password: loginPassword,
-    })
-
-    if (authError) {
-      setError(toGerman(authError.message))
+    if (!isSupabaseConfigured()) {
+      setError('Supabase ist nicht konfiguriert. Bitte Umgebungsvariablen prüfen.')
       isDemo ? setDemoLoading(false) : setLoading(false)
       return
     }
 
-    router.push('/dashboard')
-    router.refresh()
+    try {
+      const supabase = createSupabaseClient()
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPassword,
+      })
+
+      if (authError) {
+        setError(toGerman(authError.message))
+        return
+      }
+
+      router.push('/dashboard')
+      router.refresh()
+    } catch (e) {
+      setError('Verbindungsfehler. Bitte Internetverbindung prüfen.')
+      console.error(e)
+    } finally {
+      isDemo ? setDemoLoading(false) : setLoading(false)
+    }
   }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password) {
-      setError('Bitte E-Mail und Passwort eingeben.')
-      return
-    }
+    if (!email || !password) { setError('Bitte E-Mail und Passwort eingeben.'); return }
     await signIn(email, password)
   }
 
@@ -69,7 +78,6 @@ export default function LoginPage() {
       }} />
 
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }} className="fade-in">
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{
             width: 80, height: 80, borderRadius: 20, margin: '0 auto 18px',
@@ -90,7 +98,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Card */}
         <div className="pk-card" style={{ padding: '32px', boxShadow: '0 20px 60px rgba(0,0,0,.4)' }}>
           <div style={{ marginBottom: 24 }}>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Anmelden</h2>
@@ -101,33 +108,14 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>
-                E-Mail Adresse
-              </label>
-              <input
-                className="pk-input"
-                type="email"
-                placeholder="name@betrieb.de"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                autoComplete="email"
-                disabled={loading || demoLoading}
-              />
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>E-Mail Adresse</label>
+              <input className="pk-input" type="email" placeholder="name@betrieb.de" value={email}
+                onChange={e => setEmail(e.target.value)} autoComplete="email" disabled={loading || demoLoading} />
             </div>
-
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>
-                Passwort
-              </label>
-              <input
-                className="pk-input"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                autoComplete="current-password"
-                disabled={loading || demoLoading}
-              />
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Passwort</label>
+              <input className="pk-input" type="password" placeholder="••••••••" value={password}
+                onChange={e => setPassword(e.target.value)} autoComplete="current-password" disabled={loading || demoLoading} />
             </div>
 
             {error && (
@@ -138,30 +126,20 @@ export default function LoginPage() {
               }}>{error}</div>
             )}
 
-            <button
-              type="submit"
-              className="pk-btn"
-              disabled={loading || demoLoading}
-              style={{ width: '100%', fontSize: 15, fontWeight: 800, minHeight: 48 }}
-            >
+            <button type="submit" className="pk-btn" disabled={loading || demoLoading}
+              style={{ width: '100%', fontSize: 15, fontWeight: 800, minHeight: 48 }}>
               {loading ? <Spinner text="Anmeldung läuft…" /> : 'Anmelden →'}
             </button>
           </form>
 
-          {/* Divider */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0' }}>
             <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
             <span style={{ fontSize: 12, color: '#4a5568' }}>oder</span>
             <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
           </div>
 
-          {/* Demo button */}
-          <button
-            onClick={handleDemo}
-            disabled={loading || demoLoading}
-            className="pk-btn-ghost"
-            style={{ width: '100%', minHeight: 44, fontWeight: 700, fontSize: 14 }}
-          >
+          <button onClick={handleDemo} disabled={loading || demoLoading} className="pk-btn-ghost"
+            style={{ width: '100%', minHeight: 44, fontWeight: 700, fontSize: 14 }}>
             {demoLoading ? <Spinner text="Demo wird geladen…" /> : '🎯 Demo-Zugang verwenden'}
           </button>
         </div>

@@ -2,44 +2,56 @@ import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } })
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name) {
-          return request.cookies.get(name)?.value
-        },
-        set(name, value, options) {
-          request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({ request: { headers: request.headers } })
-          response.cookies.set({ name, value, ...options })
-        },
-        remove(name, options) {
-          request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({ request: { headers: request.headers } })
-          response.cookies.set({ name, value: '', ...options })
-        },
-      },
-    },
-  )
-
-  const { data: { session } } = await supabase.auth.getSession()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   const path = request.nextUrl.pathname
   const isDashboard = path.startsWith('/dashboard')
   const isLogin = path === '/login'
 
-  // Unauthenticated user tries to access dashboard → redirect to login (no 403)
+  // Supabase not configured → protect routes via simple pass-through
+  // (client-side guard in layout.tsx takes over)
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.next()
+  }
+
+  let response = NextResponse.next({ request: { headers: request.headers } })
+
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookies: {
+      get(name) {
+        return request.cookies.get(name)?.value
+      },
+      set(name, value, options) {
+        request.cookies.set({ name, value, ...options })
+        response = NextResponse.next({ request: { headers: request.headers } })
+        response.cookies.set({ name, value, ...options })
+      },
+      remove(name, options) {
+        request.cookies.set({ name, value: '', ...options })
+        response = NextResponse.next({ request: { headers: request.headers } })
+        response.cookies.set({ name, value: '', ...options })
+      },
+    },
+  })
+
+  let session = null
+  try {
+    const { data } = await supabase.auth.getSession()
+    session = data.session
+  } catch {
+    // On error, fall through to client-side checks
+    return NextResponse.next()
+  }
+
+  // Unauthenticated → redirect to login (never 403)
   if (isDashboard && !session) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Logged-in user visits login page → redirect to dashboard
+  // Already logged in → skip login page
   if (isLogin && session) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'

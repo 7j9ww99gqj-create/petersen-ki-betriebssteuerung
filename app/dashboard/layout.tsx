@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import NotificationBell from '@/components/NotificationBell'
 import GlobalSearch from '@/components/GlobalSearch'
-import { createSupabaseClient } from '@/lib/supabase'
+import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -12,24 +12,40 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [userName, setUserName] = useState('')
 
   useEffect(() => {
-    const supabase = createSupabaseClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.push('/login')
-        return
-      }
-      const email = session.user.email ?? ''
-      setUserName(email.split('@')[0] || email)
+    if (!isSupabaseConfigured()) {
+      // No Supabase → show dashboard without auth (dev mode)
       setChecked(true)
-    })
+      return
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
+    let subscription: { unsubscribe: () => void } | null = null
+
+    try {
+      const supabase = createSupabaseClient()
+
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) {
+          router.push('/login')
+          return
+        }
+        const email = session.user.email ?? ''
+        setUserName(email.split('@')[0] || email)
+        setChecked(true)
+      }).catch(() => {
         router.push('/login')
-      }
-    })
+      })
 
-    return () => subscription.unsubscribe()
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT' || !session) {
+          router.push('/login')
+        }
+      })
+      subscription = data.subscription
+    } catch {
+      router.push('/login')
+    }
+
+    return () => subscription?.unsubscribe()
   }, [router])
 
   if (!checked) {
@@ -47,7 +63,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div style={{ display: 'flex' }}>
       <Sidebar />
       <div style={{ flex: 1, marginLeft: 240, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        {/* Top bar */}
         <div style={{
           position: 'sticky', top: 0, zIndex: 40,
           background: 'linear-gradient(180deg, rgba(5,7,11,.96), rgba(5,7,11,.90))',
@@ -83,7 +98,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
           </div>
         </div>
-
         <main style={{ flex: 1, padding: '28px' }}>
           {children}
         </main>
