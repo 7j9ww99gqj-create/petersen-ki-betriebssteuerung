@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getSession, clearSession } from '@/lib/auth'
+import { createSupabaseClient } from '@/lib/supabase'
+import { isDemoUser } from '@/lib/auth'
 
 type NotifSettings = {
   wareneingaenge: boolean; niedrigerBestand: boolean; auftraege: boolean
@@ -16,49 +17,52 @@ export default function EinstellungenPage() {
   const [isDemo, setIsDemo] = useState(false)
 
   const [profil, setProfil] = useState({ name: '', email: '', role: 'Administrator', firma: '' })
-  const [pwForm, setPwForm] = useState({ alt: '', neu: '', bestaetigung: '' })
+  const [pwForm, setPwForm] = useState({ neu: '', bestaetigung: '' })
   const [notif, setNotif] = useState<NotifSettings>({
     wareneingaenge: true, niedrigerBestand: true, auftraege: true,
     rechnungen: true, cloudSync: false, kiErkennungen: false,
   })
 
   useEffect(() => {
-    const session = getSession()
-    if (session) {
-      setIsDemo(session.isDemo)
-      setProfil(prev => ({
-        ...prev,
-        name: session.name || '',
-        email: session.email || '',
-        role: session.role || 'Administrator',
-        firma: session.firma || '',
-      }))
-    }
-    const savedNotif = localStorage.getItem('pk_notif')
-    if (savedNotif) setNotif(JSON.parse(savedNotif))
+    const supabase = createSupabaseClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      const email = user.email ?? ''
+      const demo = isDemoUser(email)
+      setIsDemo(demo)
+      setProfil({
+        name: (user.user_metadata?.full_name as string) || email.split('@')[0] || '',
+        email,
+        role: demo ? 'Demo Admin' : 'Administrator',
+        firma: (user.user_metadata?.firma as string) || '',
+      })
+    })
+    const saved = localStorage.getItem('pk_notif')
+    if (saved) setNotif(JSON.parse(saved))
   }, [])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-    setToast(msg)
-    setToastType(type)
+    setToast(msg); setToastType(type)
     setTimeout(() => setToast(''), 4000)
   }
 
-  const handleProfilSave = () => {
+  const handleProfilSave = async () => {
     if (!profil.name || !profil.email) { showToast('Name und E-Mail sind Pflichtfelder', 'error'); return }
-    const session = getSession()
-    if (session) {
-      const updated = { ...session, name: profil.name, email: profil.email, firma: profil.firma }
-      localStorage.setItem('pk_user', JSON.stringify(updated))
-    }
+    const supabase = createSupabaseClient()
+    const { error } = await supabase.auth.updateUser({
+      data: { full_name: profil.name, firma: profil.firma },
+    })
+    if (error) { showToast('Fehler beim Speichern: ' + error.message, 'error'); return }
     showToast('✅ Profil wurde gespeichert')
   }
 
-  const handlePwSave = () => {
-    if (!pwForm.alt) { showToast('Bitte aktuelles Passwort eingeben', 'error'); return }
+  const handlePwSave = async () => {
     if (pwForm.neu.length < 6) { showToast('Neues Passwort muss mindestens 6 Zeichen lang sein', 'error'); return }
     if (pwForm.neu !== pwForm.bestaetigung) { showToast('Passwörter stimmen nicht überein', 'error'); return }
-    setPwForm({ alt: '', neu: '', bestaetigung: '' })
+    const supabase = createSupabaseClient()
+    const { error } = await supabase.auth.updateUser({ password: pwForm.neu })
+    if (error) { showToast('Fehler: ' + error.message, 'error'); return }
+    setPwForm({ neu: '', bestaetigung: '' })
     showToast('✅ Passwort wurde geändert')
   }
 
@@ -67,8 +71,9 @@ export default function EinstellungenPage() {
     showToast('✅ Benachrichtigungseinstellungen gespeichert')
   }
 
-  const handleLogout = () => {
-    clearSession()
+  const handleLogout = async () => {
+    const supabase = createSupabaseClient()
+    await supabase.auth.signOut()
     router.push('/login')
   }
 
@@ -108,7 +113,6 @@ export default function EinstellungenPage() {
 
   return (
     <div className="fade-in">
-      {/* Header */}
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{
           width: 52, height: 52, borderRadius: 14,
@@ -131,7 +135,6 @@ export default function EinstellungenPage() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20, alignItems: 'start' }}>
-        {/* Sidebar Nav */}
         <div className="pk-card" style={{ padding: '10px' }}>
           <NavItem id="profil" icon="👤" label="Benutzerprofil" />
           <NavItem id="benachrichtigungen" icon="🔔" label="Benachrichtigungen" />
@@ -149,15 +152,11 @@ export default function EinstellungenPage() {
           </button>
         </div>
 
-        {/* Content */}
         <div>
-          {/* ── Profil ── */}
           {section === 'profil' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="pk-card">
                 <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 800 }}>👤 Benutzerprofil</h3>
-
-                {/* Avatar */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
                   <div style={{
                     width: 64, height: 64, borderRadius: 999,
@@ -171,9 +170,7 @@ export default function EinstellungenPage() {
                   <div>
                     <div style={{ fontWeight: 800, fontSize: 18 }}>{profil.name || '–'}</div>
                     <div style={{ color: '#aeb9c8', fontSize: 13 }}>{profil.role}</div>
-                    {isDemo && (
-                      <span className="badge badge-orange" style={{ marginTop: 4 }}>● Demo-Modus</span>
-                    )}
+                    {isDemo && <span className="badge badge-orange" style={{ marginTop: 4 }}>● Demo-Modus</span>}
                   </div>
                 </div>
 
@@ -183,8 +180,8 @@ export default function EinstellungenPage() {
                     <input className="pk-input" value={profil.name} onChange={e => setProfil(p => ({ ...p, name: e.target.value }))} placeholder="Vollständiger Name" />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>E-Mail *</label>
-                    <input className="pk-input" type="email" value={profil.email} onChange={e => setProfil(p => ({ ...p, email: e.target.value }))} placeholder="email@betrieb.de" />
+                    <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>E-Mail</label>
+                    <input className="pk-input" value={profil.email} disabled style={{ opacity: .5, cursor: 'not-allowed' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Firma</label>
@@ -200,53 +197,41 @@ export default function EinstellungenPage() {
                 </div>
               </div>
 
-              <div className="pk-card">
-                <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>🔑 Passwort ändern</h3>
-                <div style={{ display: 'grid', gap: 14, maxWidth: 400 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Aktuelles Passwort</label>
-                    <input className="pk-input" type="password" placeholder="••••••••" value={pwForm.alt} onChange={e => setPwForm(p => ({ ...p, alt: e.target.value }))} />
+              {!isDemo && (
+                <div className="pk-card">
+                  <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>🔑 Passwort ändern</h3>
+                  <div style={{ display: 'grid', gap: 14, maxWidth: 400 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Neues Passwort</label>
+                      <input className="pk-input" type="password" placeholder="Min. 6 Zeichen" value={pwForm.neu} onChange={e => setPwForm(p => ({ ...p, neu: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Passwort bestätigen</label>
+                      <input className="pk-input" type="password" placeholder="Passwort wiederholen" value={pwForm.bestaetigung} onChange={e => setPwForm(p => ({ ...p, bestaetigung: e.target.value }))} />
+                    </div>
+                    <button className="pk-btn" onClick={handlePwSave} style={{ fontWeight: 700, width: 'fit-content' }}>Passwort ändern</button>
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Neues Passwort</label>
-                    <input className="pk-input" type="password" placeholder="Min. 6 Zeichen" value={pwForm.neu} onChange={e => setPwForm(p => ({ ...p, neu: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Passwort bestätigen</label>
-                    <input className="pk-input" type="password" placeholder="Passwort wiederholen" value={pwForm.bestaetigung} onChange={e => setPwForm(p => ({ ...p, bestaetigung: e.target.value }))} />
-                  </div>
-                  <button className="pk-btn" onClick={handlePwSave} style={{ fontWeight: 700, width: 'fit-content' }}>Passwort ändern</button>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
-          {/* ── Benachrichtigungen ── */}
           {section === 'benachrichtigungen' && (
             <div className="pk-card">
               <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>🔔 Benachrichtigungen</h3>
               <p style={{ margin: '0 0 20px', color: '#aeb9c8', fontSize: 14 }}>Legen Sie fest, welche System-Meldungen Sie erhalten möchten.</p>
-
-              <Toggle checked={notif.wareneingaenge} onChange={() => setNotif(p => ({ ...p, wareneingaenge: !p.wareneingaenge }))}
-                label="Wareneingänge" desc="Benachrichtigung bei neuen Wareneingängen im LagerPilot" />
-              <Toggle checked={notif.niedrigerBestand} onChange={() => setNotif(p => ({ ...p, niedrigerBestand: !p.niedrigerBestand }))}
-                label="Niedriger Bestand" desc="Alarm wenn Artikel unter den Mindestbestand fallen" />
-              <Toggle checked={notif.auftraege} onChange={() => setNotif(p => ({ ...p, auftraege: !p.auftraege }))}
-                label="Auftrags-Updates" desc="Statusänderungen bei Werkstatt-Aufträgen und Arbeitskarten" />
-              <Toggle checked={notif.rechnungen} onChange={() => setNotif(p => ({ ...p, rechnungen: !p.rechnungen }))}
-                label="Überfällige Rechnungen" desc="Erinnerung bei Zahlungsverzug im BüroPilot" />
-              <Toggle checked={notif.cloudSync} onChange={() => setNotif(p => ({ ...p, cloudSync: !p.cloudSync }))}
-                label="Cloud-Sync Status" desc="Meldungen zu Backup und Synchronisierungsstatus" />
-              <Toggle checked={notif.kiErkennungen} onChange={() => setNotif(p => ({ ...p, kiErkennungen: !p.kiErkennungen }))}
-                label="KI-Erkennungen" desc="Benachrichtigungen nach automatischer Dokumentenanalyse" />
-
+              <Toggle checked={notif.wareneingaenge} onChange={() => setNotif(p => ({ ...p, wareneingaenge: !p.wareneingaenge }))} label="Wareneingänge" desc="Benachrichtigung bei neuen Wareneingängen im LagerPilot" />
+              <Toggle checked={notif.niedrigerBestand} onChange={() => setNotif(p => ({ ...p, niedrigerBestand: !p.niedrigerBestand }))} label="Niedriger Bestand" desc="Alarm wenn Artikel unter den Mindestbestand fallen" />
+              <Toggle checked={notif.auftraege} onChange={() => setNotif(p => ({ ...p, auftraege: !p.auftraege }))} label="Auftrags-Updates" desc="Statusänderungen bei Werkstatt-Aufträgen und Arbeitskarten" />
+              <Toggle checked={notif.rechnungen} onChange={() => setNotif(p => ({ ...p, rechnungen: !p.rechnungen }))} label="Überfällige Rechnungen" desc="Erinnerung bei Zahlungsverzug im BüroPilot" />
+              <Toggle checked={notif.cloudSync} onChange={() => setNotif(p => ({ ...p, cloudSync: !p.cloudSync }))} label="Cloud-Sync Status" desc="Meldungen zu Backup und Synchronisierungsstatus" />
+              <Toggle checked={notif.kiErkennungen} onChange={() => setNotif(p => ({ ...p, kiErkennungen: !p.kiErkennungen }))} label="KI-Erkennungen" desc="Benachrichtigungen nach automatischer Dokumentenanalyse" />
               <div style={{ marginTop: 20 }}>
                 <button className="pk-btn" onClick={handleNotifSave} style={{ fontWeight: 700 }}>Einstellungen speichern</button>
               </div>
             </div>
           )}
 
-          {/* ── Info ── */}
           {section === 'info' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="pk-card">
@@ -257,8 +242,8 @@ export default function EinstellungenPage() {
                     { label: 'Version', value: 'v1.0.0' },
                     { label: 'Stack', value: 'Next.js 14 · TypeScript · Tailwind CSS' },
                     { label: 'KI-Modell', value: 'Anthropic Claude (Sonnet)' },
-                    { label: 'Modus', value: isDemo ? 'Demo – Beispieldaten im Browser' : 'Produktiv' },
-                    { label: 'Letzter Sync', value: 'Vor 2 Minuten' },
+                    { label: 'Auth', value: 'Supabase Authentication' },
+                    { label: 'Modus', value: isDemo ? 'Demo – Beispieldaten' : 'Produktiv' },
                     { label: 'Copyright', value: '© 2025 Petersen KI' },
                   ].map(r => (
                     <div key={r.label} style={{ display: 'flex', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
@@ -270,43 +255,24 @@ export default function EinstellungenPage() {
               </div>
 
               {isDemo && (
-                <>
-                  <div style={{
-                    padding: '18px 20px', borderRadius: 16,
-                    background: 'rgba(255,165,0,.08)', border: '1px solid rgba(255,165,0,.2)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                      <span style={{ fontSize: 22 }}>🎯</span>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Demo-Modus aktiv</div>
-                        <p style={{ margin: 0, fontSize: 13, color: '#aeb9c8', lineHeight: 1.6 }}>
-                          Sie sind mit dem Demo-Zugang eingeloggt. Alle Daten sind Beispieldaten und werden lokal im Browser gespeichert.
-                          Für den produktiven Einsatz besuchen Sie{' '}
-                          <a href="https://petersen-ki-pilot.de" target="_blank" rel="noopener noreferrer" style={{ color: '#6cb6ff', textDecoration: 'underline' }}>
-                            petersen-ki-pilot.de
-                          </a>.
-                        </p>
-                      </div>
+                <div style={{
+                  padding: '18px 20px', borderRadius: 16,
+                  background: 'rgba(255,165,0,.08)', border: '1px solid rgba(255,165,0,.2)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                    <span style={{ fontSize: 22 }}>🎯</span>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Demo-Modus aktiv</div>
+                      <p style={{ margin: 0, fontSize: 13, color: '#aeb9c8', lineHeight: 1.6 }}>
+                        Sie sind mit dem Demo-Zugang eingeloggt. Alle Daten sind Beispieldaten.
+                        Für den produktiven Einsatz besuchen Sie{' '}
+                        <a href="https://petersen-ki-pilot.de" target="_blank" rel="noopener noreferrer" style={{ color: '#6cb6ff', textDecoration: 'underline' }}>
+                          petersen-ki-pilot.de
+                        </a>.
+                      </p>
                     </div>
                   </div>
-
-                  <div className="pk-card" style={{ background: 'rgba(244,63,94,.06)', border: '1px solid rgba(244,63,94,.15)' }}>
-                    <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800, color: '#fb7185' }}>⚠️ Demo-Daten zurücksetzen</h3>
-                    <p style={{ margin: '0 0 14px', fontSize: 13, color: '#aeb9c8' }}>
-                      Alle lokalen Demo-Daten und Einstellungen löschen. Diese Aktion kann nicht rückgängig gemacht werden.
-                    </p>
-                    <button onClick={() => {
-                      localStorage.clear()
-                      showToast('✅ Demo-Daten wurden zurückgesetzt. Sie werden abgemeldet…')
-                      setTimeout(() => router.push('/login'), 2000)
-                    }} style={{
-                      padding: '10px 20px', borderRadius: 999, border: '1px solid rgba(244,63,94,.3)',
-                      background: 'transparent', color: '#fb7185', fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                    }}>
-                      🗑️ Daten zurücksetzen
-                    </button>
-                  </div>
-                </>
+                </div>
               )}
             </div>
           )}

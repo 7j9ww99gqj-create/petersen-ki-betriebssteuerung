@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
-import { getSession, clearSession } from '@/lib/auth'
+import { createSupabaseClient } from '@/lib/supabase'
+import { isDemoUser } from '@/lib/auth'
 
 const pilots = [
   { id: 'lager', label: 'LagerPilot', icon: '📦', href: '/dashboard/lager' },
@@ -27,12 +28,15 @@ export default function Sidebar() {
   const [isDemo, setIsDemo] = useState(false)
 
   useEffect(() => {
-    const session = getSession()
-    setIsDemo(session?.isDemo ?? false)
+    const supabase = createSupabaseClient()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsDemo(isDemoUser(session?.user?.email))
+    })
   }, [])
 
-  const logout = () => {
-    clearSession()
+  const logout = async () => {
+    const supabase = createSupabaseClient()
+    await supabase.auth.signOut()
     router.push('/login')
   }
 
@@ -138,7 +142,7 @@ export default function Sidebar() {
         ))}
       </div>
 
-      {/* Bottom */}
+      {/* Logout */}
       <div style={{ padding: '12px 10px', borderTop: '1px solid rgba(255,255,255,.08)' }}>
         <button
           onClick={logout}

@@ -4,21 +4,32 @@ import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import NotificationBell from '@/components/NotificationBell'
 import GlobalSearch from '@/components/GlobalSearch'
-import { getSession } from '@/lib/auth'
+import { createSupabaseClient } from '@/lib/supabase'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [checked, setChecked] = useState(false)
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null)
+  const [userName, setUserName] = useState('')
 
   useEffect(() => {
-    const session = getSession()
-    if (!session) {
-      router.push('/login')
-    } else {
-      setUser(session)
+    const supabase = createSupabaseClient()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.push('/login')
+        return
+      }
+      const email = session.user.email ?? ''
+      setUserName(email.split('@')[0] || email)
       setChecked(true)
-    }
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        router.push('/login')
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [router])
 
   if (!checked) {
@@ -48,7 +59,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <GlobalSearch />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <NotificationBell />
-            {/* Avatar */}
             <button
               onClick={() => router.push('/dashboard/einstellungen')}
               style={{
@@ -69,12 +79,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }}
               title="Einstellungen"
             >
-              {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
+              {userName ? userName.charAt(0).toUpperCase() : '?'}
             </button>
           </div>
         </div>
 
-        {/* Page content */}
         <main style={{ flex: 1, padding: '28px' }}>
           {children}
         </main>

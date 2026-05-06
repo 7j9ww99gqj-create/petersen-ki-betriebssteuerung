@@ -2,44 +2,66 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { checkLogin, setSession } from '@/lib/auth'
+import { createSupabaseClient } from '@/lib/supabase'
+import { DEMO_EMAIL, DEMO_PASSWORD } from '@/lib/auth'
+
+const ERROR_MESSAGES: Record<string, string> = {
+  'Invalid login credentials': 'E-Mail oder Passwort ist falsch.',
+  'Email not confirmed': 'Bitte bestätigen Sie Ihre E-Mail-Adresse.',
+  'Too many requests': 'Zu viele Anmeldeversuche. Bitte warten Sie kurz.',
+}
+
+function toGerman(msg: string): string {
+  for (const [key, val] of Object.entries(ERROR_MESSAGES)) {
+    if (msg.includes(key)) return val
+  }
+  return 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.'
+}
 
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [demoLoading, setDemoLoading] = useState(false)
   const [error, setError] = useState('')
+
+  async function signIn(loginEmail: string, loginPassword: string, isDemo = false) {
+    isDemo ? setDemoLoading(true) : setLoading(true)
+    setError('')
+
+    const supabase = createSupabaseClient()
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: loginPassword,
+    })
+
+    if (authError) {
+      setError(toGerman(authError.message))
+      isDemo ? setDemoLoading(false) : setLoading(false)
+      return
+    }
+
+    router.push('/dashboard')
+    router.refresh()
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError('')
-    await new Promise(r => setTimeout(r, 700))
-
     if (!email || !password) {
       setError('Bitte E-Mail und Passwort eingeben.')
-      setLoading(false)
       return
     }
-
-    const result = checkLogin(email, password)
-    if (!result.ok) {
-      setError(result.error)
-      setLoading(false)
-      return
-    }
-
-    setSession(result.user)
-    router.push('/dashboard')
+    await signIn(email, password)
   }
+
+  const handleDemo = () => signIn(DEMO_EMAIL, DEMO_PASSWORD, true)
 
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
       background: 'radial-gradient(circle at 20% 20%, rgba(22,132,255,.22), transparent 40%), radial-gradient(circle at 80% 80%, rgba(32,200,255,.12), transparent 40%), linear-gradient(180deg,#05070b,#07101a)',
     }}>
-      {/* Background grid */}
       <div style={{
         position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
         backgroundImage: 'linear-gradient(rgba(22,132,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(22,132,255,.04) 1px, transparent 1px)',
@@ -55,14 +77,7 @@ export default function LoginPage() {
             border: '2px solid rgba(22,132,255,.4)',
             boxShadow: '0 0 40px rgba(22,132,255,.35), 0 0 80px rgba(22,132,255,.12)',
           }}>
-            <Image
-              src="/logo.jpg"
-              alt="Petersen KI Logo"
-              width={80}
-              height={80}
-              style={{ objectFit: 'cover' }}
-              priority
-            />
+            <Image src="/logo.jpg" alt="Petersen KI Logo" width={80} height={80} style={{ objectFit: 'cover' }} priority />
           </div>
           <div style={{ fontSize: 28, fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.1 }}>
             Petersen <span style={{ color: '#1684ff' }}>KI</span>
@@ -75,7 +90,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Login card */}
+        {/* Card */}
         <div className="pk-card" style={{ padding: '32px', boxShadow: '0 20px 60px rgba(0,0,0,.4)' }}>
           <div style={{ marginBottom: 24 }}>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Anmelden</h2>
@@ -96,10 +111,11 @@ export default function LoginPage() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 autoComplete="email"
+                disabled={loading || demoLoading}
               />
             </div>
 
-            <div style={{ marginBottom: 24 }}>
+            <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>
                 Passwort
               </label>
@@ -110,6 +126,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 autoComplete="current-password"
+                disabled={loading || demoLoading}
               />
             </div>
 
@@ -124,17 +141,29 @@ export default function LoginPage() {
             <button
               type="submit"
               className="pk-btn"
-              disabled={loading}
+              disabled={loading || demoLoading}
               style={{ width: '100%', fontSize: 15, fontWeight: 800, minHeight: 48 }}
             >
-              {loading ? (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
-                  Anmeldung läuft…
-                </span>
-              ) : 'Anmelden →'}
+              {loading ? <Spinner text="Anmeldung läuft…" /> : 'Anmelden →'}
             </button>
           </form>
+
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0' }}>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
+            <span style={{ fontSize: 12, color: '#4a5568' }}>oder</span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
+          </div>
+
+          {/* Demo button */}
+          <button
+            onClick={handleDemo}
+            disabled={loading || demoLoading}
+            className="pk-btn-ghost"
+            style={{ width: '100%', minHeight: 44, fontWeight: 700, fontSize: 14 }}
+          >
+            {demoLoading ? <Spinner text="Demo wird geladen…" /> : '🎯 Demo-Zugang verwenden'}
+          </button>
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: '#4a5568' }}>
@@ -142,5 +171,18 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function Spinner({ text }: { text: string }) {
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+      <span style={{
+        width: 16, height: 16, border: '2px solid rgba(255,255,255,.3)',
+        borderTopColor: 'white', borderRadius: '50%',
+        animation: 'spin 0.7s linear infinite', display: 'inline-block',
+      }} />
+      {text}
+    </span>
   )
 }
