@@ -1,51 +1,7 @@
-# Petersen KI Betriebssteuerung – CLAUDE.md
 # Petersen KI Betriebssteuerung
 
 ## Projektübersicht
 KI-gestütztes Warenwirtschaftssystem als produktive SaaS-WebApp.
-
-## Status
-- BüroPilot: fertig
-- LagerPilot: fertig
-- WerkstattPilot: fertig
-- MarketingPilot: fertig
-- AnalysePilot: fertig
-- PlanungPilot: fertig
-- KI-Erkennung: fertig
-- Cloud: fertig
-
-## Ziel
-Produktive Version (kein Demo-Modus standardmäßig)
-
-## Auth
-- Demo Login:
-  demo@petersen-ki-pilot.de
-  Demo2025!
-
-- Normale Logins:
-  aktuell deaktiviert / später echte User
-
-## Struktur
-- /dashboard/buero
-- /dashboard/lager
-- /dashboard/werkstatt
-- /dashboard/marketing
-- /dashboard/analyse
-- /dashboard/planung
-
-## Regeln
-- Bestehenden Code nicht zerstören
-- Modular erweitern
-- Keine Demo-Logik mehr außer Demo-Login
-- UI sauber und konsistent halten
-
-## ToDo
-- echte Datenbank (Supabase)
-- echte Authentifizierung
-- Stripe Integration
-## Projektübersicht
-
-Dies ist eine **Next.js 14 Web-App** – ein KI-unterstütztes Warenwirtschaftssystem (Demo-Version).
 
 **Stack:** Next.js 14 · TypeScript · Tailwind CSS · App Router
 
@@ -54,14 +10,32 @@ Dies ist eine **Next.js 14 Web-App** – ein KI-unterstütztes Warenwirtschaftss
 ```bash
 npm install
 cp .env.example .env.local
-# ANTHROPIC_API_KEY in .env.local eintragen (optional für Demo)
+# ANTHROPIC_API_KEY in .env.local eintragen (optional)
 npm run dev
 # → http://localhost:3000
 ```
 
-## Login 
-- Kein Backend, keine Datenbank nötig für die Demo
-- Daten werden im localStorage gespeichert
+## Auth
+- Login nur mit freigeschalteten Zugangsdaten
+- Demo-Zugang: `demo@petersen-ki-pilot.de` / `Demo2025!`
+- Demo-Modus wird nur aktiviert wenn Demo-Credentials verwendet werden
+- Zentrale Auth-Logik: `lib/auth.ts` (checkLogin, getSession, setSession, clearSession)
+- Session wird im localStorage gespeichert (`pk_user`)
+
+## Piloten
+
+| Pilot | Route | Status |
+|-------|-------|--------|
+| LagerPilot | `/dashboard/lager` | ✅ Fertig |
+| BüroPilot | `/dashboard/buero` | ✅ Fertig |
+| WerkstattPilot | `/dashboard/werkstatt` | ✅ Fertig |
+| MarketingPilot | `/dashboard/marketing` | ✅ Fertig |
+| AnalysePilot | `/dashboard/analyse` | ✅ Fertig |
+| PlanungPilot | `/dashboard/planung` | ✅ Fertig |
+| KI Erkennung | `/dashboard/ki-erkennung` | ✅ Fertig |
+| Cloud & Sync | `/dashboard/cloud` | ✅ Fertig |
+| Archiv | `/dashboard/archiv` | ✅ Fertig |
+| Einstellungen | `/dashboard/einstellungen` | ✅ Fertig |
 
 ## Struktur
 
@@ -71,15 +45,25 @@ app/
   dashboard/
     page.tsx        → Haupt-Dashboard
     layout.tsx      → Sidebar-Layout (Auth-Guard)
-    lager/          → LagerPilot (vollständig)
+    lager/          → LagerPilot
+    buero/          → BüroPilot
+    werkstatt/      → WerkstattPilot
+    marketing/      → MarketingPilot
+    analyse/        → AnalysePilot
+    planung/        → PlanungPilot
     ki-erkennung/   → KI-Erkennung + Chat
-    cloud/          → Cloud-Sync Simulation
+    cloud/          → Cloud-Sync
     archiv/         → Dokumentenarchiv
-    [pilot]/        → Dynamische Seite für BüroPilot, WerkstattPilot, etc.
+    einstellungen/  → Einstellungen
+    [pilot]/        → Fallback (nicht mehr aktiv genutzt)
   api/
-    chat/route.ts   → API Route für Anthropic-Chat
+    chat/route.ts   → Anthropic-Chat API
+lib/
+  auth.ts           → Auth-Logik
 components/
   Sidebar.tsx       → Navigations-Sidebar
+  NotificationBell.tsx
+  GlobalSearch.tsx
 ```
 
 ## Design-System (globals.css)
@@ -95,44 +79,34 @@ CSS-Klassen:
 - `.pk-btn-ghost` – Sekundär-Button
 - `.pk-input` – Input-Feld
 - `.pk-table` – Tabellen-Stil
-- `.badge .badge-green/blue/orange/gray` – Status-Badges
+- `.badge .badge-green/blue/orange/gray/red/purple` – Status-Badges
 - `.fade-in` – Fade-In Animation
-
-## KI-Integration
-
-Die KI-Erkennung und der Chat nutzen die Anthropic API:
-1. `ANTHROPIC_API_KEY` in `.env.local` eintragen
-2. Chat läuft über `/api/chat`
-3. Im Demo-Modus: simulierte Antworten ohne API-Key
-
-## Demo → Produktion
-
-Um die Demo zur echten Version zu erweitern:
-1. **Datenbank**: PostgreSQL oder Supabase hinzufügen (z.B. Prisma ORM)
-2. **Auth**: NextAuth.js oder Clerk integrieren
-3. **API**: REST-Routen für CRUD-Operationen anlegen
-4. **Cloud**: Vercel (Frontend) + Supabase (Backend) empfohlen
-5. **KI-Erkennung**: Anthropic API für Dokument-Analyse aktivieren
-
-## Piloten
-
-| Pilot | Route | Status |
-|-------|-------|--------|
-| LagerPilot | `/dashboard/lager` | ✅ Vollständig (Suche: Name, Nr, Lagerplatz) |
-| BüroPilot | `/dashboard/buero` | ✅ Vollständig |
-| WerkstattPilot | `/dashboard/werkstatt` | ✅ Vollständig |
-| MarketingPilot | `/dashboard/marketing` | ✅ Vollständig (Kampagnen, Leads, Newsletter, Auswertungen) |
-| AnalysePilot | `/dashboard/analyse` | ✅ Vollständig (Recharts) |
-| PlanungPilot | `/dashboard/planung` | ✅ Vollständig (Projekte, Kalender, Ressourcen, Aufgaben) |
-| KI Erkennung | `/dashboard/ki-erkennung` | ✅ Vollständig |
-| Cloud & Sync | `/dashboard/cloud` | ✅ Vollständig |
-| Archiv | `/dashboard/archiv` | ✅ Vollständig |
-| Einstellungen | `/dashboard/einstellungen` | ✅ Vollständig |
 
 ## UI-Features
 
-- **Globale Suche**: `⌘K` öffnet Suchmodal (durchsucht alle Piloten-Daten), Komponente: `components/GlobalSearch.tsx`
-- **Benachrichtigungsglocke**: Oben rechts im Layout, 5 System-Meldungen, `components/NotificationBell.tsx`
+- **Globale Suche**: `⌘K` öffnet Suchmodal, Komponente: `components/GlobalSearch.tsx`
+- **Benachrichtigungsglocke**: Oben rechts im Layout, `components/NotificationBell.tsx`
 - **Animierte Zähler**: Dashboard-Stats zählen bei Laden hoch (requestAnimationFrame)
 - **Logo**: `/public/logo.jpg` – in Sidebar + Login eingebunden
 - **recharts v3**: Installiert für AnalysePilot (Bar, Line, Area, Pie Charts)
+
+## KI-Integration
+
+1. `ANTHROPIC_API_KEY` in `.env.local` eintragen
+2. Chat läuft über `/api/chat`
+3. Ohne API-Key: simulierte Antworten
+
+## Regeln
+
+- Bestehenden Code nicht zerstören
+- Modular erweitern
+- Keine Demo-Logik außer beim Demo-Login
+- UI sauber und konsistent halten
+- Nach jeder Änderung: committen und auf GitHub pushen
+
+## ToDo (Produktion)
+
+- Echte Datenbank (Supabase / PostgreSQL + Prisma)
+- Echte Authentifizierung (NextAuth.js oder Clerk)
+- Stripe Integration
+- Vercel Deployment
