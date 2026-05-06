@@ -1,5 +1,48 @@
 # Petersen KI Betriebssteuerung – CLAUDE.md
+# Petersen KI Betriebssteuerung
 
+## Projektübersicht
+KI-gestütztes Warenwirtschaftssystem als produktive SaaS-WebApp.
+
+## Status
+- BüroPilot: fertig
+- LagerPilot: fertig
+- WerkstattPilot: fertig
+- MarketingPilot: fertig
+- AnalysePilot: fertig
+- PlanungPilot: fertig
+- KI-Erkennung: fertig
+- Cloud: fertig
+
+## Ziel
+Produktive Version (kein Demo-Modus standardmäßig)
+
+## Auth
+- Demo Login:
+  demo@petersen-ki-pilot.de
+  Demo2025!
+
+- Normale Logins:
+  aktuell deaktiviert / später echte User
+
+## Struktur
+- /dashboard/buero
+- /dashboard/lager
+- /dashboard/werkstatt
+- /dashboard/marketing
+- /dashboard/analyse
+- /dashboard/planung
+
+## Regeln
+- Bestehenden Code nicht zerstören
+- Modular erweitern
+- Keine Demo-Logik mehr außer Demo-Login
+- UI sauber und konsistent halten
+
+## ToDo
+- echte Datenbank (Supabase)
+- echte Authentifizierung
+- Stripe Integration
 ## Projektübersicht
 
 Dies ist eine **Next.js 14 Web-App** – ein KI-unterstütztes Warenwirtschaftssystem (Demo-Version).
@@ -16,8 +59,7 @@ npm run dev
 # → http://localhost:3000
 ```
 
-## Login (Demo)
-- Beliebige E-Mail + Passwort eingeben → sofortiger Zugang
+## Login 
 - Kein Backend, keine Datenbank nötig für die Demo
 - Daten werden im localStorage gespeichert
 
