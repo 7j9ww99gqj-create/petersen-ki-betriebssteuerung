@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import NotificationBell from '@/components/NotificationBell'
 import GlobalSearch from '@/components/GlobalSearch'
+import { getSession } from '@/lib/auth'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -11,11 +12,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
 
   useEffect(() => {
-    const u = localStorage.getItem('pk_user')
-    if (!u) {
+    const session = getSession()
+    if (!session) {
       router.push('/login')
     } else {
-      setUser(JSON.parse(u))
+      setUser(session)
       setChecked(true)
     }
   }, [router])

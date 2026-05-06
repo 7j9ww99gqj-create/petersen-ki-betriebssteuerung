@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { getSession, clearSession } from '@/lib/auth'
 
 type NotifSettings = {
   wareneingaenge: boolean; niedrigerBestand: boolean; auftraege: boolean
@@ -12,8 +13,9 @@ export default function EinstellungenPage() {
   const [section, setSection] = useState<'profil' | 'benachrichtigungen' | 'info'>('profil')
   const [toast, setToast] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
+  const [isDemo, setIsDemo] = useState(false)
 
-  const [profil, setProfil] = useState({ name: '', email: '', role: 'Demo Admin', firma: 'Petersen KI Demo' })
+  const [profil, setProfil] = useState({ name: '', email: '', role: 'Administrator', firma: '' })
   const [pwForm, setPwForm] = useState({ alt: '', neu: '', bestaetigung: '' })
   const [notif, setNotif] = useState<NotifSettings>({
     wareneingaenge: true, niedrigerBestand: true, auftraege: true,
@@ -21,10 +23,16 @@ export default function EinstellungenPage() {
   })
 
   useEffect(() => {
-    const u = localStorage.getItem('pk_user')
-    if (u) {
-      const parsed = JSON.parse(u)
-      setProfil(prev => ({ ...prev, name: parsed.name || '', email: parsed.email || '', role: parsed.role || 'Demo Admin' }))
+    const session = getSession()
+    if (session) {
+      setIsDemo(session.isDemo)
+      setProfil(prev => ({
+        ...prev,
+        name: session.name || '',
+        email: session.email || '',
+        role: session.role || 'Administrator',
+        firma: session.firma || '',
+      }))
     }
     const savedNotif = localStorage.getItem('pk_notif')
     if (savedNotif) setNotif(JSON.parse(savedNotif))
@@ -38,9 +46,11 @@ export default function EinstellungenPage() {
 
   const handleProfilSave = () => {
     if (!profil.name || !profil.email) { showToast('Name und E-Mail sind Pflichtfelder', 'error'); return }
-    const u = localStorage.getItem('pk_user')
-    const parsed = u ? JSON.parse(u) : {}
-    localStorage.setItem('pk_user', JSON.stringify({ ...parsed, name: profil.name, email: profil.email }))
+    const session = getSession()
+    if (session) {
+      const updated = { ...session, name: profil.name, email: profil.email, firma: profil.firma }
+      localStorage.setItem('pk_user', JSON.stringify(updated))
+    }
     showToast('✅ Profil wurde gespeichert')
   }
 
@@ -49,7 +59,7 @@ export default function EinstellungenPage() {
     if (pwForm.neu.length < 6) { showToast('Neues Passwort muss mindestens 6 Zeichen lang sein', 'error'); return }
     if (pwForm.neu !== pwForm.bestaetigung) { showToast('Passwörter stimmen nicht überein', 'error'); return }
     setPwForm({ alt: '', neu: '', bestaetigung: '' })
-    showToast('✅ Passwort wurde geändert (Demo: keine echte Änderung)')
+    showToast('✅ Passwort wurde geändert')
   }
 
   const handleNotifSave = () => {
@@ -58,7 +68,7 @@ export default function EinstellungenPage() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('pk_user')
+    clearSession()
     router.push('/login')
   }
 
@@ -159,9 +169,11 @@ export default function EinstellungenPage() {
                     {profil.name ? profil.name.charAt(0).toUpperCase() : '?'}
                   </div>
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: 18 }}>{profil.name || 'Demo User'}</div>
+                    <div style={{ fontWeight: 800, fontSize: 18 }}>{profil.name || '–'}</div>
                     <div style={{ color: '#aeb9c8', fontSize: 13 }}>{profil.role}</div>
-                    <span className="badge badge-green" style={{ marginTop: 4 }}>● Demo-Modus aktiv</span>
+                    {isDemo && (
+                      <span className="badge badge-orange" style={{ marginTop: 4 }}>● Demo-Modus</span>
+                    )}
                   </div>
                 </div>
 
@@ -242,10 +254,10 @@ export default function EinstellungenPage() {
                 <div style={{ display: 'grid', gap: 12 }}>
                   {[
                     { label: 'Anwendung', value: 'Petersen KI Betriebssteuerung' },
-                    { label: 'Version', value: 'v1.0.0 (Demo)' },
+                    { label: 'Version', value: 'v1.0.0' },
                     { label: 'Stack', value: 'Next.js 14 · TypeScript · Tailwind CSS' },
                     { label: 'KI-Modell', value: 'Anthropic Claude (Sonnet)' },
-                    { label: 'Modus', value: 'Demo – Daten im localStorage' },
+                    { label: 'Modus', value: isDemo ? 'Demo – Beispieldaten im Browser' : 'Produktiv' },
                     { label: 'Letzter Sync', value: 'Vor 2 Minuten' },
                     { label: 'Copyright', value: '© 2025 Petersen KI' },
                   ].map(r => (
@@ -257,41 +269,45 @@ export default function EinstellungenPage() {
                 </div>
               </div>
 
-              <div style={{
-                padding: '18px 20px', borderRadius: 16,
-                background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.2)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                  <span style={{ fontSize: 22 }}>🎯</span>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Demo-Modus aktiv</div>
-                    <p style={{ margin: 0, fontSize: 13, color: '#aeb9c8', lineHeight: 1.6 }}>
-                      Diese App läuft im Demo-Modus. Alle Daten werden lokal im Browser gespeichert und gehen beim Schließen des Fensters verloren.
-                      Für eine produktive Version mit echter Datenbank, echtem Login und Cloud-Sync besuchen Sie{' '}
-                      <a href="https://petersen-ki-pilot.de" target="_blank" rel="noopener noreferrer" style={{ color: '#6cb6ff', textDecoration: 'underline' }}>
-                        petersen-ki-pilot.de
-                      </a>.
-                    </p>
+              {isDemo && (
+                <>
+                  <div style={{
+                    padding: '18px 20px', borderRadius: 16,
+                    background: 'rgba(255,165,0,.08)', border: '1px solid rgba(255,165,0,.2)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <span style={{ fontSize: 22 }}>🎯</span>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Demo-Modus aktiv</div>
+                        <p style={{ margin: 0, fontSize: 13, color: '#aeb9c8', lineHeight: 1.6 }}>
+                          Sie sind mit dem Demo-Zugang eingeloggt. Alle Daten sind Beispieldaten und werden lokal im Browser gespeichert.
+                          Für den produktiven Einsatz besuchen Sie{' '}
+                          <a href="https://petersen-ki-pilot.de" target="_blank" rel="noopener noreferrer" style={{ color: '#6cb6ff', textDecoration: 'underline' }}>
+                            petersen-ki-pilot.de
+                          </a>.
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              <div className="pk-card" style={{ background: 'rgba(244,63,94,.06)', border: '1px solid rgba(244,63,94,.15)' }}>
-                <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800, color: '#fb7185' }}>⚠️ Demo-Daten zurücksetzen</h3>
-                <p style={{ margin: '0 0 14px', fontSize: 13, color: '#aeb9c8' }}>
-                  Alle lokalen Demo-Daten und Einstellungen löschen. Diese Aktion kann nicht rückgängig gemacht werden.
-                </p>
-                <button onClick={() => {
-                  localStorage.clear()
-                  showToast('✅ Demo-Daten wurden zurückgesetzt. Sie werden abgemeldet…')
-                  setTimeout(() => router.push('/login'), 2000)
-                }} style={{
-                  padding: '10px 20px', borderRadius: 999, border: '1px solid rgba(244,63,94,.3)',
-                  background: 'transparent', color: '#fb7185', fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                }}>
-                  🗑️ Daten zurücksetzen
-                </button>
-              </div>
+                  <div className="pk-card" style={{ background: 'rgba(244,63,94,.06)', border: '1px solid rgba(244,63,94,.15)' }}>
+                    <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800, color: '#fb7185' }}>⚠️ Demo-Daten zurücksetzen</h3>
+                    <p style={{ margin: '0 0 14px', fontSize: 13, color: '#aeb9c8' }}>
+                      Alle lokalen Demo-Daten und Einstellungen löschen. Diese Aktion kann nicht rückgängig gemacht werden.
+                    </p>
+                    <button onClick={() => {
+                      localStorage.clear()
+                      showToast('✅ Demo-Daten wurden zurückgesetzt. Sie werden abgemeldet…')
+                      setTimeout(() => router.push('/login'), 2000)
+                    }} style={{
+                      padding: '10px 20px', borderRadius: 999, border: '1px solid rgba(244,63,94,.3)',
+                      background: 'transparent', color: '#fb7185', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                    }}>
+                      🗑️ Daten zurücksetzen
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

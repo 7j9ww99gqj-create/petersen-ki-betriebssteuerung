@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { checkLogin, setSession } from '@/lib/auth'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -14,18 +15,22 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    await new Promise(r => setTimeout(r, 900))
+    await new Promise(r => setTimeout(r, 700))
+
     if (!email || !password) {
       setError('Bitte E-Mail und Passwort eingeben.')
       setLoading(false)
       return
     }
-    localStorage.setItem('pk_user', JSON.stringify({
-      name: email.split('@')[0] || 'Demo User',
-      email,
-      role: 'Demo Admin',
-      pilots: ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung'],
-    }))
+
+    const result = checkLogin(email, password)
+    if (!result.ok) {
+      setError(result.error)
+      setLoading(false)
+      return
+    }
+
+    setSession(result.user)
     router.push('/dashboard')
   }
 
@@ -75,7 +80,7 @@ export default function LoginPage() {
           <div style={{ marginBottom: 24 }}>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Anmelden</h2>
             <p style={{ margin: '6px 0 0', color: '#aeb9c8', fontSize: 14 }}>
-              Willkommen zurück. Melden Sie sich an, um fortzufahren.
+              Melden Sie sich an, um auf Ihre Petersen KI Betriebssteuerung zuzugreifen.
             </p>
           </div>
 
@@ -130,18 +135,10 @@ export default function LoginPage() {
               ) : 'Anmelden →'}
             </button>
           </form>
-
-          <div style={{
-            marginTop: 20, padding: '12px 16px', borderRadius: 12,
-            background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.2)',
-            fontSize: 13, color: '#93b8ff',
-          }}>
-            <strong>🎯 Demo-Modus:</strong> Beliebige E-Mail + Passwort eingeben, um die Demo zu starten.
-          </div>
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: '#4a5568' }}>
-          © 2025 Petersen KI Betriebssteuerung · Demo Version
+          © 2025 Petersen KI Betriebssteuerung
         </div>
       </div>
     </div>

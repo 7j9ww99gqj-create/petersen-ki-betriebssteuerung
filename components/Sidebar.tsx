@@ -1,14 +1,16 @@
 'use client'
+import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
+import { getSession, clearSession } from '@/lib/auth'
 
 const pilots = [
-  { id: 'lager', label: 'LagerPilot', icon: '📦', href: '/dashboard/lager', status: '✅' },
-  { id: 'buero', label: 'BüroPilot', icon: '🧾', href: '/dashboard/buero', status: '✅' },
-  { id: 'werkstatt', label: 'WerkstattPilot', icon: '🛠️', href: '/dashboard/werkstatt', status: '✅' },
-  { id: 'marketing', label: 'MarketingPilot', icon: '📣', href: '/dashboard/marketing', status: '✅' },
-  { id: 'analyse', label: 'AnalysePilot', icon: '📊', href: '/dashboard/analyse', status: '✅' },
-  { id: 'planung', label: 'PlanungPilot', icon: '📅', href: '/dashboard/planung', status: '✅' },
+  { id: 'lager', label: 'LagerPilot', icon: '📦', href: '/dashboard/lager' },
+  { id: 'buero', label: 'BüroPilot', icon: '🧾', href: '/dashboard/buero' },
+  { id: 'werkstatt', label: 'WerkstattPilot', icon: '🛠️', href: '/dashboard/werkstatt' },
+  { id: 'marketing', label: 'MarketingPilot', icon: '📣', href: '/dashboard/marketing' },
+  { id: 'analyse', label: 'AnalysePilot', icon: '📊', href: '/dashboard/analyse' },
+  { id: 'planung', label: 'PlanungPilot', icon: '📅', href: '/dashboard/planung' },
 ]
 
 const navItems = [
@@ -22,9 +24,15 @@ const navItems = [
 export default function Sidebar() {
   const router = useRouter()
   const pathname = usePathname()
+  const [isDemo, setIsDemo] = useState(false)
+
+  useEffect(() => {
+    const session = getSession()
+    setIsDemo(session?.isDemo ?? false)
+  }, [])
 
   const logout = () => {
-    localStorage.removeItem('pk_user')
+    clearSession()
     router.push('/login')
   }
 
@@ -64,14 +72,16 @@ export default function Sidebar() {
           </div>
         </button>
 
-        <div style={{
-          marginTop: 10, padding: '4px 8px', borderRadius: 6,
-          background: 'rgba(37,211,102,.12)', border: '1px solid rgba(37,211,102,.25)',
-          fontSize: 10, color: '#4ddb7e', fontWeight: 700, textAlign: 'center',
-          letterSpacing: '.05em',
-        }}>
-          ● DEMO MODUS AKTIV
-        </div>
+        {isDemo && (
+          <div style={{
+            marginTop: 10, padding: '4px 8px', borderRadius: 6,
+            background: 'rgba(255,165,0,.12)', border: '1px solid rgba(255,165,0,.25)',
+            fontSize: 10, color: '#ffb347', fontWeight: 700, textAlign: 'center',
+            letterSpacing: '.05em',
+          }}>
+            ● DEMO-MODUS · BEISPIELDATEN
+          </div>
+        )}
       </div>
 
       {/* Main nav */}
@@ -124,12 +134,6 @@ export default function Sidebar() {
           >
             <span style={{ fontSize: 15 }}>{pilot.icon}</span>
             {pilot.label}
-            <span style={{
-              marginLeft: 'auto', fontSize: 9, padding: '2px 6px', borderRadius: 999,
-              background: pilot.status === '✅' ? 'rgba(37,211,102,.15)' : 'rgba(255,165,0,.12)',
-              color: pilot.status === '✅' ? '#4ddb7e' : '#ffb347',
-              fontWeight: 700, letterSpacing: '.04em',
-            }}>{pilot.status === '✅' ? 'AKTIV' : 'DEMO'}</span>
           </button>
         ))}
       </div>
