@@ -52,7 +52,7 @@ export default function ArchivPage() {
               key={t}
               onClick={() => setFilter(t)}
               style={{
-                padding: '7px 14px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                padding: '7px 14px', borderRadius: 999, cursor: 'pointer', fontSize: 12, fontWeight: 700,
                 background: filter === t ? 'rgba(22,132,255,.2)' : 'rgba(255,255,255,.06)',
                 color: filter === t ? '#6cb6ff' : '#aeb9c8',
                 border: filter === t ? '1px solid rgba(22,132,255,.4)' : '1px solid rgba(255,255,255,.08)',
