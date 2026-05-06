@@ -1,0 +1,434 @@
+'use client'
+import { useState } from 'react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  LineChart, Line,
+  PieChart, Pie, Cell,
+  AreaChart, Area,
+} from 'recharts'
+
+// ── Demo-Daten ────────────────────────────────────────────────────────────────
+
+const umsatzData = [
+  { monat: 'Okt', umsatz: 38400, kosten: 24200, gewinn: 14200 },
+  { monat: 'Nov', umsatz: 41200, kosten: 26100, gewinn: 15100 },
+  { monat: 'Dez', umsatz: 52800, kosten: 31400, gewinn: 21400 },
+  { monat: 'Jan', umsatz: 35600, kosten: 22800, gewinn: 12800 },
+  { monat: 'Feb', umsatz: 44100, kosten: 27300, gewinn: 16800 },
+  { monat: 'Mär', umsatz: 48700, kosten: 29100, gewinn: 19600 },
+  { monat: 'Apr', umsatz: 51300, kosten: 30800, gewinn: 20500 },
+  { monat: 'Mai', umsatz: 47200, kosten: 28400, gewinn: 18800 },
+]
+
+const bestandData = [
+  { woche: 'KW14', artikel: 1180, niedrig: 5, leer: 2 },
+  { woche: 'KW15', artikel: 1210, niedrig: 4, leer: 1 },
+  { woche: 'KW16', artikel: 1195, niedrig: 6, leer: 3 },
+  { woche: 'KW17', artikel: 1240, niedrig: 3, leer: 0 },
+  { woche: 'KW18', artikel: 1248, niedrig: 3, leer: 1 },
+]
+
+const pilotNutzungData = [
+  { name: 'LagerPilot', value: 38, color: '#1684ff' },
+  { name: 'BüroPilot', value: 24, color: '#20c8ff' },
+  { name: 'WerkstattPilot', value: 18, color: '#a78bfa' },
+  { name: 'AnalysePilot', value: 10, color: '#10b981' },
+  { name: 'MarketingPilot', value: 6, color: '#f59e0b' },
+  { name: 'PlanungPilot', value: 4, color: '#f43f5e' },
+]
+
+const kiErkennungData = [
+  { tag: 'Mo', erkennungen: 42, korrekt: 40, fehler: 2 },
+  { tag: 'Di', erkennungen: 58, korrekt: 55, fehler: 3 },
+  { tag: 'Mi', erkennungen: 51, korrekt: 49, fehler: 2 },
+  { tag: 'Do', erkennungen: 67, korrekt: 65, fehler: 2 },
+  { tag: 'Fr', erkennungen: 73, korrekt: 71, fehler: 2 },
+  { tag: 'Sa', erkennungen: 24, korrekt: 24, fehler: 0 },
+  { tag: 'So', erkennungen: 18, korrekt: 17, fehler: 1 },
+]
+
+// ── Tooltip-Styles ────────────────────────────────────────────────────────────
+
+const tooltipStyle = {
+  backgroundColor: '#0b1420',
+  border: '1px solid rgba(255,255,255,.12)',
+  borderRadius: 10,
+  color: '#f8fbff',
+  fontSize: 13,
+}
+
+const axisStyle = { fill: '#aeb9c8', fontSize: 11 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TFmt = (...args: any[]) => any
+
+function formatEuro(v: number) { return `${(v / 1000).toFixed(0)}k €` }
+function formatPct(v: number) { return `${v}%` }
+
+const fmtEuro: TFmt = (v) => [`${Number(v).toLocaleString('de-DE')} €`]
+const fmtPct: TFmt = (v) => [`${v}%`, 'Anteil']
+
+// ── KPI Card ──────────────────────────────────────────────────────────────────
+
+function KPICard({ icon, label, value, delta, color, sub }: {
+  icon: string; label: string; value: string; delta?: string; color: string; sub?: string
+}) {
+  return (
+    <div className="pk-card" style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+      <div style={{
+        width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+        background: color + '18', border: `1px solid ${color}30`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
+      }}>{icon}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 2 }}>{label}</div>
+        <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-.03em' }}>{value}</div>
+        {sub && <div style={{ fontSize: 11, color: '#4a5568', marginTop: 1 }}>{sub}</div>}
+      </div>
+      {delta && (
+        <div style={{
+          fontSize: 13, fontWeight: 700, color: delta.startsWith('+') ? '#4ddb7e' : '#fb7185',
+          background: (delta.startsWith('+') ? 'rgba(37,211,102,' : 'rgba(244,63,94,') + '.1)',
+          padding: '4px 10px', borderRadius: 999,
+        }}>{delta}</div>
+      )}
+    </div>
+  )
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+type Tab = 'uebersicht' | 'umsatz' | 'bestand' | 'ki'
+
+export default function AnalysePilotPage() {
+  const [tab, setTab] = useState<Tab>('uebersicht')
+  const [zeitraum, setZeitraum] = useState<'7T' | '30T' | '3M' | '6M' | '1J'>('6M')
+
+  return (
+    <div className="fade-in">
+      {/* Header */}
+      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: 14,
+          background: 'rgba(16,185,129,.15)', border: '1px solid rgba(16,185,129,.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0,
+        }}>📊</div>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>AnalysePilot</h1>
+          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Echtzeit-Dashboards · KPIs · Diagramme · Prognosen</p>
+        </div>
+        <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+        {([
+          { id: 'uebersicht', label: '⊞ Übersicht' },
+          { id: 'umsatz', label: '💶 Umsatz & Gewinn' },
+          { id: 'bestand', label: '📦 Bestandsentwicklung' },
+          { id: 'ki', label: '🧠 KI-Nutzung' },
+        ] as const).map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            padding: '10px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+            background: 'transparent', borderBottom: tab === t.id ? '2px solid #10b981' : '2px solid transparent',
+            color: tab === t.id ? '#34d399' : '#aeb9c8', marginBottom: -1, transition: 'color .15s',
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* ── ÜBERSICHT ── */}
+      {tab === 'uebersicht' && (
+        <div>
+          {/* KPI Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 24 }}>
+            <KPICard icon="💶" label="Umsatz (lfd. Monat)" value="47.200 €" delta="+8%" color="#10b981" />
+            <KPICard icon="📈" label="Gewinn (lfd. Monat)" value="18.800 €" delta="+12%" color="#1684ff" />
+            <KPICard icon="📦" label="Artikel im Lager" value="1.248" delta="+12" color="#f59e0b" sub="Davon 3 niedrig" />
+            <KPICard icon="🧠" label="KI-Erkennungen" value="847" delta="+14%" color="#a78bfa" sub="Diese Woche" />
+            <KPICard icon="✅" label="Auftragsquote" value="94%" color="#10b981" sub="Pünktlich abgeschlossen" />
+            <KPICard icon="👥" label="Aktive Kunden" value="5" color="#20c8ff" sub="1 Inaktiv" />
+            <KPICard icon="📋" label="Offene Angebote" value="4" color="#f59e0b" sub="Wert: 38.150 €" />
+            <KPICard icon="💶" label="Offene Rechnungen" value="4" delta="-2 vs. Vormon." color="#f43f5e" sub="Gesamt: 14.300 €" />
+          </div>
+
+          {/* Sparkline Umsatz */}
+          <div className="pk-card" style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>💶 Umsatz & Kosten – letzte 8 Monate</h3>
+              <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
+                <span style={{ color: '#10b981' }}>▬ Umsatz</span>
+                <span style={{ color: '#f43f5e' }}>▬ Kosten</span>
+                <span style={{ color: '#1684ff' }}>▬ Gewinn</span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={umsatzData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="umsatzGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gewinnGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#1684ff" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#1684ff" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
+                <XAxis dataKey="monat" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={formatEuro} tick={axisStyle} axisLine={false} tickLine={false} width={52} />
+                <Tooltip contentStyle={tooltipStyle} formatter={fmtEuro} />
+                <Area type="monotone" dataKey="umsatz" stroke="#10b981" strokeWidth={2} fill="url(#umsatzGrad)" name="Umsatz" />
+                <Area type="monotone" dataKey="kosten" stroke="#f43f5e" strokeWidth={2} fill="none" strokeDasharray="4 2" name="Kosten" />
+                <Area type="monotone" dataKey="gewinn" stroke="#1684ff" strokeWidth={2} fill="url(#gewinnGrad)" name="Gewinn" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Pilot-Nutzung + Bestand nebeneinander */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="pk-card">
+              <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>🥧 Pilot-Nutzung (Sitzungen)</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={pilotNutzungData} cx="50%" cy="50%" innerRadius={50} outerRadius={85}
+                    dataKey="value" nameKey="name" paddingAngle={3}>
+                    {pilotNutzungData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} stroke="transparent" />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} formatter={fmtPct} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginTop: 8 }}>
+                {pilotNutzungData.map(p => (
+                  <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} />
+                    <span style={{ color: '#aeb9c8' }}>{p.name}</span>
+                    <span style={{ color: p.color, fontWeight: 700 }}>{p.value}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="pk-card">
+              <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📦 Bestandstrend (KW14–18)</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={bestandData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
+                  <XAxis dataKey="woche" tick={axisStyle} axisLine={false} tickLine={false} />
+                  <YAxis tick={axisStyle} axisLine={false} tickLine={false} domain={[1100, 1300]} width={44} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Line type="monotone" dataKey="artikel" stroke="#1684ff" strokeWidth={2} dot={{ fill: '#1684ff', r: 4 }} name="Artikel gesamt" />
+                  <Line type="monotone" dataKey="niedrig" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 3 }} name="Niedr. Bestand" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── UMSATZ ── */}
+      {tab === 'umsatz' && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>💶 Umsatz, Kosten & Gewinn</h2>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(['7T', '30T', '3M', '6M', '1J'] as const).map(z => (
+                <button key={z} onClick={() => setZeitraum(z)} style={{
+                  padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)',
+                  background: zeitraum === z ? 'rgba(16,185,129,.15)' : 'transparent',
+                  color: zeitraum === z ? '#34d399' : '#aeb9c8', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                }}>{z}</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="pk-card" style={{ marginBottom: 16 }}>
+            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>Balkendiagramm – Umsatz vs. Kosten</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={umsatzData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" vertical={false} />
+                <XAxis dataKey="monat" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={formatEuro} tick={axisStyle} axisLine={false} tickLine={false} width={52} />
+                <Tooltip contentStyle={tooltipStyle} formatter={fmtEuro} />
+                <Legend wrapperStyle={{ fontSize: 12, color: '#aeb9c8', paddingTop: 8 }} />
+                <Bar dataKey="umsatz" name="Umsatz" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                <Bar dataKey="kosten" name="Kosten" fill="rgba(244,63,94,.6)" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                <Bar dataKey="gewinn" name="Gewinn" fill="#1684ff" radius={[4, 4, 0, 0]} maxBarSize={36} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="pk-card">
+            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>Liniendiagramm – Umsatzentwicklung</h3>
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={umsatzData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
+                <XAxis dataKey="monat" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={formatEuro} tick={axisStyle} axisLine={false} tickLine={false} width={52} />
+                <Tooltip contentStyle={tooltipStyle} formatter={fmtEuro} />
+                <Line type="monotone" dataKey="umsatz" stroke="#10b981" strokeWidth={2.5}
+                  dot={{ fill: '#10b981', r: 5, strokeWidth: 2, stroke: '#0b1420' }} name="Umsatz" />
+                <Line type="monotone" dataKey="gewinn" stroke="#1684ff" strokeWidth={2}
+                  dot={{ fill: '#1684ff', r: 4, strokeWidth: 2, stroke: '#0b1420' }}
+                  strokeDasharray="6 3" name="Gewinn" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* ── BESTAND ── */}
+      {tab === 'bestand' && (
+        <div>
+          <div className="pk-card" style={{ marginBottom: 16 }}>
+            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📦 Bestandsentwicklung – letzte 5 Wochen</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={bestandData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="bestandGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#1684ff" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#1684ff" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
+                <XAxis dataKey="woche" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis tick={axisStyle} axisLine={false} tickLine={false} domain={[1100, 1300]} width={44} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Legend wrapperStyle={{ fontSize: 12, color: '#aeb9c8', paddingTop: 8 }} />
+                <Area type="monotone" dataKey="artikel" stroke="#1684ff" strokeWidth={2.5}
+                  fill="url(#bestandGrad)" name="Artikel gesamt"
+                  dot={{ fill: '#1684ff', r: 5, strokeWidth: 2, stroke: '#0b1420' }} />
+                <Area type="monotone" dataKey="niedrig" stroke="#f59e0b" strokeWidth={2}
+                  fill="none" name="Niedriger Bestand"
+                  dot={{ fill: '#f59e0b', r: 4, strokeWidth: 2, stroke: '#0b1420' }} />
+                <Area type="monotone" dataKey="leer" stroke="#f43f5e" strokeWidth={2}
+                  fill="none" name="Leer / kein Bestand"
+                  dot={{ fill: '#f43f5e', r: 4, strokeWidth: 2, stroke: '#0b1420' }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <table className="pk-table">
+              <thead>
+                <tr>
+                  <th>Woche</th>
+                  <th>Artikel gesamt</th>
+                  <th>Niedriger Bestand</th>
+                  <th>Leer</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...bestandData].reverse().map(d => (
+                  <tr key={d.woche}>
+                    <td style={{ fontWeight: 700 }}>{d.woche}</td>
+                    <td style={{ fontWeight: 700, color: '#1684ff' }}>{d.artikel}</td>
+                    <td style={{ color: d.niedrig > 4 ? '#ffb347' : '#4ddb7e', fontWeight: 600 }}>{d.niedrig}</td>
+                    <td style={{ color: d.leer > 0 ? '#f43f5e' : '#4ddb7e', fontWeight: 600 }}>{d.leer}</td>
+                    <td>
+                      <span className={`badge ${d.leer === 0 && d.niedrig <= 4 ? 'badge-green' : d.leer > 0 ? 'badge-orange' : 'badge-blue'}`}>
+                        {d.leer === 0 && d.niedrig <= 4 ? '✅ Gut' : d.leer > 0 ? '⚠️ Kritisch' : '🔵 Prüfen'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── KI-NUTZUNG ── */}
+      {tab === 'ki' && (
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+            {[
+              { label: 'Erkennungen diese Woche', value: '333', icon: '🧠', color: '#a78bfa' },
+              { label: 'Genauigkeit', value: '97.3%', icon: '🎯', color: '#10b981' },
+              { label: 'Fehler gesamt', value: '12', icon: '⚠️', color: '#f43f5e' },
+              { label: 'Ø pro Tag', value: '47', icon: '📊', color: '#1684ff' },
+            ].map(s => (
+              <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
+                <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="pk-card" style={{ marginBottom: 16 }}>
+            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>🧠 KI-Erkennungen pro Tag (diese Woche)</h3>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={kiErkennungData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barGap={2}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" vertical={false} />
+                <XAxis dataKey="tag" tick={axisStyle} axisLine={false} tickLine={false} />
+                <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={36} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Legend wrapperStyle={{ fontSize: 12, color: '#aeb9c8', paddingTop: 8 }} />
+                <Bar dataKey="korrekt" name="Korrekt erkannt" fill="#a78bfa" radius={[4, 4, 0, 0]} maxBarSize={40} stackId="a" />
+                <Bar dataKey="fehler" name="Fehler" fill="rgba(244,63,94,.6)" radius={[4, 4, 0, 0]} maxBarSize={40} stackId="a" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="pk-card">
+              <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>🥧 Pilot-Nutzungsverteilung</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={pilotNutzungData} cx="50%" cy="50%" outerRadius={80}
+                    dataKey="value" nameKey="name" paddingAngle={2}>
+                    {pilotNutzungData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} stroke="transparent" />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} formatter={((v: unknown, name: unknown) => [`${v}%`, name]) as TFmt} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginTop: 8 }}>
+                {pilotNutzungData.map(p => (
+                  <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                    <div style={{ width: 7, height: 7, borderRadius: 2, background: p.color }} />
+                    <span style={{ color: '#aeb9c8' }}>{p.name.replace('Pilot', '')} </span>
+                    <span style={{ color: p.color, fontWeight: 700 }}>{p.value}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="pk-card">
+              <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📊 Tagestrend Genauigkeit</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={kiErkennungData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
+                  <XAxis dataKey="tag" tick={axisStyle} axisLine={false} tickLine={false} />
+                  <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={40}
+                    domain={[90, 100]}
+                    tickFormatter={(v) => `${v}%`} />
+                  <Tooltip contentStyle={tooltipStyle}
+                    formatter={((v: unknown, _name: unknown, props: { payload?: { erkennungen: number; korrekt: number } }) => {
+                      const d = props.payload
+                      if (!d) return [String(v), 'Genauigkeit']
+                      const pct = d.erkennungen > 0 ? ((d.korrekt / d.erkennungen) * 100).toFixed(1) : '0'
+                      return [`${pct}%`, 'Genauigkeit']
+                    }) as TFmt} />
+                  <Line type="monotone" dataKey={(d: typeof kiErkennungData[0]) =>
+                    d.erkennungen > 0 ? (d.korrekt / d.erkennungen) * 100 : 0}
+                    stroke="#a78bfa" strokeWidth={2.5}
+                    dot={{ fill: '#a78bfa', r: 5, strokeWidth: 2, stroke: '#0b1420' }}
+                    name="Genauigkeit" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
