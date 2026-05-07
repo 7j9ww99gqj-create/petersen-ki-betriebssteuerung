@@ -431,7 +431,7 @@ export default function LagerPilotPage() {
           <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Wareneingang · Warenausgang · Bestände · Inventur</p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-          {!isDemo && <button className="pk-btn" onClick={() => setModal('new')} style={{ fontSize: 13 }}>+ Artikel anlegen</button>}
+          <button className="pk-btn" onClick={() => setModal('new')} style={{ fontSize: 13 }}>+ Artikel anlegen</button>
           <span className="badge badge-green">● AKTIV</span>
         </div>
       </div>
@@ -555,7 +555,7 @@ export default function LagerPilotPage() {
                     >
                       Status{sortArrow('status')}
                     </th>
-                    {!isDemo && <th style={{ width: 80 }}>Aktionen</th>}
+                    <th style={{ width: 110 }}>Aktionen</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -578,8 +578,7 @@ export default function LagerPilotPage() {
                           {a.status === 'ok' ? '✅ OK' : a.status === 'niedrig' ? '⚠️ Niedrig' : '🚨 Leer'}
                         </span>
                       </td>
-                      {!isDemo && (
-                        <td>
+                      <td>
                           {deleteConfirmId === a.id ? (
                             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                               <button
@@ -601,8 +600,7 @@ export default function LagerPilotPage() {
                               <button onClick={() => setDeleteConfirmId(a.id)} title="Löschen" style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}>🗑</button>
                             </div>
                           )}
-                        </td>
-                      )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
