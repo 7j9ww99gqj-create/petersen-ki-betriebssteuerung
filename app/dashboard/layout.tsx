@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import NotificationBell from '@/components/NotificationBell'
 import GlobalSearch from '@/components/GlobalSearch'
@@ -9,31 +9,25 @@ import { hasDemoCookie } from '@/lib/auth'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [checked, setChecked] = useState(false)
   const [userName, setUserName] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // Close sidebar on route change (mobile nav)
+  useEffect(() => { setSidebarOpen(false) }, [pathname])
+
+  // Auth check
   useEffect(() => {
-    // Demo cookie → immediate access, no Supabase needed
-    if (hasDemoCookie()) {
-      setUserName('Demo')
-      setChecked(true)
-      return
-    }
-
-    // Supabase auth for real users
-    if (!isSupabaseConfigured()) {
-      router.push('/login')
-      return
-    }
+    if (hasDemoCookie()) { setUserName('Demo'); setChecked(true); return }
+    if (!isSupabaseConfigured()) { router.push('/login'); return }
 
     let subscription: { unsubscribe: () => void } | null = null
     try {
       const supabase = createSupabaseClient()
-
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (!session) { router.push('/login'); return }
-        const email = session.user.email ?? ''
-        setUserName(email.split('@')[0] || email)
+        setUserName((session.user.email ?? '').split('@')[0])
         setChecked(true)
       }).catch(() => router.push('/login'))
 
@@ -41,9 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (event === 'SIGNED_OUT' || !session) router.push('/login')
       })
       subscription = data.subscription
-    } catch {
-      router.push('/login')
-    }
+    } catch { router.push('/login') }
 
     return () => subscription?.unsubscribe()
   }, [router])
@@ -61,18 +53,52 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div style={{ display: 'flex' }}>
-      <Sidebar />
-      <div style={{ flex: 1, marginLeft: 240, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 40,
+            background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(2px)',
+          }}
+        />
+      )}
+
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <div className="dashboard-main">
+        {/* Top bar */}
         <div style={{
-          position: 'sticky', top: 0, zIndex: 40,
+          position: 'sticky', top: 0, zIndex: 30,
           background: 'linear-gradient(180deg, rgba(5,7,11,.96), rgba(5,7,11,.90))',
           backdropFilter: 'blur(12px)',
           borderBottom: '1px solid rgba(255,255,255,.07)',
-          padding: '10px 28px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          padding: '10px 16px',
+          display: 'flex', alignItems: 'center', gap: 10,
         }}>
-          <GlobalSearch />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Hamburger – only visible on mobile */}
+          <button
+            className="hamburger-btn"
+            onClick={() => setSidebarOpen(o => !o)}
+            aria-label="Menü öffnen"
+            style={{
+              display: 'none', // shown via CSS on mobile
+              width: 38, height: 38, borderRadius: 10,
+              background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)',
+              cursor: 'pointer', alignItems: 'center', justifyContent: 'center',
+              flexDirection: 'column', gap: 5, flexShrink: 0,
+            }}
+          >
+            <span style={{ display: 'block', width: 18, height: 2, background: '#aeb9c8', borderRadius: 2 }} />
+            <span style={{ display: 'block', width: 18, height: 2, background: '#aeb9c8', borderRadius: 2 }} />
+            <span style={{ display: 'block', width: 18, height: 2, background: '#aeb9c8', borderRadius: 2 }} />
+          </button>
+
+          <div style={{ flex: 1 }}>
+            <GlobalSearch />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <NotificationBell />
             <button
               onClick={() => router.push('/dashboard/einstellungen')}
@@ -84,21 +110,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 fontWeight: 900, fontSize: 15, color: '#6cb6ff',
                 transition: 'border-color .15s, background .15s',
               }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(22,132,255,.2)'
-                e.currentTarget.style.borderColor = 'rgba(22,132,255,.5)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #1684ff22, #20c8ff22)'
-                e.currentTarget.style.borderColor = 'rgba(22,132,255,.3)'
-              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(22,132,255,.2)'; e.currentTarget.style.borderColor = 'rgba(22,132,255,.5)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg, #1684ff22, #20c8ff22)'; e.currentTarget.style.borderColor = 'rgba(22,132,255,.3)' }}
               title="Einstellungen"
             >
               {userName ? userName.charAt(0).toUpperCase() : '?'}
             </button>
           </div>
         </div>
-        <main style={{ flex: 1, padding: '28px' }}>{children}</main>
+
+        <main style={{ flex: 1, padding: '24px' }} className="main-inner">
+          {children}
+        </main>
       </div>
     </div>
   )

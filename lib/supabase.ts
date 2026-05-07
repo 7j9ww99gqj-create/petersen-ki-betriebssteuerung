@@ -1,21 +1,21 @@
 import { createBrowserClient } from '@supabase/ssr'
 
-export function createSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) {
-    throw new Error(
-      'Supabase nicht konfiguriert. Bitte NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local setzen.',
-    )
-  }
-
-  return createBrowserClient(url, key)
+function getEnv() {
+  // Remove accidental trailing slashes from the URL
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/+$/, '')
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
+  return { url, key }
 }
 
 export function isSupabaseConfigured(): boolean {
-  return !!(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
+  const { url, key } = getEnv()
+  return url.startsWith('https://') && key.length > 20
+}
+
+export function createSupabaseClient() {
+  const { url, key } = getEnv()
+  if (!url || !key) {
+    throw new Error('Supabase nicht konfiguriert.')
+  }
+  return createBrowserClient(url, key)
 }
