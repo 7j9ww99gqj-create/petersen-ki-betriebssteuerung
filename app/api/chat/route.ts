@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, system } = await req.json()
+    const { messages, system, context } = await req.json()
 
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
@@ -10,6 +10,9 @@ export async function POST(req: NextRequest) {
         reply: 'Demo-Modus: Bitte ANTHROPIC_API_KEY in .env.local eintragen für echte KI-Antworten.',
       })
     }
+
+    const baseSystem = system || 'Du bist der KI-Assistent der Petersen KI Betriebssteuerung. Antworte auf Deutsch, professionell und hilfreich.'
+    const fullSystem = context ? `${context}\n\n${baseSystem}` : baseSystem
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -21,7 +24,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
-        system: system || 'Du bist der KI-Assistent der Petersen KI Betriebssteuerung. Antworte auf Deutsch, professionell und hilfreich.',
+        system: fullSystem,
         messages,
       }),
     })
