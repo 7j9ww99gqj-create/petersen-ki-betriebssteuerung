@@ -675,7 +675,7 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const rechnung = rechnungen.find(r => r.id === id)
     if (!isDemo && rechnung) {
-      try { await upsertBueroRechnung({ ...rechnung, status: 'Bezahlt', bezahltAm: today }) } catch { showToast('Fehler beim Speichern', true); return }
+      try { await upsertBueroRechnung({ ...rechnung, status: 'Bezahlt', bezahlt_am: today }) } catch { showToast('Fehler beim Speichern', true); return }
     }
     setRechnungen(prev => prev.map(r => r.id === id ? { ...r, status: 'Bezahlt', bezahltAm: today } : r))
     showToast(`✅ Rechnung ${id} als bezahlt markiert`)
