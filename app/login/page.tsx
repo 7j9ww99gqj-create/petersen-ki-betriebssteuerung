@@ -22,15 +22,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [demoLoading, setDemoLoading] = useState(false)
   const [error, setError] = useState('')
-
-  const handleDemo = () => {
-    setDemoLoading(true)
-    setError('')
-    setDemoCookie()
-    router.push('/dashboard')
-  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,11 +81,11 @@ export default function LoginPage() {
           <form onSubmit={handleLogin}>
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>E-Mail Adresse</label>
-              <input className="pk-input" type="email" placeholder="name@betrieb.de" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" disabled={loading || demoLoading} />
+              <input className="pk-input" type="email" placeholder="name@betrieb.de" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" disabled={loading} />
             </div>
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Passwort</label>
-              <input className="pk-input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" disabled={loading || demoLoading} />
+              <input className="pk-input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" disabled={loading} />
             </div>
 
             {error && (
@@ -102,7 +94,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            <button type="submit" className="pk-btn" disabled={loading || demoLoading} style={{ width: '100%', fontSize: 15, fontWeight: 800, minHeight: 48 }}>
+            <button type="submit" className="pk-btn" disabled={loading} style={{ width: '100%', fontSize: 15, fontWeight: 800, minHeight: 48 }}>
               {loading ? <Spinner text="Anmeldung läuft…" /> : 'Anmelden →'}
             </button>
           </form>
@@ -110,20 +102,6 @@ export default function LoginPage() {
           <div style={{ marginTop: 14, textAlign: 'center' }}>
             <span style={{ fontSize: 13, color: '#aeb9c8' }}>Noch kein Konto? </span>
             <button onClick={() => router.push('/register')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6cb6ff', fontSize: 13, fontWeight: 700, textDecoration: 'underline' }}>Konto erstellen</button>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 16px' }}>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
-            <span style={{ fontSize: 12, color: '#4a5568' }}>oder</span>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
-          </div>
-
-          <button onClick={handleDemo} disabled={loading || demoLoading} className="pk-btn-ghost" style={{ width: '100%', minHeight: 44, fontWeight: 700, fontSize: 14 }}>
-            {demoLoading ? <Spinner text="Demo wird geladen…" /> : '🎯 Demo-Zugang verwenden'}
-          </button>
-
-          <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', fontSize: 12, color: '#4a5568', textAlign: 'center' }}>
-            Demo: <span style={{ color: '#aeb9c8' }}>demo@petersen-ki.de</span> · <span style={{ color: '#aeb9c8' }}>Demo1234!</span>
           </div>
         </div>
 
