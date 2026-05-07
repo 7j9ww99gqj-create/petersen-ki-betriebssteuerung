@@ -56,16 +56,16 @@ npm run dev
 
 | Pilot | Route | Features |
 |-------|-------|---------|
-| LagerPilot | `/dashboard/lager` | Bestand (CRUD), Bewegungen, Wareneingang, Warenausgang, Inventur, Bestellvorschlag-Tab, CSV-Export, Inline-Delete, Sortierung |
-| BüroPilot | `/dashboard/buero` | Kunden (CRUD), Angebote (CRUD+Edit-Modal), Aufträge (CRUD+Fortschritt-Slider), Rechnungen (CRUD+KPI-Summen), Dokumente, Angebot→Auftrag-Konvertierung |
-| WerkstattPilot | `/dashboard/werkstatt` | Arbeitskarten (CRUD+Edit-Modal+Fortschritt-Slider), Zeiterfassung, Materialverbrauch, Prüfprotokoll (Ergebnis inline änderbar), KPI-Karten |
+| LagerPilot | `/dashboard/lager` | Bestand (CRUD), Bewegungen, Wareneingang, Warenausgang, Inventur, Bestellvorschlag-Tab, CSV-Export, Inline-Delete, Spalten-Sortierung |
+| BüroPilot | `/dashboard/buero` | Kunden/Angebote/Aufträge/Rechnungen/Dokumente (alle CRUD+Edit), PDF-Export (jsPDF), Angebot→Auftrag-Konvertierung, echtes File-Upload |
+| WerkstattPilot | `/dashboard/werkstatt` | Arbeitskarten (CRUD+Edit+Fortschritt-Slider), Zeiterfassung, Materialverbrauch, Prüfprotokoll (Ergebnis inline), KPI-Karten |
 | MarketingPilot | `/dashboard/marketing` | Kampagnen, Leads, Newsletter |
 | AnalysePilot | `/dashboard/analyse` | Charts (recharts v3): Bar, Line, Area, Pie |
 | PlanungPilot | `/dashboard/planung` | Projekte (CRUD+Edit+Meilensteine), Kalender (CRUD+Edit), Ressourcen (CRUD), Aufgaben (CRUD+Edit+Status) |
-| KI Erkennung | `/dashboard/ki-erkennung` | Chat mit Anthropic API, Lieferschein-Scan-Simulation |
+| KI-Assistent | `/dashboard/ki-erkennung` | Tab Tagesbrief (Was heute / Nachbestellung / Kunden), Tab Dokument-Erkennung, Tab Chat (via /api/chat) |
 | Cloud & Sync | `/dashboard/cloud` | Sync-Status, Storage-Übersicht |
 | Archiv | `/dashboard/archiv` | Dokumentenarchiv |
-| Einstellungen | `/dashboard/einstellungen` | Benutzerprofil |
+| Einstellungen | `/dashboard/einstellungen` | Profil, Benachrichtigungen, Rollen & Rechte (Tabelle + Wechsel) |
 
 ---
 
@@ -160,12 +160,46 @@ CSS-Klassen:
 
 ---
 
+## Neue Lib-Dateien
+
+| Datei | Beschreibung |
+|-------|-------------|
+| `lib/roles.ts` | Rollen & Rechte: `AppRole`, `PERMISSIONS`, `useRole()`, `getRole()`, `setRole()` |
+| `lib/warnings.ts` | Warnsystem: `getAppWarnings(isDemo)` liest Lager/Büro/Werkstatt/Planung |
+| `lib/pdf.ts` | PDF-Generierung: `generateRechnungPDF()`, `generateAngebotPDF()` via jsPDF |
+| `lib/db.ts` | Zentrale Datenschicht für alle Piloten (Supabase CRUD) |
+
+### Rollen-System (`lib/roles.ts`)
+```ts
+type AppRole = 'Admin' | 'Mitarbeiter' | 'Büro' | 'Werkstatt' | 'Lager'
+PERMISSIONS.canDelete(role)  // nur Admin
+PERMISSIONS.canCreate(role)  // Admin + Mitarbeiter
+PERMISSIONS.canEdit(role)    // alle außer Lager
+PERMISSIONS.canExport(role)  // Admin + Büro
+// Gespeichert in localStorage 'pk_role', Demo immer 'Admin'
+const { role, setRole, permissions } = useRole()
+```
+
+### Warnsystem (`lib/warnings.ts`)
+```ts
+// Liest Supabase-Daten und generiert Warning-Objekte
+// Bei isDemo: 6 statische Beispiel-Warnungen
+await getAppWarnings(isDemo: boolean): Promise<Warning[]>
+```
+
+### PDF (`lib/pdf.ts`)
+```ts
+// Dynamic import von jsPDF (SSR-sicher)
+await generateRechnungPDF(rechnung: PDFRechnung, kundenName: string)
+await generateAngebotPDF(angebot: PDFAngebot, kundenName: string)
+```
+
 ## Komponenten (components/)
 
 | Datei | Beschreibung |
 |-------|-------------|
 | `Sidebar.tsx` | Navigations-Sidebar mit allen Piloten-Links |
-| `NotificationBell.tsx` | Benachrichtigungsglocke (oben rechts) |
+| `NotificationBell.tsx` | Echte Live-Warnungen (Tabs: Alle/Fehler/Warnung), Auto-Refresh 60s, Links zu Piloten |
 | `GlobalSearch.tsx` | ⌘K Suchmodal |
 | `SupportButton.tsx` | Floating Support-Button (WhatsApp, E-Mail, Telefon) – fixed bottom-right |
 
@@ -216,6 +250,9 @@ CSS-Klassen:
 
 - [ ] `supabase/schema.sql` im Supabase SQL-Editor ausführen (noch nicht bestätigt)
 - [ ] MarketingPilot vollständig ausbauen (Edit/Delete fehlt noch)
-- [ ] AnalysePilot: echte Daten aus Supabase (aktuell nur Demo-Charts)
+- [ ] AnalysePilot: echte Daten aus Supabase statt Demo-Charts
 - [ ] Stripe Integration (Abos/Bezahlung)
 - [ ] E-Mail-Benachrichtigungen bei Mindestbestand-Unterschreitung
+- [ ] Rollen-basierte Sidebar-Filterung (aktuell nur in Einstellungen wählbar)
+- [ ] Benutzer-Verwaltung für Admin (andere User Rollen zuweisen)
+- [ ] PDF-Vorlagen: Firmenlogo und echte Adressdaten einbinden
