@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import NotificationBell from '@/components/NotificationBell'
 import GlobalSearch from '@/components/GlobalSearch'
+import SupportButton from '@/components/SupportButton'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { hasDemoCookie } from '@/lib/auth'
 
@@ -123,6 +124,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+
+      <SupportButton />
     </div>
   )
 }
