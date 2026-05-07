@@ -1,5 +1,12 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { hasDemoCookie } from '@/lib/auth'
+import {
+  getPlanungProjekte, upsertPlanungProjekt, deletePlanungProjekt,
+  getPlanungAufgaben, upsertPlanungAufgabe, deletePlanungAufgabe,
+  getPlanungTermine, upsertPlanungTermin, deletePlanungTermin,
+  getPlanungRessourcen, upsertPlanungRessource,
+} from '@/lib/db'
 
 // ── Typen ─────────────────────────────────────────────────────────────────────
 
@@ -31,7 +38,7 @@ type Ressource = {
 
 // ── Demo-Daten ────────────────────────────────────────────────────────────────
 
-const initProjekte: Projekt[] = [
+const demoProjekte: Projekt[] = [
   {
     id: 'PRJ-001', name: 'Hallenerweiterung Müller Bau', kunde: 'Müller Bau GmbH',
     status: 'Aktiv', start: '01.04.2025', ende: '30.06.2025', budget: '48.000 €',
@@ -82,7 +89,7 @@ const initProjekte: Projekt[] = [
   },
 ]
 
-const initAufgaben: Aufgabe[] = [
+const demoAufgaben: Aufgabe[] = [
   { id: 'AU-001', titel: 'Statikberechnung Hallenerweiterung finalisieren', projekt: 'PRJ-001', verantwortlich: 'K. Petersen', prioritaet: 'Hoch', status: 'In Arbeit', faellig: '10.05.2025', erstellt: '28.04.2025' },
   { id: 'AU-002', titel: 'Stahllieferung Termin koordinieren', projekt: 'PRJ-001', verantwortlich: 'K. Petersen', prioritaet: 'Hoch', status: 'Offen', faellig: '12.05.2025', erstellt: '02.05.2025' },
   { id: 'AU-003', titel: 'Anlage B Ölwechsel durchführen', projekt: 'PRJ-002', verantwortlich: 'M. Fischer', prioritaet: 'Mittel', status: 'Erledigt', faellig: '15.05.2025', erstellt: '01.05.2025' },
@@ -91,7 +98,7 @@ const initAufgaben: Aufgabe[] = [
   { id: 'AU-006', titel: 'Baugenehmigung Müller prüfen', projekt: 'PRJ-001', verantwortlich: 'K. Petersen', prioritaet: 'Hoch', status: 'Blockiert', faellig: '09.05.2025', erstellt: '01.05.2025' },
 ]
 
-const initTermine: Termin[] = [
+const demoTermine: Termin[] = [
   { id: 'T-001', titel: 'Kick-Off Hallenerweiterung', datum: '08.05.2025', uhrzeit: '09:00', typ: 'Meeting', projekt: 'PRJ-001', teilnehmer: 'K. Petersen, T. Müller' },
   { id: 'T-002', titel: 'Lieferung Stahlträger Charge 1', datum: '13.05.2025', uhrzeit: '07:00', typ: 'Lieferung', projekt: 'PRJ-001', teilnehmer: 'K. Petersen' },
   { id: 'T-003', titel: 'Technik Nord – Anlage C Termin', datum: '15.06.2025', uhrzeit: '08:00', typ: 'Wartung', projekt: 'PRJ-002', teilnehmer: 'M. Fischer, L. Brandt' },
@@ -100,7 +107,7 @@ const initTermine: Termin[] = [
   { id: 'T-006', titel: 'Wochenmeeting Planung', datum: '12.05.2025', uhrzeit: '10:00', typ: 'Meeting', projekt: '—', teilnehmer: 'Alle' },
 ]
 
-const initRessourcen: Ressource[] = [
+const demoRessourcen: Ressource[] = [
   { id: 'R-001', name: 'K. Petersen', typ: 'Person', kapazitaet: 40, genutzt: 36, projekt: 'PRJ-001', status: 'Belegt' },
   { id: 'R-002', name: 'M. Fischer', typ: 'Person', kapazitaet: 40, genutzt: 28, projekt: 'PRJ-002', status: 'Belegt' },
   { id: 'R-003', name: 'T. Schulz', typ: 'Person', kapazitaet: 40, genutzt: 16, projekt: 'PRJ-004', status: 'Verfügbar' },
@@ -157,21 +164,34 @@ const terminTypColor: Record<Termin['typ'], string> = {
 
 // ── Projekte-Tab ──────────────────────────────────────────────────────────────
 
-function ProjekteTab() {
-  const [projekte, setProjekte] = useState<Projekt[]>(initProjekte)
+function ProjekteTab({ isDemo }: { isDemo: boolean }) {
+  const [projekte, setProjekte] = useState<Projekt[]>(isDemo ? demoProjekte : [])
   const [showForm, setShowForm] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState('Alle')
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
   const [form, setForm] = useState({ name: '', kunde: '', verantwortlich: '', start: '', ende: '', budget: '', beschreibung: '' })
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  useEffect(() => {
+    if (isDemo) return
+    getPlanungProjekte()
+      .then(data => setProjekte(data as Projekt[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Projekte'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
 
   const filtered = projekte.filter(p => filterStatus === 'Alle' || p.status === filterStatus)
   const counts: Record<string, number> = { Alle: projekte.length }
   projekte.forEach(p => { counts[p.status] = (counts[p.status] || 0) + 1 })
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name || !form.kunde) return
     const newP: Projekt = {
       id: `PRJ-00${projekte.length + 1}`, name: form.name, kunde: form.kunde,
@@ -180,23 +200,39 @@ function ProjekteTab() {
       beschreibung: form.beschreibung, verantwortlich: form.verantwortlich,
       meilensteine: [],
     }
+    if (!isDemo) {
+      try { await upsertPlanungProjekt(newP) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setProjekte(prev => [newP, ...prev])
     setForm({ name: '', kunde: '', verantwortlich: '', start: '', ende: '', budget: '', beschreibung: '' })
     setShowForm(false)
     showToast(`✅ Projekt "${newP.name}" wurde angelegt`)
   }
 
-  const toggleMeilenstein = (projektId: string, msIndex: number) => {
-    setProjekte(prev => prev.map(p => {
-      if (p.id !== projektId) return p
-      const ms = p.meilensteine.map((m, i) => i === msIndex ? { ...m, erledigt: !m.erledigt } : m)
-      const done = ms.filter(m => m.erledigt).length
-      return { ...p, meilensteine: ms, fortschritt: Math.round((done / ms.length) * 100) }
-    }))
+  const toggleMeilenstein = async (projektId: string, msIndex: number) => {
+    const projekt = projekte.find(p => p.id === projektId)
+    if (!projekt) return
+    const ms = projekt.meilensteine.map((m, i) => i === msIndex ? { ...m, erledigt: !m.erledigt } : m)
+    const done = ms.filter(m => m.erledigt).length
+    const updated = { ...projekt, meilensteine: ms, fortschritt: Math.round((done / ms.length) * 100) }
+    if (!isDemo) {
+      try { await upsertPlanungProjekt(updated) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setProjekte(prev => prev.map(p => p.id === projektId ? updated : p))
   }
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Projekte…</div>
+      </div>
+    </div>
+  )
 
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -299,20 +335,36 @@ function ProjekteTab() {
 
 // ── Kalender-Tab ──────────────────────────────────────────────────────────────
 
-function KalenderTab() {
-  const [termine, setTermine] = useState<Termin[]>(initTermine)
+function KalenderTab({ isDemo }: { isDemo: boolean }) {
+  const [termine, setTermine] = useState<Termin[]>(isDemo ? demoTermine : [])
   const [showForm, setShowForm] = useState(false)
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
   const [form, setForm] = useState({ titel: '', datum: '', uhrzeit: '', typ: 'Meeting', projekt: '', teilnehmer: '' })
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  useEffect(() => {
+    if (isDemo) return
+    getPlanungTermine()
+      .then(data => setTermine(data as Termin[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Termine'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
 
-  const handleSave = () => {
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
+
+  const handleSave = async () => {
     if (!form.titel || !form.datum) return
     const newT: Termin = {
       id: `T-00${termine.length + 1}`, titel: form.titel, datum: form.datum,
       uhrzeit: form.uhrzeit || '—', typ: form.typ as Termin['typ'],
       projekt: form.projekt || '—', teilnehmer: form.teilnehmer || '—',
+    }
+    if (!isDemo) {
+      try { await upsertPlanungTermin(newT) } catch { showToast('Fehler beim Speichern', true); return }
     }
     setTermine(prev => [...prev, newT].sort((a, b) => a.datum.split('.').reverse().join('').localeCompare(b.datum.split('.').reverse().join(''))))
     setForm({ titel: '', datum: '', uhrzeit: '', typ: 'Meeting', projekt: '', teilnehmer: '' })
@@ -326,8 +378,18 @@ function KalenderTab() {
     return da.localeCompare(db)
   })
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Termine…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
@@ -397,21 +459,42 @@ function KalenderTab() {
 
 // ── Ressourcen-Tab ────────────────────────────────────────────────────────────
 
-function RessourcenTab() {
-  const ressourcen = initRessourcen
+function RessourcenTab({ isDemo }: { isDemo: boolean }) {
+  const [ressourcen, setRessourcen] = useState<Ressource[]>(isDemo ? demoRessourcen : [])
+  const [loading, setLoading] = useState(!isDemo)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    if (isDemo) return
+    getPlanungRessourcen()
+      .then(data => setRessourcen(data as Ressource[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Ressourcen'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
   const personen = ressourcen.filter(r => r.typ === 'Person')
   const maschinen = ressourcen.filter(r => r.typ !== 'Person')
 
   const gesamtKap = personen.reduce((s, r) => s + r.kapazitaet, 0)
   const genutztKap = personen.reduce((s, r) => s + r.genutzt, 0)
-  const auslastung = Math.round((genutztKap / gesamtKap) * 100)
+  const auslastung = gesamtKap > 0 ? Math.round((genutztKap / gesamtKap) * 100) : 0
 
   const statusColor: Record<Ressource['status'], string> = { Verfügbar: '#25d366', Belegt: '#f59e0b', Wartung: '#f43f5e' }
   const statusBadge: Record<Ressource['status'], string> = { Verfügbar: 'badge-green', Belegt: 'badge-orange', Wartung: 'badge-red' }
   const typIcon: Record<Ressource['typ'], string> = { Person: '👤', Maschine: '⚙️', Fahrzeug: '🚚' }
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Ressourcen…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
           { label: 'Team-Auslastung', value: `${auslastung}%`, icon: '👥', color: auslastung > 85 ? '#f43f5e' : '#1684ff' },
@@ -462,20 +545,33 @@ function RessourcenTab() {
 
 // ── Aufgaben-Tab ──────────────────────────────────────────────────────────────
 
-function AufgabenTab() {
-  const [aufgaben, setAufgaben] = useState<Aufgabe[]>(initAufgaben)
+function AufgabenTab({ isDemo }: { isDemo: boolean }) {
+  const [aufgaben, setAufgaben] = useState<Aufgabe[]>(isDemo ? demoAufgaben : [])
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState('Alle')
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
   const [form, setForm] = useState({ titel: '', projekt: '', verantwortlich: '', prioritaet: 'Mittel', faellig: '' })
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  useEffect(() => {
+    if (isDemo) return
+    getPlanungAufgaben()
+      .then(data => setAufgaben(data as Aufgabe[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Aufgaben'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
 
   const filtered = aufgaben.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
   const counts: Record<string, number> = { Alle: aufgaben.length }
   aufgaben.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1 })
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.titel) return
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const newA: Aufgabe = {
@@ -484,19 +580,36 @@ function AufgabenTab() {
       prioritaet: form.prioritaet as Prioritaet, status: 'Offen',
       faellig: form.faellig || '—', erstellt: today,
     }
+    if (!isDemo) {
+      try { await upsertPlanungAufgabe(newA) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setAufgaben(prev => [newA, ...prev])
     setForm({ titel: '', projekt: '', verantwortlich: '', prioritaet: 'Mittel', faellig: '' })
     setShowForm(false)
     showToast(`✅ Aufgabe "${newA.titel}" wurde erstellt`)
   }
 
-  const handleStatus = (id: string, status: AufgabeStatus) => {
+  const handleStatus = async (id: string, status: AufgabeStatus) => {
+    const aufgabe = aufgaben.find(a => a.id === id)
+    if (!isDemo && aufgabe) {
+      try { await upsertPlanungAufgabe({ ...aufgabe, status }) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setAufgaben(prev => prev.map(a => a.id === id ? { ...a, status } : a))
     showToast(`✅ Aufgabe auf "${status}" gesetzt`)
   }
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Aufgaben…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -579,12 +692,44 @@ function AufgabenTab() {
 type Tab = 'projekte' | 'kalender' | 'ressourcen' | 'aufgaben'
 
 export default function PlanungPilotPage() {
+  const [isDemo] = useState(() => hasDemoCookie())
   const [tab, setTab] = useState<Tab>('projekte')
+  const [projekte, setProjekte] = useState<Projekt[]>(isDemo ? demoProjekte : [])
+  const [termine, setTermine] = useState<Termin[]>(isDemo ? demoTermine : [])
+  const [aufgaben, setAufgaben] = useState<Aufgabe[]>(isDemo ? demoAufgaben : [])
+  const [ressourcen, setRessourcen] = useState<Ressource[]>(isDemo ? demoRessourcen : [])
+  const [loading, setLoading] = useState(!isDemo)
+  const [errorMsg, setErrorMsg] = useState('')
 
-  const aktiveProjekte = initProjekte.filter(p => p.status === 'Aktiv').length
-  const termineWoche = initTermine.length
-  const offeneAufgaben = initAufgaben.filter(a => a.status !== 'Erledigt').length
-  const kapazitaet = Math.round((initRessourcen.filter(r => r.typ === 'Person').reduce((s, r) => s + r.genutzt, 0) / initRessourcen.filter(r => r.typ === 'Person').reduce((s, r) => s + r.kapazitaet, 0)) * 100)
+  useEffect(() => {
+    if (isDemo) return
+    Promise.all([getPlanungProjekte(), getPlanungTermine(), getPlanungAufgaben(), getPlanungRessourcen()])
+      .then(([p, t, a, r]) => {
+        setProjekte(p as Projekt[])
+        setTermine(t as Termin[])
+        setAufgaben(a as Aufgabe[])
+        setRessourcen(r as Ressource[])
+      })
+      .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const aktiveProjekte = projekte.filter(p => p.status === 'Aktiv').length
+  const termineWoche = termine.length
+  const offeneAufgaben = aufgaben.filter(a => a.status !== 'Erledigt').length
+  const personenRessourcen = ressourcen.filter(r => r.typ === 'Person')
+  const gesamtKap = personenRessourcen.reduce((s, r) => s + r.kapazitaet, 0)
+  const genutztKap = personenRessourcen.reduce((s, r) => s + r.genutzt, 0)
+  const kapazitaet = gesamtKap > 0 ? Math.round((genutztKap / gesamtKap) * 100) : 0
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 32, height: 32, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade PlanungPilot…</div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="fade-in">
@@ -596,6 +741,8 @@ export default function PlanungPilotPage() {
         </div>
         <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>
       </div>
+
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 22 }}>
         {[
@@ -627,10 +774,10 @@ export default function PlanungPilotPage() {
         ))}
       </div>
 
-      {tab === 'projekte' && <ProjekteTab />}
-      {tab === 'kalender' && <KalenderTab />}
-      {tab === 'ressourcen' && <RessourcenTab />}
-      {tab === 'aufgaben' && <AufgabenTab />}
+      {tab === 'projekte' && <ProjekteTab isDemo={isDemo} />}
+      {tab === 'kalender' && <KalenderTab isDemo={isDemo} />}
+      {tab === 'ressourcen' && <RessourcenTab isDemo={isDemo} />}
+      {tab === 'aufgaben' && <AufgabenTab isDemo={isDemo} />}
     </div>
   )
 }

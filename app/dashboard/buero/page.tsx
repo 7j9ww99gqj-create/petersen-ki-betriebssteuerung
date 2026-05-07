@@ -1,7 +1,15 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { hasDemoCookie } from '@/lib/auth'
+import {
+  getBueroKunden, upsertBueroKunde, deleteBueroKunde,
+  getBueroAngebote, upsertBueroAngebot,
+  getBueroAuftraege, upsertBueroAuftrag,
+  getBueroRechnungen, upsertBueroRechnung,
+  getBueroDokumente, insertBueroDokument, deleteBueroDokument,
+} from '@/lib/db'
 
-// ── Demo-Daten ──────────────────────────────────────────────────────────────
+// ── Typen ───────────────────────────────────────────────────────────────────
 
 type Kunde = {
   id: string; name: string; typ: 'Firma' | 'Privat'; ansprechpartner: string
@@ -30,7 +38,9 @@ type Dokument = {
   kategorie: 'Angebot' | 'Rechnung' | 'Vertrag' | 'Sonstiges'; bezug: string
 }
 
-const initKunden: Kunde[] = [
+// ── Demo-Daten ──────────────────────────────────────────────────────────────
+
+const demoKunden: Kunde[] = [
   { id: 'K-001', name: 'Müller Bau GmbH', typ: 'Firma', ansprechpartner: 'Thomas Müller', email: 't.mueller@muellerbu.de', telefon: '040 12345-0', ort: 'Hamburg', umsatz: '84.200 €', status: 'Aktiv' },
   { id: 'K-002', name: 'Schmidt & Partner', typ: 'Firma', ansprechpartner: 'Anna Schmidt', email: 'a.schmidt@sp-kg.de', telefon: '030 98765-10', ort: 'Berlin', umsatz: '31.500 €', status: 'Aktiv' },
   { id: 'K-003', name: 'Technik Nord AG', typ: 'Firma', ansprechpartner: 'Lars Brandt', email: 'l.brandt@techniknord.de', telefon: '0511 44400', ort: 'Hannover', umsatz: '127.800 €', status: 'Aktiv' },
@@ -39,7 +49,7 @@ const initKunden: Kunde[] = [
   { id: 'K-006', name: 'Ritter Elektro GmbH', typ: 'Firma', ansprechpartner: 'Jens Ritter', email: 'j.ritter@ritter-e.de', telefon: '089 10203', ort: 'München', umsatz: '19.200 €', status: 'Inaktiv' },
 ]
 
-const initAngebote: Angebot[] = [
+const demoAngebote: Angebot[] = [
   { id: 'ANG-2025-042', kunde: 'Müller Bau GmbH', titel: 'Stahlkonstruktion Hallenerweiterung', betrag: '18.400,00 €', datum: '02.05.2025', gueltig: '01.06.2025', status: 'Versendet' },
   { id: 'ANG-2025-041', kunde: 'Technik Nord AG', titel: 'Wartungsvertrag 2025/26', betrag: '7.200,00 €', datum: '28.04.2025', gueltig: '28.05.2025', status: 'Akzeptiert' },
   { id: 'ANG-2025-040', kunde: 'Delta Logistik KG', titel: 'Regalanlage Lager Ost', betrag: '12.850,00 €', datum: '25.04.2025', gueltig: '25.05.2025', status: 'Entwurf' },
@@ -48,7 +58,7 @@ const initAngebote: Angebot[] = [
   { id: 'ANG-2025-037', kunde: 'Ritter Elektro GmbH', titel: 'Elektroinstallation Erweiterung', betrag: '9.300,00 €', datum: '03.04.2025', gueltig: '03.05.2025', status: 'Versendet' },
 ]
 
-const initAuftraege: Auftrag[] = [
+const demoAuftraege: Auftrag[] = [
   { id: 'A-2025-034', kunde: 'Technik Nord AG', beschreibung: 'Wartungsvertrag – Q2 Durchführung', wert: '1.800,00 €', start: '01.05.2025', ende: '31.05.2025', status: 'In Bearbeitung', fortschritt: 65 },
   { id: 'A-2025-033', kunde: 'Müller Bau GmbH', beschreibung: 'Lieferung Stahlträger Charge 1', wert: '6.200,00 €', start: '15.04.2025', ende: '15.05.2025', status: 'In Bearbeitung', fortschritt: 80 },
   { id: 'A-2025-032', kunde: 'Hans Werner', beschreibung: 'Carport Montage & Fundament', wert: '3.100,00 €', start: '28.04.2025', ende: '10.05.2025', status: 'Geplant', fortschritt: 0 },
@@ -57,7 +67,7 @@ const initAuftraege: Auftrag[] = [
   { id: 'A-2025-029', kunde: 'Ritter Elektro GmbH', beschreibung: 'Schaltschrankbau Sonderanfertigung', wert: '8.900,00 €', start: '10.05.2025', ende: '30.06.2025', status: 'Pausiert', fortschritt: 30 },
 ]
 
-const initRechnungen: Rechnung[] = [
+const demoRechnungen: Rechnung[] = [
   { id: 'RE-2025-078', kunde: 'Delta Logistik KG', betrag: '4.400,00 €', faellig: '10.05.2025', erstellt: '10.04.2025', status: 'Offen' },
   { id: 'RE-2025-077', kunde: 'Schmidt & Partner', betrag: '2.700,00 €', faellig: '08.05.2025', erstellt: '08.04.2025', status: 'Überfällig' },
   { id: 'RE-2025-076', kunde: 'Technik Nord AG', betrag: '7.200,00 €', faellig: '30.05.2025', erstellt: '30.04.2025', status: 'Offen' },
@@ -66,7 +76,7 @@ const initRechnungen: Rechnung[] = [
   { id: 'RE-2025-073', kunde: 'Delta Logistik KG', betrag: '3.800,00 €', faellig: '20.03.2025', erstellt: '20.02.2025', status: 'Bezahlt', bezahltAm: '18.03.2025' },
 ]
 
-const initDokumente: Dokument[] = [
+const demoDokumente: Dokument[] = [
   { id: 'DOK-001', name: 'Angebot_ANG-2025-042.pdf', typ: 'PDF', groesse: '284 KB', datum: '02.05.2025', kategorie: 'Angebot', bezug: 'Müller Bau GmbH' },
   { id: 'DOK-002', name: 'Rechnung_RE-2025-078.pdf', typ: 'PDF', groesse: '198 KB', datum: '10.04.2025', kategorie: 'Rechnung', bezug: 'Delta Logistik KG' },
   { id: 'DOK-003', name: 'Wartungsvertrag_TechnikNord_2025.pdf', typ: 'PDF', groesse: '1,2 MB', datum: '28.04.2025', kategorie: 'Vertrag', bezug: 'Technik Nord AG' },
@@ -157,13 +167,23 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
 
 // ── Kunden-Tab ──────────────────────────────────────────────────────────────
 
-function KundenTab() {
-  const [kunden, setKunden] = useState<Kunde[]>(initKunden)
+function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftraege: Auftrag[]; rechnungen: Rechnung[] }) {
+  const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [selected, setSelected] = useState<Kunde | null>(null)
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
   const [form, setForm] = useState({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '' })
+
+  useEffect(() => {
+    if (isDemo) return
+    getBueroKunden()
+      .then(data => setKunden(data as Kunde[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Kunden'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
 
   const filtered = kunden.filter(k =>
     k.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -171,9 +191,12 @@ function KundenTab() {
     k.ort.toLowerCase().includes(search.toLowerCase())
   )
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name || !form.email) return
     const newKunde: Kunde = {
       id: `K-${String(kunden.length + 1).padStart(3, '0')}`,
@@ -182,11 +205,23 @@ function KundenTab() {
       email: form.email, telefon: form.telefon, ort: form.ort,
       umsatz: '0 €', status: 'Aktiv',
     }
+    if (!isDemo) {
+      try { await upsertBueroKunde(newKunde) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setKunden(prev => [newKunde, ...prev])
     setForm({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '' })
     setShowForm(false)
     showToast(`✅ Kunde "${newKunde.name}" wurde erfolgreich angelegt (${newKunde.id})`)
   }
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: '3px solid rgba(32,200,255,.3)', borderTopColor: '#20c8ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Kunden…</div>
+      </div>
+    </div>
+  )
 
   if (selected) {
     return (
@@ -233,7 +268,7 @@ function KundenTab() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="pk-card">
               <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 800, color: '#aeb9c8', textTransform: 'uppercase', letterSpacing: '.06em' }}>Letzte Aufträge</h4>
-              {initAuftraege.filter(a => a.kunde === selected.name).slice(0, 3).map(a => (
+              {auftraege.filter(a => a.kunde === selected.name).slice(0, 3).map(a => (
                 <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{a.id}</div>
@@ -242,13 +277,13 @@ function KundenTab() {
                   <StatusBadgeAuftrag status={a.status} />
                 </div>
               ))}
-              {initAuftraege.filter(a => a.kunde === selected.name).length === 0 && (
+              {auftraege.filter(a => a.kunde === selected.name).length === 0 && (
                 <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine Aufträge vorhanden</div>
               )}
             </div>
             <div className="pk-card">
               <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 800, color: '#aeb9c8', textTransform: 'uppercase', letterSpacing: '.06em' }}>Offene Rechnungen</h4>
-              {initRechnungen.filter(r => r.kunde === selected.name && r.status !== 'Bezahlt').map(r => (
+              {rechnungen.filter(r => r.kunde === selected.name && r.status !== 'Bezahlt').map(r => (
                 <div key={r.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{r.id}</div>
@@ -260,7 +295,7 @@ function KundenTab() {
                   </div>
                 </div>
               ))}
-              {initRechnungen.filter(r => r.kunde === selected.name && r.status !== 'Bezahlt').length === 0 && (
+              {rechnungen.filter(r => r.kunde === selected.name && r.status !== 'Bezahlt').length === 0 && (
                 <div style={{ color: '#aeb9c8', fontSize: 13 }}>Alle Rechnungen beglichen ✅</div>
               )}
             </div>
@@ -272,6 +307,7 @@ function KundenTab() {
 
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
         <input className="pk-input" placeholder="🔍 Kunden suchen (Name, Nummer, Ort)…" value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 360 }} />
@@ -355,28 +391,44 @@ function KundenTab() {
 
 // ── Angebote-Tab ────────────────────────────────────────────────────────────
 
-function AngeboteTab() {
-  const [angebote, setAngebote] = useState<Angebot[]>(initAngebote)
+function AngeboteTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] }) {
+  const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
   const [showForm, setShowForm] = useState(false)
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [form, setForm] = useState({ kunde: '', titel: '', betrag: '', gueltig: '' })
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  useEffect(() => {
+    if (isDemo) return
+    getBueroAngebote()
+      .then(data => setAngebote(data as Angebot[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Angebote'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
 
   const filtered = angebote.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.kunde || !form.titel || !form.betrag) return
     const today = new Date()
     const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const newAng: Angebot = {
-      id: `ANG-2025-0${43 + angebote.length - initAngebote.length}`,
+      id: `ANG-2025-0${43 + angebote.length - demoAngebote.length}`,
       kunde: form.kunde, titel: form.titel,
       betrag: form.betrag.includes('€') ? form.betrag : `${form.betrag} €`,
       datum: fmt(today),
       gueltig: form.gueltig || fmt(new Date(today.getTime() + 30 * 86400000)),
       status: 'Entwurf',
+    }
+    if (!isDemo) {
+      try { await upsertBueroAngebot(newAng) } catch { showToast('Fehler beim Speichern', true); return }
     }
     setAngebote(prev => [newAng, ...prev])
     setForm({ kunde: '', titel: '', betrag: '', gueltig: '' })
@@ -384,7 +436,13 @@ function AngeboteTab() {
     showToast(`✅ Angebot "${newAng.id}" wurde als Entwurf erstellt`)
   }
 
-  const handleStatusChange = (id: string, status: Angebot['status']) => {
+  const handleStatusChange = async (id: string, status: Angebot['status']) => {
+    if (!isDemo) {
+      const ang = angebote.find(a => a.id === id)
+      if (ang) {
+        try { await upsertBueroAngebot({ ...ang, status }) } catch { showToast('Fehler beim Speichern', true); return }
+      }
+    }
     setAngebote(prev => prev.map(a => a.id === id ? { ...a, status } : a))
     showToast(`✅ Angebot ${id} wurde auf "${status}" gesetzt`)
   }
@@ -392,8 +450,18 @@ function AngeboteTab() {
   const statusCounts = { Alle: angebote.length, Entwurf: 0, Versendet: 0, Akzeptiert: 0, Abgelehnt: 0 }
   angebote.forEach(a => { statusCounts[a.status]++ })
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: '3px solid rgba(32,200,255,.3)', borderTopColor: '#20c8ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Angebote…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -420,7 +488,7 @@ function AngeboteTab() {
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Kunde *</label>
               <select className="pk-input" value={form.kunde} onChange={e => setForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option value="">Kunde wählen…</option>
-                {initKunden.map(k => <option key={k.id}>{k.name}</option>)}
+                {kunden.map(k => <option key={k.id}>{k.name}</option>)}
               </select>
             </div>
             <div>
@@ -496,12 +564,15 @@ function AngeboteTab() {
 
 // ── Aufträge-Tab ────────────────────────────────────────────────────────────
 
-function AuftraegeTab() {
-  const [auftraege, setAuftraege] = useState<Auftrag[]>(initAuftraege)
+function AuftraegeTab({ isDemo, auftraege, setAuftraege }: { isDemo: boolean; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>> }) {
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
 
   const filtered = auftraege.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
 
@@ -512,7 +583,11 @@ function AuftraegeTab() {
     Pausiert: '#f59e0b',
   }
 
-  const handleAbschliessen = (id: string) => {
+  const handleAbschliessen = async (id: string) => {
+    const auftrag = auftraege.find(a => a.id === id)
+    if (!isDemo && auftrag) {
+      try { await upsertBueroAuftrag({ ...auftrag, status: 'Abgeschlossen', fortschritt: 100 }) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setAuftraege(prev => prev.map(a => a.id === id ? { ...a, status: 'Abgeschlossen', fortschritt: 100 } : a))
     showToast(`✅ Auftrag ${id} wurde als abgeschlossen markiert`)
   }
@@ -522,6 +597,7 @@ function AuftraegeTab() {
 
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
         {(['Alle', 'In Bearbeitung', 'Geplant', 'Pausiert', 'Abgeschlossen'] as const).map(s => (
@@ -569,41 +645,65 @@ function AuftraegeTab() {
 
 // ── Rechnungen-Tab ──────────────────────────────────────────────────────────
 
-function RechnungenTab() {
-  const [rechnungen, setRechnungen] = useState<Rechnung[]>(initRechnungen)
+function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] }) {
+  const [rechnungen, setRechnungen] = useState<Rechnung[]>(isDemo ? demoRechnungen : [])
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [form, setForm] = useState({ kunde: '', betrag: '', faellig: '' })
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  useEffect(() => {
+    if (isDemo) return
+    getBueroRechnungen()
+      .then(data => setRechnungen(data as Rechnung[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Rechnungen'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
 
   const filtered = rechnungen.filter(r => filterStatus === 'Alle' || r.status === filterStatus)
   const counts: Record<string, number> = { Alle: rechnungen.length }
   rechnungen.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1 })
 
-  const handleBezahlt = (id: string) => {
+  const handleBezahlt = async (id: string) => {
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const rechnung = rechnungen.find(r => r.id === id)
+    if (!isDemo && rechnung) {
+      try { await upsertBueroRechnung({ ...rechnung, status: 'Bezahlt', bezahltAm: today }) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setRechnungen(prev => prev.map(r => r.id === id ? { ...r, status: 'Bezahlt', bezahltAm: today } : r))
     showToast(`✅ Rechnung ${id} als bezahlt markiert`)
   }
 
-  const handleMahnung = (id: string) => {
+  const handleMahnung = async (id: string) => {
+    const rechnung = rechnungen.find(r => r.id === id)
+    if (!isDemo && rechnung) {
+      try { await upsertBueroRechnung({ ...rechnung, status: 'Mahnung' }) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setRechnungen(prev => prev.map(r => r.id === id ? { ...r, status: 'Mahnung' } : r))
     showToast(`📮 Mahnung für Rechnung ${id} wurde versendet`)
   }
 
-  const handleNeu = () => {
+  const handleNeu = async () => {
     if (!form.kunde || !form.betrag) return
     const today = new Date()
     const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const newRe: Rechnung = {
-      id: `RE-2025-0${79 + rechnungen.length - initRechnungen.length}`,
+      id: `RE-2025-0${79 + rechnungen.length - demoRechnungen.length}`,
       kunde: form.kunde,
       betrag: form.betrag.includes('€') ? form.betrag : `${form.betrag} €`,
       faellig: form.faellig || fmt(new Date(today.getTime() + 30 * 86400000)),
       erstellt: fmt(today),
       status: 'Offen',
+    }
+    if (!isDemo) {
+      try { await upsertBueroRechnung(newRe) } catch { showToast('Fehler beim Speichern', true); return }
     }
     setRechnungen(prev => [newRe, ...prev])
     setForm({ kunde: '', betrag: '', faellig: '' })
@@ -614,8 +714,18 @@ function RechnungenTab() {
   const offen = rechnungen.filter(r => r.status === 'Offen' || r.status === 'Überfällig' || r.status === 'Mahnung')
   const gesamtOffen = offen.length
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: '3px solid rgba(32,200,255,.3)', borderTopColor: '#20c8ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Rechnungen…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
 
       {gesamtOffen > 0 && (
@@ -652,7 +762,7 @@ function RechnungenTab() {
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Kunde *</label>
               <select className="pk-input" value={form.kunde} onChange={e => setForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option value="">Kunde wählen…</option>
-                {initKunden.map(k => <option key={k.id}>{k.name}</option>)}
+                {kunden.map(k => <option key={k.id}>{k.name}</option>)}
               </select>
             </div>
             <div>
@@ -726,23 +836,51 @@ function RechnungenTab() {
 
 // ── Dokumente-Tab ───────────────────────────────────────────────────────────
 
-function DokumenteTab() {
-  const [dokumente, setDokumente] = useState<Dokument[]>(initDokumente)
+function DokumenteTab({ isDemo }: { isDemo: boolean }) {
+  const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [search, setSearch] = useState('')
   const [filterKat, setFilterKat] = useState<string>('Alle')
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
   const [uploading, setUploading] = useState(false)
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  useEffect(() => {
+    if (isDemo) return
+    getBueroDokumente()
+      .then(data => setDokumente(data as Dokument[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Dokumente'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
 
   const filtered = dokumente.filter(d =>
     (filterKat === 'Alle' || d.kategorie === filterKat) &&
     (d.name.toLowerCase().includes(search.toLowerCase()) || d.bezug.toLowerCase().includes(search.toLowerCase()))
   )
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     setUploading(true)
-    setTimeout(() => {
+    if (isDemo) {
+      setTimeout(() => {
+        const newDoc: Dokument = {
+          id: `DOK-${String(dokumente.length + 1).padStart(3, '0')}`,
+          name: 'Neues_Dokument_Upload.pdf',
+          typ: 'PDF', groesse: '245 KB',
+          datum: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+          kategorie: 'Sonstiges', bezug: '—',
+        }
+        setDokumente(prev => [newDoc, ...prev])
+        setUploading(false)
+        showToast('✅ Dokument erfolgreich hochgeladen und archiviert')
+      }, 1800)
+      return
+    }
+    try {
       const newDoc: Dokument = {
         id: `DOK-${String(dokumente.length + 1).padStart(3, '0')}`,
         name: 'Neues_Dokument_Upload.pdf',
@@ -750,17 +888,29 @@ function DokumenteTab() {
         datum: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
         kategorie: 'Sonstiges', bezug: '—',
       }
-      setDokumente(prev => [newDoc, ...prev])
-      setUploading(false)
+      await insertBueroDokument(newDoc)
+      const data = await getBueroDokumente()
+      setDokumente(data as Dokument[])
       showToast('✅ Dokument erfolgreich hochgeladen und archiviert')
-    }, 1800)
+    } catch { showToast('Fehler beim Hochladen', true) }
+    finally { setUploading(false) }
   }
 
   const kategorieIcon: Record<string, string> = { Angebot: '📋', Rechnung: '💶', Vertrag: '📝', Sonstiges: '📄' }
   const kategorieBadge: Record<string, string> = { Angebot: 'badge-blue', Rechnung: 'badge-orange', Vertrag: 'badge-green', Sonstiges: 'badge-gray' }
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: '3px solid rgba(32,200,255,.3)', borderTopColor: '#20c8ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Dokumente…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <input className="pk-input" placeholder="🔍 Dokumente suchen…" value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 300 }} />
@@ -832,11 +982,34 @@ function DokumenteTab() {
 // ── Haupt-Seite ─────────────────────────────────────────────────────────────
 
 export default function BueroPilotPage() {
+  const [isDemo] = useState(() => hasDemoCookie())
   const [tab, setTab] = useState<Tab>('kunden')
+  const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
+  const [auftraege, setAuftraege] = useState<Auftrag[]>(isDemo ? demoAuftraege : [])
+  const [loading, setLoading] = useState(!isDemo)
+  const [errorMsg, setErrorMsg] = useState('')
 
-  const offeneAngebote = initAngebote.filter(a => a.status === 'Versendet' || a.status === 'Entwurf').length
-  const offeneRechnungen = initRechnungen.filter(r => r.status !== 'Bezahlt').length
-  const laufendeAuftraege = initAuftraege.filter(a => a.status === 'In Bearbeitung').length
+  // Shared data laden (Kunden + Aufträge für Cross-Tab-Referenzen)
+  useEffect(() => {
+    if (isDemo) return
+    Promise.all([getBueroKunden(), getBueroAuftraege()])
+      .then(([k, a]) => { setKunden(k as Kunde[]); setAuftraege(a as Auftrag[]) })
+      .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const offeneAngebote = isDemo ? demoAngebote.filter(a => a.status === 'Versendet' || a.status === 'Entwurf').length : 0
+  const offeneRechnungen = isDemo ? demoRechnungen.filter(r => r.status !== 'Bezahlt').length : 0
+  const laufendeAuftraege = auftraege.filter(a => a.status === 'In Bearbeitung').length
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 32, height: 32, border: '3px solid rgba(32,200,255,.3)', borderTopColor: '#20c8ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade BüroPilot…</div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="fade-in">
@@ -854,10 +1027,12 @@ export default function BueroPilotPage() {
         <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>
       </div>
 
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
+
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 22 }}>
         {[
-          { label: 'Kunden gesamt', value: String(initKunden.filter(k => k.status === 'Aktiv').length), icon: '👥', color: '#20c8ff' },
+          { label: 'Kunden gesamt', value: String(kunden.filter(k => k.status === 'Aktiv').length), icon: '👥', color: '#20c8ff' },
           { label: 'Offene Angebote', value: String(offeneAngebote), icon: '📋', color: '#1684ff' },
           { label: 'Laufende Aufträge', value: String(laufendeAuftraege), icon: '✅', color: '#25d366' },
           { label: 'Offene Rechnungen', value: String(offeneRechnungen), icon: '💶', color: '#f59e0b' },
@@ -872,11 +1047,11 @@ export default function BueroPilotPage() {
 
       <TabBar tab={tab} setTab={setTab} />
 
-      {tab === 'kunden' && <KundenTab />}
-      {tab === 'angebote' && <AngeboteTab />}
-      {tab === 'auftraege' && <AuftraegeTab />}
-      {tab === 'rechnungen' && <RechnungenTab />}
-      {tab === 'dokumente' && <DokumenteTab />}
+      {tab === 'kunden' && <KundenTab isDemo={isDemo} auftraege={auftraege} rechnungen={isDemo ? demoRechnungen : []} />}
+      {tab === 'angebote' && <AngeboteTab isDemo={isDemo} kunden={kunden} />}
+      {tab === 'auftraege' && <AuftraegeTab isDemo={isDemo} auftraege={auftraege} setAuftraege={setAuftraege} />}
+      {tab === 'rechnungen' && <RechnungenTab isDemo={isDemo} kunden={kunden} />}
+      {tab === 'dokumente' && <DokumenteTab isDemo={isDemo} />}
     </div>
   )
 }

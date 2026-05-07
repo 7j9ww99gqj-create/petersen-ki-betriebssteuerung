@@ -1,5 +1,12 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { hasDemoCookie } from '@/lib/auth'
+import {
+  getWerkstattKarten, upsertWerkstattKarte, deleteWerkstattKarte,
+  getWerkstattZeitbuchungen, insertWerkstattZeitbuchung,
+  getWerkstattMaterial, insertWerkstattMaterial,
+  getWerkstattPruefprotokolle, insertWerkstattPruefprotokoll,
+} from '@/lib/db'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
 
@@ -30,7 +37,7 @@ type Pruefprotokoll = {
 
 // ── Demo-Daten ────────────────────────────────────────────────────────────────
 
-const initKarten: Arbeitskarte[] = [
+const demoKarten: Arbeitskarte[] = [
   { id: 'AK-2025-041', auftragsnr: 'A-2025-034', beschreibung: 'Wartung Hydraulikpresse Station 3', mitarbeiter: 'K. Meier', prioritaet: 'Hoch', status: 'In Arbeit', erstellt: '02.05.2025', geplant: '07.05.2025', stunden: 4, fortschritt: 60, maschine: 'HP-Station-3' },
   { id: 'AK-2025-040', auftragsnr: 'A-2025-033', beschreibung: 'Schweißnahtprüfung Stahlträger Charge 1', mitarbeiter: 'M. Fischer', prioritaet: 'Mittel', status: 'In Arbeit', erstellt: '01.05.2025', geplant: '06.05.2025', stunden: 6, fortschritt: 80, maschine: 'Schweißbereich-B' },
   { id: 'AK-2025-039', auftragsnr: 'A-2025-032', beschreibung: 'Fundament Carport Vorbereitung', mitarbeiter: 'T. Schulz', prioritaet: 'Niedrig', status: 'Offen', erstellt: '30.04.2025', geplant: '10.05.2025', stunden: 8, fortschritt: 0, maschine: '—' },
@@ -39,7 +46,7 @@ const initKarten: Arbeitskarte[] = [
   { id: 'AK-2025-036', auftragsnr: 'A-2025-030', beschreibung: 'Druckluftleitung Hauptstrang verlegen', mitarbeiter: 'M. Fischer', prioritaet: 'Mittel', status: 'Fertig', erstellt: '18.04.2025', geplant: '25.04.2025', stunden: 10, fortschritt: 100, maschine: '—' },
 ]
 
-const initZeit: Zeitbuchung[] = [
+const demoZeit: Zeitbuchung[] = [
   { id: 1, mitarbeiter: 'K. Meier', auftragsnr: 'A-2025-034', stunden: 2.5, datum: '06.05.2025', taetigkeit: 'Ölwechsel & Filterreinigung' },
   { id: 2, mitarbeiter: 'M. Fischer', auftragsnr: 'A-2025-033', stunden: 3.0, datum: '06.05.2025', taetigkeit: 'Sichtprüfung Schweißnähte' },
   { id: 3, mitarbeiter: 'T. Schulz', auftragsnr: 'A-2025-034', stunden: 1.5, datum: '05.05.2025', taetigkeit: 'Dichtungsprüfung Zylinder' },
@@ -47,14 +54,14 @@ const initZeit: Zeitbuchung[] = [
   { id: 5, mitarbeiter: 'J. Brand', auftragsnr: 'A-2025-029', stunden: 4.0, datum: '25.04.2025', taetigkeit: 'Schaltplan erstellt & begonnen' },
 ]
 
-const initMaterial: Materialverbrauch[] = [
+const demoMaterial: Materialverbrauch[] = [
   { id: 1, artikel: 'Hydrauliköl HLP46', menge: 12, einheit: 'Liter', auftragsnr: 'A-2025-034', datum: '06.05.2025', mitarbeiter: 'K. Meier' },
   { id: 2, artikel: 'Dichtungsring 50mm', menge: 8, einheit: 'Stk', auftragsnr: 'A-2025-034', datum: '06.05.2025', mitarbeiter: 'K. Meier' },
   { id: 3, artikel: 'Schweißdraht 1.0mm', menge: 3, einheit: 'Rollen', auftragsnr: 'A-2025-033', datum: '05.05.2025', mitarbeiter: 'M. Fischer' },
   { id: 4, artikel: 'Schrauben M8x30', menge: 48, einheit: 'Stk', auftragsnr: 'A-2025-031', datum: '28.04.2025', mitarbeiter: 'K. Meier' },
 ]
 
-const initPruefung: Pruefprotokoll[] = [
+const demoPruefung: Pruefprotokoll[] = [
   { id: 1, auftragsnr: 'A-2025-034', pruefpunkt: 'Hydraulikdruck 250 bar', ergebnis: 'OK', pruefer: 'K. Meier', datum: '06.05.2025' },
   { id: 2, auftragsnr: 'A-2025-034', pruefpunkt: 'Dichtheitsprüfung Zylinder', ergebnis: 'OK', pruefer: 'K. Meier', datum: '06.05.2025' },
   { id: 3, auftragsnr: 'A-2025-033', pruefpunkt: 'Schweißnaht Sichtprüfung', ergebnis: 'OK', pruefer: 'M. Fischer', datum: '05.05.2025' },
@@ -104,18 +111,31 @@ function Toast({ msg }: { msg: string }) {
 
 // ── Arbeitskarten-Tab ─────────────────────────────────────────────────────────
 
-function ArbeitskartentTab() {
-  const [karten, setKarten] = useState<Arbeitskarte[]>(initKarten)
+function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
+  const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [filterPrio, setFilterPrio] = useState<string>('Alle')
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
   const [form, setForm] = useState({
     auftragsnr: '', beschreibung: '', mitarbeiter: '', prioritaet: 'Mittel' as Prioritaet,
     status: 'Offen' as AKStatus, geplant: '', stunden: '', maschine: '',
   })
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  useEffect(() => {
+    if (isDemo) return
+    getWerkstattKarten()
+      .then(data => setKarten(data as Arbeitskarte[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Arbeitskarten'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
 
   const filtered = karten.filter(k =>
     (filterStatus === 'Alle' || k.status === filterStatus) &&
@@ -128,15 +148,18 @@ function ArbeitskartentTab() {
     counts[k.prioritaet] = (counts[k.prioritaet] || 0) + 1
   })
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.auftragsnr || !form.beschreibung || !form.mitarbeiter) return
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    const nextId = `AK-2025-0${42 + karten.length - initKarten.length}`
+    const nextId = `AK-2025-0${42 + karten.length - demoKarten.length}`
     const newKarte: Arbeitskarte = {
       id: nextId, auftragsnr: form.auftragsnr, beschreibung: form.beschreibung,
       mitarbeiter: form.mitarbeiter, prioritaet: form.prioritaet, status: form.status,
       erstellt: today, geplant: form.geplant || '—', stunden: Number(form.stunden) || 0,
       fortschritt: 0, maschine: form.maschine || '—',
+    }
+    if (!isDemo) {
+      try { await upsertWerkstattKarte(newKarte) } catch { showToast('Fehler beim Speichern', true); return }
     }
     setKarten(prev => [newKarte, ...prev])
     setForm({ auftragsnr: '', beschreibung: '', mitarbeiter: '', prioritaet: 'Mittel', status: 'Offen', geplant: '', stunden: '', maschine: '' })
@@ -144,7 +167,12 @@ function ArbeitskartentTab() {
     showToast(`✅ Arbeitskarte ${nextId} wurde erfolgreich erstellt`)
   }
 
-  const handleStatusChange = (id: string, status: AKStatus) => {
+  const handleStatusChange = async (id: string, status: AKStatus) => {
+    const karte = karten.find(k => k.id === id)
+    if (!isDemo && karte) {
+      const updated = { ...karte, status, fortschritt: status === 'Fertig' ? 100 : karte.fortschritt }
+      try { await upsertWerkstattKarte(updated) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setKarten(prev => prev.map(k => k.id === id
       ? { ...k, status, fortschritt: status === 'Fertig' ? 100 : k.fortschritt }
       : k
@@ -152,8 +180,18 @@ function ArbeitskartentTab() {
     showToast(`✅ ${id}: Status auf "${status}" gesetzt`)
   }
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: '3px solid rgba(167,139,250,.3)', borderTopColor: '#a78bfa', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Arbeitskarten…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
 
       {/* Filter + New Button */}
@@ -305,32 +343,60 @@ function ArbeitskartentTab() {
 
 // ── Zeiterfassung-Tab ─────────────────────────────────────────────────────────
 
-function ZeiterfassungTab() {
-  const [buchungen, setBuchungen] = useState<Zeitbuchung[]>(initZeit)
+function ZeiterfassungTab({ isDemo }: { isDemo: boolean }) {
+  const [buchungen, setBuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])
   const [form, setForm] = useState({ mitarbeiter: '', auftragsnr: '', stunden: '', taetigkeit: '' })
   const [toast, setToast] = useState('')
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
 
-  const gesamtHeute = buchungen.filter(b => b.datum === '06.05.2025').reduce((s, b) => s + b.stunden, 0)
+  useEffect(() => {
+    if (isDemo) return
+    getWerkstattZeitbuchungen()
+      .then(data => setBuchungen(data as Zeitbuchung[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Zeitbuchungen'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
+
+  const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const gesamtHeute = buchungen.filter(b => b.datum === today).reduce((s, b) => s + b.stunden, 0)
   const gesamtAlle = buchungen.reduce((s, b) => s + b.stunden, 0)
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.mitarbeiter || !form.auftragsnr || !form.stunden) return
-    const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    setBuchungen(prev => [{ id: Date.now(), ...form, stunden: Number(form.stunden), datum: today }, ...prev])
+    const newBuchung: Zeitbuchung = { id: Date.now(), ...form, stunden: Number(form.stunden), datum: today }
+    if (!isDemo) {
+      try { await insertWerkstattZeitbuchung(newBuchung) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setBuchungen(prev => [newBuchung, ...prev])
     setForm({ mitarbeiter: '', auftragsnr: '', stunden: '', taetigkeit: '' })
     showToast(`✅ ${form.stunden}h für ${form.mitarbeiter} auf ${form.auftragsnr} gebucht`)
   }
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: '3px solid rgba(167,139,250,.3)', borderTopColor: '#a78bfa', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Zeitbuchungen…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
           { label: 'Stunden heute', value: `${gesamtHeute}h`, icon: '⏱️', color: '#a78bfa' },
           { label: 'Stunden gesamt', value: `${gesamtAlle}h`, icon: '📊', color: '#1684ff' },
           { label: 'Mitarbeiter aktiv', value: '4', icon: '👷', color: '#10b981' },
-          { label: 'Buchungen heute', value: String(buchungen.filter(b => b.datum === '06.05.2025').length), icon: '📋', color: '#f59e0b' },
+          { label: 'Buchungen heute', value: String(buchungen.filter(b => b.datum === today).length), icon: '📋', color: '#f59e0b' },
         ].map(s => (
           <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
             <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
@@ -398,22 +464,50 @@ function ZeiterfassungTab() {
 
 // ── Materialverbrauch-Tab ────────────────────────────────────────────────────
 
-function MaterialverbrauchTab() {
-  const [material, setMaterial] = useState<Materialverbrauch[]>(initMaterial)
+function MaterialverbrauchTab({ isDemo }: { isDemo: boolean }) {
+  const [material, setMaterial] = useState<Materialverbrauch[]>(isDemo ? demoMaterial : [])
   const [form, setForm] = useState({ artikel: '', menge: '', einheit: 'Stk', auftragsnr: '', mitarbeiter: '' })
   const [toast, setToast] = useState('')
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
 
-  const handleSave = () => {
+  useEffect(() => {
+    if (isDemo) return
+    getWerkstattMaterial()
+      .then(data => setMaterial(data as Materialverbrauch[]))
+      .catch(() => setErrorMsg('Fehler beim Laden des Materialverbrauchs'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
+
+  const handleSave = async () => {
     if (!form.artikel || !form.menge || !form.auftragsnr) return
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    setMaterial(prev => [{ id: Date.now(), ...form, menge: Number(form.menge), datum: today }, ...prev])
+    const newEntry: Materialverbrauch = { id: Date.now(), ...form, menge: Number(form.menge), datum: today }
+    if (!isDemo) {
+      try { await insertWerkstattMaterial(newEntry) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setMaterial(prev => [newEntry, ...prev])
     setForm({ artikel: '', menge: '', einheit: 'Stk', auftragsnr: '', mitarbeiter: '' })
     showToast(`✅ Verbrauch "${form.artikel}" (${form.menge} ${form.einheit}) gebucht`)
   }
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: '3px solid rgba(167,139,250,.3)', borderTopColor: '#a78bfa', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Materialverbrauch…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div className="pk-card fade-in" style={{ marginBottom: 16, border: '1px solid rgba(167,139,250,.2)' }}>
         <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 800 }}>🔩 Materialverbrauch buchen</h3>
@@ -479,21 +573,45 @@ function MaterialverbrauchTab() {
 
 // ── Qualitätskontrolle-Tab ────────────────────────────────────────────────────
 
-function QualitaetTab() {
-  const [protokolle, setProtokolle] = useState<Pruefprotokoll[]>(initPruefung)
+function QualitaetTab({ isDemo }: { isDemo: boolean }) {
+  const [protokolle, setProtokolle] = useState<Pruefprotokoll[]>(isDemo ? demoPruefung : [])
   const [form, setForm] = useState({ auftragsnr: '', pruefpunkt: '', pruefer: '' })
   const [toast, setToast] = useState('')
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
 
-  const handleErgebnis = (id: number, ergebnis: 'OK' | 'Fehler') => {
+  useEffect(() => {
+    if (isDemo) return
+    getWerkstattPruefprotokolle()
+      .then(data => setProtokolle(data as Pruefprotokoll[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Prüfprotokolle'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
+
+  const handleErgebnis = async (id: number, ergebnis: 'OK' | 'Fehler') => {
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    if (!isDemo) {
+      const p = protokolle.find(p => p.id === id)
+      if (p) {
+        try { await insertWerkstattPruefprotokoll({ ...p, ergebnis, datum: today }) } catch { showToast('Fehler beim Speichern', true); return }
+      }
+    }
     setProtokolle(prev => prev.map(p => p.id === id ? { ...p, ergebnis, datum: today } : p))
     showToast(ergebnis === 'OK' ? `✅ Prüfpunkt bestanden` : `⚠️ Fehler protokolliert`)
   }
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!form.auftragsnr || !form.pruefpunkt) return
-    setProtokolle(prev => [{ id: Date.now(), ...form, ergebnis: 'Offen', datum: '—' }, ...prev])
+    const newP: Pruefprotokoll = { id: Date.now(), ...form, ergebnis: 'Offen', datum: '—' }
+    if (!isDemo) {
+      try { await insertWerkstattPruefprotokoll(newP) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setProtokolle(prev => [newP, ...prev])
     setForm({ auftragsnr: '', pruefpunkt: '', pruefer: '' })
     showToast('✅ Prüfpunkt hinzugefügt')
   }
@@ -502,8 +620,18 @@ function QualitaetTab() {
   const fehler = protokolle.filter(p => p.ergebnis === 'Fehler').length
   const offen = protokolle.filter(p => p.ergebnis === 'Offen').length
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: '3px solid rgba(167,139,250,.3)', borderTopColor: '#a78bfa', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Prüfprotokolle…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
         <div className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
@@ -593,11 +721,34 @@ function QualitaetTab() {
 type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet'
 
 export default function WerkstattPilotPage() {
+  const [isDemo] = useState(() => hasDemoCookie())
   const [tab, setTab] = useState<Tab>('karten')
+  const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
+  const [zeitbuchungen, setZeitbuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])
+  const [loading, setLoading] = useState(!isDemo)
+  const [errorMsg, setErrorMsg] = useState('')
 
-  const offeneKarten = initKarten.filter(k => k.status !== 'Fertig' && k.status !== 'Storniert').length
-  const kritisch = initKarten.filter(k => k.prioritaet === 'Kritisch' && k.status !== 'Fertig').length
-  const heuteStunden = initZeit.filter(b => b.datum === '06.05.2025').reduce((s, b) => s + b.stunden, 0)
+  useEffect(() => {
+    if (isDemo) return
+    Promise.all([getWerkstattKarten(), getWerkstattZeitbuchungen()])
+      .then(([k, z]) => { setKarten(k as Arbeitskarte[]); setZeitbuchungen(z as Zeitbuchung[]) })
+      .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const offeneKarten = karten.filter(k => k.status !== 'Fertig' && k.status !== 'Storniert').length
+  const kritisch = karten.filter(k => k.prioritaet === 'Kritisch' && k.status !== 'Fertig').length
+  const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const heuteStunden = zeitbuchungen.filter(b => b.datum === today).reduce((s, b) => s + b.stunden, 0)
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 32, height: 32, border: '3px solid rgba(167,139,250,.3)', borderTopColor: '#a78bfa', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade WerkstattPilot…</div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="fade-in">
@@ -614,6 +765,8 @@ export default function WerkstattPilotPage() {
         </div>
         <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>
       </div>
+
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 22 }}>
@@ -647,10 +800,10 @@ export default function WerkstattPilotPage() {
         ))}
       </div>
 
-      {tab === 'karten' && <ArbeitskartentTab />}
-      {tab === 'zeit' && <ZeiterfassungTab />}
-      {tab === 'material' && <MaterialverbrauchTab />}
-      {tab === 'qualitaet' && <QualitaetTab />}
+      {tab === 'karten' && <ArbeitskartentTab isDemo={isDemo} />}
+      {tab === 'zeit' && <ZeiterfassungTab isDemo={isDemo} />}
+      {tab === 'material' && <MaterialverbrauchTab isDemo={isDemo} />}
+      {tab === 'qualitaet' && <QualitaetTab isDemo={isDemo} />}
     </div>
   )
 }

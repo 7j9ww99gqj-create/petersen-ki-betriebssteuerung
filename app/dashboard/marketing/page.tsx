@@ -1,5 +1,11 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { hasDemoCookie } from '@/lib/auth'
+import {
+  getMarketingKampagnen, upsertMarketingKampagne,
+  getMarketingLeads, upsertMarketingLead,
+  getMarketingNewsletter, upsertMarketingNewsletter,
+} from '@/lib/db'
 
 // ── Typen ─────────────────────────────────────────────────────────────────────
 
@@ -27,7 +33,7 @@ type Newsletter = {
 
 // ── Demo-Daten ────────────────────────────────────────────────────────────────
 
-const initKampagnen: Kampagne[] = [
+const demoKampagnen: Kampagne[] = [
   { id: 'KMP-001', name: 'Frühjahrs-Aktion 2025', typ: 'E-Mail', status: 'Aktiv', zielgruppe: 'Bestandskunden', start: '01.04.2025', ende: '31.05.2025', empfaenger: 234, geoeffnet: 89, geklickt: 41, konversionen: 12, budget: '800 €' },
   { id: 'KMP-002', name: 'LinkedIn Reichweite Mai', typ: 'Social Media', status: 'Aktiv', zielgruppe: 'B2B-Neukunden', start: '01.05.2025', ende: '31.05.2025', empfaenger: 1840, geoeffnet: 612, geklickt: 188, konversionen: 7, budget: '350 €' },
   { id: 'KMP-003', name: 'Monatlicher Newsletter', typ: 'Newsletter', status: 'Abgeschlossen', zielgruppe: 'Alle Kunden', start: '01.04.2025', ende: '01.04.2025', empfaenger: 312, geoeffnet: 141, geklickt: 58, konversionen: 9, budget: '0 €' },
@@ -35,7 +41,7 @@ const initKampagnen: Kampagne[] = [
   { id: 'KMP-005', name: 'Messe-Nachfass-Mail', typ: 'E-Mail', status: 'Pausiert', zielgruppe: 'Messekontakte', start: '15.03.2025', ende: '15.04.2025', empfaenger: 67, geoeffnet: 18, geklickt: 6, konversionen: 1, budget: '0 €' },
 ]
 
-const initLeads: Lead[] = [
+const demoLeads: Lead[] = [
   { id: 'LD-001', name: 'Peter Braun', firma: 'Braun Metall GmbH', email: 'p.braun@braun-metall.de', telefon: '040 55512', quelle: 'Website', status: 'Qualifiziert', wert: '15.000 €', erstellt: '28.04.2025', betreuer: 'K. Petersen' },
   { id: 'LD-002', name: 'Maria Vogel', firma: 'Vogel Technik KG', email: 'm.vogel@vogeltech.de', telefon: '0511 8834', quelle: 'Messe', status: 'Angebot', wert: '8.200 €', erstellt: '22.04.2025', betreuer: 'K. Petersen' },
   { id: 'LD-003', name: 'Klaus Werner', firma: 'Einzelkunde', email: 'k.werner@gmail.com', telefon: '0172 3314455', quelle: 'Empfehlung', status: 'Kontaktiert', wert: '2.400 €', erstellt: '15.04.2025', betreuer: 'M. Fischer' },
@@ -44,7 +50,7 @@ const initLeads: Lead[] = [
   { id: 'LD-006', name: 'Stadt Logistik AG', firma: 'Stadt Logistik AG', email: 'info@stadtlog.de', telefon: '0211 77700', quelle: 'Website', status: 'Verloren', wert: '18.500 €', erstellt: '01.03.2025', betreuer: 'K. Petersen' },
 ]
 
-const initNewsletter: Newsletter[] = [
+const demoNewsletter: Newsletter[] = [
   { id: 'NL-006', betreff: 'Mai-News: Neue KI-Funktionen & Sommer-Angebote', vorschau: 'Entdecken Sie unsere neuesten Entwicklungen…', empfaenger: 312, datum: '01.05.2025', status: 'Entwurf', oeffnungsrate: 0, klickrate: 0 },
   { id: 'NL-005', betreff: 'April: Frühjahrs-Aktion startet jetzt!', vorschau: 'Nur bis Ende April: 10% Rabatt auf alle Wartungsverträge…', empfaenger: 312, datum: '01.04.2025', status: 'Versendet', oeffnungsrate: 45.2, klickrate: 18.6 },
   { id: 'NL-004', betreff: 'März: Messennachbericht & neue Referenzen', vorschau: 'Wir berichten von der Hannover Messe und stellen neue Kunden vor…', empfaenger: 298, datum: '01.03.2025', status: 'Versendet', oeffnungsrate: 38.7, klickrate: 12.4 },
@@ -87,20 +93,33 @@ function PctBar({ value, color }: { value: number; color: string }) {
 
 // ── Kampagnen-Tab ─────────────────────────────────────────────────────────────
 
-function KampagnenTab() {
-  const [kampagnen, setKampagnen] = useState<Kampagne[]>(initKampagnen)
+function KampagnenTab({ isDemo }: { isDemo: boolean }) {
+  const [kampagnen, setKampagnen] = useState<Kampagne[]>(isDemo ? demoKampagnen : [])
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState('Alle')
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
   const [form, setForm] = useState({ name: '', typ: 'E-Mail', zielgruppe: '', start: '', ende: '', budget: '' })
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  useEffect(() => {
+    if (isDemo) return
+    getMarketingKampagnen()
+      .then(data => setKampagnen(data as Kampagne[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Kampagnen'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
 
   const filtered = kampagnen.filter(k => filterStatus === 'Alle' || k.status === filterStatus)
   const counts: Record<string, number> = { Alle: kampagnen.length }
   kampagnen.forEach(k => { counts[k.status] = (counts[k.status] || 0) + 1 })
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name || !form.zielgruppe) return
     const newK: Kampagne = {
       id: `KMP-00${kampagnen.length + 1}`, name: form.name,
@@ -109,19 +128,36 @@ function KampagnenTab() {
       empfaenger: 0, geoeffnet: 0, geklickt: 0, konversionen: 0,
       budget: form.budget ? `${form.budget} €` : '0 €',
     }
+    if (!isDemo) {
+      try { await upsertMarketingKampagne(newK) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setKampagnen(prev => [newK, ...prev])
     setForm({ name: '', typ: 'E-Mail', zielgruppe: '', start: '', ende: '', budget: '' })
     setShowForm(false)
     showToast(`✅ Kampagne "${newK.name}" als Entwurf angelegt`)
   }
 
-  const handleStatus = (id: string, status: KampagneStatus) => {
+  const handleStatus = async (id: string, status: KampagneStatus) => {
+    const k = kampagnen.find(k => k.id === id)
+    if (!isDemo && k) {
+      try { await upsertMarketingKampagne({ ...k, status }) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setKampagnen(prev => prev.map(k => k.id === id ? { ...k, status } : k))
     showToast(`✅ Kampagne auf "${status}" gesetzt`)
   }
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Kampagnen…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -229,15 +265,28 @@ function KampagnenTab() {
 
 // ── Leads-Tab ─────────────────────────────────────────────────────────────────
 
-function LeadsTab() {
-  const [leads, setLeads] = useState<Lead[]>(initLeads)
+function LeadsTab({ isDemo }: { isDemo: boolean }) {
+  const [leads, setLeads] = useState<Lead[]>(isDemo ? demoLeads : [])
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState('Alle')
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
   const [form, setForm] = useState({ name: '', firma: '', email: '', telefon: '', quelle: 'Website', wert: '', betreuer: '' })
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  useEffect(() => {
+    if (isDemo) return
+    getMarketingLeads()
+      .then(data => setLeads(data as Lead[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Leads'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
 
   const filtered = leads.filter(l =>
     (filterStatus === 'Alle' || l.status === filterStatus) &&
@@ -246,7 +295,7 @@ function LeadsTab() {
   const counts: Record<string, number> = { Alle: leads.length }
   leads.forEach(l => { counts[l.status] = (counts[l.status] || 0) + 1 })
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name || !form.email) return
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const newL: Lead = {
@@ -254,21 +303,38 @@ function LeadsTab() {
       quelle: form.quelle as LeadQuelle, status: 'Neu',
       wert: form.wert ? `${form.wert} €` : '—', erstellt: today,
     }
+    if (!isDemo) {
+      try { await upsertMarketingLead(newL) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setLeads(prev => [newL, ...prev])
     setForm({ name: '', firma: '', email: '', telefon: '', quelle: 'Website', wert: '', betreuer: '' })
     setShowForm(false)
     showToast(`✅ Lead "${newL.name}" wurde angelegt`)
   }
 
-  const handleStatusChange = (id: string, status: LeadStatus) => {
+  const handleStatusChange = async (id: string, status: LeadStatus) => {
+    const lead = leads.find(l => l.id === id)
+    if (!isDemo && lead) {
+      try { await upsertMarketingLead({ ...lead, status }) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
     showToast(`✅ Lead-Status auf "${status}" gesetzt`)
   }
 
   const pipeline: LeadStatus[] = ['Neu', 'Kontaktiert', 'Qualifiziert', 'Angebot', 'Gewonnen', 'Verloren']
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Leads…</div>
+      </div>
+    </div>
+  )
+
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
 
       {/* Pipeline Visual */}
@@ -383,15 +449,28 @@ function LeadsTab() {
 
 // ── Newsletter-Tab ────────────────────────────────────────────────────────────
 
-function NewsletterTab() {
-  const [newsletter, setNewsletter] = useState<Newsletter[]>(initNewsletter)
+function NewsletterTab({ isDemo }: { isDemo: boolean }) {
+  const [newsletter, setNewsletter] = useState<Newsletter[]>(isDemo ? demoNewsletter : [])
   const [showForm, setShowForm] = useState(false)
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [loading, setLoading] = useState(!isDemo)
   const [form, setForm] = useState({ betreff: '', vorschau: '', datum: '' })
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000) }
+  useEffect(() => {
+    if (isDemo) return
+    getMarketingNewsletter()
+      .then(data => setNewsletter(data as Newsletter[]))
+      .catch(() => setErrorMsg('Fehler beim Laden der Newsletter'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
 
-  const handleSave = () => {
+  const showToast = (msg: string, error = false) => {
+    if (error) setErrorMsg(msg); else setToast(msg)
+    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+  }
+
+  const handleSave = async () => {
     if (!form.betreff) return
     const newNL: Newsletter = {
       id: `NL-00${newsletter.length + 1}`, betreff: form.betreff,
@@ -399,22 +478,40 @@ function NewsletterTab() {
       empfaenger: 312, datum: form.datum || new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
       status: 'Entwurf', oeffnungsrate: 0, klickrate: 0,
     }
+    if (!isDemo) {
+      try { await upsertMarketingNewsletter(newNL) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setNewsletter(prev => [newNL, ...prev])
     setForm({ betreff: '', vorschau: '', datum: '' })
     setShowForm(false)
     showToast(`✅ Newsletter "${newNL.betreff.substring(0, 40)}…" als Entwurf gespeichert`)
   }
 
-  const handleVersenden = (id: string) => {
+  const handleVersenden = async (id: string) => {
+    const nl = newsletter.find(n => n.id === id)
+    const updated = nl ? { ...nl, status: 'Versendet' as const, oeffnungsrate: 34 + Math.random() * 15, klickrate: 10 + Math.random() * 8 } : null
+    if (!isDemo && updated) {
+      try { await upsertMarketingNewsletter(updated) } catch { showToast('Fehler beim Versenden', true); return }
+    }
     setNewsletter(prev => prev.map(n => n.id === id
       ? { ...n, status: 'Versendet', oeffnungsrate: 34 + Math.random() * 15, klickrate: 10 + Math.random() * 8 }
       : n
     ))
-    showToast('✅ Newsletter wurde versendet (Demo-Simulation)')
+    showToast('✅ Newsletter wurde versendet' + (isDemo ? ' (Demo-Simulation)' : ''))
   }
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 28, height: 28, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Newsletter…</div>
+      </div>
+    </div>
+  )
 
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
 
       {/* Stats */}
@@ -504,17 +601,17 @@ function NewsletterTab() {
 
 // ── Auswertungen-Tab ──────────────────────────────────────────────────────────
 
-function AuswertungenTab() {
-  const gesamtLeads = initLeads.length
-  const gewonneneLeads = initLeads.filter(l => l.status === 'Gewonnen').length
-  const konvRate = ((gewonneneLeads / gesamtLeads) * 100).toFixed(1)
-  const pipelineWert = initLeads.filter(l => !['Gewonnen', 'Verloren'].includes(l.status))
+function AuswertungenTab({ leads, kampagnen }: { leads: Lead[]; kampagnen: Kampagne[] }) {
+  const gesamtLeads = leads.length
+  const gewonneneLeads = leads.filter(l => l.status === 'Gewonnen').length
+  const konvRate = gesamtLeads > 0 ? ((gewonneneLeads / gesamtLeads) * 100).toFixed(1) : '0.0'
+  const pipelineWert = leads.filter(l => !['Gewonnen', 'Verloren'].includes(l.status))
     .reduce((s, l) => s + parseFloat(l.wert.replace(/[^0-9.]/g, '') || '0'), 0)
 
   const quellenStats = ['Website', 'Empfehlung', 'Messe', 'Social Media', 'Kaltakquise'].map(q => ({
     quelle: q,
-    count: initLeads.filter(l => l.quelle === q).length,
-    gewonnen: initLeads.filter(l => l.quelle === q && l.status === 'Gewonnen').length,
+    count: leads.filter(l => l.quelle === q).length,
+    gewonnen: leads.filter(l => l.quelle === q && l.status === 'Gewonnen').length,
   }))
 
   return (
@@ -525,7 +622,7 @@ function AuswertungenTab() {
           { label: 'Gewonnen', value: String(gewonneneLeads), icon: '🏆', color: '#10b981' },
           { label: 'Konversionsrate', value: `${konvRate}%`, icon: '📈', color: '#1684ff' },
           { label: 'Pipeline-Wert', value: `${pipelineWert.toLocaleString('de-DE')} €`, icon: '💶', color: '#a78bfa' },
-          { label: 'Aktive Kampagnen', value: String(initKampagnen.filter(k => k.status === 'Aktiv').length), icon: '📣', color: COLOR },
+          { label: 'Aktive Kampagnen', value: String(kampagnen.filter(k => k.status === 'Aktiv').length), icon: '📣', color: COLOR },
           { label: 'Ø Öffnungsrate', value: '41.7%', icon: '👁️', color: '#10b981' },
         ].map(s => (
           <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
@@ -545,14 +642,14 @@ function AuswertungenTab() {
                 <span style={{ fontWeight: 600 }}>{q.quelle}</span>
                 <span style={{ color: '#aeb9c8' }}>{q.count} Leads · {q.gewonnen} gewonnen</span>
               </div>
-              <PctBar value={(q.count / gesamtLeads) * 100} color={COLOR} />
+              <PctBar value={gesamtLeads > 0 ? (q.count / gesamtLeads) * 100 : 0} color={COLOR} />
             </div>
           ))}
         </div>
 
         <div className="pk-card">
           <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📣 Kampagnen-Performance</h3>
-          {initKampagnen.filter(k => k.empfaenger > 0).map(k => {
+          {kampagnen.filter(k => k.empfaenger > 0).map(k => {
             const rate = ((k.geoeffnet / k.empfaenger) * 100).toFixed(1)
             return (
               <div key={k.id} style={{ marginBottom: 14 }}>
@@ -575,11 +672,34 @@ function AuswertungenTab() {
 type Tab = 'kampagnen' | 'leads' | 'newsletter' | 'auswertungen'
 
 export default function MarketingPilotPage() {
+  const [isDemo] = useState(() => hasDemoCookie())
   const [tab, setTab] = useState<Tab>('kampagnen')
-  const aktiveKampagnen = initKampagnen.filter(k => k.status === 'Aktiv').length
-  const neueLeads = initLeads.filter(l => l.status === 'Neu').length
-  const gesamtLeads = initLeads.length
+  const [kampagnen, setKampagnen] = useState<Kampagne[]>(isDemo ? demoKampagnen : [])
+  const [leads, setLeads] = useState<Lead[]>(isDemo ? demoLeads : [])
+  const [loading, setLoading] = useState(!isDemo)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    if (isDemo) return
+    Promise.all([getMarketingKampagnen(), getMarketingLeads()])
+      .then(([k, l]) => { setKampagnen(k as Kampagne[]); setLeads(l as Lead[]) })
+      .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
+      .finally(() => setLoading(false))
+  }, [isDemo])
+
+  const aktiveKampagnen = kampagnen.filter(k => k.status === 'Aktiv').length
+  const neueLeads = leads.filter(l => l.status === 'Neu').length
+  const gesamtLeads = leads.length
   const gesamtEmpfaenger = 1240
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 32, height: 32, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade MarketingPilot…</div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="fade-in">
@@ -591,6 +711,8 @@ export default function MarketingPilotPage() {
         </div>
         <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>
       </div>
+
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 22 }}>
         {[
@@ -622,10 +744,10 @@ export default function MarketingPilotPage() {
         ))}
       </div>
 
-      {tab === 'kampagnen' && <KampagnenTab />}
-      {tab === 'leads' && <LeadsTab />}
-      {tab === 'newsletter' && <NewsletterTab />}
-      {tab === 'auswertungen' && <AuswertungenTab />}
+      {tab === 'kampagnen' && <KampagnenTab isDemo={isDemo} />}
+      {tab === 'leads' && <LeadsTab isDemo={isDemo} />}
+      {tab === 'newsletter' && <NewsletterTab isDemo={isDemo} />}
+      {tab === 'auswertungen' && <AuswertungenTab leads={leads} kampagnen={kampagnen} />}
     </div>
   )
 }
