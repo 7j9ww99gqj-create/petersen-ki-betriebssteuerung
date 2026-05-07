@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
-import { DEMO_EMAIL, DEMO_PASSWORD } from '@/lib/auth'
+import { DEMO_EMAIL, DEMO_PASSWORD, setDemoCookie } from '@/lib/auth'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -13,46 +13,63 @@ export default function LoginPage() {
   const [demoLoading, setDemoLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function signIn(loginEmail: string, loginPassword: string, isDemo = false) {
-    isDemo ? setDemoLoading(true) : setLoading(true)
+  const handleDemo = () => {
+    setDemoLoading(true)
+    setError('')
+    // Demo works 100% client-side – no Supabase needed
+    if (email === DEMO_EMAIL || email === '') {
+      if (password === DEMO_PASSWORD || password === '') {
+        setDemoCookie()
+        router.push('/dashboard')
+        return
+      }
+    }
+    // Wrong credentials entered for demo
+    setError('Demo-Zugangsdaten: demo@petersen-ki.de / Demo1234!')
+    setDemoLoading(false)
+  }
+
+  async function signInWithSupabase() {
+    setLoading(true)
     setError('')
 
     if (!isSupabaseConfigured()) {
-      setError('Supabase ist nicht konfiguriert. Bitte NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY setzen.')
-      isDemo ? setDemoLoading(false) : setLoading(false)
+      setError('Supabase ist nicht konfiguriert. Bitte NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY in den Vercel-Umgebungsvariablen setzen.')
+      setLoading(false)
       return
     }
 
     try {
       const supabase = createSupabaseClient()
       const { error: authError } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password: loginPassword,
+        email,
+        password,
       })
-
       if (authError) {
-        // Show the real Supabase error – helps diagnose issues
         setError(authError.message)
         return
       }
-
       router.push('/dashboard')
       router.refresh()
     } catch (e) {
       setError('Verbindungsfehler. Bitte Internetverbindung prüfen.')
       console.error(e)
     } finally {
-      isDemo ? setDemoLoading(false) : setLoading(false)
+      setLoading(false)
     }
   }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email || !password) { setError('Bitte E-Mail und Passwort eingeben.'); return }
-    await signIn(email, password)
+    // Demo credentials → use local session (no Supabase)
+    if (email.toLowerCase() === DEMO_EMAIL && password === DEMO_PASSWORD) {
+      setDemoCookie()
+      router.push('/dashboard')
+      return
+    }
+    await signInWithSupabase()
   }
-
-  const handleDemo = () => signIn(DEMO_EMAIL, DEMO_PASSWORD, true)
 
   return (
     <div style={{
@@ -66,7 +83,6 @@ export default function LoginPage() {
       }} />
 
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }} className="fade-in">
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{
             width: 80, height: 80, borderRadius: 20, margin: '0 auto 18px', overflow: 'hidden',
@@ -111,14 +127,7 @@ export default function LoginPage() {
                 marginBottom: 16, padding: '10px 14px', borderRadius: 10,
                 background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)',
                 color: '#ff8080', fontSize: 13, lineHeight: 1.5,
-              }}>
-                {error}
-                {error.includes('Email not confirmed') && (
-                  <div style={{ marginTop: 8, fontSize: 12, color: '#ffb0b0' }}>
-                    → Bitte bestätigen Sie Ihre E-Mail-Adresse (Link in der Registrierungs-E-Mail).
-                  </div>
-                )}
-              </div>
+              }}>{error}</div>
             )}
 
             <button type="submit" className="pk-btn" disabled={loading || demoLoading}
@@ -127,29 +136,32 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Register link */}
-          <div style={{ marginTop: 16, textAlign: 'center' }}>
+          <div style={{ marginTop: 14, textAlign: 'center' }}>
             <span style={{ fontSize: 13, color: '#aeb9c8' }}>Noch kein Konto?{' '}</span>
             <button onClick={() => router.push('/register')} style={{
               background: 'none', border: 'none', cursor: 'pointer',
               color: '#6cb6ff', fontSize: 13, fontWeight: 700, textDecoration: 'underline',
-            }}>
-              Konto erstellen
-            </button>
+            }}>Konto erstellen</button>
           </div>
 
-          {/* Divider */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 16px' }}>
             <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
             <span style={{ fontSize: 12, color: '#4a5568' }}>oder</span>
             <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
           </div>
 
-          {/* Demo button */}
           <button onClick={handleDemo} disabled={loading || demoLoading} className="pk-btn-ghost"
             style={{ width: '100%', minHeight: 44, fontWeight: 700, fontSize: 14 }}>
             {demoLoading ? <Spinner text="Demo wird geladen…" /> : '🎯 Demo-Zugang verwenden'}
           </button>
+
+          <div style={{
+            marginTop: 14, padding: '10px 14px', borderRadius: 10,
+            background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)',
+            fontSize: 12, color: '#4a5568', textAlign: 'center',
+          }}>
+            Demo: <span style={{ color: '#aeb9c8' }}>demo@petersen-ki.de</span> / <span style={{ color: '#aeb9c8' }}>Demo1234!</span>
+          </div>
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: '#4a5568' }}>

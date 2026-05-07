@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import NotificationBell from '@/components/NotificationBell'
 import GlobalSearch from '@/components/GlobalSearch'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
+import { hasDemoCookie } from '@/lib/auth'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -12,33 +13,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [userName, setUserName] = useState('')
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      // No Supabase → show dashboard without auth (dev mode)
+    // Demo cookie → immediate access, no Supabase needed
+    if (hasDemoCookie()) {
+      setUserName('Demo')
       setChecked(true)
       return
     }
 
-    let subscription: { unsubscribe: () => void } | null = null
+    // Supabase auth for real users
+    if (!isSupabaseConfigured()) {
+      router.push('/login')
+      return
+    }
 
+    let subscription: { unsubscribe: () => void } | null = null
     try {
       const supabase = createSupabaseClient()
 
       supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session) {
-          router.push('/login')
-          return
-        }
+        if (!session) { router.push('/login'); return }
         const email = session.user.email ?? ''
         setUserName(email.split('@')[0] || email)
         setChecked(true)
-      }).catch(() => {
-        router.push('/login')
-      })
+      }).catch(() => router.push('/login'))
 
       const { data } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_OUT' || !session) {
-          router.push('/login')
-        }
+        if (event === 'SIGNED_OUT' || !session) router.push('/login')
       })
       subscription = data.subscription
     } catch {
@@ -98,9 +98,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
           </div>
         </div>
-        <main style={{ flex: 1, padding: '28px' }}>
-          {children}
-        </main>
+        <main style={{ flex: 1, padding: '28px' }}>{children}</main>
       </div>
     </div>
   )
