@@ -17,6 +17,9 @@ type Bewegung = {
   datum: string; mitarbeiter: string; status: string
 }
 
+type SortKey = 'id' | 'name' | 'bestand' | 'status'
+type SortDir = 'asc' | 'desc'
+
 const EINHEITEN = ['Stk', 'Liter', 'kg', 'Rollen', 'Meter', 'Paar', 'Karton', 'Palette']
 const KATEGORIEN = ['Rohstoffe', 'Kleinteile', 'Betriebsstoffe', 'Verbrauchsmaterial', 'Werkzeug', 'Schutzausrüstung', 'Sonstiges']
 
@@ -58,6 +61,28 @@ function calcStatus(bestand: number, mindestbestand: number): string {
 
 function toDE(date: Date) {
   return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function exportCSV(data: Artikel[]) {
+  const header = ['id', 'name', 'kategorie', 'bestand', 'einheit', 'lagerplatz', 'status', 'mindestbestand']
+  const rows = data.map(a => [
+    a.id,
+    `"${a.name.replace(/"/g, '""')}"`,
+    a.kategorie,
+    String(a.bestand),
+    a.einheit,
+    a.lagerplatz,
+    a.status,
+    String(a.mindestbestand ?? 0),
+  ].join(';'))
+  const csv = [header.join(';'), ...rows].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `lager-export-${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 // ── Modal-Komponente ─────────────────────────────────────────────────────────
@@ -138,7 +163,7 @@ function ArtikelModal({ artikel, onSave, onClose }: {
 
 export default function LagerPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
-  const [tab, setTab] = useState<'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur'>('bestand')
+  const [tab, setTab] = useState<'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur' | 'bestellung'>('bestand')
   const [search, setSearch] = useState('')
   const [filterKat, setFilterKat] = useState('Alle')
   const [artikel, setArtikel] = useState<Artikel[]>(isDemo ? demoArtikel : [])
@@ -150,6 +175,20 @@ export default function LagerPilotPage() {
   const [newAusgang, setNewAusgang] = useState({ artikel: '', menge: '', empfaenger: '', mitarbeiter: '' })
   const [inventurWerte, setInventurWerte] = useState<Record<string, string>>({})
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+
+  // Sortierung Bestand-Tab
+  const [sortKey, setSortKey] = useState<SortKey>('id')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  // Inline-Delete-Bestätigung
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+
+  // Warnbanner-Liste ausklappen
+  const [warnListOpen, setWarnListOpen] = useState(false)
+
+  // Bestellvorschlag-State
+  const [bestellMengen, setBestellMengen] = useState<Record<string, string>>({})
+  const [bestelltIds, setBestelltIds] = useState<Set<string>>(new Set())
 
   // Daten laden
   useEffect(() => {
@@ -175,6 +214,29 @@ export default function LagerPilotPage() {
     return matchSearch && matchKat
   })
 
+  // ── Sortierung ───────────────────────────────────────────────────────────────
+
+  const statusOrder: Record<string, number> = { leer: 0, niedrig: 1, ok: 2 }
+
+  const sorted = [...filtered].sort((a, b) => {
+    let cmp = 0
+    if (sortKey === 'id') cmp = a.id.localeCompare(b.id)
+    else if (sortKey === 'name') cmp = a.name.localeCompare(b.name)
+    else if (sortKey === 'bestand') cmp = a.bestand - b.bestand
+    else if (sortKey === 'status') cmp = (statusOrder[a.status] ?? 0) - (statusOrder[b.status] ?? 0)
+    return sortDir === 'asc' ? cmp : -cmp
+  })
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
+  const sortArrow = (key: SortKey) => {
+    if (sortKey !== key) return <span style={{ color: '#4a5568', marginLeft: 4, fontSize: 10 }}>↕</span>
+    return <span style={{ color: '#6cb6ff', marginLeft: 4, fontSize: 10 }}>{sortDir === 'asc' ? '↑' : '↓'}</span>
+  }
+
   // ── Artikel CRUD ─────────────────────────────────────────────────────────────
 
   const handleSaveArtikel = async (form: ArtikelForm) => {
@@ -196,11 +258,11 @@ export default function LagerPilotPage() {
   }
 
   const handleDeleteArtikel = async (id: string) => {
-    if (!confirm('Artikel wirklich löschen?')) return
     if (!isDemo) {
-      try { await deleteLagerArtikel(id) } catch { showToast('Fehler beim Löschen', false); return }
+      try { await deleteLagerArtikel(id) } catch { showToast('Fehler beim Löschen', false); setDeleteConfirmId(null); return }
     }
     setArtikel(prev => prev.filter(a => a.id !== id))
+    setDeleteConfirmId(null)
     showToast('🗑 Artikel gelöscht')
   }
 
@@ -306,11 +368,27 @@ export default function LagerPilotPage() {
     }
   }
 
+  // ── Bestellvorschlag ─────────────────────────────────────────────────────────
+
+  const bestellArtikel = artikel.filter(a => a.bestand === 0 || a.bestand <= (a.mindestbestand ?? 0))
+
+  const getBestellMenge = (a: Artikel) => {
+    if (bestellMengen[a.id] !== undefined) return bestellMengen[a.id]
+    return String((a.mindestbestand ?? 0) * 2)
+  }
+
+  const handleBestellungAusloesen = (id: string) => {
+    setBestelltIds(prev => { const next = new Set(Array.from(prev)); next.add(id); return next })
+    showToast('✅ Bestellung ausgelöst')
+  }
+
   // ── Stats ────────────────────────────────────────────────────────────────────
 
   const statsNiedrig = artikel.filter(a => a.status === 'niedrig').length
   const statsLeer = artikel.filter(a => a.status === 'leer').length
   const gesamtWert = artikel.reduce((s, a) => s + a.bestand, 0)
+
+  const warnArtikel = artikel.filter(a => a.status === 'niedrig' || a.status === 'leer')
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
@@ -366,6 +444,7 @@ export default function LagerPilotPage() {
           { label: 'Niedrig Bestand', value: String(statsNiedrig), icon: '⚠️', color: '#f59e0b' },
           { label: 'Leer / 0', value: String(statsLeer), icon: '🚨', color: '#f43f5e' },
           { label: 'Buchungen', value: String(bewegungen.length), icon: '🔄', color: '#10b981' },
+          { label: 'Bestellpflichtig', value: String(bestellArtikel.length), icon: '🛒', color: bestellArtikel.length > 0 ? '#f59e0b' : '#10b981' },
         ].map(s => (
           <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
             <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
@@ -375,13 +454,38 @@ export default function LagerPilotPage() {
         ))}
       </div>
 
-      {/* Warnhinweis niedrig/leer */}
+      {/* Warnhinweis niedrig/leer – klappbar */}
       {(statsNiedrig > 0 || statsLeer > 0) && (
-        <div style={{ marginBottom: 18, padding: '12px 16px', borderRadius: 10, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', display: 'flex', gap: 10, alignItems: 'center' }}>
-          <span style={{ fontSize: 18 }}>⚠️</span>
-          <span style={{ fontSize: 13, color: '#fbbf24' }}>
-            <b>{statsLeer} Artikel leer</b> · <b>{statsNiedrig} Artikel unter Mindestbestand</b> – Nachbestellung empfohlen
-          </span>
+        <div style={{ marginBottom: 18, padding: '12px 16px', borderRadius: 10, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <span style={{ fontSize: 13, color: '#fbbf24', flex: 1 }}>
+              <b>{statsLeer} Artikel leer</b> · <b>{statsNiedrig} Artikel unter Mindestbestand</b> – Nachbestellung empfohlen
+            </span>
+            <button
+              onClick={() => setWarnListOpen(o => !o)}
+              style={{ background: 'transparent', border: '1px solid rgba(245,158,11,.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: '#fbbf24', fontSize: 12, fontWeight: 600, flexShrink: 0 }}
+            >
+              {warnListOpen ? 'Schließen ▲' : 'Artikel anzeigen ▼'}
+            </button>
+          </div>
+          {warnListOpen && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(245,158,11,.15)', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {warnArtikel.map(a => (
+                <span
+                  key={a.id}
+                  style={{
+                    fontSize: 12, padding: '3px 9px', borderRadius: 6, fontWeight: 600,
+                    background: a.status === 'leer' ? 'rgba(244,63,94,.12)' : 'rgba(245,158,11,.12)',
+                    border: `1px solid ${a.status === 'leer' ? 'rgba(244,63,94,.3)' : 'rgba(245,158,11,.3)'}`,
+                    color: a.status === 'leer' ? '#f43f5e' : '#f59e0b',
+                  }}
+                >
+                  {a.status === 'leer' ? '🚨' : '⚠️'} {a.name} ({a.bestand} {a.einheit})
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -393,6 +497,7 @@ export default function LagerPilotPage() {
           { id: 'eingang', label: '📥 Wareneingang' },
           { id: 'ausgang', label: '📤 Warenausgang' },
           { id: 'inventur', label: '📋 Inventur' },
+          { id: 'bestellung', label: `🛒 Bestellvorschlag${bestellArtikel.length > 0 ? ` (${bestellArtikel.length})` : ''}` },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as typeof tab)} style={{ padding: '10px 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: 'transparent', borderBottom: tab === t.id ? '2px solid #1684ff' : '2px solid transparent', color: tab === t.id ? '#6cb6ff' : '#aeb9c8', marginBottom: -1, transition: 'color .15s', whiteSpace: 'nowrap' }}>
             {t.label}
@@ -409,24 +514,56 @@ export default function LagerPilotPage() {
               <option>Alle</option>
               {KATEGORIEN.map(k => <option key={k}>{k}</option>)}
             </select>
-            <span style={{ fontSize: 12, color: '#aeb9c8', marginLeft: 'auto' }}>{filtered.length} von {artikel.length} Artikel</span>
+            <span style={{ fontSize: 12, color: '#aeb9c8' }}>{filtered.length} von {artikel.length} Artikel</span>
+            <button
+              className="pk-btn-ghost"
+              onClick={() => exportCSV(sorted)}
+              style={{ marginLeft: 'auto', fontSize: 13, padding: '7px 14px' }}
+            >
+              📥 CSV Export
+            </button>
           </div>
           <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
             <div className="pk-table-wrap">
               <table className="pk-table">
                 <thead>
                   <tr>
-                    <th>Art.-Nr.</th><th>Bezeichnung</th><th>Kategorie</th>
-                    <th>Bestand</th><th>Mindest</th><th>Lagerplatz</th><th>Status</th>
+                    <th
+                      onClick={() => handleSort('id')}
+                      style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                    >
+                      Art.-Nr.{sortArrow('id')}
+                    </th>
+                    <th
+                      onClick={() => handleSort('name')}
+                      style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                    >
+                      Bezeichnung{sortArrow('name')}
+                    </th>
+                    <th>Kategorie</th>
+                    <th
+                      onClick={() => handleSort('bestand')}
+                      style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                    >
+                      Bestand{sortArrow('bestand')}
+                    </th>
+                    <th>Mindest</th>
+                    <th>Lagerplatz</th>
+                    <th
+                      onClick={() => handleSort('status')}
+                      style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                    >
+                      Status{sortArrow('status')}
+                    </th>
                     {!isDemo && <th style={{ width: 80 }}>Aktionen</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.length === 0 ? (
+                  {sorted.length === 0 ? (
                     <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>
                       {artikel.length === 0 ? '📦 Noch keine Artikel. Lege deinen ersten Artikel an.' : 'Keine Artikel gefunden.'}
                     </td></tr>
-                  ) : filtered.map(a => (
+                  ) : sorted.map(a => (
                     <tr key={a.id}>
                       <td style={{ color: '#aeb9c8', fontFamily: 'monospace', fontSize: 12 }}>{a.id}</td>
                       <td style={{ fontWeight: 600 }}>{a.name}</td>
@@ -443,10 +580,27 @@ export default function LagerPilotPage() {
                       </td>
                       {!isDemo && (
                         <td>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button onClick={() => setModal(a)} title="Bearbeiten" style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>
-                            <button onClick={() => handleDeleteArtikel(a.id)} title="Löschen" style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}>🗑</button>
-                          </div>
+                          {deleteConfirmId === a.id ? (
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <button
+                                onClick={() => handleDeleteArtikel(a.id)}
+                                style={{ background: 'rgba(244,63,94,.18)', border: '1px solid rgba(244,63,94,.4)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}
+                              >
+                                Ja, löschen
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirmId(null)}
+                                style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#aeb9c8', fontSize: 11, whiteSpace: 'nowrap' }}
+                              >
+                                Abbrechen
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button onClick={() => setModal(a)} title="Bearbeiten" style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>
+                              <button onClick={() => setDeleteConfirmId(a.id)} title="Löschen" style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}>🗑</button>
+                            </div>
+                          )}
                         </td>
                       )}
                     </tr>
@@ -641,6 +795,109 @@ export default function LagerPilotPage() {
             </button>
             <button className="pk-btn-ghost" onClick={() => setInventurWerte({})} style={{ fontSize: 13 }}>Zurücksetzen</button>
           </div>
+        </div>
+      )}
+
+      {/* ── BESTELLVORSCHLAG ── */}
+      {tab === 'bestellung' && (
+        <div>
+          <div style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ padding: '10px 16px', borderRadius: 10, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', fontSize: 13, color: '#fbbf24', flex: 1, minWidth: 200 }}>
+              🛒 <b>{bestellArtikel.length} Artikel</b> benötigen eine Nachbestellung (Bestand leer oder unter Mindestbestand)
+            </div>
+          </div>
+
+          {bestellArtikel.length === 0 ? (
+            <div className="pk-card" style={{ textAlign: 'center', padding: 48 }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Alle Bestände ausreichend</div>
+              <div style={{ color: '#aeb9c8', fontSize: 13 }}>Aktuell sind alle Artikel über dem Mindestbestand.</div>
+            </div>
+          ) : (
+            <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div className="pk-table-wrap">
+                <table className="pk-table">
+                  <thead>
+                    <tr>
+                      <th>Art.-Nr.</th>
+                      <th>Bezeichnung</th>
+                      <th>Kategorie</th>
+                      <th>Aktueller Bestand</th>
+                      <th>Mindestbestand</th>
+                      <th>Vorschlag-Menge</th>
+                      <th style={{ width: 160 }}>Aktion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bestellArtikel.map(a => {
+                      const bestellt = bestelltIds.has(a.id)
+                      return (
+                        <tr key={a.id} style={{ opacity: bestellt ? 0.55 : 1 }}>
+                          <td style={{ color: '#aeb9c8', fontFamily: 'monospace', fontSize: 12 }}>{a.id}</td>
+                          <td style={{ fontWeight: 600 }}>{a.name}</td>
+                          <td><span className="badge badge-gray">{a.kategorie}</span></td>
+                          <td style={{ fontWeight: 700, color: a.status === 'leer' ? '#f43f5e' : '#f59e0b' }}>
+                            {a.bestand} {a.einheit}
+                            <span style={{ marginLeft: 6 }}>
+                              <span className={`badge ${a.status === 'leer' ? 'badge-red' : 'badge-orange'}`} style={{ fontSize: 10 }}>
+                                {a.status === 'leer' ? '🚨 Leer' : '⚠️ Niedrig'}
+                              </span>
+                            </span>
+                          </td>
+                          <td style={{ color: '#aeb9c8', fontSize: 13 }}>{a.mindestbestand ?? 0} {a.einheit}</td>
+                          <td>
+                            {bestellt ? (
+                              <span style={{ color: '#aeb9c8', fontSize: 13 }}>{getBestellMenge(a)} {a.einheit}</span>
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={getBestellMenge(a)}
+                                  onChange={e => setBestellMengen(p => ({ ...p, [a.id]: e.target.value }))}
+                                  style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '5px 8px', color: '#f8fbff', fontSize: 13, width: 80, outline: 'none' }}
+                                />
+                                <span style={{ color: '#aeb9c8', fontSize: 12 }}>{a.einheit}</span>
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            {bestellt ? (
+                              <span className="badge badge-green" style={{ fontSize: 11 }}>✅ Bestellt</span>
+                            ) : (
+                              <button
+                                onClick={() => handleBestellungAusloesen(a.id)}
+                                style={{
+                                  background: 'rgba(22,132,255,.15)', border: '1px solid rgba(22,132,255,.35)',
+                                  borderRadius: 7, padding: '6px 12px', cursor: 'pointer',
+                                  color: '#6cb6ff', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+                                }}
+                              >
+                                🛒 Bestellung auslösen
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {bestelltIds.size > 0 && (
+            <div style={{ marginTop: 14, display: 'flex', gap: 10, alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: '#aeb9c8' }}>{bestelltIds.size} Bestellung(en) ausgelöst</span>
+              <button
+                className="pk-btn-ghost"
+                onClick={() => setBestelltIds(new Set())}
+                style={{ fontSize: 12, padding: '6px 12px' }}
+              >
+                Zurücksetzen
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
