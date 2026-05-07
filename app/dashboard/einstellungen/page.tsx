@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
 import { isDemoUser } from '@/lib/auth'
+import { type AppRole, ROLE_LABELS, ROLE_PILOTS, PERMISSIONS, useRole, setRole as saveRole } from '@/lib/roles'
 
 type NotifSettings = {
   wareneingaenge: boolean; niedrigerBestand: boolean; auftraege: boolean
@@ -11,10 +12,16 @@ type NotifSettings = {
 
 export default function EinstellungenPage() {
   const router = useRouter()
-  const [section, setSection] = useState<'profil' | 'benachrichtigungen' | 'info'>('profil')
+  const [section, setSection] = useState<'profil' | 'benachrichtigungen' | 'rollen' | 'info'>('profil')
   const [toast, setToast] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [isDemo, setIsDemo] = useState(false)
+
+  const { role: currentRole, setRole: applyRole } = useRole()
+  const [selectedRole, setSelectedRole] = useState<AppRole>('Admin')
+
+  // Sync picker with current role once loaded
+  useEffect(() => { setSelectedRole(currentRole) }, [currentRole])
 
   const [profil, setProfil] = useState({ name: '', email: '', role: 'Administrator', firma: '' })
   const [pwForm, setPwForm] = useState({ neu: '', bestaetigung: '' })
@@ -138,6 +145,7 @@ export default function EinstellungenPage() {
         <div className="pk-card" style={{ padding: '10px' }}>
           <NavItem id="profil" icon="👤" label="Benutzerprofil" />
           <NavItem id="benachrichtigungen" icon="🔔" label="Benachrichtigungen" />
+          <NavItem id="rollen" icon="🔑" label="Rollen & Rechte" />
           <NavItem id="info" icon="ℹ️" label="App-Informationen" />
           <div style={{ height: 1, background: 'rgba(255,255,255,.08)', margin: '10px 0' }} />
           <button onClick={handleLogout} style={{
@@ -231,6 +239,114 @@ export default function EinstellungenPage() {
               </div>
             </div>
           )}
+
+          {section === 'rollen' && (() => {
+            const roleDescriptions: Record<AppRole, string> = {
+              Admin: 'Vollzugriff auf alle Funktionen und Einstellungen',
+              Mitarbeiter: 'Zugriff auf Kernfunktionen, kein Löschen',
+              Büro: 'Büro, Analyse, Archiv und Einstellungen',
+              Werkstatt: 'Werkstatt, Lager, Planung und KI-Erkennung',
+              Lager: 'Nur Lagerverwaltung und KI-Erkennung',
+            }
+            const allRoles = Object.keys(ROLE_LABELS) as AppRole[]
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Aktuelle Rolle */}
+                <div className="pk-card">
+                  <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800 }}>🔑 Rollen & Rechte</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+                    <div style={{
+                      padding: '10px 22px', borderRadius: 999, fontSize: 18, fontWeight: 900,
+                      background: 'rgba(22,132,255,.18)', border: '2px solid rgba(22,132,255,.4)',
+                      color: '#6cb6ff', letterSpacing: '-.02em',
+                    }}>
+                      {ROLE_LABELS[currentRole]}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#aeb9c8' }}>Ihre aktuelle Rolle im System</div>
+                  </div>
+
+                  {/* Rollen-Tabelle */}
+                  <div style={{ overflowX: 'auto', marginBottom: 24 }}>
+                    <table className="pk-table" style={{ width: '100%', fontSize: 13 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: 'left', padding: '10px 12px' }}>Rolle</th>
+                          <th style={{ textAlign: 'left', padding: '10px 12px' }}>Beschreibung</th>
+                          <th style={{ textAlign: 'left', padding: '10px 12px' }}>Piloten</th>
+                          <th style={{ textAlign: 'center', padding: '10px 12px' }}>Löschen</th>
+                          <th style={{ textAlign: 'center', padding: '10px 12px' }}>Bearbeiten</th>
+                          <th style={{ textAlign: 'center', padding: '10px 12px' }}>Export</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allRoles.map(r => (
+                          <tr key={r} style={{ background: r === currentRole ? 'rgba(22,132,255,.06)' : undefined }}>
+                            <td style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              {ROLE_LABELS[r]}
+                              {r === currentRole && (
+                                <span style={{ marginLeft: 8, fontSize: 10, padding: '2px 6px', borderRadius: 999, background: 'rgba(22,132,255,.25)', color: '#6cb6ff', fontWeight: 700 }}>Aktiv</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '10px 12px', color: '#aeb9c8' }}>{roleDescriptions[r]}</td>
+                            <td style={{ padding: '10px 12px' }}>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                {ROLE_PILOTS[r].slice(0, 4).map(p => (
+                                  <span key={p} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 999, background: 'rgba(255,255,255,.07)', color: '#aeb9c8', fontWeight: 600 }}>{p}</span>
+                                ))}
+                                {ROLE_PILOTS[r].length > 4 && (
+                                  <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 999, background: 'rgba(255,255,255,.07)', color: '#aeb9c8', fontWeight: 600 }}>+{ROLE_PILOTS[r].length - 4}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                              {PERMISSIONS.canDelete(r) ? <span style={{ color: '#4ddb7e', fontWeight: 700 }}>✓</span> : <span style={{ color: '#4a5568' }}>–</span>}
+                            </td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                              {PERMISSIONS.canEdit(r) ? <span style={{ color: '#4ddb7e', fontWeight: 700 }}>✓</span> : <span style={{ color: '#4a5568' }}>–</span>}
+                            </td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                              {PERMISSIONS.canExport(r) ? <span style={{ color: '#4ddb7e', fontWeight: 700 }}>✓</span> : <span style={{ color: '#4a5568' }}>–</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Rolle wechseln */}
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', paddingTop: 20 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>Rolle wechseln (Demo)</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <select
+                        value={selectedRole}
+                        onChange={e => setSelectedRole(e.target.value as AppRole)}
+                        className="pk-input"
+                        style={{ width: 'auto', minWidth: 180 }}
+                      >
+                        {allRoles.map(r => (
+                          <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                        ))}
+                      </select>
+                      <button
+                        className="pk-btn"
+                        style={{ fontWeight: 700 }}
+                        onClick={() => {
+                          applyRole(selectedRole)
+                          saveRole(selectedRole)
+                          showToast(`✅ Rolle gesetzt: ${ROLE_LABELS[selectedRole]}`)
+                        }}
+                      >
+                        Speichern
+                      </button>
+                    </div>
+                    <p style={{ margin: '12px 0 0', fontSize: 12, color: '#4a5568', lineHeight: 1.6 }}>
+                      Im Produktivbetrieb werden Rollen vom Admin über die Benutzerverwaltung vergeben.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
 
           {section === 'info' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

@@ -7,6 +7,7 @@ import GlobalSearch from '@/components/GlobalSearch'
 import SupportButton from '@/components/SupportButton'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { hasDemoCookie } from '@/lib/auth'
+import { ROLE_LABELS, type AppRole } from '@/lib/roles'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -14,9 +15,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [checked, setChecked] = useState(false)
   const [userName, setUserName] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [role, setRoleState] = useState<AppRole>('Admin')
 
   // Close sidebar on route change (mobile nav)
   useEffect(() => { setSidebarOpen(false) }, [pathname])
+
+  // Read role from localStorage (Demo always Admin)
+  useEffect(() => {
+    const stored = hasDemoCookie()
+      ? 'Admin'
+      : ((localStorage.getItem('pk_role') as AppRole) || 'Admin')
+    setRoleState(stored)
+  }, [pathname]) // re-read when navigating (e.g. after saving in Einstellungen)
 
   // Auth check
   useEffect(() => {
@@ -101,6 +111,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <NotificationBell />
+            <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', color: '#aeb9c8', fontWeight: 700 }}>
+              {ROLE_LABELS[role]}
+            </span>
             <button
               onClick={() => router.push('/dashboard/einstellungen')}
               style={{
