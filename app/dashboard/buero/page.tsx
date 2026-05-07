@@ -87,6 +87,13 @@ const demoDokumente: Dokument[] = [
   { id: 'DOK-008', name: 'Mahnung_RE-2025-074.pdf', typ: 'PDF', groesse: '112 KB', datum: '15.04.2025', kategorie: 'Rechnung', bezug: 'Hans Werner' },
 ]
 
+// ── Hilfs-Funktionen ────────────────────────────────────────────────────────
+
+function parseBetrag(s: string): number {
+  const cleaned = s.replace(/[^\d,\.]/g, '').replace(',', '.')
+  return parseFloat(cleaned) || 0
+}
+
 // ── Hilfs-Komponenten ───────────────────────────────────────────────────────
 
 type Tab = 'kunden' | 'angebote' | 'auftraege' | 'rechnungen' | 'dokumente'
@@ -112,14 +119,46 @@ function TabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   )
 }
 
-function Toast({ msg }: { msg: string }) {
+// Fixed-position Toast (bottom-right)
+function Toast({ msg, error }: { msg: string; error?: boolean }) {
   if (!msg) return null
   return (
     <div style={{
-      padding: '14px 18px', borderRadius: 12, marginBottom: 16,
-      background: 'rgba(37,211,102,.12)', border: '1px solid rgba(37,211,102,.3)',
-      color: '#4ddb7e', fontSize: 14, fontWeight: 600,
+      position: 'fixed', bottom: 90, right: 24, zIndex: 9999,
+      padding: '14px 18px', borderRadius: 12, maxWidth: 360,
+      background: error ? 'rgba(255,80,80,.15)' : 'rgba(37,211,102,.12)',
+      border: `1px solid ${error ? 'rgba(255,80,80,.3)' : 'rgba(37,211,102,.3)'}`,
+      color: error ? '#ff8080' : '#4ddb7e',
+      fontSize: 14, fontWeight: 600,
+      boxShadow: '0 8px 32px rgba(0,0,0,.4)',
+      animation: 'fadeIn .2s ease',
     }}>{msg}</div>
+  )
+}
+
+// Modal-Komponente (nach PlanungPilot-Pattern)
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
+      <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', position: 'relative' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{title}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// Inline-Löschbestätigung
+function DeleteConfirm({ label, onConfirm, onCancel }: { label: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,80,80,.08)', border: '1px solid rgba(255,80,80,.2)' }}>
+      <span style={{ fontSize: 12, color: '#ff8080', fontWeight: 600 }}>{label} löschen?</span>
+      <button onClick={onConfirm} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.15)', color: '#ff8080', cursor: 'pointer', fontWeight: 700 }}>Ja</button>
+      <button onClick={onCancel} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+    </div>
   )
 }
 
@@ -165,6 +204,8 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
   )
 }
 
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }
+
 // ── Kunden-Tab ──────────────────────────────────────────────────────────────
 
 function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftraege: Auftrag[]; rechnungen: Rechnung[] }) {
@@ -173,7 +214,7 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
   const [showForm, setShowForm] = useState(false)
   const [selected, setSelected] = useState<Kunde | null>(null)
   const [toast, setToast] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
+  const [toastError, setToastError] = useState(false)
   const [loading, setLoading] = useState(!isDemo)
   const [form, setForm] = useState({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '' })
 
@@ -181,7 +222,7 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
     if (isDemo) return
     getBueroKunden()
       .then(data => setKunden(data as Kunde[]))
-      .catch(() => setErrorMsg('Fehler beim Laden der Kunden'))
+      .catch(() => showToast('Fehler beim Laden der Kunden', true))
       .finally(() => setLoading(false))
   }, [isDemo])
 
@@ -192,8 +233,8 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
   )
 
   const showToast = (msg: string, error = false) => {
-    if (error) setErrorMsg(msg); else setToast(msg)
-    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+    setToast(msg); setToastError(error)
+    setTimeout(() => setToast(''), 4000)
   }
 
   const handleSave = async () => {
@@ -226,6 +267,7 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
   if (selected) {
     return (
       <div className="fade-in">
+        <Toast msg={toast} error={toastError} />
         <button className="pk-btn-ghost" onClick={() => setSelected(null)} style={{ marginBottom: 20, fontSize: 13 }}>
           ← Zurück zur Übersicht
         </button>
@@ -307,8 +349,7 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
 
   return (
     <div>
-      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
-      <Toast msg={toast} />
+      <Toast msg={toast} error={toastError} />
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
         <input className="pk-input" placeholder="🔍 Kunden suchen (Name, Nummer, Ort)…" value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 360 }} />
         <button className="pk-btn" style={{ fontSize: 13, whiteSpace: 'nowrap' }} onClick={() => setShowForm(f => !f)}>
@@ -321,30 +362,30 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
           <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>👥 Neuen Kunden anlegen</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Name / Firma *</label>
+              <label style={labelStyle}>Name / Firma *</label>
               <input className="pk-input" placeholder="z.B. Müller GmbH" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
+              <label style={labelStyle}>Typ</label>
               <select className="pk-input" value={form.typ} onChange={e => setForm(p => ({ ...p, typ: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option>Firma</option>
                 <option>Privat</option>
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Ansprechpartner</label>
+              <label style={labelStyle}>Ansprechpartner</label>
               <input className="pk-input" placeholder="Vor- und Nachname" value={form.ansprechpartner} onChange={e => setForm(p => ({ ...p, ansprechpartner: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>E-Mail *</label>
+              <label style={labelStyle}>E-Mail *</label>
               <input className="pk-input" placeholder="email@beispiel.de" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Telefon</label>
+              <label style={labelStyle}>Telefon</label>
               <input className="pk-input" placeholder="040 123456" value={form.telefon} onChange={e => setForm(p => ({ ...p, telefon: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Ort</label>
+              <label style={labelStyle}>Ort</label>
               <input className="pk-input" placeholder="Stadt" value={form.ort} onChange={e => setForm(p => ({ ...p, ort: e.target.value }))} />
             </div>
           </div>
@@ -391,26 +432,33 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
 
 // ── Angebote-Tab ────────────────────────────────────────────────────────────
 
-function AngeboteTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] }) {
+function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege }: { isDemo: boolean; kunden: Kunde[]; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>> }) {
   const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
   const [showForm, setShowForm] = useState(false)
   const [toast, setToast] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
+  const [toastError, setToastError] = useState(false)
   const [loading, setLoading] = useState(!isDemo)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [form, setForm] = useState({ kunde: '', titel: '', betrag: '', gueltig: '' })
+
+  // Edit-Modal
+  const [editAngebot, setEditAngebot] = useState<Angebot | null>(null)
+  const [editForm, setEditForm] = useState({ kunde: '', titel: '', betrag: '', datum: '', gueltig: '', status: 'Entwurf' as Angebot['status'] })
+
+  // Delete-Bestätigung
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     if (isDemo) return
     getBueroAngebote()
       .then(data => setAngebote(data as Angebot[]))
-      .catch(() => setErrorMsg('Fehler beim Laden der Angebote'))
+      .catch(() => showToast('Fehler beim Laden der Angebote', true))
       .finally(() => setLoading(false))
   }, [isDemo])
 
   const showToast = (msg: string, error = false) => {
-    if (error) setErrorMsg(msg); else setToast(msg)
-    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+    setToast(msg); setToastError(error)
+    setTimeout(() => setToast(''), 4000)
   }
 
   const filtered = angebote.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
@@ -447,7 +495,58 @@ function AngeboteTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] }) {
     showToast(`✅ Angebot ${id} wurde auf "${status}" gesetzt`)
   }
 
-  const statusCounts = { Alle: angebote.length, Entwurf: 0, Versendet: 0, Akzeptiert: 0, Abgelehnt: 0 }
+  const openEdit = (a: Angebot) => {
+    setEditAngebot(a)
+    setEditForm({ kunde: a.kunde, titel: a.titel, betrag: a.betrag, datum: a.datum, gueltig: a.gueltig, status: a.status })
+  }
+
+  const handleEditSave = async () => {
+    if (!editAngebot) return
+    const updated: Angebot = { ...editAngebot, ...editForm, betrag: editForm.betrag.includes('€') ? editForm.betrag : `${editForm.betrag} €` }
+    if (!isDemo) {
+      try { await upsertBueroAngebot(updated) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setAngebote(prev => prev.map(a => a.id === updated.id ? updated : a))
+    setEditAngebot(null)
+    showToast(`✅ Angebot ${updated.id} wurde aktualisiert`)
+  }
+
+  const handleDelete = async (id: string) => {
+    setDeleteId(null)
+    // Kein eigener DB-Call für Angebote-Delete in der lib – wir entfernen nur lokal (Demo) oder rufen ggf. einen generischen Delete auf
+    if (!isDemo) {
+      // Angebote haben ggf. keinen expliziten deleteBueroAngebot – wir aktualisieren den Status auf Abgelehnt als Soft-Delete-Alternative
+      const ang = angebote.find(a => a.id === id)
+      if (ang) {
+        try { await upsertBueroAngebot({ ...ang, status: 'Abgelehnt' }) } catch { showToast('Fehler beim Löschen', true); return }
+      }
+    }
+    setAngebote(prev => prev.filter(a => a.id !== id))
+    showToast(`🗑️ Angebot ${id} wurde gelöscht`)
+  }
+
+  // Angebot → Auftrag konvertieren
+  const handleKonvertieren = async (a: Angebot) => {
+    const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const today = new Date()
+    const newAuftrag: Auftrag = {
+      id: `A-2025-0${35 + auftraege.length}`,
+      kunde: a.kunde,
+      beschreibung: a.titel,
+      wert: a.betrag,
+      start: fmt(today),
+      ende: a.gueltig,
+      status: 'Geplant',
+      fortschritt: 0,
+    }
+    if (!isDemo) {
+      try { await upsertBueroAuftrag(newAuftrag) } catch { showToast('Fehler beim Erstellen des Auftrags', true); return }
+    }
+    setAuftraege(prev => [newAuftrag, ...prev])
+    showToast(`✅ Auftrag ${newAuftrag.id} aus Angebot ${a.id} erstellt`)
+  }
+
+  const statusCounts: Record<string, number> = { Alle: angebote.length, Entwurf: 0, Versendet: 0, Akzeptiert: 0, Abgelehnt: 0 }
   angebote.forEach(a => { statusCounts[a.status]++ })
 
   if (loading) return (
@@ -461,8 +560,51 @@ function AngeboteTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] }) {
 
   return (
     <div>
-      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
-      <Toast msg={toast} />
+      <Toast msg={toast} error={toastError} />
+
+      {/* Edit-Modal */}
+      {editAngebot && (
+        <Modal title={`📋 Angebot bearbeiten – ${editAngebot.id}`} onClose={() => setEditAngebot(null)}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div>
+              <label style={labelStyle}>Titel / Leistung *</label>
+              <input className="pk-input" value={editForm.titel} onChange={e => setEditForm(p => ({ ...p, titel: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Kunde</label>
+              <select className="pk-input" value={editForm.kunde} onChange={e => setEditForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
+                {kunden.map(k => <option key={k.id}>{k.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Betrag (€)</label>
+              <input className="pk-input" value={editForm.betrag} onChange={e => setEditForm(p => ({ ...p, betrag: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Datum</label>
+              <input className="pk-input" placeholder="TT.MM.JJJJ" value={editForm.datum} onChange={e => setEditForm(p => ({ ...p, datum: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Gültig bis</label>
+              <input className="pk-input" placeholder="TT.MM.JJJJ" value={editForm.gueltig} onChange={e => setEditForm(p => ({ ...p, gueltig: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Status</label>
+              <select className="pk-input" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value as Angebot['status'] }))} style={{ cursor: 'pointer' }}>
+                <option>Entwurf</option>
+                <option>Versendet</option>
+                <option>Akzeptiert</option>
+                <option>Abgelehnt</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
+            <button className="pk-btn" onClick={handleEditSave}>Speichern</button>
+            <button className="pk-btn-ghost" onClick={() => setEditAngebot(null)}>Abbrechen</button>
+          </div>
+        </Modal>
+      )}
+
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 6 }}>
           {(['Alle', 'Entwurf', 'Versendet', 'Akzeptiert', 'Abgelehnt'] as const).map(s => (
@@ -485,22 +627,22 @@ function AngeboteTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] }) {
           <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>📋 Neues Angebot erstellen</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Kunde *</label>
+              <label style={labelStyle}>Kunde *</label>
               <select className="pk-input" value={form.kunde} onChange={e => setForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option value="">Kunde wählen…</option>
                 {kunden.map(k => <option key={k.id}>{k.name}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Titel / Leistung *</label>
+              <label style={labelStyle}>Titel / Leistung *</label>
               <input className="pk-input" placeholder="z.B. Wartungsvertrag 2025" value={form.titel} onChange={e => setForm(p => ({ ...p, titel: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Nettobetrag (€) *</label>
+              <label style={labelStyle}>Nettobetrag (€) *</label>
               <input className="pk-input" placeholder="z.B. 4.200,00" value={form.betrag} onChange={e => setForm(p => ({ ...p, betrag: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Gültig bis</label>
+              <label style={labelStyle}>Gültig bis</label>
               <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.gueltig} onChange={e => setForm(p => ({ ...p, gueltig: e.target.value }))} />
             </div>
           </div>
@@ -535,22 +677,34 @@ function AngeboteTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] }) {
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{a.gueltig}</td>
                 <td><StatusBadgeAngebot status={a.status} /></td>
                 <td>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {a.status === 'Entwurf' && (
-                      <button onClick={() => handleStatusChange(a.id, 'Versendet')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(22,132,255,.3)', background: 'transparent', color: '#6cb6ff', cursor: 'pointer' }}>
-                        📤 Senden
+                  {deleteId === a.id ? (
+                    <DeleteConfirm label={a.id} onConfirm={() => handleDelete(a.id)} onCancel={() => setDeleteId(null)} />
+                  ) : (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {a.status === 'Entwurf' && (
+                        <button onClick={() => handleStatusChange(a.id, 'Versendet')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(22,132,255,.3)', background: 'transparent', color: '#6cb6ff', cursor: 'pointer' }}>
+                          📤 Senden
+                        </button>
+                      )}
+                      {a.status === 'Versendet' && (
+                        <>
+                          <button onClick={() => handleStatusChange(a.id, 'Akzeptiert')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>✅</button>
+                          <button onClick={() => handleStatusChange(a.id, 'Abgelehnt')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,165,0,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>✕</button>
+                        </>
+                      )}
+                      {a.status === 'Akzeptiert' && (
+                        <button onClick={() => handleKonvertieren(a)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'rgba(37,211,102,.08)', color: '#4ddb7e', cursor: 'pointer', fontWeight: 700 }}>
+                          → Auftrag erstellen
+                        </button>
+                      )}
+                      <button onClick={() => openEdit(a)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
+                        ✏️
                       </button>
-                    )}
-                    {a.status === 'Versendet' && (
-                      <>
-                        <button onClick={() => handleStatusChange(a.id, 'Akzeptiert')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>✅</button>
-                        <button onClick={() => handleStatusChange(a.id, 'Abgelehnt')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,165,0,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>✕</button>
-                      </>
-                    )}
-                    {(a.status === 'Akzeptiert' || a.status === 'Abgelehnt') && (
-                      <span style={{ fontSize: 11, color: '#4a5568' }}>—</span>
-                    )}
-                  </div>
+                      <button onClick={() => setDeleteId(a.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.3)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>
+                        🗑️
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -564,14 +718,23 @@ function AngeboteTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] }) {
 
 // ── Aufträge-Tab ────────────────────────────────────────────────────────────
 
-function AuftraegeTab({ isDemo, auftraege, setAuftraege }: { isDemo: boolean; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>> }) {
+function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boolean; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; kunden: Kunde[] }) {
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [toast, setToast] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
+  const [toastError, setToastError] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ kunde: '', beschreibung: '', wert: '', start: '', ende: '' })
+
+  // Edit-Modal
+  const [editAuftrag, setEditAuftrag] = useState<Auftrag | null>(null)
+  const [editForm, setEditForm] = useState({ kunde: '', beschreibung: '', wert: '', start: '', ende: '', status: 'Geplant' as Auftrag['status'], fortschritt: 0 })
+
+  // Delete-Bestätigung
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const showToast = (msg: string, error = false) => {
-    if (error) setErrorMsg(msg); else setToast(msg)
-    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+    setToast(msg); setToastError(error)
+    setTimeout(() => setToast(''), 4000)
   }
 
   const filtered = auftraege.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
@@ -592,24 +755,159 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege }: { isDemo: boolean; au
     showToast(`✅ Auftrag ${id} wurde als abgeschlossen markiert`)
   }
 
+  const handleNeuSave = async () => {
+    if (!form.kunde || !form.beschreibung || !form.wert) return
+    const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const today = new Date()
+    const newA: Auftrag = {
+      id: `A-2025-0${35 + auftraege.length}`,
+      kunde: form.kunde, beschreibung: form.beschreibung,
+      wert: form.wert.includes('€') ? form.wert : `${form.wert} €`,
+      start: form.start || fmt(today),
+      ende: form.ende || fmt(new Date(today.getTime() + 30 * 86400000)),
+      status: 'Geplant', fortschritt: 0,
+    }
+    if (!isDemo) {
+      try { await upsertBueroAuftrag(newA) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setAuftraege(prev => [newA, ...prev])
+    setForm({ kunde: '', beschreibung: '', wert: '', start: '', ende: '' })
+    setShowForm(false)
+    showToast(`✅ Auftrag ${newA.id} wurde angelegt`)
+  }
+
+  const openEdit = (a: Auftrag) => {
+    setEditAuftrag(a)
+    setEditForm({ kunde: a.kunde, beschreibung: a.beschreibung, wert: a.wert, start: a.start, ende: a.ende, status: a.status, fortschritt: a.fortschritt })
+  }
+
+  const handleEditSave = async () => {
+    if (!editAuftrag) return
+    const updated: Auftrag = { ...editAuftrag, ...editForm, wert: editForm.wert.includes('€') ? editForm.wert : `${editForm.wert} €` }
+    if (!isDemo) {
+      try { await upsertBueroAuftrag(updated) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setAuftraege(prev => prev.map(a => a.id === updated.id ? updated : a))
+    setEditAuftrag(null)
+    showToast(`✅ Auftrag ${updated.id} wurde aktualisiert`)
+  }
+
+  const handleDelete = async (id: string) => {
+    setDeleteId(null)
+    if (!isDemo) {
+      const a = auftraege.find(x => x.id === id)
+      if (a) {
+        try { await upsertBueroAuftrag({ ...a, status: 'Abgeschlossen' }) } catch { showToast('Fehler beim Löschen', true); return }
+      }
+    }
+    setAuftraege(prev => prev.filter(a => a.id !== id))
+    showToast(`🗑️ Auftrag ${id} wurde gelöscht`)
+  }
+
   const counts: Record<string, number> = { Alle: auftraege.length }
   auftraege.forEach(a => { counts[a.status] = (counts[a.status] || 0) + 1 })
 
   return (
     <div>
-      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
-      <Toast msg={toast} />
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-        {(['Alle', 'In Bearbeitung', 'Geplant', 'Pausiert', 'Abgeschlossen'] as const).map(s => (
-          <button key={s} onClick={() => setFilterStatus(s)} style={{
-            padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)',
-            background: filterStatus === s ? 'rgba(32,200,255,.15)' : 'transparent',
-            color: filterStatus === s ? '#20c8ff' : '#aeb9c8', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-          }}>
-            {s} <span style={{ opacity: .7 }}>({counts[s] ?? 0})</span>
-          </button>
-        ))}
+      <Toast msg={toast} error={toastError} />
+
+      {/* Edit-Modal */}
+      {editAuftrag && (
+        <Modal title={`✅ Auftrag bearbeiten – ${editAuftrag.id}`} onClose={() => setEditAuftrag(null)}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Beschreibung *</label>
+              <input className="pk-input" value={editForm.beschreibung} onChange={e => setEditForm(p => ({ ...p, beschreibung: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Kunde</label>
+              <select className="pk-input" value={editForm.kunde} onChange={e => setEditForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
+                {kunden.map(k => <option key={k.id}>{k.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Wert (€)</label>
+              <input className="pk-input" value={editForm.wert} onChange={e => setEditForm(p => ({ ...p, wert: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Start</label>
+              <input className="pk-input" placeholder="TT.MM.JJJJ" value={editForm.start} onChange={e => setEditForm(p => ({ ...p, start: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Ende</label>
+              <input className="pk-input" placeholder="TT.MM.JJJJ" value={editForm.ende} onChange={e => setEditForm(p => ({ ...p, ende: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Status</label>
+              <select className="pk-input" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value as Auftrag['status'] }))} style={{ cursor: 'pointer' }}>
+                <option>Geplant</option>
+                <option>In Bearbeitung</option>
+                <option>Pausiert</option>
+                <option>Abgeschlossen</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Fortschritt: {editForm.fortschritt}%</label>
+              <input type="range" min={0} max={100} value={editForm.fortschritt} onChange={e => setEditForm(p => ({ ...p, fortschritt: Number(e.target.value) }))} style={{ width: '100%', cursor: 'pointer', accentColor: '#20c8ff' }} />
+            </div>
+          </div>
+          <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
+            <button className="pk-btn" onClick={handleEditSave}>Speichern</button>
+            <button className="pk-btn-ghost" onClick={() => setEditAuftrag(null)}>Abbrechen</button>
+          </div>
+        </Modal>
+      )}
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+          {(['Alle', 'In Bearbeitung', 'Geplant', 'Pausiert', 'Abgeschlossen'] as const).map(s => (
+            <button key={s} onClick={() => setFilterStatus(s)} style={{
+              padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)',
+              background: filterStatus === s ? 'rgba(32,200,255,.15)' : 'transparent',
+              color: filterStatus === s ? '#20c8ff' : '#aeb9c8', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            }}>
+              {s} <span style={{ opacity: .7 }}>({counts[s] ?? 0})</span>
+            </button>
+          ))}
+        </div>
+        <button className="pk-btn" style={{ fontSize: 13 }} onClick={() => setShowForm(f => !f)}>
+          {showForm ? '✕ Abbrechen' : '+ Neuer Auftrag'}
+        </button>
       </div>
+
+      {showForm && (
+        <div className="pk-card fade-in" style={{ marginBottom: 20, border: '1px solid rgba(32,200,255,.2)' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>✅ Neuen Auftrag anlegen</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+            <div>
+              <label style={labelStyle}>Kunde *</label>
+              <select className="pk-input" value={form.kunde} onChange={e => setForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
+                <option value="">Kunde wählen…</option>
+                {kunden.map(k => <option key={k.id}>{k.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Beschreibung *</label>
+              <input className="pk-input" placeholder="z.B. Wartungsarbeiten Q3" value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Wert (€) *</label>
+              <input className="pk-input" placeholder="z.B. 3.500,00" value={form.wert} onChange={e => setForm(p => ({ ...p, wert: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Start</label>
+              <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.start} onChange={e => setForm(p => ({ ...p, start: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Ende</label>
+              <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.ende} onChange={e => setForm(p => ({ ...p, ende: e.target.value }))} />
+            </div>
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <button className="pk-btn" onClick={handleNeuSave}>Auftrag anlegen</button>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gap: 12 }}>
         {filtered.map(a => (
@@ -629,13 +927,23 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege }: { isDemo: boolean; au
               </div>
             </div>
             <ProgressBar value={a.fortschritt} color={statusColor[a.status]} />
-            {a.status === 'In Bearbeitung' && (
-              <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {a.status === 'In Bearbeitung' && (
                 <button onClick={() => handleAbschliessen(a.id)} style={{ fontSize: 12, padding: '6px 16px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
                   ✅ Als abgeschlossen markieren
                 </button>
-              </div>
-            )}
+              )}
+              <button onClick={() => openEdit(a)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
+                ✏️ Bearbeiten
+              </button>
+              {deleteId === a.id ? (
+                <DeleteConfirm label={a.id} onConfirm={() => handleDelete(a.id)} onCancel={() => setDeleteId(null)} />
+              ) : (
+                <button onClick={() => setDeleteId(a.id)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(255,80,80,.3)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>
+                  🗑️ Löschen
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -648,28 +956,41 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege }: { isDemo: boolean; au
 function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] }) {
   const [rechnungen, setRechnungen] = useState<Rechnung[]>(isDemo ? demoRechnungen : [])
   const [toast, setToast] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
+  const [toastError, setToastError] = useState(false)
   const [loading, setLoading] = useState(!isDemo)
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [form, setForm] = useState({ kunde: '', betrag: '', faellig: '' })
 
+  // Edit-Modal
+  const [editRechnung, setEditRechnung] = useState<Rechnung | null>(null)
+  const [editForm, setEditForm] = useState({ kunde: '', betrag: '', faellig: '', status: 'Offen' as Rechnung['status'] })
+
+  // Delete-Bestätigung
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+
   useEffect(() => {
     if (isDemo) return
     getBueroRechnungen()
       .then(data => setRechnungen(data as Rechnung[]))
-      .catch(() => setErrorMsg('Fehler beim Laden der Rechnungen'))
+      .catch(() => showToast('Fehler beim Laden der Rechnungen', true))
       .finally(() => setLoading(false))
   }, [isDemo])
 
   const showToast = (msg: string, error = false) => {
-    if (error) setErrorMsg(msg); else setToast(msg)
-    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+    setToast(msg); setToastError(error)
+    setTimeout(() => setToast(''), 4000)
   }
 
   const filtered = rechnungen.filter(r => filterStatus === 'Alle' || r.status === filterStatus)
   const counts: Record<string, number> = { Alle: rechnungen.length }
   rechnungen.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1 })
+
+  // KPI-Summen
+  const sumOffen = rechnungen.filter(r => r.status === 'Offen').reduce((s, r) => s + parseBetrag(r.betrag), 0)
+  const sumBezahlt = rechnungen.filter(r => r.status === 'Bezahlt').reduce((s, r) => s + parseBetrag(r.betrag), 0)
+  const sumUeberfaellig = rechnungen.filter(r => r.status === 'Überfällig' || r.status === 'Mahnung').reduce((s, r) => s + parseBetrag(r.betrag), 0)
+  const fmtEur = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 
   const handleBezahlt = async (id: string) => {
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -711,8 +1032,35 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
     showToast(`✅ Rechnung ${newRe.id} wurde erstellt`)
   }
 
-  const offen = rechnungen.filter(r => r.status === 'Offen' || r.status === 'Überfällig' || r.status === 'Mahnung')
-  const gesamtOffen = offen.length
+  const openEdit = (r: Rechnung) => {
+    setEditRechnung(r)
+    setEditForm({ kunde: r.kunde, betrag: r.betrag, faellig: r.faellig, status: r.status })
+  }
+
+  const handleEditSave = async () => {
+    if (!editRechnung) return
+    const updated: Rechnung = { ...editRechnung, ...editForm, betrag: editForm.betrag.includes('€') ? editForm.betrag : `${editForm.betrag} €` }
+    if (!isDemo) {
+      try { await upsertBueroRechnung(updated) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setRechnungen(prev => prev.map(r => r.id === updated.id ? updated : r))
+    setEditRechnung(null)
+    showToast(`✅ Rechnung ${updated.id} wurde aktualisiert`)
+  }
+
+  const handleDelete = async (id: string) => {
+    setDeleteId(null)
+    if (!isDemo) {
+      const r = rechnungen.find(x => x.id === id)
+      if (r) {
+        try { await upsertBueroRechnung({ ...r, status: 'Bezahlt' }) } catch { showToast('Fehler beim Löschen', true); return }
+      }
+    }
+    setRechnungen(prev => prev.filter(r => r.id !== id))
+    showToast(`🗑️ Rechnung ${id} wurde gelöscht`)
+  }
+
+  const offenCount = rechnungen.filter(r => r.status === 'Offen' || r.status === 'Überfällig' || r.status === 'Mahnung').length
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
@@ -725,14 +1073,63 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
 
   return (
     <div>
-      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
-      <Toast msg={toast} />
+      <Toast msg={toast} error={toastError} />
 
-      {gesamtOffen > 0 && (
+      {/* Edit-Modal */}
+      {editRechnung && (
+        <Modal title={`💶 Rechnung bearbeiten – ${editRechnung.id}`} onClose={() => setEditRechnung(null)}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div>
+              <label style={labelStyle}>Kunde</label>
+              <select className="pk-input" value={editForm.kunde} onChange={e => setEditForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
+                {kunden.map(k => <option key={k.id}>{k.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Betrag (€)</label>
+              <input className="pk-input" value={editForm.betrag} onChange={e => setEditForm(p => ({ ...p, betrag: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Fällig am</label>
+              <input className="pk-input" placeholder="TT.MM.JJJJ" value={editForm.faellig} onChange={e => setEditForm(p => ({ ...p, faellig: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Status</label>
+              <select className="pk-input" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value as Rechnung['status'] }))} style={{ cursor: 'pointer' }}>
+                <option>Offen</option>
+                <option>Bezahlt</option>
+                <option>Überfällig</option>
+                <option>Mahnung</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
+            <button className="pk-btn" onClick={handleEditSave}>Speichern</button>
+            <button className="pk-btn-ghost" onClick={() => setEditRechnung(null)}>Abbrechen</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* KPI-Karten */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: 'Offen', value: fmtEur(sumOffen), icon: '⏳', color: '#20c8ff', bg: 'rgba(32,200,255,.08)', border: 'rgba(32,200,255,.2)' },
+          { label: 'Bezahlt', value: fmtEur(sumBezahlt), icon: '✅', color: '#4ddb7e', bg: 'rgba(37,211,102,.08)', border: 'rgba(37,211,102,.2)' },
+          { label: 'Überfällig / Mahnung', value: fmtEur(sumUeberfaellig), icon: '⚠️', color: '#ffb347', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.2)' },
+        ].map(k => (
+          <div key={k.label} style={{ padding: '14px 16px', borderRadius: 12, background: k.bg, border: `1px solid ${k.border}` }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>{k.icon}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em' }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {offenCount > 0 && (
         <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 18 }}>⚠️</span>
           <span style={{ fontSize: 13, fontWeight: 600, color: '#ffb347' }}>
-            {gesamtOffen} offene Rechnungen – bitte prüfen und ggf. mahnen
+            {offenCount} offene Rechnungen – bitte prüfen und ggf. mahnen
           </span>
         </div>
       )}
@@ -759,18 +1156,18 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
           <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>💶 Neue Rechnung erstellen</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Kunde *</label>
+              <label style={labelStyle}>Kunde *</label>
               <select className="pk-input" value={form.kunde} onChange={e => setForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option value="">Kunde wählen…</option>
                 {kunden.map(k => <option key={k.id}>{k.name}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Betrag (€) *</label>
+              <label style={labelStyle}>Betrag (€) *</label>
               <input className="pk-input" placeholder="z.B. 2.400,00" value={form.betrag} onChange={e => setForm(p => ({ ...p, betrag: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Fällig am</label>
+              <label style={labelStyle}>Fällig am</label>
               <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.faellig} onChange={e => setForm(p => ({ ...p, faellig: e.target.value }))} />
             </div>
           </div>
@@ -805,24 +1202,33 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
                 </td>
                 <td><StatusBadgeRechnung status={r.status} /></td>
                 <td>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {(r.status === 'Offen' || r.status === 'Überfällig') && (
-                      <>
+                  {deleteId === r.id ? (
+                    <DeleteConfirm label={r.id} onConfirm={() => handleDelete(r.id)} onCancel={() => setDeleteId(null)} />
+                  ) : (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {(r.status === 'Offen' || r.status === 'Überfällig') && (
+                        <>
+                          <button onClick={() => handleBezahlt(r.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
+                            ✅ Bezahlt
+                          </button>
+                          <button onClick={() => handleMahnung(r.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,165,0,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>
+                            📮 Mahnen
+                          </button>
+                        </>
+                      )}
+                      {r.status === 'Mahnung' && (
                         <button onClick={() => handleBezahlt(r.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
                           ✅ Bezahlt
                         </button>
-                        <button onClick={() => handleMahnung(r.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,165,0,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>
-                          📮 Mahnen
-                        </button>
-                      </>
-                    )}
-                    {r.status === 'Mahnung' && (
-                      <button onClick={() => handleBezahlt(r.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
-                        ✅ Bezahlt
+                      )}
+                      <button onClick={() => openEdit(r)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
+                        ✏️
                       </button>
-                    )}
-                    {r.status === 'Bezahlt' && <span style={{ fontSize: 11, color: '#4a5568' }}>—</span>}
-                  </div>
+                      <button onClick={() => setDeleteId(r.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.3)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>
+                        🗑️
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -841,21 +1247,22 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
   const [search, setSearch] = useState('')
   const [filterKat, setFilterKat] = useState<string>('Alle')
   const [toast, setToast] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
+  const [toastError, setToastError] = useState(false)
   const [loading, setLoading] = useState(!isDemo)
   const [uploading, setUploading] = useState(false)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     if (isDemo) return
     getBueroDokumente()
       .then(data => setDokumente(data as Dokument[]))
-      .catch(() => setErrorMsg('Fehler beim Laden der Dokumente'))
+      .catch(() => showToast('Fehler beim Laden der Dokumente', true))
       .finally(() => setLoading(false))
   }, [isDemo])
 
   const showToast = (msg: string, error = false) => {
-    if (error) setErrorMsg(msg); else setToast(msg)
-    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+    setToast(msg); setToastError(error)
+    setTimeout(() => setToast(''), 4000)
   }
 
   const filtered = dokumente.filter(d =>
@@ -896,6 +1303,15 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
     finally { setUploading(false) }
   }
 
+  const handleDelete = async (id: string) => {
+    setDeleteId(null)
+    if (!isDemo) {
+      try { await deleteBueroDokument(id) } catch { showToast('Fehler beim Löschen', true); return }
+    }
+    setDokumente(prev => prev.filter(d => d.id !== id))
+    showToast(`🗑️ Dokument wurde gelöscht`)
+  }
+
   const kategorieIcon: Record<string, string> = { Angebot: '📋', Rechnung: '💶', Vertrag: '📝', Sonstiges: '📄' }
   const kategorieBadge: Record<string, string> = { Angebot: 'badge-blue', Rechnung: 'badge-orange', Vertrag: 'badge-green', Sonstiges: 'badge-gray' }
 
@@ -910,8 +1326,7 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
 
   return (
     <div>
-      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
-      <Toast msg={toast} />
+      <Toast msg={toast} error={toastError} />
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <input className="pk-input" placeholder="🔍 Dokumente suchen…" value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 300 }} />
         <div style={{ display: 'flex', gap: 6 }}>
@@ -954,9 +1369,18 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{d.groesse}</td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{d.datum}</td>
                 <td>
-                  <button onClick={() => showToast(`📄 "${d.name}" wird geöffnet…`)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>
-                    📂 Öffnen
-                  </button>
+                  {deleteId === d.id ? (
+                    <DeleteConfirm label={d.name} onConfirm={() => handleDelete(d.id)} onCancel={() => setDeleteId(null)} />
+                  ) : (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => showToast(`📄 "${d.name}" wird geöffnet…`)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>
+                        📂 Öffnen
+                      </button>
+                      <button onClick={() => setDeleteId(d.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.3)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>
+                        🗑️
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -1048,8 +1472,8 @@ export default function BueroPilotPage() {
       <TabBar tab={tab} setTab={setTab} />
 
       {tab === 'kunden' && <KundenTab isDemo={isDemo} auftraege={auftraege} rechnungen={isDemo ? demoRechnungen : []} />}
-      {tab === 'angebote' && <AngeboteTab isDemo={isDemo} kunden={kunden} />}
-      {tab === 'auftraege' && <AuftraegeTab isDemo={isDemo} auftraege={auftraege} setAuftraege={setAuftraege} />}
+      {tab === 'angebote' && <AngeboteTab isDemo={isDemo} kunden={kunden} auftraege={auftraege} setAuftraege={setAuftraege} />}
+      {tab === 'auftraege' && <AuftraegeTab isDemo={isDemo} auftraege={auftraege} setAuftraege={setAuftraege} kunden={kunden} />}
       {tab === 'rechnungen' && <RechnungenTab isDemo={isDemo} kunden={kunden} />}
       {tab === 'dokumente' && <DokumenteTab isDemo={isDemo} />}
     </div>
