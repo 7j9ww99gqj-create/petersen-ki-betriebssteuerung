@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
 import {
   getBueroKunden, upsertBueroKunde, deleteBueroKunde,
@@ -8,6 +8,7 @@ import {
   getBueroRechnungen, upsertBueroRechnung,
   getBueroDokumente, insertBueroDokument, deleteBueroDokument,
 } from '@/lib/db'
+import { generateRechnungPDF, generateAngebotPDF } from '@/lib/pdf'
 
 // ── Typen ───────────────────────────────────────────────────────────────────
 
@@ -697,6 +698,9 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege }: { isDemo: bool
                           → Auftrag erstellen
                         </button>
                       )}
+                      <button onClick={() => generateAngebotPDF(a, a.kunde)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
+                        📄 PDF
+                      </button>
                       <button onClick={() => openEdit(a)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
                         ✏️
                       </button>
@@ -1221,6 +1225,9 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
                           ✅ Bezahlt
                         </button>
                       )}
+                      <button onClick={() => generateRechnungPDF(r, r.kunde)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
+                        📄 PDF
+                      </button>
                       <button onClick={() => openEdit(r)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
                         ✏️
                       </button>
@@ -1251,6 +1258,7 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
   const [loading, setLoading] = useState(!isDemo)
   const [uploading, setUploading] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (isDemo) return
@@ -1267,40 +1275,52 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
 
   const filtered = dokumente.filter(d =>
     (filterKat === 'Alle' || d.kategorie === filterKat) &&
-    (d.name.toLowerCase().includes(search.toLowerCase()) || d.bezug.toLowerCase().includes(search.toLowerCase()))
+    (
+      d.name.toLowerCase().includes(search.toLowerCase()) ||
+      d.bezug.toLowerCase().includes(search.toLowerCase()) ||
+      d.kategorie.toLowerCase().includes(search.toLowerCase())
+    )
   )
 
-  const handleUpload = async () => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
     setUploading(true)
+
+    const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const groesseKB = file.size < 1024 * 1024
+      ? `${Math.round(file.size / 1024)} KB`
+      : `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+    const ext = file.name.split('.').pop()?.toUpperCase() ?? 'PDF'
+
+    const newDoc: Dokument = {
+      id: `DOK-${String(dokumente.length + 1).padStart(3, '0')}`,
+      name: file.name,
+      typ: ext,
+      groesse: groesseKB,
+      datum: fmt(new Date()),
+      kategorie: 'Sonstiges',
+      bezug: '—',
+    }
+
     if (isDemo) {
       setTimeout(() => {
-        const newDoc: Dokument = {
-          id: `DOK-${String(dokumente.length + 1).padStart(3, '0')}`,
-          name: 'Neues_Dokument_Upload.pdf',
-          typ: 'PDF', groesse: '245 KB',
-          datum: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-          kategorie: 'Sonstiges', bezug: '—',
-        }
         setDokumente(prev => [newDoc, ...prev])
         setUploading(false)
-        showToast('✅ Dokument erfolgreich hochgeladen und archiviert')
-      }, 1800)
-      return
+        showToast(`✅ "${file.name}" erfolgreich hochgeladen und archiviert`)
+      }, 900)
+    } else {
+      try {
+        await insertBueroDokument(newDoc)
+        const data = await getBueroDokumente()
+        setDokumente(data as Dokument[])
+        showToast(`✅ "${file.name}" erfolgreich hochgeladen und archiviert`)
+      } catch { showToast('Fehler beim Hochladen', true) }
+      finally { setUploading(false) }
     }
-    try {
-      const newDoc: Dokument = {
-        id: `DOK-${String(dokumente.length + 1).padStart(3, '0')}`,
-        name: 'Neues_Dokument_Upload.pdf',
-        typ: 'PDF', groesse: '245 KB',
-        datum: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-        kategorie: 'Sonstiges', bezug: '—',
-      }
-      await insertBueroDokument(newDoc)
-      const data = await getBueroDokumente()
-      setDokumente(data as Dokument[])
-      showToast('✅ Dokument erfolgreich hochgeladen und archiviert')
-    } catch { showToast('Fehler beim Hochladen', true) }
-    finally { setUploading(false) }
+
+    // Input zurücksetzen für erneuten Upload derselben Datei
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const handleDelete = async (id: string) => {
@@ -1327,9 +1347,35 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
   return (
     <div>
       <Toast msg={toast} error={toastError} />
+
+      {/* Upload-Bereich */}
+      <div className="pk-card fade-in" style={{ marginBottom: 16, border: '1px dashed rgba(32,200,255,.25)', background: 'rgba(32,200,255,.04)', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px' }}>
+        <span style={{ fontSize: 24 }}>📁</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>Dokument hochladen</div>
+          <div style={{ fontSize: 12, color: '#aeb9c8' }}>PDF, JPG, PNG oder DOCX · Wird im Archiv gespeichert</div>
+        </div>
+        {/* Verstecktes File-Input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.docx"
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
+        <button
+          className="pk-btn"
+          style={{ fontSize: 13, whiteSpace: 'nowrap' }}
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+        >
+          {uploading ? '⏳ Wird hochgeladen…' : '📤 Datei auswählen'}
+        </button>
+      </div>
+
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-        <input className="pk-input" placeholder="🔍 Dokumente suchen…" value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 300 }} />
-        <div style={{ display: 'flex', gap: 6 }}>
+        <input className="pk-input" placeholder="🔍 Suchen nach Name, Bezug, Kategorie…" value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 320 }} />
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(['Alle', 'Angebot', 'Rechnung', 'Vertrag', 'Sonstiges'] as const).map(k => (
             <button key={k} onClick={() => setFilterKat(k)} style={{
               padding: '6px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)',
@@ -1338,9 +1384,6 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
             }}>{k}</button>
           ))}
         </div>
-        <button className="pk-btn" style={{ fontSize: 13, marginLeft: 'auto' }} onClick={handleUpload} disabled={uploading}>
-          {uploading ? '⏳ Wird hochgeladen…' : '📤 Dokument hochladen'}
-        </button>
       </div>
 
       <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -1373,8 +1416,12 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
                     <DeleteConfirm label={d.name} onConfirm={() => handleDelete(d.id)} onCancel={() => setDeleteId(null)} />
                   ) : (
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={() => showToast(`📄 "${d.name}" wird geöffnet…`)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>
-                        📂 Öffnen
+                      <button
+                        onClick={() => isDemo ? showToast(`📄 Demo: "${d.name}" — kein echter Download verfügbar`) : showToast(`📄 "${d.name}" wird geöffnet…`)}
+                        style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: isDemo ? '#6b7e94' : '#aeb9c8', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.6 : 1 }}
+                        title={isDemo ? 'Download nur mit echtem Account verfügbar' : 'Dokument herunterladen'}
+                      >
+                        🔗 Download
                       </button>
                       <button onClick={() => setDeleteId(d.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.3)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>
                         🗑️
@@ -1384,6 +1431,13 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
                 </td>
               </tr>
             ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', color: '#aeb9c8', fontSize: 13, padding: '24px 0' }}>
+                  Keine Dokumente gefunden
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
