@@ -87,6 +87,10 @@ const statusIcon: Record<AKStatus, string> = {
   Offen: '📋', 'In Arbeit': '⚙️', Warten: '⏸️', Fertig: '✅', Storniert: '✕',
 }
 
+function genId() {
+  return `AK-${Date.now().toString(36).toUpperCase()}`
+}
+
 function ProgressBar({ value, color }: { value: number; color: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -98,14 +102,137 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
   )
 }
 
-function Toast({ msg }: { msg: string }) {
+// Fixed-position Toast (success = green, error = red)
+function Toast({ msg, isError }: { msg: string; isError?: boolean }) {
   if (!msg) return null
   return (
     <div style={{
-      padding: '14px 18px', borderRadius: 12, marginBottom: 16,
-      background: 'rgba(37,211,102,.12)', border: '1px solid rgba(37,211,102,.3)',
-      color: '#4ddb7e', fontSize: 14, fontWeight: 600,
+      position: 'fixed', bottom: 90, right: 24, zIndex: 9999,
+      padding: '14px 20px', borderRadius: 12, minWidth: 260, maxWidth: 400,
+      background: isError ? 'rgba(244,63,94,.15)' : 'rgba(37,211,102,.12)',
+      border: `1px solid ${isError ? 'rgba(244,63,94,.4)' : 'rgba(37,211,102,.3)'}`,
+      color: isError ? '#fb7185' : '#4ddb7e',
+      fontSize: 14, fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,.4)',
     }}>{msg}</div>
+  )
+}
+
+// Modal-Pattern
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
+      <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', position: 'relative' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{title}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// ── Edit-Modal für Arbeitskarten ──────────────────────────────────────────────
+
+function EditKarteModal({ karte, onClose, onSave }: {
+  karte: Arbeitskarte
+  onClose: () => void
+  onSave: (updated: Arbeitskarte) => void
+}) {
+  const [form, setForm] = useState({
+    auftragsnr: karte.auftragsnr,
+    beschreibung: karte.beschreibung,
+    mitarbeiter: karte.mitarbeiter,
+    prioritaet: karte.prioritaet,
+    status: karte.status,
+    geplant: karte.geplant,
+    stunden: String(karte.stunden),
+    maschine: karte.maschine,
+    fortschritt: karte.fortschritt,
+  })
+
+  const handleSubmit = () => {
+    if (!form.auftragsnr || !form.beschreibung || !form.mitarbeiter) return
+    onSave({
+      ...karte,
+      auftragsnr: form.auftragsnr,
+      beschreibung: form.beschreibung,
+      mitarbeiter: form.mitarbeiter,
+      prioritaet: form.prioritaet,
+      status: form.status,
+      geplant: form.geplant || '—',
+      stunden: Number(form.stunden) || 0,
+      maschine: form.maschine || '—',
+      fortschritt: form.fortschritt,
+    })
+  }
+
+  const labelStyle: React.CSSProperties = { display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }
+
+  return (
+    <Modal title={`✏️ Arbeitskarte bearbeiten – ${karte.id}`} onClose={onClose}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+        <div>
+          <label style={labelStyle}>Auftragsnummer *</label>
+          <input className="pk-input" value={form.auftragsnr} onChange={e => setForm(p => ({ ...p, auftragsnr: e.target.value }))} />
+        </div>
+        <div style={{ gridColumn: 'span 2' }}>
+          <label style={labelStyle}>Beschreibung *</label>
+          <input className="pk-input" value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} />
+        </div>
+        <div>
+          <label style={labelStyle}>Mitarbeiter *</label>
+          <select className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
+            <option value="">Mitarbeiter wählen…</option>
+            {mitarbeiterListe.map(m => <option key={m}>{m}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Maschine / Bereich</label>
+          <select className="pk-input" value={form.maschine} onChange={e => setForm(p => ({ ...p, maschine: e.target.value }))} style={{ cursor: 'pointer' }}>
+            <option value="">Maschine wählen…</option>
+            {maschineListe.map(m => <option key={m}>{m}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Priorität</label>
+          <select className="pk-input" value={form.prioritaet} onChange={e => setForm(p => ({ ...p, prioritaet: e.target.value as Prioritaet }))} style={{ cursor: 'pointer' }}>
+            <option>Niedrig</option><option>Mittel</option><option>Hoch</option><option>Kritisch</option>
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Status</label>
+          <select className="pk-input" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as AKStatus }))} style={{ cursor: 'pointer' }}>
+            <option>Offen</option><option>In Arbeit</option><option>Warten</option><option>Fertig</option><option>Storniert</option>
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Geplant bis</label>
+          <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.geplant} onChange={e => setForm(p => ({ ...p, geplant: e.target.value }))} />
+        </div>
+        <div>
+          <label style={labelStyle}>Geplante Stunden</label>
+          <input className="pk-input" type="number" value={form.stunden} onChange={e => setForm(p => ({ ...p, stunden: e.target.value }))} />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={labelStyle}>Fortschritt: {form.fortschritt}%</label>
+          <input
+            type="range" min={0} max={100} step={5} value={form.fortschritt}
+            onChange={e => setForm(p => ({ ...p, fortschritt: Number(e.target.value) }))}
+            style={{ width: '100%', accentColor: '#7c3aed', cursor: 'pointer' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#4a5568', marginTop: 2 }}>
+            <span>0%</span><span>50%</span><span>100%</span>
+          </div>
+        </div>
+      </div>
+      <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
+        <button className="pk-btn" onClick={handleSubmit} style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', fontWeight: 700 }}>
+          💾 Speichern
+        </button>
+        <button className="pk-btn-ghost" onClick={onClose}>Abbrechen</button>
+      </div>
+    </Modal>
   )
 }
 
@@ -117,8 +244,12 @@ function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [filterPrio, setFilterPrio] = useState<string>('Alle')
   const [toast, setToast] = useState('')
+  const [toastError, setToastError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(!isDemo)
+  const [editKarte, setEditKarte] = useState<Arbeitskarte | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [sliderValues, setSliderValues] = useState<Record<string, number>>({})
   const [form, setForm] = useState({
     auftragsnr: '', beschreibung: '', mitarbeiter: '', prioritaet: 'Mittel' as Prioritaet,
     status: 'Offen' as AKStatus, geplant: '', stunden: '', maschine: '',
@@ -133,8 +264,8 @@ function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
   }, [isDemo])
 
   const showToast = (msg: string, error = false) => {
-    if (error) setErrorMsg(msg); else setToast(msg)
-    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+    setToast(msg); setToastError(error)
+    setTimeout(() => { setToast(''); setToastError(false) }, 4000)
   }
 
   const filtered = karten.filter(k =>
@@ -142,18 +273,23 @@ function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
     (filterPrio === 'Alle' || k.prioritaet === filterPrio)
   )
 
+  const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
   const counts: Record<string, number> = { Alle: karten.length }
   karten.forEach(k => {
     counts[k.status] = (counts[k.status] || 0) + 1
     counts[k.prioritaet] = (counts[k.prioritaet] || 0) + 1
   })
 
+  // KPI counts
+  const kpiOffen = karten.filter(k => k.status === 'Offen').length
+  const kpiInArbeit = karten.filter(k => k.status === 'In Arbeit').length
+  const kpiKritisch = karten.filter(k => k.prioritaet === 'Kritisch' && k.status !== 'Fertig' && k.status !== 'Storniert').length
+  const kpiFertigHeute = karten.filter(k => k.status === 'Fertig' && k.erstellt === today).length
+
   const handleSave = async () => {
     if (!form.auftragsnr || !form.beschreibung || !form.mitarbeiter) return
-    const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    const nextId = `AK-2025-0${42 + karten.length - demoKarten.length}`
     const newKarte: Arbeitskarte = {
-      id: nextId, auftragsnr: form.auftragsnr, beschreibung: form.beschreibung,
+      id: genId(), auftragsnr: form.auftragsnr, beschreibung: form.beschreibung,
       mitarbeiter: form.mitarbeiter, prioritaet: form.prioritaet, status: form.status,
       erstellt: today, geplant: form.geplant || '—', stunden: Number(form.stunden) || 0,
       fortschritt: 0, maschine: form.maschine || '—',
@@ -164,7 +300,7 @@ function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
     setKarten(prev => [newKarte, ...prev])
     setForm({ auftragsnr: '', beschreibung: '', mitarbeiter: '', prioritaet: 'Mittel', status: 'Offen', geplant: '', stunden: '', maschine: '' })
     setShowForm(false)
-    showToast(`✅ Arbeitskarte ${nextId} wurde erfolgreich erstellt`)
+    showToast(`✅ Arbeitskarte ${newKarte.id} wurde erfolgreich erstellt`)
   }
 
   const handleStatusChange = async (id: string, status: AKStatus) => {
@@ -180,6 +316,42 @@ function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
     showToast(`✅ ${id}: Status auf "${status}" gesetzt`)
   }
 
+  const handleEditSave = async (updated: Arbeitskarte) => {
+    if (!isDemo) {
+      try { await upsertWerkstattKarte(updated) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setKarten(prev => prev.map(k => k.id === updated.id ? updated : k))
+    setEditKarte(null)
+    showToast(`✅ Arbeitskarte ${updated.id} gespeichert`)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!isDemo) {
+      try { await deleteWerkstattKarte(id) } catch { showToast('Fehler beim Löschen', true); return }
+    }
+    setKarten(prev => prev.filter(k => k.id !== id))
+    setDeleteConfirm(null)
+    showToast(`🗑️ Arbeitskarte ${id} gelöscht`)
+  }
+
+  const handleSliderChange = (id: string, value: number) => {
+    setSliderValues(prev => ({ ...prev, [id]: value }))
+    setKarten(prev => prev.map(k => k.id === id ? { ...k, fortschritt: value } : k))
+  }
+
+  const handleSliderRelease = async (id: string, value: number) => {
+    const karte = karten.find(k => k.id === id)
+    if (!karte) return
+    const updated = { ...karte, fortschritt: value }
+    if (!isDemo) {
+      try { await upsertWerkstattKarte(updated) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setKarten(prev => prev.map(k => k.id === id ? updated : k))
+    const newSlider = { ...sliderValues }
+    delete newSlider[id]
+    setSliderValues(newSlider)
+  }
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
       <div style={{ textAlign: 'center' }}>
@@ -191,8 +363,24 @@ function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
 
   return (
     <div>
+      <Toast msg={toast} isError={toastError} />
       {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
-      <Toast msg={toast} />
+
+      {/* KPI-Karten */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: 'Offen', value: kpiOffen, icon: '📋', color: '#aeb9c8' },
+          { label: 'In Arbeit', value: kpiInArbeit, icon: '⚙️', color: '#1684ff' },
+          { label: 'Kritisch', value: kpiKritisch, icon: '🔴', color: '#f43f5e' },
+          { label: 'Fertig heute', value: kpiFertigHeute, icon: '✅', color: '#10b981' },
+        ].map(s => (
+          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+            <div style={{ fontSize: 18, marginBottom: 4 }}>{s.icon}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
 
       {/* Filter + New Button */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -307,7 +495,9 @@ function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
                   <span>📋 Erstellt: {k.erstellt}</span>
                 </div>
               </div>
-              <div style={{ flexShrink: 0 }}>
+              {/* Action Buttons */}
+              <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+                {/* Status-Schnellwechsel */}
                 {k.status !== 'Fertig' && k.status !== 'Storniert' && (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     {k.status !== 'In Arbeit' && (
@@ -325,9 +515,42 @@ function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
                     </button>
                   </div>
                 )}
+                {/* Edit + Delete */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => setEditKarte(k)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(167,139,250,.3)', background: 'transparent', color: '#c4b5fd', cursor: 'pointer' }}>
+                    ✏️
+                  </button>
+                  {deleteConfirm === k.id ? (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => handleDelete(k.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(244,63,94,.4)', background: 'rgba(244,63,94,.1)', color: '#fb7185', cursor: 'pointer', fontWeight: 700 }}>
+                        Ja, löschen
+                      </button>
+                      <button onClick={() => setDeleteConfirm(null)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.15)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>
+                        Abbrechen
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setDeleteConfirm(k.id)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(244,63,94,.2)', background: 'transparent', color: '#fb7185', cursor: 'pointer' }}>
+                      🗑️
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-            <ProgressBar value={k.fortschritt} color={prioColor[k.prioritaet]} />
+            {/* ProgressBar + inline Slider */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <ProgressBar value={sliderValues[k.id] ?? k.fortschritt} color={prioColor[k.prioritaet]} />
+              </div>
+              <input
+                type="range" min={0} max={100} step={5}
+                value={sliderValues[k.id] ?? k.fortschritt}
+                onChange={e => handleSliderChange(k.id, Number(e.target.value))}
+                onMouseUp={e => handleSliderRelease(k.id, Number((e.target as HTMLInputElement).value))}
+                onTouchEnd={e => handleSliderRelease(k.id, Number((e.target as HTMLInputElement).value))}
+                style={{ width: 90, accentColor: prioColor[k.prioritaet], cursor: 'pointer', flexShrink: 0 }}
+              />
+            </div>
           </div>
         ))}
         {filtered.length === 0 && (
@@ -337,6 +560,15 @@ function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
           </div>
         )}
       </div>
+
+      {/* Edit-Modal */}
+      {editKarte && (
+        <EditKarteModal
+          karte={editKarte}
+          onClose={() => setEditKarte(null)}
+          onSave={handleEditSave}
+        />
+      )}
     </div>
   )
 }
@@ -347,8 +579,10 @@ function ZeiterfassungTab({ isDemo }: { isDemo: boolean }) {
   const [buchungen, setBuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])
   const [form, setForm] = useState({ mitarbeiter: '', auftragsnr: '', stunden: '', taetigkeit: '' })
   const [toast, setToast] = useState('')
+  const [toastError, setToastError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(!isDemo)
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
   useEffect(() => {
     if (isDemo) return
@@ -359,8 +593,8 @@ function ZeiterfassungTab({ isDemo }: { isDemo: boolean }) {
   }, [isDemo])
 
   const showToast = (msg: string, error = false) => {
-    if (error) setErrorMsg(msg); else setToast(msg)
-    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+    setToast(msg); setToastError(error)
+    setTimeout(() => { setToast(''); setToastError(false) }, 4000)
   }
 
   const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -378,6 +612,12 @@ function ZeiterfassungTab({ isDemo }: { isDemo: boolean }) {
     showToast(`✅ ${form.stunden}h für ${form.mitarbeiter} auf ${form.auftragsnr} gebucht`)
   }
 
+  const handleDelete = (id: number) => {
+    setBuchungen(prev => prev.filter(b => b.id !== id))
+    setDeleteConfirm(null)
+    showToast('🗑️ Zeitbuchung gelöscht')
+  }
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
       <div style={{ textAlign: 'center' }}>
@@ -389,8 +629,8 @@ function ZeiterfassungTab({ isDemo }: { isDemo: boolean }) {
 
   return (
     <div>
+      <Toast msg={toast} isError={toastError} />
       {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
-      <Toast msg={toast} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
           { label: 'Stunden heute', value: `${gesamtHeute}h`, icon: '⏱️', color: '#a78bfa' },
@@ -443,6 +683,7 @@ function ZeiterfassungTab({ isDemo }: { isDemo: boolean }) {
               <th>Stunden</th>
               <th>Tätigkeit</th>
               <th>Datum</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -453,6 +694,16 @@ function ZeiterfassungTab({ isDemo }: { isDemo: boolean }) {
                 <td style={{ fontWeight: 700, color: '#a78bfa' }}>{b.stunden}h</td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{b.taetigkeit}</td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{b.datum}</td>
+                <td>
+                  {deleteConfirm === b.id ? (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => handleDelete(b.id)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.4)', background: 'rgba(244,63,94,.1)', color: '#fb7185', cursor: 'pointer', fontWeight: 700 }}>Ja</button>
+                      <button onClick={() => setDeleteConfirm(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,.15)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setDeleteConfirm(b.id)} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.2)', background: 'transparent', color: '#fb7185', cursor: 'pointer' }}>🗑️</button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -468,8 +719,10 @@ function MaterialverbrauchTab({ isDemo }: { isDemo: boolean }) {
   const [material, setMaterial] = useState<Materialverbrauch[]>(isDemo ? demoMaterial : [])
   const [form, setForm] = useState({ artikel: '', menge: '', einheit: 'Stk', auftragsnr: '', mitarbeiter: '' })
   const [toast, setToast] = useState('')
+  const [toastError, setToastError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(!isDemo)
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
   useEffect(() => {
     if (isDemo) return
@@ -480,8 +733,8 @@ function MaterialverbrauchTab({ isDemo }: { isDemo: boolean }) {
   }, [isDemo])
 
   const showToast = (msg: string, error = false) => {
-    if (error) setErrorMsg(msg); else setToast(msg)
-    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+    setToast(msg); setToastError(error)
+    setTimeout(() => { setToast(''); setToastError(false) }, 4000)
   }
 
   const handleSave = async () => {
@@ -496,6 +749,12 @@ function MaterialverbrauchTab({ isDemo }: { isDemo: boolean }) {
     showToast(`✅ Verbrauch "${form.artikel}" (${form.menge} ${form.einheit}) gebucht`)
   }
 
+  const handleDelete = (id: number) => {
+    setMaterial(prev => prev.filter(m => m.id !== id))
+    setDeleteConfirm(null)
+    showToast('🗑️ Materialverbrauch gelöscht')
+  }
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
       <div style={{ textAlign: 'center' }}>
@@ -507,8 +766,8 @@ function MaterialverbrauchTab({ isDemo }: { isDemo: boolean }) {
 
   return (
     <div>
+      <Toast msg={toast} isError={toastError} />
       {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
-      <Toast msg={toast} />
       <div className="pk-card fade-in" style={{ marginBottom: 16, border: '1px solid rgba(167,139,250,.2)' }}>
         <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 800 }}>🔩 Materialverbrauch buchen</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
@@ -552,6 +811,7 @@ function MaterialverbrauchTab({ isDemo }: { isDemo: boolean }) {
               <th>Auftrag</th>
               <th>Mitarbeiter</th>
               <th>Datum</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -562,6 +822,16 @@ function MaterialverbrauchTab({ isDemo }: { isDemo: boolean }) {
                 <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#a78bfa' }}>{m.auftragsnr}</td>
                 <td style={{ color: '#aeb9c8' }}>{m.mitarbeiter}</td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{m.datum}</td>
+                <td>
+                  {deleteConfirm === m.id ? (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => handleDelete(m.id)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.4)', background: 'rgba(244,63,94,.1)', color: '#fb7185', cursor: 'pointer', fontWeight: 700 }}>Ja</button>
+                      <button onClick={() => setDeleteConfirm(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,.15)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setDeleteConfirm(m.id)} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.2)', background: 'transparent', color: '#fb7185', cursor: 'pointer' }}>🗑️</button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -577,8 +847,10 @@ function QualitaetTab({ isDemo }: { isDemo: boolean }) {
   const [protokolle, setProtokolle] = useState<Pruefprotokoll[]>(isDemo ? demoPruefung : [])
   const [form, setForm] = useState({ auftragsnr: '', pruefpunkt: '', pruefer: '' })
   const [toast, setToast] = useState('')
+  const [toastError, setToastError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(!isDemo)
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
   useEffect(() => {
     if (isDemo) return
@@ -589,20 +861,22 @@ function QualitaetTab({ isDemo }: { isDemo: boolean }) {
   }, [isDemo])
 
   const showToast = (msg: string, error = false) => {
-    if (error) setErrorMsg(msg); else setToast(msg)
-    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+    setToast(msg); setToastError(error)
+    setTimeout(() => { setToast(''); setToastError(false) }, 4000)
   }
 
-  const handleErgebnis = async (id: number, ergebnis: 'OK' | 'Fehler') => {
+  const handleErgebnis = async (id: number, ergebnis: 'OK' | 'Fehler' | 'Offen') => {
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     if (!isDemo) {
       const p = protokolle.find(p => p.id === id)
       if (p) {
-        try { await insertWerkstattPruefprotokoll({ ...p, ergebnis, datum: today }) } catch { showToast('Fehler beim Speichern', true); return }
+        try { await insertWerkstattPruefprotokoll({ ...p, ergebnis, datum: ergebnis === 'Offen' ? '—' : today }) } catch { showToast('Fehler beim Speichern', true); return }
       }
     }
-    setProtokolle(prev => prev.map(p => p.id === id ? { ...p, ergebnis, datum: today } : p))
-    showToast(ergebnis === 'OK' ? `✅ Prüfpunkt bestanden` : `⚠️ Fehler protokolliert`)
+    setProtokolle(prev => prev.map(p => p.id === id ? { ...p, ergebnis, datum: ergebnis === 'Offen' ? '—' : today } : p))
+    if (ergebnis === 'OK') showToast('✅ Prüfpunkt bestanden')
+    else if (ergebnis === 'Fehler') showToast('⚠️ Fehler protokolliert')
+    else showToast('🔍 Prüfpunkt zurückgesetzt')
   }
 
   const handleAdd = async () => {
@@ -615,6 +889,23 @@ function QualitaetTab({ isDemo }: { isDemo: boolean }) {
     setForm({ auftragsnr: '', pruefpunkt: '', pruefer: '' })
     showToast('✅ Prüfpunkt hinzugefügt')
   }
+
+  const handleDelete = (id: number) => {
+    setProtokolle(prev => prev.filter(p => p.id !== id))
+    setDeleteConfirm(null)
+    showToast('🗑️ Prüfpunkt gelöscht')
+  }
+
+  // Fertig-Badge: alle Prüfpunkte eines Auftrags sind "OK"
+  const auftragsFertig = new Set<string>()
+  const auftragsPunkte: Record<string, Pruefprotokoll[]> = {}
+  protokolle.forEach(p => {
+    if (!auftragsPunkte[p.auftragsnr]) auftragsPunkte[p.auftragsnr] = []
+    auftragsPunkte[p.auftragsnr].push(p)
+  })
+  Object.entries(auftragsPunkte).forEach(([nr, pts]) => {
+    if (pts.length > 0 && pts.every(p => p.ergebnis === 'OK')) auftragsFertig.add(nr)
+  })
 
   const ok = protokolle.filter(p => p.ergebnis === 'OK').length
   const fehler = protokolle.filter(p => p.ergebnis === 'Fehler').length
@@ -631,8 +922,8 @@ function QualitaetTab({ isDemo }: { isDemo: boolean }) {
 
   return (
     <div>
+      <Toast msg={toast} isError={toastError} />
       {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
-      <Toast msg={toast} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
         <div className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
           <div style={{ fontSize: 22, marginBottom: 4 }}>✅</div>
@@ -684,27 +975,46 @@ function QualitaetTab({ isDemo }: { isDemo: boolean }) {
               <th>Ergebnis</th>
               <th>Prüfer</th>
               <th>Datum</th>
-              <th>Aktion</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {protokolle.map(p => (
               <tr key={p.id}>
-                <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#a78bfa' }}>{p.auftragsnr}</td>
+                <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#a78bfa' }}>
+                  {p.auftragsnr}
+                  {auftragsFertig.has(p.auftragsnr) && (
+                    <span className="badge badge-green" style={{ marginLeft: 6, fontSize: 10 }}>✅ Fertig</span>
+                  )}
+                </td>
                 <td style={{ fontWeight: 600 }}>{p.pruefpunkt}</td>
                 <td>
-                  <span className={`badge ${p.ergebnis === 'OK' ? 'badge-green' : p.ergebnis === 'Fehler' ? 'badge-orange' : 'badge-gray'}`}>
-                    {p.ergebnis === 'OK' ? '✅ OK' : p.ergebnis === 'Fehler' ? '⚠️ Fehler' : '🔍 Offen'}
-                  </span>
+                  {/* Ergebnis-Dropdown direkt in der Zeile */}
+                  <select
+                    value={p.ergebnis}
+                    onChange={e => handleErgebnis(p.id, e.target.value as 'OK' | 'Fehler' | 'Offen')}
+                    style={{
+                      background: 'transparent',
+                      border: `1px solid ${p.ergebnis === 'OK' ? 'rgba(37,211,102,.3)' : p.ergebnis === 'Fehler' ? 'rgba(244,63,94,.3)' : 'rgba(255,255,255,.15)'}`,
+                      color: p.ergebnis === 'OK' ? '#4ddb7e' : p.ergebnis === 'Fehler' ? '#fb7185' : '#f59e0b',
+                      borderRadius: 999, padding: '3px 8px', fontSize: 12, cursor: 'pointer', fontWeight: 700,
+                    }}
+                  >
+                    <option value="OK">✅ OK</option>
+                    <option value="Fehler">⚠️ Fehler</option>
+                    <option value="Offen">🔍 Offen</option>
+                  </select>
                 </td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{p.pruefer}</td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{p.datum}</td>
                 <td>
-                  {p.ergebnis === 'Offen' && (
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={() => handleErgebnis(p.id, 'OK')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>✅ OK</button>
-                      <button onClick={() => handleErgebnis(p.id, 'Fehler')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(244,63,94,.3)', background: 'transparent', color: '#fb7185', cursor: 'pointer' }}>⚠️ Fehler</button>
+                  {deleteConfirm === p.id ? (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => handleDelete(p.id)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.4)', background: 'rgba(244,63,94,.1)', color: '#fb7185', cursor: 'pointer', fontWeight: 700 }}>Ja</button>
+                      <button onClick={() => setDeleteConfirm(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,.15)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
                     </div>
+                  ) : (
+                    <button onClick={() => setDeleteConfirm(p.id)} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.2)', background: 'transparent', color: '#fb7185', cursor: 'pointer' }}>🗑️</button>
                   )}
                 </td>
               </tr>
