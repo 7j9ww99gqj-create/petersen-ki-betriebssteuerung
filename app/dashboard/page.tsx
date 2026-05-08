@@ -1,22 +1,31 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { hasDemoCookie } from '@/lib/auth'
+import { getLagerArtikel, getBueroRechnungen, getBueroAuftraege } from '@/lib/db'
 
 const pilots = [
   { id: 'lager', label: 'LagerPilot', icon: '📦', desc: 'Wareneingang, Bestände, Lagerplätze, Inventur', href: '/dashboard/lager', color: '#1684ff', status: 'AKTIV' },
-  { id: 'buero', label: 'BüroPilot', icon: '🧾', desc: 'Kunden, Aufträge, Rechnungen, Dokumente', href: '/dashboard/buero', color: '#20c8ff', status: 'AKTIV' },
+  { id: 'buero', label: 'BüroPilot', icon: '🧾', desc: 'Kunden, Aufträge, Rechnungen, Dokumente, Einkauf', href: '/dashboard/buero', color: '#20c8ff', status: 'AKTIV' },
   { id: 'werkstatt', label: 'WerkstattPilot', icon: '🛠️', desc: 'Arbeitskarten, Zeiterfassung, Qualität', href: '/dashboard/werkstatt', color: '#a78bfa', status: 'AKTIV' },
   { id: 'marketing', label: 'MarketingPilot', icon: '📣', desc: 'Kampagnen, E-Mail, Social Media, Leads', href: '/dashboard/marketing', color: '#f59e0b', status: 'AKTIV' },
   { id: 'analyse', label: 'AnalysePilot', icon: '📊', desc: 'Dashboards, KPIs, Prognosen, Berichte', href: '/dashboard/analyse', color: '#10b981', status: 'AKTIV' },
   { id: 'planung', label: 'PlanungPilot', icon: '📅', desc: 'Produktion, Ressourcen, Termine, Projekte', href: '/dashboard/planung', color: '#f43f5e', status: 'AKTIV' },
 ]
 
-const statsConfig = [
-  { label: 'Artikel im Lager', target: 1248, suffix: '', delta: '+12 heute', icon: '📦', color: '#1684ff' },
-  { label: 'Offene Aufträge', target: 34, suffix: '', delta: '5 fällig', icon: '🧾', color: '#f59e0b' },
-  { label: 'Cloud-Sync', target: 100, suffix: '%', delta: 'Vor 2 Min.', icon: '☁️', color: '#10b981' },
-  { label: 'KI-Erkennungen', target: 847, suffix: '', delta: 'Diese Woche', icon: '🧠', color: '#a78bfa' },
-]
+type KpiData = {
+  lagerArtikel: number
+  kritischeBestände: number
+  offeneRechnungen: number
+  rechnungenWert: string
+  laufendeAuftraege: number
+  ueberfaelligeRechnungen: number
+}
+
+const demoKpis: KpiData = {
+  lagerArtikel: 8, kritischeBestände: 3, offeneRechnungen: 4,
+  rechnungenWert: '14.300 €', laufendeAuftraege: 3, ueberfaelligeRechnungen: 2,
+}
 
 function useCountUp(target: number, duration = 1400, start = false) {
   const [value, setValue] = useState(0)
@@ -141,12 +150,50 @@ export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null)
   const [headerVisible, setHeaderVisible] = useState(false)
+  const [kpi, setKpi] = useState<KpiData>(demoKpis)
+  const [kpiLoaded, setKpiLoaded] = useState(false)
 
   useEffect(() => {
     const u = localStorage.getItem('pk_user')
     if (u) setUser(JSON.parse(u))
     setTimeout(() => setHeaderVisible(true), 80)
+
+    const isDemo = hasDemoCookie()
+    if (!isDemo) {
+      Promise.allSettled([getLagerArtikel(), getBueroRechnungen(), getBueroAuftraege()])
+        .then(([artikelRes, rechnungenRes, auftraegeRes]) => {
+          const artikel = artikelRes.status === 'fulfilled' ? (artikelRes.value as { bestand: number; mindestbestand?: number; status: string }[]) : []
+          const rechnungen = rechnungenRes.status === 'fulfilled' ? (rechnungenRes.value as { betrag: string; status: string }[]) : []
+          const auftraege = auftraegeRes.status === 'fulfilled' ? (auftraegeRes.value as { status: string }[]) : []
+
+          const parseBetrag = (s: string) => parseFloat(s.replace(/[^\d,\.]/g, '').replace(',', '.')) || 0
+          const offeneRe = rechnungen.filter(r => r.status !== 'Bezahlt')
+          const offeneWert = offeneRe.reduce((s, r) => s + parseBetrag(r.betrag), 0)
+          const ueberfaellig = rechnungen.filter(r => r.status === 'Überfällig' || r.status === 'Mahnung').length
+
+          setKpi({
+            lagerArtikel: artikel.length,
+            kritischeBestände: artikel.filter(a => a.status === 'niedrig' || a.status === 'leer').length,
+            offeneRechnungen: offeneRe.length,
+            rechnungenWert: offeneWert.toLocaleString('de-DE', { minimumFractionDigits: 0 }) + ' €',
+            laufendeAuftraege: auftraege.filter(a => a.status === 'In Bearbeitung').length,
+            ueberfaelligeRechnungen: ueberfaellig,
+          })
+        })
+        .finally(() => setKpiLoaded(true))
+    } else {
+      setKpiLoaded(true)
+    }
   }, [])
+
+  const kpiCards = [
+    { label: 'Artikel im Lager', value: String(kpi.lagerArtikel), icon: '📦', color: '#1684ff', href: '/dashboard/lager', delta: `${kpi.kritischeBestände} kritisch` },
+    { label: 'Kritische Bestände', value: String(kpi.kritischeBestände), icon: '⚠️', color: kpi.kritischeBestände > 0 ? '#f59e0b' : '#10b981', href: '/dashboard/lager', delta: kpi.kritischeBestände > 0 ? 'Nachbestellung nötig' : 'Alles OK' },
+    { label: 'Offene Rechnungen', value: String(kpi.offeneRechnungen), icon: '💶', color: kpi.ueberfaelligeRechnungen > 0 ? '#f43f5e' : '#f59e0b', href: '/dashboard/buero', delta: kpi.rechnungenWert },
+    { label: 'Überfällige Zahlungen', value: String(kpi.ueberfaelligeRechnungen), icon: '🚨', color: kpi.ueberfaelligeRechnungen > 0 ? '#f43f5e' : '#10b981', href: '/dashboard/buero', delta: kpi.ueberfaelligeRechnungen > 0 ? 'Mahnung prüfen' : 'Alles beglichen' },
+    { label: 'Laufende Aufträge', value: String(kpi.laufendeAuftraege), icon: '✅', color: '#10b981', href: '/dashboard/buero', delta: 'In Bearbeitung' },
+    { label: 'Cloud-Sync', value: '100%', icon: '☁️', color: '#20c8ff', href: '/dashboard/cloud', delta: 'Aktuell' },
+  ]
 
   return (
     <div>
@@ -177,10 +224,34 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats row – animated counters */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
-        {statsConfig.map((s, i) => (
-          <StatCard key={s.label} {...s} delay={i * 80} />
+      {/* Echte KPI-Karten */}
+      <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Live-KPIs</h2>
+        {!kpiLoaded && <div style={{ width: 16, height: 16, border: '2px solid rgba(22,132,255,.3)', borderTopColor: '#1684ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
+        {kpiCards.map((s, i) => (
+          <button
+            key={s.label}
+            onClick={() => router.push(s.href)}
+            style={{
+              all: 'unset', cursor: 'pointer',
+              display: 'flex', gap: 14, alignItems: 'center',
+              background: 'linear-gradient(180deg, rgba(16,26,40,.94), rgba(8,12,19,.94))',
+              border: `1px solid rgba(255,255,255,.1)`,
+              borderRadius: 16, padding: '16px 18px',
+              transition: 'border-color .2s, transform .15s, box-shadow .2s',
+            }}
+            onMouseEnter={e => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = s.color + '50'; el.style.transform = 'translateY(-2px)'; el.style.boxShadow = `0 8px 24px ${s.color}18` }}
+            onMouseLeave={e => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = 'rgba(255,255,255,.1)'; el.style.transform = 'translateY(0)'; el.style.boxShadow = 'none' }}
+          >
+            <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: `${s.color}18`, border: `1px solid ${s.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{s.icon}</div>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-.03em', color: s.color }}>{s.value}</div>
+              <div style={{ fontSize: 12, color: '#aeb9c8' }}>{s.label}</div>
+              <div style={{ fontSize: 11, color: s.color, marginTop: 2, fontWeight: 600, opacity: .8 }}>{s.delta}</div>
+            </div>
+          </button>
         ))}
       </div>
 

@@ -389,6 +389,69 @@ export async function deletePlanungTermin(id: string) {
   if (error) throw error
 }
 
+// ── EINKAUF / LIEFERANTEN ────────────────────────────────────────────────────
+
+export async function getEinkaufLieferanten() {
+  const { data, error } = await db().from('einkauf_lieferanten').select('*').order('name')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertEinkaufLieferant(l: {
+  id: string; name: string; kontakt?: string; email?: string; telefon?: string
+  ort?: string; kategorie?: string; zahlungsziel?: string; status?: string; bewertung?: number
+}) {
+  const { data, error } = await db()
+    .from('einkauf_lieferanten')
+    .upsert({ ...l, updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteEinkaufLieferant(id: string) {
+  const { error } = await db().from('einkauf_lieferanten').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function getEinkaufBestellungen() {
+  const { data, error } = await db().from('einkauf_bestellungen').select('*').order('id', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertEinkaufBestellung(b: {
+  id: string; lieferant?: string; artikel?: string; menge?: number; einheit?: string
+  einkaufspreis?: string; gesamt?: string; status?: string; bestellt_am?: string
+  erwartet_am?: string; geliefert_am?: string; notiz?: string
+}) {
+  const { data, error } = await db()
+    .from('einkauf_bestellungen')
+    .upsert({ ...b, updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function getEinkaufWareneingaenge() {
+  const { data, error } = await db()
+    .from('einkauf_wareneingaenge')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(200)
+  if (error) throw error
+  return data ?? []
+}
+
+export async function insertEinkaufWareneingang(w: {
+  id: string; bestellung_id?: string; lieferant?: string; artikel?: string
+  menge?: number; einheit?: string; datum?: string; qualitaet?: string; mitarbeiter?: string
+}) {
+  const { data, error } = await db().from('einkauf_wareneingaenge').insert(w).select()
+  if (error) throw error
+  return data
+}
+
 export async function getPlanungRessourcen() {
   const { data, error } = await db().from('planung_ressourcen').select('*').order('name')
   if (error) throw error

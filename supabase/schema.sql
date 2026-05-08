@@ -118,6 +118,67 @@ create policy "buero_auftraege_user" on buero_auftraege for all using (auth.uid(
 create policy "buero_rechnungen_user" on buero_rechnungen for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "buero_dokumente_user" on buero_dokumente for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- ── Einkauf / Lieferanten ───────────────────────────────────
+
+create table if not exists einkauf_lieferanten (
+  id            text primary key,
+  user_id       uuid references auth.users not null default auth.uid(),
+  name          text not null,
+  kontakt       text,
+  email         text,
+  telefon       text,
+  ort           text,
+  kategorie     text,
+  zahlungsziel  text,
+  status        text default 'Aktiv',
+  bewertung     integer default 4,
+  created_at    timestamptz default now(),
+  updated_at    timestamptz default now()
+);
+
+create table if not exists einkauf_bestellungen (
+  id            text primary key,
+  user_id       uuid references auth.users not null default auth.uid(),
+  lieferant     text,
+  artikel       text,
+  menge         numeric default 0,
+  einheit       text default 'Stk',
+  einkaufspreis text,
+  gesamt        text,
+  status        text default 'Entwurf',
+  bestellt_am   text,
+  erwartet_am   text,
+  geliefert_am  text,
+  notiz         text,
+  created_at    timestamptz default now(),
+  updated_at    timestamptz default now()
+);
+
+create table if not exists einkauf_wareneingaenge (
+  id              text primary key,
+  user_id         uuid references auth.users not null default auth.uid(),
+  bestellung_id   text references einkauf_bestellungen(id),
+  lieferant       text,
+  artikel         text,
+  menge           numeric default 0,
+  einheit         text default 'Stk',
+  datum           text,
+  qualitaet       text default 'OK',
+  mitarbeiter     text,
+  created_at      timestamptz default now()
+);
+
+alter table einkauf_lieferanten   enable row level security;
+alter table einkauf_bestellungen  enable row level security;
+alter table einkauf_wareneingaenge enable row level security;
+
+create policy "einkauf_lieferanten_user"    on einkauf_lieferanten    for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "einkauf_bestellungen_user"   on einkauf_bestellungen   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "einkauf_wareneingaenge_user" on einkauf_wareneingaenge for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- lager_artikel benötigt auch mindestbestand-Spalte (falls noch nicht vorhanden):
+alter table lager_artikel add column if not exists mindestbestand integer default 0;
+
 -- ── WerkstattPilot ──────────────────────────────────────────
 
 create table if not exists werkstatt_karten (

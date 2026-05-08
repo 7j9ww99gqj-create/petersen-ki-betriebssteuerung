@@ -19,6 +19,7 @@ type Bewegung = {
 
 type SortKey = 'id' | 'name' | 'bestand' | 'status'
 type SortDir = 'asc' | 'desc'
+type LagerTab = 'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur' | 'bestellung' | 'historie'
 
 const EINHEITEN = ['Stk', 'Liter', 'kg', 'Rollen', 'Meter', 'Paar', 'Karton', 'Palette']
 const KATEGORIEN = ['Rohstoffe', 'Kleinteile', 'Betriebsstoffe', 'Verbrauchsmaterial', 'Werkzeug', 'Schutzausrüstung', 'Sonstiges']
@@ -159,11 +160,120 @@ function ArtikelModal({ artikel, onSave, onClose }: {
   )
 }
 
+// ── Bestell-Detail-Modal ─────────────────────────────────────────────────────
+
+function BestellDetailModal({ artikel, menge, onConfirm, onClose }: {
+  artikel: Artikel
+  menge: string
+  onConfirm: (m: string) => void
+  onClose: () => void
+}) {
+  const [m, setM] = useState(menge)
+  const [emailSent, setEmailSent] = useState(false)
+  const heute = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const lieferdatum = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(4px)' }} />
+      <div className="pk-card fade-in-scale" style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: 28, maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>🛒 Bestellung auslösen</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
+        </div>
+
+        {/* Artikel-Info */}
+        <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.2)', marginBottom: 18 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span style={{ fontSize: 28 }}>📦</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 15 }}>{artikel.name}</div>
+              <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>
+                {artikel.id} · {artikel.kategorie} · Lagerplatz: {artikel.lagerplatz || '—'}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 14 }}>
+            {[
+              { label: 'Aktuell', value: `${artikel.bestand} ${artikel.einheit}`, color: artikel.status === 'leer' ? '#f43f5e' : '#f59e0b' },
+              { label: 'Mindestbestand', value: `${artikel.mindestbestand ?? 0} ${artikel.einheit}`, color: '#aeb9c8' },
+              { label: 'Fehlmenge', value: `${Math.max(0, (artikel.mindestbestand ?? 0) - artikel.bestand)} ${artikel.einheit}`, color: '#fbbf24' },
+            ].map(s => (
+              <div key={s.label} style={{ textAlign: 'center', padding: '8px', borderRadius: 8, background: 'rgba(255,255,255,.04)' }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bestellmenge */}
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Bestellmenge *</label>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <input
+              className="pk-input"
+              type="number" min="1"
+              value={m}
+              onChange={e => setM(e.target.value)}
+              style={{ maxWidth: 140 }}
+            />
+            <span style={{ color: '#aeb9c8', fontSize: 14 }}>{artikel.einheit}</span>
+          </div>
+        </div>
+
+        {/* E-Mail-Vorschau */}
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 13, color: '#aeb9c8', fontWeight: 600, marginBottom: 8 }}>📧 E-Mail-Vorschau (Bestellanfrage)</div>
+          <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.1)', fontFamily: 'monospace', fontSize: 12, color: '#d0dce8', lineHeight: 1.7 }}>
+            <div style={{ color: '#aeb9c8', marginBottom: 8, fontSize: 11 }}>An: lieferant@beispiel.de · Betreff: Bestellanfrage – {artikel.name}</div>
+            <div>Sehr geehrte Damen und Herren,</div>
+            <div style={{ marginTop: 8 }}>hiermit stellen wir folgende Bestellanfrage:</div>
+            <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 6, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.15)' }}>
+              <div>Artikel: <b style={{ color: '#f8fbff' }}>{artikel.name}</b> ({artikel.id})</div>
+              <div>Menge: <b style={{ color: '#6cb6ff' }}>{m || '—'} {artikel.einheit}</b></div>
+              <div>Gewünschte Lieferung bis: <b style={{ color: '#f8fbff' }}>{lieferdatum}</b></div>
+            </div>
+            <div style={{ marginTop: 8 }}>Bitte bestätigen Sie die Bestellung und teilen Sie uns Ihre Lieferzeit mit.</div>
+            <div style={{ marginTop: 8, color: '#aeb9c8' }}>Mit freundlichen Grüßen · Petersen Betrieb · {heute}</div>
+          </div>
+        </div>
+
+        {emailSent && (
+          <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(37,211,102,.1)', border: '1px solid rgba(37,211,102,.3)', fontSize: 13, color: '#4ddb7e', fontWeight: 600 }}>
+            ✅ E-Mail-Vorschau wurde simuliert – In einer echten Integration würde jetzt eine E-Mail versandt.
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            className="pk-btn"
+            onClick={() => { onConfirm(m); }}
+            style={{ flex: 1, fontWeight: 700 }}
+            disabled={!m || parseInt(m) <= 0}
+          >
+            ✅ Bestellung bestätigen
+          </button>
+          <button
+            className="pk-btn-ghost"
+            onClick={() => setEmailSent(true)}
+            style={{ fontSize: 13 }}
+            title="E-Mail simulieren"
+          >
+            📧 E-Mail senden
+          </button>
+          <button className="pk-btn-ghost" onClick={onClose} style={{ fontSize: 13 }}>Abbrechen</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Hauptkomponente ──────────────────────────────────────────────────────────
 
 export default function LagerPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
-  const [tab, setTab] = useState<'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur' | 'bestellung'>('bestand')
+  const [tab, setTab] = useState<LagerTab>('bestand')
   const [search, setSearch] = useState('')
   const [filterKat, setFilterKat] = useState('Alle')
   const [artikel, setArtikel] = useState<Artikel[]>(isDemo ? demoArtikel : [])
@@ -189,6 +299,11 @@ export default function LagerPilotPage() {
   // Bestellvorschlag-State
   const [bestellMengen, setBestellMengen] = useState<Record<string, string>>({})
   const [bestelltIds, setBestelltIds] = useState<Set<string>>(new Set())
+  const [bestellModal, setBestellModal] = useState<Artikel | null>(null)
+  const [bestellHint, setBestellHint] = useState<string | null>(null)
+
+  // Artikel-Historie-State (P3)
+  const [histArtikel, setHistArtikel] = useState<string | null>(null)
 
   // Daten laden
   useEffect(() => {
@@ -335,6 +450,14 @@ export default function LagerPilotPage() {
     }
 
     showToast(`✅ Ausgang: ${menge}× "${newAusgang.artikel}" gebucht`)
+    if (existing) {
+      const newBestand = Math.max(0, existing.bestand - menge)
+      const newStatus = calcStatus(newBestand, existing.mindestbestand ?? 0)
+      if (newStatus !== 'ok') {
+        setBestellHint(`⚠️ "${existing.name}" ist jetzt ${newStatus === 'leer' ? 'leer' : 'unter Mindestbestand'}!`)
+        setTimeout(() => setBestellHint(null), 10000)
+      }
+    }
     setNewAusgang({ artikel: '', menge: '', empfaenger: '', mitarbeiter: '' })
     setSaving(false)
   }
@@ -377,9 +500,15 @@ export default function LagerPilotPage() {
     return String((a.mindestbestand ?? 0) * 2)
   }
 
-  const handleBestellungAusloesen = (id: string) => {
+  const handleBestellungAusloesen = (a: Artikel) => {
+    setBestellModal(a)
+  }
+
+  const handleBestellungBestaetigen = (id: string, menge: string) => {
     setBestelltIds(prev => { const next = new Set(Array.from(prev)); next.add(id); return next })
-    showToast('✅ Bestellung ausgelöst')
+    if (menge) setBestellMengen(prev => ({ ...prev, [id]: menge }))
+    setBestellModal(null)
+    showToast(`✅ Bestellung für "${bestellModal?.name}" (${menge} ${bestellModal?.einheit}) wurde ausgelöst`)
   }
 
   // ── Stats ────────────────────────────────────────────────────────────────────
@@ -401,12 +530,22 @@ export default function LagerPilotPage() {
 
   return (
     <div className="fade-in">
-      {/* Modal */}
+      {/* Artikel-Modal */}
       {modal !== null && (
         <ArtikelModal
           artikel={modal === 'new' ? null : modal}
           onSave={handleSaveArtikel}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {/* Bestell-Detail-Modal */}
+      {bestellModal && (
+        <BestellDetailModal
+          artikel={bestellModal}
+          menge={getBestellMenge(bestellModal)}
+          onConfirm={(m) => handleBestellungBestaetigen(bestellModal.id, m)}
+          onClose={() => setBestellModal(null)}
         />
       )}
 
@@ -489,6 +628,21 @@ export default function LagerPilotPage() {
         </div>
       )}
 
+      {/* Bestandsalarm nach Ausgang */}
+      {bestellHint && (
+        <div style={{ marginBottom: 14, padding: '12px 16px', borderRadius: 10, background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.25)', display: 'flex', gap: 10, alignItems: 'center' }}>
+          <span style={{ fontSize: 18 }}>🚨</span>
+          <span style={{ fontSize: 13, color: '#f87171', flex: 1, fontWeight: 600 }}>{bestellHint}</span>
+          <button
+            onClick={() => { setTab('bestellung'); setBestellHint(null) }}
+            style={{ background: 'rgba(244,63,94,.15)', border: '1px solid rgba(244,63,94,.35)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', color: '#f87171', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}
+          >
+            Bestellvorschlag anzeigen →
+          </button>
+          <button onClick={() => setBestellHint(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        </div>
+      )}
+
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)', overflowX: 'auto' }}>
         {[
@@ -498,8 +652,9 @@ export default function LagerPilotPage() {
           { id: 'ausgang', label: '📤 Warenausgang' },
           { id: 'inventur', label: '📋 Inventur' },
           { id: 'bestellung', label: `🛒 Bestellvorschlag${bestellArtikel.length > 0 ? ` (${bestellArtikel.length})` : ''}` },
+          { id: 'historie', label: '📈 Artikel-Historie' },
         ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as typeof tab)} style={{ padding: '10px 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: 'transparent', borderBottom: tab === t.id ? '2px solid #1684ff' : '2px solid transparent', color: tab === t.id ? '#6cb6ff' : '#aeb9c8', marginBottom: -1, transition: 'color .15s', whiteSpace: 'nowrap' }}>
+          <button key={t.id} onClick={() => setTab(t.id as LagerTab)} style={{ padding: '10px 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: 'transparent', borderBottom: tab === t.id ? '2px solid #1684ff' : '2px solid transparent', color: tab === t.id ? '#6cb6ff' : '#aeb9c8', marginBottom: -1, transition: 'color .15s', whiteSpace: 'nowrap' }}>
             {t.label}
           </button>
         ))}
@@ -597,6 +752,7 @@ export default function LagerPilotPage() {
                           ) : (
                             <div style={{ display: 'flex', gap: 6 }}>
                               <button onClick={() => setModal(a)} title="Bearbeiten" style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>
+                              <button onClick={() => { setHistArtikel(a.id); setTab('historie') }} title="Artikel-Historie" style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#34d399', fontSize: 13 }}>📈</button>
                               <button onClick={() => setDeleteConfirmId(a.id)} title="Löschen" style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}>🗑</button>
                             </div>
                           )}
@@ -803,6 +959,20 @@ export default function LagerPilotPage() {
             <div style={{ padding: '10px 16px', borderRadius: 10, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', fontSize: 13, color: '#fbbf24', flex: 1, minWidth: 200 }}>
               🛒 <b>{bestellArtikel.length} Artikel</b> benötigen eine Nachbestellung (Bestand leer oder unter Mindestbestand)
             </div>
+            {bestellArtikel.length > 0 && bestelltIds.size < bestellArtikel.length && (
+              <button
+                onClick={() => {
+                  const offene = bestellArtikel.filter(a => !bestelltIds.has(a.id))
+                  offene.forEach(a => {
+                    setBestelltIds(prev => { const n = new Set(Array.from(prev)); n.add(a.id); return n })
+                  })
+                  showToast(`✅ ${offene.length} Bestellung(en) auf einmal ausgelöst`)
+                }}
+                style={{ background: 'rgba(22,132,255,.15)', border: '1px solid rgba(22,132,255,.35)', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}
+              >
+                🛒 Alle bestellen ({bestellArtikel.filter(a => !bestelltIds.has(a.id)).length})
+              </button>
+            )}
           </div>
 
           {bestellArtikel.length === 0 ? (
@@ -864,7 +1034,7 @@ export default function LagerPilotPage() {
                               <span className="badge badge-green" style={{ fontSize: 11 }}>✅ Bestellt</span>
                             ) : (
                               <button
-                                onClick={() => handleBestellungAusloesen(a.id)}
+                                onClick={() => handleBestellungAusloesen(a)}
                                 style={{
                                   background: 'rgba(22,132,255,.15)', border: '1px solid rgba(22,132,255,.35)',
                                   borderRadius: 7, padding: '6px 12px', cursor: 'pointer',
@@ -898,6 +1068,106 @@ export default function LagerPilotPage() {
           )}
         </div>
       )}
+
+      {/* ── ARTIKEL-HISTORIE ── */}
+      {tab === 'historie' && (() => {
+        const selectedArtikel = histArtikel ? artikel.find(a => a.id === histArtikel) : null
+        const filteredBewegungen = histArtikel
+          ? bewegungen.filter(b => {
+              const a = artikel.find(x => x.id === histArtikel)
+              return a && (b.artikel === a.name || b.artikel === a.id)
+            })
+          : bewegungen
+
+        const letzterEingang = filteredBewegungen.filter(b => b.typ === 'Eingang').sort((a, b) => b.id > a.id ? 1 : -1)[0]
+        const letzterAusgang = filteredBewegungen.filter(b => b.typ === 'Ausgang').sort((a, b) => b.id > a.id ? 1 : -1)[0]
+        const gesamtEingang = filteredBewegungen.filter(b => b.typ === 'Eingang').reduce((s, b) => s + b.menge, 0)
+        const gesamtAusgang = filteredBewegungen.filter(b => b.typ === 'Ausgang').reduce((s, b) => s + b.menge, 0)
+
+        return (
+          <div>
+            {/* Filter */}
+            <div style={{ marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <select
+                className="pk-input"
+                value={histArtikel ?? ''}
+                onChange={e => setHistArtikel(e.target.value || null)}
+                style={{ maxWidth: 320 }}
+              >
+                <option value="">📦 Alle Artikel</option>
+                {artikel.map(a => (
+                  <option key={a.id} value={a.id}>{a.name} ({a.id})</option>
+                ))}
+              </select>
+              {histArtikel && (
+                <button
+                  className="pk-btn-ghost"
+                  onClick={() => setHistArtikel(null)}
+                  style={{ fontSize: 12, padding: '7px 12px' }}
+                >✕ Filter aufheben</button>
+              )}
+              <span style={{ fontSize: 12, color: '#aeb9c8' }}>{filteredBewegungen.length} Bewegungen</span>
+            </div>
+
+            {/* Artikel-Detail-Karte */}
+            {selectedArtikel && (
+              <div style={{ marginBottom: 16, padding: '16px 20px', borderRadius: 12, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.2)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
+                {[
+                  { label: 'Aktueller Bestand', value: `${selectedArtikel.bestand} ${selectedArtikel.einheit}`, icon: '📦', color: selectedArtikel.status === 'leer' ? '#f43f5e' : selectedArtikel.status === 'niedrig' ? '#f59e0b' : '#10b981' },
+                  { label: 'Mindestbestand', value: `${selectedArtikel.mindestbestand ?? 0} ${selectedArtikel.einheit}`, icon: '⚠️', color: '#aeb9c8' },
+                  { label: 'Ges. Eingang', value: `+${gesamtEingang}`, icon: '📥', color: '#10b981' },
+                  { label: 'Ges. Ausgang', value: `-${gesamtAusgang}`, icon: '📤', color: '#f59e0b' },
+                  { label: 'Letzter Eingang', value: letzterEingang?.datum ?? '—', icon: '📅', color: '#6cb6ff' },
+                  { label: 'Letzter Ausgang', value: letzterAusgang?.datum ?? '—', icon: '📅', color: '#f59e0b' },
+                ].map(s => (
+                  <div key={s.label} style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 18, marginBottom: 4 }}>{s.icon}</div>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: s.color }}>{s.value}</div>
+                    <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Bewegungstabelle */}
+            <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div className="pk-table-wrap">
+                <table className="pk-table">
+                  <thead>
+                    <tr><th>Typ</th><th>Artikel</th><th>Menge</th><th>Datum</th><th>Mitarbeiter</th><th>Status</th></tr>
+                  </thead>
+                  <tbody>
+                    {filteredBewegungen.length === 0 ? (
+                      <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>
+                        {histArtikel ? '📈 Noch keine Bewegungen für diesen Artikel.' : '🔄 Keine Buchungen vorhanden.'}
+                      </td></tr>
+                    ) : filteredBewegungen.map(b => (
+                      <tr key={b.id}>
+                        <td>
+                          <span className={`badge ${b.typ === 'Eingang' ? 'badge-green' : b.typ === 'Inventur' ? 'badge-blue' : 'badge-orange'}`}>
+                            {b.typ === 'Eingang' ? '📥' : b.typ === 'Inventur' ? '📋' : '📤'} {b.typ}
+                          </span>
+                        </td>
+                        <td style={{ fontWeight: 600 }}>{b.artikel}</td>
+                        <td style={{ fontWeight: 700, color: b.typ === 'Eingang' ? '#10b981' : b.typ === 'Ausgang' ? '#f59e0b' : '#6cb6ff' }}>
+                          {b.typ === 'Eingang' ? '+' : b.typ === 'Ausgang' ? '-' : ''}{b.menge}
+                        </td>
+                        <td style={{ color: '#aeb9c8', fontSize: 13 }}>{b.datum}</td>
+                        <td style={{ color: '#aeb9c8' }}>{b.mitarbeiter}</td>
+                        <td>
+                          <span className={`badge ${b.status === 'KI erkannt' ? 'badge-purple' : 'badge-green'}`}>
+                            {b.status === 'KI erkannt' ? '🧠 ' : '✅ '}{b.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
