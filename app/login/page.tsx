@@ -57,7 +57,8 @@ export default function LoginPage() {
 
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+      minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)) 16px',
       background: 'radial-gradient(circle at 20% 20%, rgba(22,132,255,.22), transparent 40%), radial-gradient(circle at 80% 80%, rgba(32,200,255,.12), transparent 40%), linear-gradient(180deg,#05070b,#07101a)',
     }}>
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, backgroundImage: 'linear-gradient(rgba(22,132,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(22,132,255,.04) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
@@ -72,7 +73,7 @@ export default function LoginPage() {
           <div style={{ marginTop: 8, fontSize: 12, color: '#4a5568', letterSpacing: '.08em', textTransform: 'uppercase' }}>KI-unterstütztes Warenwirtschaftssystem</div>
         </div>
 
-        <div className="pk-card" style={{ padding: '32px', boxShadow: '0 20px 60px rgba(0,0,0,.4)' }}>
+        <div className="pk-card" style={{ padding: 'clamp(20px, 5vw, 32px)', boxShadow: '0 20px 60px rgba(0,0,0,.4)' }}>
           <div style={{ marginBottom: 24 }}>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Anmelden</h2>
             <p style={{ margin: '6px 0 0', color: '#aeb9c8', fontSize: 14 }}>Melden Sie sich an, um auf Ihre Petersen KI Betriebssteuerung zuzugreifen.</p>

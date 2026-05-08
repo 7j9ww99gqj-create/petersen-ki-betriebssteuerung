@@ -9,6 +9,16 @@ import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { hasDemoCookie } from '@/lib/auth'
 import { ROLE_LABELS, type AppRole } from '@/lib/roles'
 
+// Bottom-Nav Einträge (Mobile)
+const bottomNavItems = [
+  { href: '/dashboard',             icon: '⊞',  label: 'Start' },
+  { href: '/dashboard/lager',       icon: '📦', label: 'Lager' },
+  { href: '/dashboard/buero',       icon: '🧾', label: 'Büro' },
+  { href: '/dashboard/werkstatt',   icon: '🛠️', label: 'Werkstatt' },
+  { href: '/dashboard/ki-erkennung',icon: '🧠', label: 'KI' },
+  { href: '#menu',                  icon: '☰',  label: 'Menü' },
+]
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -26,7 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       ? 'Admin'
       : ((localStorage.getItem('pk_role') as AppRole) || 'Admin')
     setRoleState(stored)
-  }, [pathname]) // re-read when navigating (e.g. after saving in Einstellungen)
+  }, [pathname])
 
   // Auth check
   useEffect(() => {
@@ -62,6 +72,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     )
   }
 
+  const isActive = (href: string) =>
+    href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
+
   return (
     <div style={{ display: 'flex' }}>
       {/* Mobile overlay */}
@@ -70,7 +83,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           onClick={() => setSidebarOpen(false)}
           style={{
             position: 'fixed', inset: 0, zIndex: 40,
-            background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(2px)',
+            background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(3px)',
           }}
         />
       )}
@@ -79,25 +92,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <div className="dashboard-main">
         {/* Top bar */}
-        <div style={{
-          position: 'sticky', top: 0, zIndex: 30,
-          background: 'linear-gradient(180deg, rgba(5,7,11,.96), rgba(5,7,11,.90))',
-          backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(255,255,255,.07)',
-          padding: '10px 16px',
-          display: 'flex', alignItems: 'center', gap: 10,
-        }}>
-          {/* Hamburger – only visible on mobile */}
+        <div
+          className="topbar"
+          style={{
+            position: 'sticky', top: 0, zIndex: 30,
+            background: 'linear-gradient(180deg, rgba(5,7,11,.97), rgba(5,7,11,.92))',
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            borderBottom: '1px solid rgba(255,255,255,.07)',
+            padding: '10px 16px',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}
+        >
+          {/* Hamburger – only visible on desktop (mobile uses bottom-nav "Menü") */}
           <button
             className="hamburger-btn"
             onClick={() => setSidebarOpen(o => !o)}
             aria-label="Menü öffnen"
             style={{
-              display: 'none', // shown via CSS on mobile
-              width: 38, height: 38, borderRadius: 10,
+              display: 'none',
+              width: 40, height: 40, borderRadius: 10,
               background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)',
               cursor: 'pointer', alignItems: 'center', justifyContent: 'center',
               flexDirection: 'column', gap: 5, flexShrink: 0,
+              touchAction: 'manipulation',
             }}
           >
             <span style={{ display: 'block', width: 18, height: 2, background: '#aeb9c8', borderRadius: 2 }} />
@@ -105,13 +123,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span style={{ display: 'block', width: 18, height: 2, background: '#aeb9c8', borderRadius: 2 }} />
           </button>
 
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <GlobalSearch />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <NotificationBell />
-            <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', color: '#aeb9c8', fontWeight: 700 }}>
+            {/* Role badge – hide on very small screens via inline media */}
+            <span
+              className="role-badge-desktop"
+              style={{
+                fontSize: 11, padding: '3px 8px', borderRadius: 999,
+                background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)',
+                color: '#aeb9c8', fontWeight: 700, whiteSpace: 'nowrap',
+              }}
+            >
               {ROLE_LABELS[role]}
             </span>
             <button
@@ -123,9 +149,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontWeight: 900, fontSize: 15, color: '#6cb6ff',
                 transition: 'border-color .15s, background .15s',
+                touchAction: 'manipulation',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(22,132,255,.2)'; e.currentTarget.style.borderColor = 'rgba(22,132,255,.5)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg, #1684ff22, #20c8ff22)'; e.currentTarget.style.borderColor = 'rgba(22,132,255,.3)' }}
               title="Einstellungen"
             >
               {userName ? userName.charAt(0).toUpperCase() : '?'}
@@ -133,10 +158,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        <main style={{ flex: 1, padding: '24px' }} className="main-inner">
+        <main className="main-inner">
           {children}
         </main>
       </div>
+
+      {/* ── Bottom Navigation (Mobile) ── */}
+      <nav className="bottom-nav" role="navigation" aria-label="Hauptnavigation">
+        {bottomNavItems.map(item => {
+          const active = item.href !== '#menu' && isActive(item.href)
+          return (
+            <button
+              key={item.href}
+              className={`bottom-nav-item${active ? ' active' : ''}`}
+              onClick={() => {
+                if (item.href === '#menu') {
+                  setSidebarOpen(o => !o)
+                } else {
+                  router.push(item.href)
+                }
+              }}
+              aria-label={item.label}
+            >
+              <span className="bn-icon">{item.icon}</span>
+              <span>{item.label}</span>
+            </button>
+          )
+        })}
+      </nav>
 
       <SupportButton />
     </div>

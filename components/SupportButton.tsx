@@ -77,7 +77,7 @@ export default function SupportButton() {
   }, [])
 
   return (
-    <div ref={ref} style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 200 }}>
+    <div ref={ref} className="support-btn-wrap" style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 200 }}>
       {/* Optionen-Menü */}
       {open && (
         <div

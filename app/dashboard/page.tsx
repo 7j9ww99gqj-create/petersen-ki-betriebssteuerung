@@ -229,7 +229,7 @@ export default function DashboardPage() {
         <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Live-KPIs</h2>
         {!kpiLoaded && <div style={{ width: 16, height: 16, border: '2px solid rgba(22,132,255,.3)', borderTopColor: '#1684ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
+      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
         {kpiCards.map((s, i) => (
           <button
             key={s.label}
@@ -261,13 +261,13 @@ export default function DashboardPage() {
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>KI-Piloten</h2>
           <span style={{ fontSize: 12, color: '#aeb9c8' }}>6 Piloten verfügbar</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+        <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
           {pilots.map((p, i) => <PilotCard key={p.id} pilot={p} delay={200 + i * 60} />)}
         </div>
       </div>
 
       {/* Quick actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+      <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
         {[
           { label: 'KI Erkennung', desc: 'Dokumente & Fotos automatisch erfassen', icon: '🧠', href: '/dashboard/ki-erkennung', color: '#a78bfa' },
           { label: 'Cloud & Sync', desc: 'Datensicherung & Cloud-Status', icon: '☁️', href: '/dashboard/cloud', color: '#20c8ff' },

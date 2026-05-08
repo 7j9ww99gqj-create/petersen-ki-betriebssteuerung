@@ -576,7 +576,7 @@ export default function LagerPilotPage() {
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 22 }}>
+      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 22 }}>
         {[
           { label: 'Artikel gesamt', value: String(artikel.length), icon: '📦', color: '#1684ff' },
           { label: 'Gesamtbestand', value: gesamtWert.toLocaleString('de-DE'), icon: '🔢', color: '#20c8ff' },
@@ -644,7 +644,7 @@ export default function LagerPilotPage() {
       )}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)', overflowX: 'auto' }}>
+      <div className="pk-tab-bar" style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)', overflowX: 'auto' }}>
         {[
           { id: 'bestand', label: '📦 Bestand' },
           { id: 'bewegungen', label: '🔄 Bewegungen' },

@@ -247,7 +247,58 @@ select.pk-input { appearance: none; }
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  /* Snap-scrolling für smoother feel auf Mobile */
+  scroll-snap-type: x proximity;
 }
+
+/* ── Bottom Navigation (Mobile only, hidden on desktop) ──────────────────── */
+
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  background: linear-gradient(180deg, rgba(9,19,31,.97), rgba(6,14,24,.99));
+  border-top: 1px solid rgba(255,255,255,.1);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 6px 0;
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  gap: 0;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 4px;
+  min-height: 52px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7d8f;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  transition: color .15s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.bottom-nav-item.active { color: #6cb6ff; }
+.bottom-nav-item .bn-icon {
+  font-size: 20px;
+  line-height: 1;
+  transition: transform .15s;
+}
+.bottom-nav-item.active .bn-icon { transform: translateY(-1px); }
+.bottom-nav-item:active .bn-icon { transform: scale(.9); }
 
 /* ── Mobile (≤ 768 px) ───────────────────────────────────────────────────── */
 
@@ -259,15 +310,17 @@ select.pk-input { appearance: none; }
   }
   .sidebar.open {
     transform: translateX(0);
-    box-shadow: 4px 0 40px rgba(0,0,0,.6);
+    box-shadow: 4px 0 40px rgba(0,0,0,.7);
   }
 
-  /* Main content fills full width */
+  /* Main content fills full width, account for bottom nav */
   .dashboard-main {
     margin-left: 0;
   }
   .main-inner {
-    padding: 16px;
+    padding: 14px 14px;
+    /* Leave room for bottom nav + safe area */
+    padding-bottom: calc(72px + max(8px, env(safe-area-inset-bottom)));
   }
 
   /* Show hamburger button */
@@ -275,26 +328,169 @@ select.pk-input { appearance: none; }
     display: flex !important;
   }
 
+  /* Show bottom nav */
+  .bottom-nav {
+    display: flex;
+  }
+
   /* Cards: less padding */
-  .pk-card { padding: 14px; border-radius: 14px; }
+  .pk-card {
+    padding: 14px;
+    border-radius: 14px;
+  }
 
-  /* Tables scroll horizontally */
-  .pk-table th, .pk-table td { padding: 10px 10px; font-size: 13px; }
+  /* Tables scroll horizontally – better visual cue */
+  .pk-table th {
+    padding: 9px 10px;
+    font-size: 10px;
+  }
+  .pk-table td {
+    padding: 10px 10px;
+    font-size: 13px;
+  }
 
-  /* Buttons: full width in forms */
-  .pk-btn, .pk-btn-ghost { font-size: 13px; padding: 9px 16px; }
+  /* Inputs: min font-size 16px prevents iOS auto-zoom */
+  .pk-input {
+    font-size: 16px !important;
+    padding: 11px 14px;
+    border-radius: 12px;
+  }
 
-  /* Reduce heading sizes */
-  h1 { font-size: 22px !important; }
+  /* Buttons: proper touch targets (min 44px) */
+  .pk-btn {
+    min-height: 44px;
+    font-size: 14px;
+    padding: 10px 20px;
+  }
+  .pk-btn-ghost {
+    min-height: 44px;
+    font-size: 14px;
+    padding: 10px 18px;
+  }
+
+  /* Headings */
+  h1 { font-size: 21px !important; }
   h2 { font-size: 17px !important; }
+  h3 { font-size: 15px !important; }
 
-  /* Grids: single column */
-  .mobile-1col { grid-template-columns: 1fr !important; }
+  /* Grids: 2 columns on tablet, 1 on phone */
+  .mobile-1col { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Badges: slightly larger tap area */
+  .badge { font-size: 10px; padding: 3px 8px; }
+
+  /* Modals: near full-screen on mobile */
+  .modal-mobile {
+    max-width: 100% !important;
+    max-height: 95vh !important;
+    margin: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+
+  /* SupportButton moves up above bottom nav */
+  .support-btn-wrap {
+    bottom: calc(72px + max(8px, env(safe-area-inset-bottom))) !important;
+  }
+
+  /* Tab bars: ensure touch-friendly */
+  .pk-tab-bar button {
+    min-height: 44px !important;
+    font-size: 12px !important;
+    padding: 8px 10px !important;
+  }
+
+  /* Stat grids: 2 columns on mobile */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
 }
 
 /* ── Small mobile (≤ 480 px) ─────────────────────────────────────────────── */
 
 @media (max-width: 480px) {
-  .main-inner { padding: 12px; }
-  .pk-card { padding: 12px; border-radius: 12px; }
+  .main-inner {
+    padding: 10px 10px;
+    padding-bottom: calc(72px + max(8px, env(safe-area-inset-bottom)));
+  }
+  .pk-card {
+    padding: 12px;
+    border-radius: 12px;
+  }
+  h1 { font-size: 19px !important; }
+
+  /* Stats + pilot-grid: single column on very small screens */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  .mobile-1col { grid-template-columns: 1fr !important; }
+
+  /* Hide less-important table columns on tiny screens */
+  .pk-table .hide-xs { display: none; }
+}
+
+/* ── Safe Area (Notch/Rounded corners) ───────────────────────────────────── */
+
+.sidebar {
+  padding-top: max(0px, env(safe-area-inset-top));
+  padding-left: max(0px, env(safe-area-inset-left));
+}
+
+.dashboard-main .topbar {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
+/* ── Role badge: hide on small screens ───────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .role-badge-desktop { display: none !important; }
+}
+
+/* ── Tab bar: scroll indicator fade ──────────────────────────────────────── */
+
+.pk-tab-bar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 11 */
+  scroll-behavior: smooth;
+}
+.pk-tab-bar::-webkit-scrollbar { display: none; }
+
+/* ── Fix: modal as bottom sheet on mobile ────────────────────────────────── */
+
+@media (max-width: 600px) {
+  /* Any fixed modal that is centered – shift to bottom sheet */
+  [style*="position: fixed"][style*="alignItems: center"][style*="justifyContent: center"] > .pk-card {
+    max-width: 100% !important;
+    max-height: 92vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+  }
+}
+
+/* ── Utility: touch-friendly ─────────────────────────────────────────────── */
+
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth momentum scroll on iOS */
+.pk-table-wrap,
+.scroll-x {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent text selection on double-tap (buttons/cards) */
+.pk-btn, .pk-btn-ghost, .pk-card, .bottom-nav-item {
+  -webkit-user-select: none;
+  user-select: none;
 }
