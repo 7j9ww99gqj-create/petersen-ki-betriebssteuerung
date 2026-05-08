@@ -515,3 +515,121 @@ export async function uploadSteuerBeleg(file: File, userId: string): Promise<str
   if (error) throw error
   return path
 }
+
+// ── STEUER BUCHUNGEN ──────────────────────────────────────────────────────────
+
+export async function getSteuerBuchungen() {
+  const { data, error } = await db().from('steuer_buchungen').select('*').order('datum', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertSteuerBuchung(b: {
+  id: string; datum: string; buchungstext: string; betrag: number
+  soll_konto?: string; haben_konto?: string; steuerkonto?: string
+  steuersatz?: number; beleg_id?: string; status?: string
+}) {
+  const { data, error } = await db().from('steuer_buchungen').upsert(b).select()
+  if (error) throw error
+  return data
+}
+
+// ── STEUER KONTEN ─────────────────────────────────────────────────────────────
+
+export async function getSteuerKonten() {
+  const { data, error } = await db().from('steuer_konten').select('*').order('kontonummer')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertSteuerKonto(k: {
+  id: string; kontonummer: string; name: string; typ?: string; steuersatz?: number; aktiv?: boolean
+}) {
+  const { data, error } = await db().from('steuer_konten').upsert(k).select()
+  if (error) throw error
+  return data
+}
+
+// ── IMPORT PROTOKOLLE ─────────────────────────────────────────────────────────
+
+export async function getImportProtokolle() {
+  const { data, error } = await db().from('import_protokolle').select('*').order('erstellt_am', { ascending: false }).limit(50)
+  if (error) throw error
+  return data ?? []
+}
+
+export async function insertImportProtokoll(p: {
+  id: string; quelle: string; datentyp: string; dateiname: string; status: string
+  anzahl_gesamt: number; anzahl_erfolgreich: number; anzahl_fehlerhaft: number; fehler?: object
+}) {
+  const { data, error } = await db().from('import_protokolle').insert(p).select()
+  if (error) throw error
+  return data
+}
+
+// ── BULK INSERT HELPERS ────────────────────────────────────────────────────────
+
+export async function bulkImportLagerArtikel(rows: Array<{
+  id: string; name: string; artikelnummer?: string; beschreibung?: string
+  bestand?: number; mindestbestand?: number; einkaufspreis?: number
+  verkaufspreis?: number; einheit?: string; lagerort?: string
+}>) {
+  const { data, error } = await db().from('lager_artikel').insert(rows).select()
+  if (error) throw error
+  return data
+}
+
+export async function bulkImportBueroKunden(rows: Array<{
+  id: string; name: string; email?: string; telefon?: string
+  adresse?: string; kundennummer?: string; notizen?: string
+}>) {
+  const { data, error } = await db().from('buero_kunden').insert(rows).select()
+  if (error) throw error
+  return data
+}
+
+export async function bulkImportEinkaufLieferanten(rows: Array<{
+  id: string; name: string; email?: string; telefon?: string
+  ort?: string; kategorie?: string; zahlungsziel?: string; notiz?: string
+}>) {
+  const { data, error } = await db().from('einkauf_lieferanten').insert(rows).select()
+  if (error) throw error
+  return data
+}
+
+export async function bulkImportBueroRechnungen(rows: Array<{
+  id: string; nummer: string; kunde?: string; datum?: string
+  faellig_am?: string; summe?: number; status?: string; notiz?: string
+}>) {
+  const { data, error } = await db().from('buero_rechnungen').insert(rows).select()
+  if (error) throw error
+  return data
+}
+
+export async function bulkImportSteuerBelege(rows: Array<{
+  id: string; lieferant: string; betrag: number; datum: string
+  steuerbetrag?: number; steuersatz?: number; belegnummer?: string
+  kategorie?: string; status?: string; notiz?: string
+}>) {
+  const { data, error } = await db().from('steuer_belege').insert(rows).select()
+  if (error) throw error
+  return data
+}
+
+export async function bulkImportSteuerBuchungen(rows: Array<{
+  id: string; datum: string; buchungstext: string; betrag: number
+  soll_konto?: string; haben_konto?: string; steuerkonto?: string
+  steuersatz?: number; beleg_id?: string; status?: string
+}>) {
+  const { data, error } = await db().from('steuer_buchungen').insert(rows).select()
+  if (error) throw error
+  return data
+}
+
+export async function bulkImportSteuerKonten(rows: Array<{
+  id: string; kontonummer: string; name: string; typ?: string; steuersatz?: number; aktiv?: boolean
+}>) {
+  const { data, error } = await db().from('steuer_konten').insert(rows).select()
+  if (error) throw error
+  return data
+}
