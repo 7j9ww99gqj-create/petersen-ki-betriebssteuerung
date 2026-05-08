@@ -678,7 +678,7 @@ export default function LagerPilotPage() {
               📥 CSV Export
             </button>
           </div>
-          <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
             <div className="pk-table-wrap">
               <table className="pk-table">
                 <thead>
@@ -772,7 +772,7 @@ export default function LagerPilotPage() {
           <div style={{ marginBottom: 14, fontSize: 13, color: '#aeb9c8' }}>
             Alle {bewegungen.length} Lagerbewegungen
           </div>
-          <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
             <div className="pk-table-wrap">
               <table className="pk-table">
                 <thead>
@@ -904,7 +904,7 @@ export default function LagerPilotPage() {
           <div style={{ marginBottom: 16, padding: '14px 18px', borderRadius: 12, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.2)', fontSize: 13, color: '#aeb9c8' }}>
             📋 <b style={{ color: '#f8fbff' }}>Inventur-Modus:</b> Trage den gezählten Ist-Bestand ein. Nur ausgefüllte Felder werden aktualisiert.
           </div>
-          <div className="pk-card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+          <div className="pk-card" style={{ padding: 0, overflowX: 'auto', marginBottom: 16 }}>
             <div className="pk-table-wrap">
               <table className="pk-table">
                 <thead>
@@ -982,7 +982,7 @@ export default function LagerPilotPage() {
               <div style={{ color: '#aeb9c8', fontSize: 13 }}>Aktuell sind alle Artikel über dem Mindestbestand.</div>
             </div>
           ) : (
-            <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
               <div className="pk-table-wrap">
                 <table className="pk-table">
                   <thead>
@@ -1130,7 +1130,7 @@ export default function LagerPilotPage() {
             )}
 
             {/* Bewegungstabelle */}
-            <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
               <div className="pk-table-wrap">
                 <table className="pk-table">
                   <thead>

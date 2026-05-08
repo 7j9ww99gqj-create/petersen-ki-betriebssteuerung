@@ -444,7 +444,7 @@ export default function SteuerPilotPage() {
             <div style={{ fontWeight: 700, fontSize: 15 }}>Eingangsbelege ({belege.length})</div>
             <button className="pk-btn" onClick={() => setEditBeleg({})} style={{ fontSize: 13 }}>+ Beleg erfassen</button>
           </div>
-          <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
             <div style={{ overflowX: 'auto' }}>
               <table className="pk-table">
                 <thead>

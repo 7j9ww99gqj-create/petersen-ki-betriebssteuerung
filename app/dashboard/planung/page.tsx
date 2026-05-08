@@ -1063,7 +1063,7 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
         </div>
       )}
 
-      <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="pk-table">
           <thead>
             <tr>

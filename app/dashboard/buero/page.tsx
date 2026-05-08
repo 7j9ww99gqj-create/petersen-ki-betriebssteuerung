@@ -433,7 +433,7 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
         </div>
       )}
 
-      <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="pk-table">
           <thead>
             <tr>
@@ -690,7 +690,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege }: { isDemo: bool
         </div>
       )}
 
-      <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="pk-table">
           <thead>
             <tr>
@@ -1152,7 +1152,7 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
       )}
 
       {/* KPI-Karten */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
           { label: 'Offen', value: fmtEur(sumOffen), icon: '⏳', color: '#20c8ff', bg: 'rgba(32,200,255,.08)', border: 'rgba(32,200,255,.2)' },
           { label: 'Bezahlt', value: fmtEur(sumBezahlt), icon: '✅', color: '#4ddb7e', bg: 'rgba(37,211,102,.08)', border: 'rgba(37,211,102,.2)' },
@@ -1218,7 +1218,7 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
         </div>
       )}
 
-      <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="pk-table">
           <thead>
             <tr>
@@ -1423,7 +1423,7 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
         </div>
       </div>
 
-      <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="pk-table">
           <thead>
             <tr>
@@ -1694,7 +1694,7 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
             </div>
           )}
 
-          <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
             <div className="pk-table-wrap">
               <table className="pk-table">
                 <thead>
@@ -1771,7 +1771,7 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
             </div>
           )}
 
-          <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
             <div className="pk-table-wrap">
               <table className="pk-table">
                 <thead>
@@ -1858,7 +1858,7 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
             </div>
           )}
 
-          <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
             <div className="pk-table-wrap">
               <table className="pk-table">
                 <thead>

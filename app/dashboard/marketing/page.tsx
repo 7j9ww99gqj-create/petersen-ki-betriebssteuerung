@@ -228,7 +228,7 @@ function KampagnenTab({ isDemo }: { isDemo: boolean }) {
                 </div>
               </div>
               {k.empfaenger > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 12 }}>
                   {[
                     { label: 'Empfänger', value: k.empfaenger.toLocaleString('de-DE'), icon: '👥' },
                     { label: 'Geöffnet', value: k.geoeffnet.toLocaleString('de-DE'), icon: '👁️' },
@@ -406,7 +406,7 @@ function LeadsTab({ isDemo }: { isDemo: boolean }) {
         </div>
       )}
 
-      <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="pk-table">
           <thead>
             <tr>

@@ -97,14 +97,14 @@ export default function EinstellungenPage() {
   }
 
   const NavItem = ({ id, icon, label }: { id: typeof section; icon: string; label: string }) => (
-    <button onClick={() => setSection(id)} style={{
-      width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+    <button onClick={() => setSection(id)} data-active={section === id} style={{
+      width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
       borderRadius: 10, border: 'none', cursor: 'pointer', textAlign: 'left',
       background: section === id ? 'rgba(22,132,255,.15)' : 'transparent',
       color: section === id ? '#6cb6ff' : '#aeb9c8',
       fontWeight: section === id ? 700 : 500, fontSize: 14,
       borderLeft: section === id ? '2px solid #1684ff' : '2px solid transparent',
-      transition: 'background .15s',
+      transition: 'background .15s', whiteSpace: 'nowrap',
     }}>
       <span>{icon}</span> {label}
     </button>
@@ -153,13 +153,13 @@ export default function EinstellungenPage() {
         }}>{toast}</div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20, alignItems: 'start' }}>
-        <div className="pk-card" style={{ padding: '10px' }}>
-          <NavItem id="profil" icon="👤" label="Benutzerprofil" />
-          <NavItem id="benachrichtigungen" icon="🔔" label="Benachrichtigungen" />
-          <NavItem id="rollen" icon="🔑" label="Rollen & Rechte" />
-          <NavItem id="import" icon="📥" label="Import / Migration" />
-          <NavItem id="info" icon="ℹ️" label="App-Informationen" />
+      <div className="settings-layout" style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20, alignItems: 'start' }}>
+        <div className="pk-card settings-nav" style={{ padding: '10px' }}>
+          <NavItem id="profil" icon="👤" label="Profil" />
+          <NavItem id="benachrichtigungen" icon="🔔" label="Benachricht." />
+          <NavItem id="rollen" icon="🔑" label="Rollen" />
+          <NavItem id="import" icon="📥" label="Import" />
+          <NavItem id="info" icon="ℹ️" label="Info" />
           <div style={{ height: 1, background: 'rgba(255,255,255,.08)', margin: '10px 0' }} />
           <button onClick={handleLogout} style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',

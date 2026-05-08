@@ -674,7 +674,7 @@ function ZeiterfassungTab({ isDemo }: { isDemo: boolean }) {
         </button>
       </div>
 
-      <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="pk-table">
           <thead>
             <tr>
@@ -802,7 +802,7 @@ function MaterialverbrauchTab({ isDemo }: { isDemo: boolean }) {
         </button>
       </div>
 
-      <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="pk-table">
           <thead>
             <tr>
@@ -924,7 +924,7 @@ function QualitaetTab({ isDemo }: { isDemo: boolean }) {
     <div>
       <Toast msg={toast} isError={toastError} />
       {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12, marginBottom: 20 }}>
         <div className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
           <div style={{ fontSize: 22, marginBottom: 4 }}>✅</div>
           <div style={{ fontSize: 22, fontWeight: 900, color: '#10b981' }}>{ok}</div>
@@ -966,7 +966,7 @@ function QualitaetTab({ isDemo }: { isDemo: boolean }) {
         </button>
       </div>
 
-      <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
         <table className="pk-table">
           <thead>
             <tr>
