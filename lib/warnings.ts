@@ -3,6 +3,7 @@ import {
   getBueroRechnungen,
   getWerkstattKarten,
   getPlanungProjekte,
+  getSteuerBelege,
 } from '@/lib/db'
 
 export type Warning = {
@@ -188,6 +189,122 @@ export async function getAppWarnings(isDemo: boolean): Promise<Warning[]> {
   } catch {
     // Planung nicht verfügbar – ignorieren
   }
+
+  // ── Steuer ─────────────────────────────────────────────────────────────────
+  try {
+    const belege = await getSteuerBelege()
+    const ohneSteuersatz = belege.filter(b => b.steuersatz == null)
+    if (ohneSteuersatz.length > 0) {
+      warnings.push({
+        id: 'steuer-kein-steuersatz',
+        type: 'warn',
+        category: 'büro',
+        title: '🧾 Belege ohne Steuersatz',
+        desc: `${ohneSteuersatz.length} Beleg(e) haben keinen Steuersatz`,
+        link: '/dashboard/steuer',
+        timestamp: new Date(),
+      })
+    }
+    const nullBelege = belege.filter(b => !b.betrag || b.betrag === 0)
+    if (nullBelege.length > 0) {
+      warnings.push({
+        id: 'steuer-null-betrag',
+        type: 'warn',
+        category: 'büro',
+        title: '⚠️ Belege mit 0€',
+        desc: `${nullBelege.length} Beleg(e) haben keinen Betrag`,
+        link: '/dashboard/steuer',
+        timestamp: new Date(),
+      })
+    }
+  } catch {
+    // Steuer nicht verfügbar – ignorieren
+  }
+
+  return warnings
+}
+
+export async function getSteuerWarnings(isDemo: boolean): Promise<Warning[]> {
+  if (isDemo) {
+    return [
+      {
+        id: 'steuer-demo-1',
+        type: 'warn',
+        category: 'büro',
+        title: '🧾 Beleg ohne Steuersatz',
+        desc: 'Lieferant "Büromaterial GmbH" – kein Steuersatz hinterlegt',
+        link: '/dashboard/steuer',
+        timestamp: new Date(),
+      },
+      {
+        id: 'steuer-demo-2',
+        type: 'error',
+        category: 'büro',
+        title: '🔴 Doppelter Beleg',
+        desc: '2× gleicher Betrag (480,00 €) am 15.04.2025',
+        link: '/dashboard/steuer',
+        timestamp: new Date(),
+      },
+      {
+        id: 'steuer-demo-3',
+        type: 'info',
+        category: 'büro',
+        title: '📅 UStVA April noch nicht geprüft',
+        desc: 'Monat April 2025 wurde noch nicht als geprüft markiert',
+        link: '/dashboard/steuer',
+        timestamp: new Date(),
+      },
+    ]
+  }
+
+  const warnings: Warning[] = []
+  try {
+    const belege = await getSteuerBelege()
+
+    const ohneSteuersatz = belege.filter(b => b.steuersatz == null)
+    if (ohneSteuersatz.length > 0)
+      warnings.push({
+        id: 'steuer-kein-steuersatz',
+        type: 'warn',
+        category: 'büro',
+        title: '🧾 Belege ohne Steuersatz',
+        desc: `${ohneSteuersatz.length} Beleg(e) ohne Steuersatz`,
+        link: '/dashboard/steuer',
+        timestamp: new Date(),
+      })
+
+    const nullBelege = belege.filter(b => !b.betrag || b.betrag === 0)
+    if (nullBelege.length > 0)
+      warnings.push({
+        id: 'steuer-null-betrag',
+        type: 'warn',
+        category: 'büro',
+        title: '⚠️ Belege mit 0€',
+        desc: `${nullBelege.length} Beleg(e) ohne Betrag`,
+        link: '/dashboard/steuer',
+        timestamp: new Date(),
+      })
+
+    // Duplikat-Erkennung
+    const seen = new Map<string, number>()
+    for (const b of belege) {
+      const key = `${b.datum}-${b.betrag}`
+      seen.set(key, (seen.get(key) ?? 0) + 1)
+    }
+    const dups = Array.from(seen.entries()).filter(([, count]) => count > 1)
+    for (const [key] of dups) {
+      const [datum, betrag] = key.split('-')
+      warnings.push({
+        id: `steuer-duplikat-${key}`,
+        type: 'error',
+        category: 'büro',
+        title: '🔴 Möglicher Doppelbeleg',
+        desc: `${dups.length}× Betrag ${betrag}€ am ${datum}`,
+        link: '/dashboard/steuer',
+        timestamp: new Date(),
+      })
+    }
+  } catch {}
 
   return warnings
 }

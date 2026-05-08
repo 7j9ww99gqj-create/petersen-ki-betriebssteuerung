@@ -12,6 +12,7 @@ const pilots = [
   { id: 'marketing', label: 'MarketingPilot', icon: '📣', href: '/dashboard/marketing' },
   { id: 'analyse',   label: 'AnalysePilot',   icon: '📊', href: '/dashboard/analyse' },
   { id: 'planung',   label: 'PlanungPilot',   icon: '📅', href: '/dashboard/planung' },
+  { id: 'steuer',    label: 'SteuerPilot',    icon: '🧾', href: '/dashboard/steuer' },
 ]
 
 const navItems = [

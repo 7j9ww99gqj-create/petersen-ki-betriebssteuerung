@@ -469,3 +469,49 @@ export async function upsertPlanungRessource(r: {
   if (error) throw error
   return data
 }
+
+// ── STEUER ────────────────────────────────────────────────────────────────────
+
+export async function getSteuerBelege() {
+  const { data, error } = await db().from('steuer_belege').select('*').order('datum', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertSteuerBeleg(b: {
+  id: string; lieferant: string; betrag: number; steuerbetrag: number
+  steuersatz: number; datum: string; status: string; datei_url?: string; notiz?: string
+}) {
+  const { data, error } = await db().from('steuer_belege').upsert(b).select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteSteuerBeleg(id: string) {
+  const { error } = await db().from('steuer_belege').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function getSteuerUstva() {
+  const { data, error } = await db().from('steuer_ustva').select('*').order('monat', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertSteuerUstva(u: {
+  id: string; monat: string; umsatzsteuer: number; vorsteuer: number
+  zahllast: number; status: string
+}) {
+  const { data, error } = await db().from('steuer_ustva').upsert(u).select()
+  if (error) throw error
+  return data
+}
+
+export async function uploadSteuerBeleg(file: File, userId: string): Promise<string> {
+  const supabase = createSupabaseClient()
+  const ext = file.name.split('.').pop()
+  const path = `steuer/${userId}/${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('dokumente').upload(path, file)
+  if (error) throw error
+  return path
+}

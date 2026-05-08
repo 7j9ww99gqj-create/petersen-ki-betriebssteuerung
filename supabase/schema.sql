@@ -382,3 +382,40 @@ create policy "dokumente_select" on storage.objects
 
 create policy "dokumente_delete" on storage.objects
   for delete using (bucket_id = 'dokumente' and auth.uid()::text = (storage.foldername(name))[1]);
+
+-- ── STEUERPILOT ──────────────────────────────────────────────────────────────
+
+create table if not exists steuer_belege (
+  id text primary key,
+  user_id uuid references auth.users default auth.uid(),
+  lieferant text not null,
+  betrag numeric not null default 0,
+  steuerbetrag numeric not null default 0,
+  steuersatz numeric not null default 19,
+  datum date not null,
+  status text not null default 'offen',
+  datei_url text,
+  notiz text,
+  erstellt_am timestamp default now()
+);
+
+alter table steuer_belege enable row level security;
+
+create policy "steuer_belege_all" on steuer_belege
+  for all using (auth.uid() = user_id);
+
+create table if not exists steuer_ustva (
+  id text primary key,
+  user_id uuid references auth.users default auth.uid(),
+  monat text not null,
+  umsatzsteuer numeric not null default 0,
+  vorsteuer numeric not null default 0,
+  zahllast numeric not null default 0,
+  status text not null default 'offen',
+  erstellt_am timestamp default now()
+);
+
+alter table steuer_ustva enable row level security;
+
+create policy "steuer_ustva_all" on steuer_ustva
+  for all using (auth.uid() = user_id);
