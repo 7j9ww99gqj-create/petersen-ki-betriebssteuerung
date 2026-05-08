@@ -34,8 +34,8 @@ npm run dev
 
 ## Datenbank (Supabase)
 
-- **`lib/db.ts`** – Zentrale Datenschicht für alle Piloten (~409 Zeilen)
-- **`supabase/schema.sql`** – Vollständiges Schema mit RLS für alle 17 Tabellen
+- **`lib/db.ts`** – Zentrale Datenschicht für alle Piloten
+- **`supabase/schema.sql`** – Vollständiges Schema mit RLS
 - Alle Tabellen haben `user_id uuid references auth.users default auth.uid()`
 - RLS: jeder User sieht nur seine eigenen Daten
 - Storage-Bucket: `dokumente` (Upload/Select/Delete Policies)
@@ -44,11 +44,23 @@ npm run dev
 ### Tabellen
 | Pilot | Tabellen |
 |-------|---------|
-| Lager | `lager_artikel`, `lager_bewegungen` |
+| Lager | `lager_artikel` (+ `mindestbestand` Spalte!), `lager_bewegungen` |
 | Büro | `buero_kunden`, `buero_angebote`, `buero_auftraege`, `buero_rechnungen`, `buero_dokumente` |
+| Einkauf | `einkauf_lieferanten`, `einkauf_bestellungen`, `einkauf_wareneingaenge` ⚠️ neu – noch im SQL-Editor ausführen! |
 | Werkstatt | `werkstatt_karten`, `werkstatt_zeitbuchungen`, `werkstatt_material`, `werkstatt_pruefprotokolle` |
 | Marketing | `marketing_kampagnen`, `marketing_leads`, `marketing_newsletter` |
 | Planung | `planung_projekte`, `planung_aufgaben`, `planung_termine`, `planung_ressourcen` |
+
+### Neue DB-Funktionen in `lib/db.ts` (Einkauf-Modul)
+```ts
+getEinkaufLieferanten()
+upsertEinkaufLieferant(l: { id?, name, kategorie, ansprechpartner, email, telefon, zahlungsziel, bewertung, notiz })
+deleteEinkaufLieferant(id: string)
+getEinkaufBestellungen()
+upsertEinkaufBestellung(b: { id?, lieferant_id, status, artikel, menge, einzelpreis, gesamtpreis, bestelldatum, lieferdatum_soll, notiz })
+getEinkaufWareneingaenge()
+insertEinkaufWareneingang(w: { bestellung_id, eingangsdatum, menge_bestellt, menge_erhalten, qualitaet, notiz })
+```
 
 ---
 
@@ -56,8 +68,8 @@ npm run dev
 
 | Pilot | Route | Features |
 |-------|-------|---------|
-| LagerPilot | `/dashboard/lager` | Bestand (CRUD), Bewegungen, Wareneingang, Warenausgang, Inventur, Bestellvorschlag-Tab, CSV-Export, Inline-Delete, Spalten-Sortierung |
-| BüroPilot | `/dashboard/buero` | Kunden/Angebote/Aufträge/Rechnungen/Dokumente (alle CRUD+Edit), PDF-Export (jsPDF), Angebot→Auftrag-Konvertierung, echtes File-Upload |
+| LagerPilot | `/dashboard/lager` | Bestand (CRUD), Bewegungen, Wareneingang, Warenausgang, Inventur, Bestellvorschlag-Tab, CSV-Export, Inline-Delete, Spalten-Sortierung, **Mindestbestand-Alarm** (rotes Banner + Bestellvorschlag-Modal), **Alle bestellen**-Button, **Historie-Tab** (Bewegungsfilter je Artikel, Statistik-Karten) |
+| BüroPilot | `/dashboard/buero` | Kunden/Angebote/Aufträge/Rechnungen/Dokumente (alle CRUD+Edit), PDF-Export (jsPDF), Angebot→Auftrag-Konvertierung, echtes File-Upload, **Einkauf/Lieferanten-Tab** (Lieferanten-CRUD+Bewertung, Bestellungen-Workflow, Wareneingänge+Qualitätskontrolle, KPI-Karten) |
 | WerkstattPilot | `/dashboard/werkstatt` | Arbeitskarten (CRUD+Edit+Fortschritt-Slider), Zeiterfassung, Materialverbrauch, Prüfprotokoll (Ergebnis inline), KPI-Karten |
 | MarketingPilot | `/dashboard/marketing` | Kampagnen, Leads, Newsletter |
 | AnalysePilot | `/dashboard/analyse` | Charts (recharts v3): Bar, Line, Area, Pie |
@@ -66,6 +78,64 @@ npm run dev
 | Cloud & Sync | `/dashboard/cloud` | Sync-Status, Storage-Übersicht |
 | Archiv | `/dashboard/archiv` | Dokumentenarchiv |
 | Einstellungen | `/dashboard/einstellungen` | Profil, Benachrichtigungen, Rollen & Rechte (Tabelle + Wechsel) |
+
+### LagerPilot Tab-Typen
+```ts
+type LagerTab = 'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur' | 'bestellung' | 'historie'
+```
+- **Bestellvorschlag-Flow**: Warenausgang → prüft Mindestbestand → zeigt `bestellHint`-Banner → Modal mit Bestellmenge + E-Mail-Vorschau
+- **Alle bestellen**: Bulk-Bestellung aller offenen Vorschläge auf einmal
+- **📈-Button** per Artikelzeile → navigiert zu Historie-Tab gefiltert auf diesen Artikel
+- **BestellDetailModal**: Artikel-Info, editierbare Menge, E-Mail-Simulation
+
+### BüroPilot Einkauf-Tab (`EinkaufTab`-Komponente)
+```ts
+type Tab = 'kunden' | 'angebote' | 'auftraege' | 'rechnungen' | 'dokumente' | 'einkauf'
+```
+- **Sub-Tabs**: Lieferanten · Bestellungen · Wareneingänge
+- **Lieferanten**: CRUD, Sternebewertung (★/☆), Zahlungsziel, Kategorie, 🛒-Quicklink zu Bestellung
+- **Bestellungen**: Status-Workflow Entwurf→Bestellt→Teillieferung→Geliefert, "WE buchen"-Quicklink
+- **Wareneingänge**: Qualitätskontrolle (OK/Mängel/Abgelehnt), auto Bestellstatus-Update
+- ⚠️ Aktuell Demo-State (db.ts-Funktionen vorbereitet aber noch nicht in EinkaufTab verdrahtet)
+
+### Dashboard KPIs (P4)
+- `app/dashboard/page.tsx` lädt echte Supabase-Daten via `Promise.allSettled` (graceful degradation)
+- Im Demo-Modus: statische `demoKpis`-Werte
+- 6 klickbare KPI-Cards mit Navigation zum jeweiligen Piloten
+
+---
+
+## Mobile / PWA Optimierungen
+
+### Viewport & PWA (app/layout.tsx)
+```tsx
+export const viewport: Viewport = {
+  width: 'device-width', initialScale: 1, maximumScale: 1,
+  userScalable: false, viewportFit: 'cover', themeColor: '#05070b',
+}
+// PWA Meta-Tags: apple-mobile-web-app-capable, apple-mobile-web-app-status-bar-style
+// manifest.json in public/manifest.json
+```
+
+### Bottom Navigation (app/dashboard/layout.tsx)
+```tsx
+const bottomNavItems = [
+  { href: '/dashboard',              icon: '⊞',  label: 'Start' },
+  { href: '/dashboard/lager',        icon: '📦', label: 'Lager' },
+  { href: '/dashboard/buero',        icon: '🧾', label: 'Büro' },
+  { href: '/dashboard/werkstatt',    icon: '🛠️', label: 'Werkstatt' },
+  { href: '/dashboard/ki-erkennung', icon: '🧠', label: 'KI' },
+  { href: '#menu',                   icon: '☰',  label: 'Menü' },  // öffnet Sidebar
+]
+// Sichtbar bei ≤768px via CSS display:flex
+```
+
+### iOS-Fixes
+- `font-size: 16px !important` auf `.pk-input` (verhindert Auto-Zoom)
+- `min-height: 44px` auf `.pk-btn`, `.pk-btn-ghost` (Touch-Target Apple HIG)
+- `env(safe-area-inset-*)` in padding-Werten für Notch/Home-Indicator
+- `100dvh` statt `100vh` (behebt iOS Safari-Viewport-Bug)
+- `-webkit-overflow-scrolling: touch` auf `.pk-table-wrap` (in globals.css)
 
 ---
 
@@ -140,13 +210,22 @@ CSS-Variablen:
 
 CSS-Klassen:
 - `.pk-card` – Standard-Karte
-- `.pk-btn` – Primär-Button (Blau)
-- `.pk-btn-ghost` – Sekundär-Button
-- `.pk-input` – Input-Feld
+- `.pk-btn` – Primär-Button (Blau, min-height 44px)
+- `.pk-btn-ghost` – Sekundär-Button (min-height 44px)
+- `.pk-input` – Input-Feld (font-size 16px auf Mobile → kein iOS-Zoom)
 - `.pk-table` – Tabellen-Stil
 - `.badge .badge-green/blue/orange/gray/red/purple` – Status-Badges
 - `.fade-in` / `.fade-in-scale` – Animationen
-- `.hamburger-btn` – Mobiler Menü-Button (per CSS sichtbar)
+- `.hamburger-btn` – Mobiler Menü-Button (per CSS sichtbar, Desktop versteckt)
+- `.bottom-nav` – Bottom Navigation Bar (nur Mobile ≤768px)
+- `.bottom-nav-item` – Einzelner Nav-Eintrag (flex column, touch-target)
+- `.bn-icon` – Icon in Bottom Nav
+- `.stats-grid` – Responsive KPI-Grid (1–4 Spalten je Viewport)
+- `.mobile-1col` – Erzwingt 1-Spalten-Layout auf Mobile
+- `.pk-tab-bar` – Horizontaler Tab-Container (scroll ohne Scrollbar)
+- `.support-btn-wrap` – SupportButton-Wrapper (hebt Button über Bottom-Nav auf Mobile)
+- `.role-badge-desktop` – Rollen-Badge (nur Desktop sichtbar)
+- `.hide-xs` – Versteckt Element auf sehr kleinen Screens
 
 ### Piloten-Farben
 | Pilot | Farbe | Hex |
@@ -167,7 +246,7 @@ CSS-Klassen:
 | `lib/roles.ts` | Rollen & Rechte: `AppRole`, `PERMISSIONS`, `useRole()`, `getRole()`, `setRole()` |
 | `lib/warnings.ts` | Warnsystem: `getAppWarnings(isDemo)` liest Lager/Büro/Werkstatt/Planung |
 | `lib/pdf.ts` | PDF-Generierung: `generateRechnungPDF()`, `generateAngebotPDF()` via jsPDF |
-| `lib/db.ts` | Zentrale Datenschicht für alle Piloten (Supabase CRUD) |
+| `lib/db.ts` | Zentrale Datenschicht für alle Piloten (Supabase CRUD) inkl. Einkauf-Funktionen |
 
 ### Rollen-System (`lib/roles.ts`)
 ```ts
@@ -201,7 +280,7 @@ await generateAngebotPDF(angebot: PDFAngebot, kundenName: string)
 | `Sidebar.tsx` | Navigations-Sidebar mit allen Piloten-Links |
 | `NotificationBell.tsx` | Echte Live-Warnungen (Tabs: Alle/Fehler/Warnung), Auto-Refresh 60s, Links zu Piloten |
 | `GlobalSearch.tsx` | ⌘K Suchmodal |
-| `SupportButton.tsx` | Floating Support-Button (WhatsApp, E-Mail, Telefon) – fixed bottom-right |
+| `SupportButton.tsx` | Floating Support-Button (WhatsApp, E-Mail, Telefon) – fixed bottom-right, className="support-btn-wrap" für Mobile-Override |
 
 ---
 
@@ -212,7 +291,8 @@ await generateAngebotPDF(angebot: PDFAngebot, kundenName: string)
 - **Animierte Zähler**: Dashboard-Stats zählen bei Laden hoch
 - **Logo**: `/public/logo.jpg` – in Sidebar + Login
 - **recharts v3**: Installiert für AnalysePilot
-- **Mobile**: Hamburger-Menü, responsive Grid-Layouts, `overflowX: auto` für Tabellen
+- **Mobile Bottom-Nav**: 6 Einträge, sichtbar ≤768px, '#menu'-Eintrag öffnet Sidebar
+- **PWA**: `public/manifest.json`, Viewport-Meta in `app/layout.tsx`
 
 ---
 
@@ -233,6 +313,7 @@ await generateAngebotPDF(angebot: PDFAngebot, kundenName: string)
 - **IDs immer via `genId(prefix)`** (Date.now().toString(36))
 - **snake_case in DB-Typen**: z.B. `bezahlt_am` nicht `bezahltAm`
 - **Nach jeder Änderung**: `git add <datei> && git commit -m "..." && git push`
+- **TypeScript prüfen**: `npx tsc --noEmit` nach größeren Änderungen
 - UI sauber und konsistent halten
 
 ---
@@ -248,11 +329,15 @@ await generateAngebotPDF(angebot: PDFAngebot, kundenName: string)
 
 ## Offene Punkte / Nächste Schritte
 
-- [ ] `supabase/schema.sql` im Supabase SQL-Editor ausführen (noch nicht bestätigt)
+### Dringend (Supabase)
+- [ ] `supabase/schema.sql` im Supabase SQL-Editor ausführen – 3 neue Einkauf-Tabellen + `ALTER TABLE lager_artikel ADD COLUMN mindestbestand integer default 0`
+
+### Features
+- [ ] EinkaufTab: Demo-State auf echte Supabase-Calls umstellen (db.ts-Funktionen bereits fertig)
 - [ ] MarketingPilot vollständig ausbauen (Edit/Delete fehlt noch)
 - [ ] AnalysePilot: echte Daten aus Supabase statt Demo-Charts
 - [ ] Stripe Integration (Abos/Bezahlung)
-- [ ] E-Mail-Benachrichtigungen bei Mindestbestand-Unterschreitung
+- [ ] E-Mail-Benachrichtigungen bei Mindestbestand-Unterschreitung (aktuell nur simuliert)
 - [ ] Rollen-basierte Sidebar-Filterung (aktuell nur in Einstellungen wählbar)
 - [ ] Benutzer-Verwaltung für Admin (andere User Rollen zuweisen)
 - [ ] PDF-Vorlagen: Firmenlogo und echte Adressdaten einbinden
