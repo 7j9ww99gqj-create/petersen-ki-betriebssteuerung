@@ -23,7 +23,7 @@ export async function getLagerArtikel() {
 
 export async function upsertLagerArtikel(artikel: {
   id: string; name: string; kategorie?: string; bestand?: number
-  einheit?: string; lagerplatz?: string; status?: string
+  einheit?: string; lagerplatz?: string; status?: string; mindestbestand?: number
 }) {
   const { data, error } = await db()
     .from('lager_artikel')
@@ -632,4 +632,167 @@ export async function bulkImportSteuerKonten(rows: Array<{
   const { data, error } = await db().from('steuer_konten').insert(rows).select()
   if (error) throw error
   return data
+}
+
+// ── LAGER STELLPLÄTZE ─────────────────────────────────────────────────────────
+
+export async function getLagerStellplaetze() {
+  const { data, error } = await db()
+    .from('lager_stellplaetze')
+    .select('*')
+    .order('code')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertLagerStellplatz(s: {
+  id: string; code: string; name?: string; bereich?: string; zone?: string
+  gang?: string; regal?: string; ebene?: string; fach?: string; typ?: string
+  warengruppe?: string; warenobergruppe?: string; temperaturzone?: string
+  max_gewicht?: number; max_volumen?: number; aktiv?: boolean; notiz?: string
+}) {
+  const { data, error } = await db()
+    .from('lager_stellplaetze')
+    .upsert({ ...s, updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteLagerStellplatz(id: string) {
+  const { error } = await db().from('lager_stellplaetze').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ── LAGER STELLPLATZ-BESTAND ──────────────────────────────────────────────────
+
+export async function getLagerStellplatzBestand() {
+  const { data, error } = await db()
+    .from('lager_stellplatz_bestand')
+    .select('*, lager_stellplaetze(code, bereich, warengruppe, warenobergruppe)')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertLagerStellplatzBestand(b: {
+  id: string; stellplatz_id: string; artikel_id?: string
+  artikelnummer?: string; artikelname?: string; charge?: string
+  mhd?: string; menge: number; einheit?: string; status?: string
+  eingelagert_am?: string; notiz?: string
+}) {
+  const { data, error } = await db()
+    .from('lager_stellplatz_bestand')
+    .upsert(b)
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteLagerStellplatzBestand(id: string) {
+  const { error } = await db().from('lager_stellplatz_bestand').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ── LAGER UMLAGERUNGEN ────────────────────────────────────────────────────────
+
+export async function getLagerUmlagerungen() {
+  const { data, error } = await db()
+    .from('lager_umlagerungen')
+    .select('*')
+    .order('datum', { ascending: false })
+    .limit(200)
+  if (error) throw error
+  return data ?? []
+}
+
+export async function insertLagerUmlagerung(u: {
+  id: string; artikel_id?: string; artikelnummer?: string; artikelname?: string
+  von_stellplatz_id?: string; nach_stellplatz_id?: string; charge?: string
+  mhd?: string; menge: number; grund?: string; datum?: string; notiz?: string
+}) {
+  const { data, error } = await db()
+    .from('lager_umlagerungen')
+    .insert(u)
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function umlagerArtikel(params: {
+  vonBestandId: string
+  nachStellplatzId: string
+  menge: number
+  charge?: string
+  mhd?: string
+  grund?: string
+  notiz?: string
+  artikelname?: string
+  artikelnummer?: string
+  artikelId?: string
+  vonStellplatzId?: string
+}) {
+  const supabase = db()
+
+  // 1. Quell-Bestand laden
+  const { data: von, error: vonErr } = await supabase
+    .from('lager_stellplatz_bestand')
+    .select('*')
+    .eq('id', params.vonBestandId)
+    .single()
+  if (vonErr || !von) throw new Error('Quell-Bestand nicht gefunden')
+  if (von.menge < params.menge) throw new Error(`Nur ${von.menge} ${von.einheit ?? 'Stk'} verfügbar`)
+
+  // 2. Quell-Menge reduzieren oder Datensatz löschen
+  if (von.menge === params.menge) {
+    await supabase.from('lager_stellplatz_bestand').delete().eq('id', params.vonBestandId)
+  } else {
+    await supabase.from('lager_stellplatz_bestand')
+      .update({ menge: von.menge - params.menge })
+      .eq('id', params.vonBestandId)
+  }
+
+  // 3. Ziel-Bestand suchen (gleicher Artikel+Charge+MHD am Ziel-Stellplatz)
+  const { data: zielRows } = await supabase
+    .from('lager_stellplatz_bestand')
+    .select('*')
+    .eq('stellplatz_id', params.nachStellplatzId)
+    .eq('artikelnummer', von.artikelnummer ?? '')
+    .eq('charge', params.charge ?? von.charge ?? '')
+
+  if (zielRows && zielRows.length > 0) {
+    await supabase.from('lager_stellplatz_bestand')
+      .update({ menge: zielRows[0].menge + params.menge })
+      .eq('id', zielRows[0].id)
+  } else {
+    await supabase.from('lager_stellplatz_bestand').insert({
+      id: `SB-${Date.now().toString(36).toUpperCase()}`,
+      stellplatz_id: params.nachStellplatzId,
+      artikel_id: von.artikel_id,
+      artikelnummer: von.artikelnummer,
+      artikelname: von.artikelname,
+      charge: params.charge ?? von.charge,
+      mhd: params.mhd ?? von.mhd,
+      menge: params.menge,
+      einheit: von.einheit,
+      status: 'Verfügbar',
+      eingelagert_am: new Date().toISOString().slice(0, 10),
+    })
+  }
+
+  // 4. Umlagerung dokumentieren
+  await supabase.from('lager_umlagerungen').insert({
+    id: `UML-${Date.now().toString(36).toUpperCase()}`,
+    artikel_id: von.artikel_id,
+    artikelnummer: von.artikelnummer,
+    artikelname: von.artikelname,
+    von_stellplatz_id: von.stellplatz_id,
+    nach_stellplatz_id: params.nachStellplatzId,
+    charge: params.charge ?? von.charge,
+    mhd: params.mhd ?? von.mhd,
+    menge: params.menge,
+    grund: params.grund,
+    notiz: params.notiz,
+    datum: new Date().toISOString(),
+  })
 }

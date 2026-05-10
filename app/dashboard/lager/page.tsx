@@ -4,6 +4,9 @@ import { hasDemoCookie } from '@/lib/auth'
 import {
   getLagerArtikel, getLagerBewegungen,
   upsertLagerArtikel, insertLagerBewegung, deleteLagerArtikel,
+  getLagerStellplaetze, getLagerStellplatzBestand, getLagerUmlagerungen,
+  upsertLagerStellplatz, deleteLagerStellplatz,
+  deleteLagerStellplatzBestand, umlagerArtikel,
 } from '@/lib/db'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
@@ -17,9 +20,42 @@ type Bewegung = {
   datum: string; mitarbeiter: string; status: string
 }
 
+type Stellplatz = {
+  id: string; code: string; name?: string; bereich?: string; zone?: string
+  typ?: string; warengruppe?: string; aktiv?: boolean; notiz?: string
+}
+type StellplatzBestand = {
+  id: string; stellplatz_id: string; artikelnummer?: string; artikelname?: string
+  charge?: string; mhd?: string; menge: number; einheit?: string; status?: string
+  eingelagert_am?: string; notiz?: string
+  lager_stellplaetze?: { code: string; bereich?: string }
+}
+type Umlagerung = {
+  id: string; artikelname?: string; artikelnummer?: string
+  von_stellplatz_id?: string; nach_stellplatz_id?: string
+  menge: number; grund?: string; datum?: string; notiz?: string
+}
+
+type StellplatzForm = {
+  code: string; name: string; bereich: string; zone: string; gang: string
+  regal: string; ebene: string; fach: string; typ: string; warengruppe: string
+  warenobergruppe: string; temperaturzone: string; max_gewicht: string
+  max_volumen: string; aktiv: boolean; notiz: string
+}
+const emptyStellplatzForm: StellplatzForm = {
+  code: '', name: '', bereich: '', zone: '', gang: '', regal: '', ebene: '',
+  fach: '', typ: 'Standard', warengruppe: '', warenobergruppe: '',
+  temperaturzone: '', max_gewicht: '', max_volumen: '', aktiv: true, notiz: '',
+}
+type UmlagerungForm = { vonBestandId: string; nachStellplatzId: string; menge: string; grund: string; notiz: string }
+const emptyUmlagerungForm: UmlagerungForm = { vonBestandId: '', nachStellplatzId: '', menge: '', grund: '', notiz: '' }
+
+const SP_BEREICHE = ['Trockenlager', 'Kühlbereich', 'Wareneingang', 'Versand', 'Sperrlager', 'Außenlager', 'Sonstiges']
+const SP_TYPEN = ['Standard', 'Kühl', 'Tiefkühl', 'Eingang', 'Ausgang', 'Sperr', 'Bodenplatz', 'Hochregal']
+
 type SortKey = 'id' | 'name' | 'bestand' | 'status'
 type SortDir = 'asc' | 'desc'
-type LagerTab = 'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur' | 'bestellung' | 'historie'
+type LagerTab = 'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur' | 'bestellung' | 'historie' | 'stellplaetze' | 'lagerbelegung' | 'umlagerung'
 
 const EINHEITEN = ['Stk', 'Liter', 'kg', 'Rollen', 'Meter', 'Paar', 'Karton', 'Palette']
 const KATEGORIEN = ['Rohstoffe', 'Kleinteile', 'Betriebsstoffe', 'Verbrauchsmaterial', 'Werkzeug', 'Schutzausrüstung', 'Sonstiges']
@@ -44,6 +80,29 @@ const demoBewegungen: Bewegung[] = [
   { id: 4, typ: 'Ausgang', artikel: 'Schweißdraht 1.0mm', menge: 6, datum: '05.05.2025', mitarbeiter: 'M. Fischer', status: 'Gebucht' },
   { id: 5, typ: 'Eingang', artikel: 'Schrauben M8x30', menge: 1000, datum: '03.05.2025', mitarbeiter: 'K. Petersen', status: 'Gebucht' },
   { id: 6, typ: 'Ausgang', artikel: 'Stahlrohr 40x40', menge: 8, datum: '02.05.2025', mitarbeiter: 'T. Schulz', status: 'Gebucht' },
+]
+
+const demoStellplaetze: Stellplatz[] = [
+  { id: 'SP-001', code: 'TL-A-01-01', name: 'Trockenlager A Regal 1 Fach 1', bereich: 'Trockenlager', zone: 'A', typ: 'Standard', aktiv: true },
+  { id: 'SP-002', code: 'TL-A-01-02', name: 'Trockenlager A Regal 1 Fach 2', bereich: 'Trockenlager', zone: 'A', typ: 'Standard', aktiv: true },
+  { id: 'SP-003', code: 'KL-B-02-01', name: 'Kühlbereich B Regal 2 Fach 1', bereich: 'Kühlbereich', zone: 'B', typ: 'Kühl', aktiv: true },
+  { id: 'SP-004', code: 'WE-ZONE-01', name: 'Wareneingangszone 1', bereich: 'Wareneingang', zone: 'WE', typ: 'Eingang', aktiv: true },
+  { id: 'SP-005', code: 'SPERR-01', name: 'Sperrlager 1', bereich: 'Sperrlager', zone: 'S', typ: 'Sperr', aktiv: true },
+  { id: 'SP-006', code: 'VERSAND-01', name: 'Versandzone 1', bereich: 'Versand', zone: 'V', typ: 'Ausgang', aktiv: true },
+]
+
+const demoStellplatzBestand: StellplatzBestand[] = [
+  { id: 'SB-001', stellplatz_id: 'SP-001', artikelnummer: 'ART-001', artikelname: 'Stahlrohr 40x40', charge: 'CH-2025-01', menge: 80, einheit: 'Stk', status: 'Verfügbar', lager_stellplaetze: { code: 'TL-A-01-01', bereich: 'Trockenlager' } },
+  { id: 'SB-002', stellplatz_id: 'SP-002', artikelnummer: 'ART-001', artikelname: 'Stahlrohr 40x40', charge: 'CH-2025-02', menge: 62, einheit: 'Stk', status: 'Verfügbar', lager_stellplaetze: { code: 'TL-A-01-02', bereich: 'Trockenlager' } },
+  { id: 'SB-003', stellplatz_id: 'SP-001', artikelnummer: 'ART-002', artikelname: 'Schrauben M8x30', menge: 1840, einheit: 'Stk', status: 'Verfügbar', lager_stellplaetze: { code: 'TL-A-01-01', bereich: 'Trockenlager' } },
+  { id: 'SB-004', stellplatz_id: 'SP-003', artikelnummer: 'ART-003', artikelname: 'Hydrauliköl HLP46', charge: 'CH-2024-11', mhd: '2026-12-31', menge: 8, einheit: 'Liter', status: 'Verfügbar', lager_stellplaetze: { code: 'KL-B-02-01', bereich: 'Kühlbereich' } },
+  { id: 'SB-005', stellplatz_id: 'SP-004', artikelnummer: 'ART-005', artikelname: 'Aluminiumplatte 200x300', menge: 0, einheit: 'Stk', status: 'Leer', lager_stellplaetze: { code: 'WE-ZONE-01', bereich: 'Wareneingang' } },
+]
+
+const demoUmlagerungen: Umlagerung[] = [
+  { id: 'UML-001', artikelname: 'Stahlrohr 40x40', artikelnummer: 'ART-001', von_stellplatz_id: 'SP-004', nach_stellplatz_id: 'SP-001', menge: 50, grund: 'Einlagerung Wareneingang', datum: '2026-05-06T08:15:00Z' },
+  { id: 'UML-002', artikelname: 'Schrauben M8x30', artikelnummer: 'ART-002', von_stellplatz_id: 'SP-001', nach_stellplatz_id: 'SP-005', menge: 200, grund: 'Qualitätsprüfung', datum: '2026-05-07T10:30:00Z' },
+  { id: 'UML-003', artikelname: 'Hydrauliköl HLP46', artikelnummer: 'ART-003', von_stellplatz_id: 'SP-004', nach_stellplatz_id: 'SP-003', menge: 20, grund: 'Einlagerung Kühlbereich', datum: '2026-05-08T14:00:00Z' },
 ]
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
@@ -269,6 +328,131 @@ function BestellDetailModal({ artikel, menge, onConfirm, onClose }: {
   )
 }
 
+// ── Stellplatz-Modal ─────────────────────────────────────────────────────────
+
+function StellplatzModal({ stellplatz, onSave, onClose }: {
+  stellplatz?: Stellplatz | null
+  onSave: (form: StellplatzForm) => void
+  onClose: () => void
+}) {
+  const [form, setForm] = useState<StellplatzForm>(stellplatz ? {
+    code: stellplatz.code,
+    name: stellplatz.name ?? '',
+    bereich: stellplatz.bereich ?? '',
+    zone: stellplatz.zone ?? '',
+    gang: '',
+    regal: '',
+    ebene: '',
+    fach: '',
+    typ: stellplatz.typ ?? 'Standard',
+    warengruppe: stellplatz.warengruppe ?? '',
+    warenobergruppe: (stellplatz as Stellplatz & { warenobergruppe?: string }).warenobergruppe ?? '',
+    temperaturzone: '',
+    max_gewicht: '',
+    max_volumen: '',
+    aktiv: stellplatz.aktiv !== false,
+    notiz: stellplatz.notiz ?? '',
+  } : emptyStellplatzForm)
+
+  const set = (k: keyof StellplatzForm) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      setForm(p => ({ ...p, [k]: e.target.value }))
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} />
+      <div className="pk-card fade-in-scale" style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: 28, maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 800 }}>
+          {stellplatz ? '✏️ Stellplatz bearbeiten' : '📍 Neuer Stellplatz'}
+        </h3>
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Stellplatz-Code * <span style={{ color: '#aeb9c8', fontWeight: 400 }}>(z.B. TL-A-01-02)</span></label>
+            <input className="pk-input" placeholder="TL-A-01-02" value={form.code} onChange={set('code')} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Bezeichnung</label>
+            <input className="pk-input" placeholder="z.B. Trockenlager A Regal 1 Fach 2" value={form.name} onChange={set('name')} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Bereich</label>
+              <select className="pk-input" value={form.bereich} onChange={set('bereich')}>
+                <option value="">— Bereich wählen —</option>
+                {SP_BEREICHE.map(b => <option key={b}>{b}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Typ</label>
+              <select className="pk-input" value={form.typ} onChange={set('typ')}>
+                {SP_TYPEN.map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
+            {([['zone', 'Zone'], ['gang', 'Gang'], ['regal', 'Regal'], ['ebene', 'Ebene']] as [keyof StellplatzForm, string][]).map(([k, label]) => (
+              <div key={k}>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 600 }}>{label}</label>
+                <input className="pk-input" placeholder={label} value={form[k] as string} onChange={set(k)} />
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Fach</label>
+              <input className="pk-input" placeholder="z.B. 03" value={form.fach} onChange={set('fach')} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Temperaturzone</label>
+              <input className="pk-input" placeholder="z.B. +15°C bis +25°C" value={form.temperaturzone} onChange={set('temperaturzone')} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Warengruppe</label>
+              <input className="pk-input" placeholder="z.B. Metallwaren" value={form.warengruppe} onChange={set('warengruppe')} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Warenobergruppe</label>
+              <input className="pk-input" placeholder="z.B. Rohstoffe" value={form.warenobergruppe} onChange={set('warenobergruppe')} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Max. Gewicht (kg)</label>
+              <input className="pk-input" type="number" min="0" placeholder="z.B. 500" value={form.max_gewicht} onChange={set('max_gewicht')} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Max. Volumen (m³)</label>
+              <input className="pk-input" type="number" min="0" step="0.01" placeholder="z.B. 2.5" value={form.max_volumen} onChange={set('max_volumen')} />
+            </div>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Notiz</label>
+            <input className="pk-input" placeholder="Optionale Hinweise" value={form.notiz} onChange={set('notiz')} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="checkbox"
+              id="sp-aktiv"
+              checked={form.aktiv}
+              onChange={e => setForm(p => ({ ...p, aktiv: e.target.checked }))}
+              style={{ width: 18, height: 18, accentColor: '#1684ff', cursor: 'pointer' }}
+            />
+            <label htmlFor="sp-aktiv" style={{ fontSize: 14, color: '#f8fbff', cursor: 'pointer', fontWeight: 600 }}>Stellplatz aktiv</label>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+          <button className="pk-btn" onClick={() => { if (form.code.trim()) onSave(form) }} style={{ flex: 1, fontWeight: 700 }}>
+            {stellplatz ? 'Speichern' : 'Stellplatz anlegen'}
+          </button>
+          <button className="pk-btn-ghost" onClick={onClose} style={{ flex: 1 }}>Abbrechen</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Hauptkomponente ──────────────────────────────────────────────────────────
 
 export default function LagerPilotPage() {
@@ -305,6 +489,24 @@ export default function LagerPilotPage() {
   // Artikel-Historie-State (P3)
   const [histArtikel, setHistArtikel] = useState<string | null>(null)
 
+  // Stellplatz-State
+  const [stellplaetze, setStellplaetze] = useState<Stellplatz[]>(isDemo ? demoStellplaetze : [])
+  const [stellplatzBestand, setStellplatzBestand] = useState<StellplatzBestand[]>(isDemo ? demoStellplatzBestand : [])
+  const [umlagerungen, setUmlagerungen] = useState<Umlagerung[]>(isDemo ? demoUmlagerungen : [])
+  const [spModal, setSpModal] = useState<null | 'new' | Stellplatz>(null)
+  const [spDeleteConfirmId, setSpDeleteConfirmId] = useState<string | null>(null)
+  const [spSearch, setSpSearch] = useState('')
+  const [spFilterBereich, setSpFilterBereich] = useState('Alle')
+
+  // Umlagerungs-State
+  const [umlForm, setUmlForm] = useState<UmlagerungForm>(emptyUmlagerungForm)
+
+  // Lagerbelegung-State
+  const [lbSearch, setLbSearch] = useState('')
+  const [lbFilterBereich, setLbFilterBereich] = useState('Alle')
+  const [lbNurMhdKritisch, setLbNurMhdKritisch] = useState(false)
+  const [lbDeleteConfirmId, setLbDeleteConfirmId] = useState<string | null>(null)
+
   // Daten laden
   useEffect(() => {
     if (isDemo) return
@@ -312,6 +514,17 @@ export default function LagerPilotPage() {
       .then(([a, b]) => { setArtikel(a as Artikel[]); setBewegungen(b as Bewegung[]) })
       .catch(() => showToast('Fehler beim Laden', false))
       .finally(() => setLoading(false))
+  }, [isDemo])
+
+  useEffect(() => {
+    if (isDemo) return
+    Promise.all([getLagerStellplaetze(), getLagerStellplatzBestand(), getLagerUmlagerungen()])
+      .then(([sp, sb, uml]) => {
+        setStellplaetze(sp as Stellplatz[])
+        setStellplatzBestand(sb as StellplatzBestand[])
+        setUmlagerungen(uml as Umlagerung[])
+      })
+      .catch(() => {})
   }, [isDemo])
 
   const showToast = (msg: string, ok = true) => {
@@ -491,6 +704,188 @@ export default function LagerPilotPage() {
     }
   }
 
+  // ── Stellplatz CRUD ──────────────────────────────────────────────────────────
+
+  const handleSaveStellplatz = async (form: StellplatzForm) => {
+    const codeNorm = form.code.trim().toUpperCase()
+    const isEdit = spModal !== null && spModal !== 'new'
+    const editId = isEdit ? (spModal as Stellplatz).id : null
+
+    // Eindeutigkeit prüfen
+    const duplicate = stellplaetze.find(sp => sp.code.toUpperCase() === codeNorm && sp.id !== editId)
+    if (duplicate) { showToast(`⚠️ Code "${codeNorm}" existiert bereits`, false); return }
+
+    const id = editId ?? (isDemo
+      ? `SP-${Date.now().toString(36).toUpperCase()}`
+      : crypto.randomUUID())
+
+    const payload: Stellplatz = {
+      id,
+      code: codeNorm,
+      name: form.name || undefined,
+      bereich: form.bereich || undefined,
+      zone: form.zone || undefined,
+      typ: form.typ || undefined,
+      warengruppe: form.warengruppe || undefined,
+      aktiv: form.aktiv,
+      notiz: form.notiz || undefined,
+    }
+
+    setSaving(true)
+    if (!isDemo) {
+      try {
+        await upsertLagerStellplatz({
+          id,
+          code: codeNorm,
+          name: form.name || undefined,
+          bereich: form.bereich || undefined,
+          zone: form.zone || undefined,
+          gang: form.gang || undefined,
+          regal: form.regal || undefined,
+          ebene: form.ebene || undefined,
+          fach: form.fach || undefined,
+          typ: form.typ || undefined,
+          warengruppe: form.warengruppe || undefined,
+          warenobergruppe: form.warenobergruppe || undefined,
+          temperaturzone: form.temperaturzone || undefined,
+          max_gewicht: form.max_gewicht ? parseFloat(form.max_gewicht) : undefined,
+          max_volumen: form.max_volumen ? parseFloat(form.max_volumen) : undefined,
+          aktiv: form.aktiv,
+          notiz: form.notiz || undefined,
+        })
+      } catch { showToast('Fehler beim Speichern', false); setSaving(false); return }
+    }
+
+    setStellplaetze(prev => isEdit ? prev.map(sp => sp.id === id ? payload : sp) : [...prev, payload])
+    setSpModal(null)
+    setSaving(false)
+    showToast(isEdit ? `✅ "${codeNorm}" aktualisiert` : `✅ Stellplatz "${codeNorm}" angelegt`)
+  }
+
+  const handleDeleteStellplatz = async (id: string) => {
+    if (!isDemo) {
+      try { await deleteLagerStellplatz(id) }
+      catch { showToast('Fehler beim Löschen', false); setSpDeleteConfirmId(null); return }
+    }
+    setStellplaetze(prev => prev.filter(sp => sp.id !== id))
+    setSpDeleteConfirmId(null)
+    showToast('🗑 Stellplatz gelöscht')
+  }
+
+  // ── Lagerbelegung Helpers ────────────────────────────────────────────────────
+
+  function mhdStatus(mhd: string | undefined): 'abgelaufen' | 'kritisch' | 'ok' | 'kein' {
+    if (!mhd) return 'kein'
+    const diff = (new Date(mhd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    if (diff < 0) return 'abgelaufen'
+    if (diff < 30) return 'kritisch'
+    return 'ok'
+  }
+
+  const handleDeleteStellplatzBestand = async (id: string) => {
+    if (!isDemo) {
+      try { await deleteLagerStellplatzBestand(id) }
+      catch { showToast('Fehler beim Entfernen', false); setLbDeleteConfirmId(null); return }
+    }
+    setStellplatzBestand(prev => prev.filter(sb => sb.id !== id))
+    setLbDeleteConfirmId(null)
+    showToast('🗑 Bestand-Position entfernt')
+  }
+
+  // ── Umlagerung ───────────────────────────────────────────────────────────────
+
+  const handleUmlagerung = async () => {
+    const { vonBestandId, nachStellplatzId, menge: mengeStr, grund, notiz } = umlForm
+    if (!vonBestandId || !nachStellplatzId || !mengeStr) return
+    const menge = parseInt(mengeStr)
+    if (isNaN(menge) || menge <= 0) return
+
+    const vonBestand = stellplatzBestand.find(sb => sb.id === vonBestandId)
+    if (!vonBestand) { showToast('Quell-Position nicht gefunden', false); return }
+    if (vonBestand.menge < menge) {
+      showToast(`⚠️ Nur ${vonBestand.menge} ${vonBestand.einheit ?? 'Stk'} verfügbar`, false)
+      return
+    }
+    if (vonBestand.stellplatz_id === nachStellplatzId) {
+      showToast('Quelle und Ziel sind identisch', false); return
+    }
+
+    setSaving(true)
+
+    if (!isDemo) {
+      try {
+        await umlagerArtikel({
+          vonBestandId,
+          nachStellplatzId,
+          menge,
+          grund: grund || undefined,
+          notiz: notiz || undefined,
+        })
+        const [sp, sb, uml] = await Promise.all([
+          getLagerStellplaetze(), getLagerStellplatzBestand(), getLagerUmlagerungen(),
+        ])
+        setStellplaetze(sp as Stellplatz[])
+        setStellplatzBestand(sb as StellplatzBestand[])
+        setUmlagerungen(uml as Umlagerung[])
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Fehler bei Umlagerung'
+        showToast(msg, false); setSaving(false); return
+      }
+    } else {
+      // Demo: lokalen State simulieren
+      setStellplatzBestand(prev => {
+        let next = [...prev]
+        // Quelle reduzieren oder entfernen
+        if (vonBestand.menge === menge) {
+          next = next.filter(sb => sb.id !== vonBestandId)
+        } else {
+          next = next.map(sb => sb.id === vonBestandId ? { ...sb, menge: sb.menge - menge } : sb)
+        }
+        // Ziel: bestehende Position gleicher Artikel+Charge aufstocken oder neu anlegen
+        const ziel = next.find(sb =>
+          sb.stellplatz_id === nachStellplatzId &&
+          sb.artikelnummer === vonBestand.artikelnummer &&
+          (sb.charge ?? '') === (vonBestand.charge ?? '')
+        )
+        const nachSp = stellplaetze.find(sp => sp.id === nachStellplatzId)
+        if (ziel) {
+          next = next.map(sb => sb.id === ziel.id ? { ...sb, menge: sb.menge + menge } : sb)
+        } else {
+          next.push({
+            id: `SB-${Date.now().toString(36).toUpperCase()}`,
+            stellplatz_id: nachStellplatzId,
+            artikelnummer: vonBestand.artikelnummer,
+            artikelname: vonBestand.artikelname,
+            charge: vonBestand.charge,
+            mhd: vonBestand.mhd,
+            menge,
+            einheit: vonBestand.einheit,
+            status: 'Verfügbar',
+            eingelagert_am: new Date().toISOString().slice(0, 10),
+            lager_stellplaetze: nachSp ? { code: nachSp.code, bereich: nachSp.bereich } : undefined,
+          })
+        }
+        return next
+      })
+      setUmlagerungen(prev => [{
+        id: `UML-${Date.now().toString(36).toUpperCase()}`,
+        artikelname: vonBestand.artikelname,
+        artikelnummer: vonBestand.artikelnummer,
+        von_stellplatz_id: vonBestand.stellplatz_id,
+        nach_stellplatz_id: nachStellplatzId,
+        menge,
+        grund: grund || undefined,
+        datum: new Date().toISOString(),
+      }, ...prev])
+    }
+
+    const vonSp = stellplaetze.find(sp => sp.id === vonBestand.stellplatz_id)
+    const nachSp = stellplaetze.find(sp => sp.id === nachStellplatzId)
+    showToast(`✅ ${menge}× "${vonBestand.artikelname}" von ${vonSp?.code ?? '?'} → ${nachSp?.code ?? '?'}`)
+    setUmlForm(emptyUmlagerungForm)
+    setSaving(false)
+  }
+
   // ── Bestellvorschlag ─────────────────────────────────────────────────────────
 
   const bestellArtikel = artikel.filter(a => a.bestand === 0 || a.bestand <= (a.mindestbestand ?? 0))
@@ -546,6 +941,15 @@ export default function LagerPilotPage() {
           menge={getBestellMenge(bestellModal)}
           onConfirm={(m) => handleBestellungBestaetigen(bestellModal.id, m)}
           onClose={() => setBestellModal(null)}
+        />
+      )}
+
+      {/* Stellplatz-Modal */}
+      {spModal !== null && (
+        <StellplatzModal
+          stellplatz={spModal === 'new' ? null : spModal}
+          onSave={handleSaveStellplatz}
+          onClose={() => setSpModal(null)}
         />
       )}
 
@@ -653,6 +1057,9 @@ export default function LagerPilotPage() {
           { id: 'inventur', label: '📋 Inventur' },
           { id: 'bestellung', label: `🛒 Bestellvorschlag${bestellArtikel.length > 0 ? ` (${bestellArtikel.length})` : ''}` },
           { id: 'historie', label: '📈 Artikel-Historie' },
+          { id: 'stellplaetze', label: '📍 Stellplätze' },
+          { id: 'lagerbelegung', label: '📊 Lagerbelegung' },
+          { id: 'umlagerung', label: '↔️ Umlagerung' },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as LagerTab)} style={{ padding: '10px 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: 'transparent', borderBottom: tab === t.id ? '2px solid #1684ff' : '2px solid transparent', color: tab === t.id ? '#6cb6ff' : '#aeb9c8', marginBottom: -1, transition: 'color .15s', whiteSpace: 'nowrap' }}>
             {t.label}
@@ -1068,6 +1475,399 @@ export default function LagerPilotPage() {
           )}
         </div>
       )}
+
+      {/* ── STELLPLÄTZE ── */}
+      {tab === 'stellplaetze' && (() => {
+        const belegteIds = new Set(stellplatzBestand.map(sb => sb.stellplatz_id))
+        const spAktiv = stellplaetze.filter(sp => sp.aktiv !== false).length
+        const spBelegt = stellplaetze.filter(sp => belegteIds.has(sp.id)).length
+        const spFrei = stellplaetze.filter(sp => !belegteIds.has(sp.id)).length
+
+        const bereiche = ['Alle', ...Array.from(new Set(stellplaetze.map(sp => sp.bereich).filter(Boolean) as string[]))]
+
+        const filtered = stellplaetze.filter(sp => {
+          const q = spSearch.toLowerCase()
+          const matchQ = !q || sp.code.toLowerCase().includes(q) || (sp.name ?? '').toLowerCase().includes(q) || (sp.bereich ?? '').toLowerCase().includes(q)
+          const matchB = spFilterBereich === 'Alle' || sp.bereich === spFilterBereich
+          return matchQ && matchB
+        })
+
+        return (
+          <div>
+            {/* KPIs */}
+            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
+              {[
+                { label: 'Stellplätze gesamt', value: String(stellplaetze.length), icon: '📍', color: '#1684ff' },
+                { label: 'Aktiv', value: String(spAktiv), icon: '✅', color: '#10b981' },
+                { label: 'Belegt', value: String(spBelegt), icon: '📦', color: '#f59e0b' },
+                { label: 'Frei', value: String(spFrei), icon: '🟢', color: '#10b981' },
+              ].map(s => (
+                <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+                  <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Toolbar */}
+            <div style={{ marginBottom: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                className="pk-input"
+                placeholder="🔍 Code, Name, Bereich…"
+                value={spSearch}
+                onChange={e => setSpSearch(e.target.value)}
+                style={{ maxWidth: 260 }}
+              />
+              <select className="pk-input" value={spFilterBereich} onChange={e => setSpFilterBereich(e.target.value)} style={{ maxWidth: 180 }}>
+                {bereiche.map(b => <option key={b}>{b}</option>)}
+              </select>
+              <span style={{ fontSize: 12, color: '#aeb9c8' }}>{filtered.length} von {stellplaetze.length}</span>
+              <button className="pk-btn" onClick={() => setSpModal('new')} style={{ marginLeft: 'auto', fontSize: 13 }}>
+                + Stellplatz anlegen
+              </button>
+            </div>
+
+            {/* Tabelle */}
+            <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+              <div className="pk-table-wrap">
+                <table className="pk-table">
+                  <thead>
+                    <tr><th>Code</th><th>Bezeichnung</th><th>Bereich</th><th>Typ</th><th>Status</th><th style={{ width: 110 }}>Aktionen</th></tr>
+                  </thead>
+                  <tbody>
+                    {filtered.length === 0 ? (
+                      <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>
+                        {stellplaetze.length === 0 ? '📍 Noch keine Stellplätze. Lege deinen ersten an.' : 'Keine Stellplätze gefunden.'}
+                      </td></tr>
+                    ) : filtered.map(sp => (
+                      <tr key={sp.id}>
+                        <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#6cb6ff' }}>{sp.code}</td>
+                        <td style={{ color: '#aeb9c8', fontSize: 13 }}>{sp.name ?? '—'}</td>
+                        <td><span className="badge badge-gray">{sp.bereich ?? '—'}</span></td>
+                        <td style={{ color: '#aeb9c8', fontSize: 13 }}>{sp.typ ?? '—'}</td>
+                        <td>
+                          <span className={`badge ${sp.aktiv !== false ? 'badge-green' : 'badge-red'}`}>
+                            {sp.aktiv !== false ? '✅ Aktiv' : '🚫 Inaktiv'}
+                          </span>
+                        </td>
+                        <td>
+                          {spDeleteConfirmId === sp.id ? (
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <button
+                                onClick={() => handleDeleteStellplatz(sp.id)}
+                                style={{ background: 'rgba(244,63,94,.18)', border: '1px solid rgba(244,63,94,.4)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}
+                              >Ja, löschen</button>
+                              <button
+                                onClick={() => setSpDeleteConfirmId(null)}
+                                style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#aeb9c8', fontSize: 11, whiteSpace: 'nowrap' }}
+                              >Abbrechen</button>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button onClick={() => setSpModal(sp)} title="Bearbeiten" style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>
+                              <button onClick={() => setSpDeleteConfirmId(sp.id)} title="Löschen" style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}>🗑</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── LAGERBELEGUNG ── */}
+      {tab === 'lagerbelegung' && (() => {
+        const bereiche = ['Alle', ...Array.from(new Set(
+          stellplatzBestand
+            .map(sb => stellplaetze.find(sp => sp.id === sb.stellplatz_id)?.bereich)
+            .filter(Boolean) as string[]
+        ))]
+
+        const filtered = stellplatzBestand.filter(sb => {
+          const sp = stellplaetze.find(x => x.id === sb.stellplatz_id)
+          const q = lbSearch.toLowerCase()
+          const matchQ = !q ||
+            (sb.artikelname ?? '').toLowerCase().includes(q) ||
+            (sb.artikelnummer ?? '').toLowerCase().includes(q) ||
+            (sp?.code ?? '').toLowerCase().includes(q)
+          const matchB = lbFilterBereich === 'Alle' || sp?.bereich === lbFilterBereich
+          const matchMhd = !lbNurMhdKritisch || mhdStatus(sb.mhd) === 'abgelaufen' || mhdStatus(sb.mhd) === 'kritisch'
+          return matchQ && matchB && matchMhd
+        })
+
+        const mhdBadge = (mhd: string | undefined) => {
+          const s = mhdStatus(mhd)
+          if (s === 'kein') return null
+          const map = {
+            abgelaufen: { cls: 'badge-red',    label: `🚨 ${mhd} (abgelaufen)` },
+            kritisch:   { cls: 'badge-orange', label: `⚠️ ${mhd} (<30 Tage)` },
+            ok:         { cls: 'badge-green',  label: `✅ ${mhd}` },
+          } as const
+          const { cls, label } = map[s]
+          return <span className={`badge ${cls}`} style={{ fontSize: 11 }}>{label}</span>
+        }
+
+        return (
+          <div>
+            {/* Toolbar */}
+            <div style={{ marginBottom: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                className="pk-input"
+                placeholder="🔍 Artikel, Artikelnr., Stellplatz…"
+                value={lbSearch}
+                onChange={e => setLbSearch(e.target.value)}
+                style={{ maxWidth: 280 }}
+              />
+              <select className="pk-input" value={lbFilterBereich} onChange={e => setLbFilterBereich(e.target.value)} style={{ maxWidth: 180 }}>
+                {bereiche.map(b => <option key={b}>{b}</option>)}
+              </select>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#aeb9c8', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <input
+                  type="checkbox"
+                  checked={lbNurMhdKritisch}
+                  onChange={e => setLbNurMhdKritisch(e.target.checked)}
+                  style={{ accentColor: '#f59e0b', width: 16, height: 16 }}
+                />
+                Nur MHD-kritisch
+              </label>
+              <span style={{ fontSize: 12, color: '#aeb9c8' }}>{filtered.length} von {stellplatzBestand.length} Positionen</span>
+            </div>
+
+            {/* Tabelle */}
+            <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+              <div className="pk-table-wrap">
+                <table className="pk-table">
+                  <thead>
+                    <tr>
+                      <th>Stellplatz</th>
+                      <th>Bereich</th>
+                      <th>Artikelnr.</th>
+                      <th>Artikelname</th>
+                      <th>Charge</th>
+                      <th>MHD</th>
+                      <th>Menge</th>
+                      <th>Status</th>
+                      <th>Eingelagert</th>
+                      <th style={{ width: 100 }}>Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.length === 0 ? (
+                      <tr><td colSpan={10} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>
+                        {stellplatzBestand.length === 0
+                          ? '📊 Noch keine Artikel auf Stellplätzen erfasst.'
+                          : 'Keine Positionen gefunden.'}
+                      </td></tr>
+                    ) : filtered.map(sb => {
+                      const sp = stellplaetze.find(x => x.id === sb.stellplatz_id)
+                      return (
+                        <tr key={sb.id}>
+                          <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#6cb6ff' }}>{sp?.code ?? sb.stellplatz_id}</td>
+                          <td><span className="badge badge-gray">{sp?.bereich ?? '—'}</span></td>
+                          <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#aeb9c8' }}>{sb.artikelnummer ?? '—'}</td>
+                          <td style={{ fontWeight: 600 }}>{sb.artikelname ?? '—'}</td>
+                          <td style={{ color: '#aeb9c8', fontSize: 13 }}>{sb.charge ?? '—'}</td>
+                          <td>{mhdBadge(sb.mhd) ?? <span style={{ color: '#aeb9c8', fontSize: 13 }}>—</span>}</td>
+                          <td style={{ fontWeight: 700 }}>{sb.menge} <span style={{ color: '#aeb9c8', fontSize: 12 }}>{sb.einheit ?? ''}</span></td>
+                          <td>
+                            <span className={`badge ${sb.status === 'Leer' ? 'badge-red' : sb.status === 'Gesperrt' ? 'badge-orange' : 'badge-green'}`}>
+                              {sb.status ?? 'Verfügbar'}
+                            </span>
+                          </td>
+                          <td style={{ color: '#aeb9c8', fontSize: 12 }}>
+                            {sb.eingelagert_am ? new Date(sb.eingelagert_am as string).toLocaleDateString('de-DE') : '—'}
+                          </td>
+                          <td>
+                            {lbDeleteConfirmId === sb.id ? (
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button
+                                  onClick={() => handleDeleteStellplatzBestand(sb.id)}
+                                  style={{ background: 'rgba(244,63,94,.18)', border: '1px solid rgba(244,63,94,.4)', borderRadius: 6, padding: '4px 7px', cursor: 'pointer', color: '#f43f5e', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}
+                                >Ja</button>
+                                <button
+                                  onClick={() => setLbDeleteConfirmId(null)}
+                                  style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, padding: '4px 7px', cursor: 'pointer', color: '#aeb9c8', fontSize: 11, whiteSpace: 'nowrap' }}
+                                >Nein</button>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', gap: 5 }}>
+                                <button
+                                  title="Bearbeiten (folgt)"
+                                  disabled
+                                  style={{ background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.15)', borderRadius: 6, padding: '4px 8px', cursor: 'not-allowed', color: '#4a6080', fontSize: 13 }}
+                                >✏️</button>
+                                <button
+                                  onClick={() => setLbDeleteConfirmId(sb.id)}
+                                  title="Entfernen"
+                                  style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}
+                                >🗑</button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── UMLAGERUNG ── */}
+      {tab === 'umlagerung' && (() => {
+        const vonBestand = stellplatzBestand.find(sb => sb.id === umlForm.vonBestandId)
+        const vonSp = vonBestand ? stellplaetze.find(sp => sp.id === vonBestand.stellplatz_id) : null
+
+        return (
+          <div>
+            {/* Formular */}
+            <div className="pk-card" style={{ marginBottom: 20 }}>
+              <h3 style={{ margin: '0 0 18px', fontSize: 16, fontWeight: 800 }}>↔️ Umlagerung durchführen</h3>
+              <div style={{ display: 'grid', gap: 14 }}>
+
+                {/* Quell-Position */}
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Quell-Position * <span style={{ fontWeight: 400 }}>(Stellplatz + Artikel)</span></label>
+                  <select
+                    className="pk-input"
+                    value={umlForm.vonBestandId}
+                    onChange={e => setUmlForm(p => ({ ...p, vonBestandId: e.target.value, menge: '' }))}
+                  >
+                    <option value="">— Quell-Position wählen —</option>
+                    {stellplatzBestand.filter(sb => sb.menge > 0).map(sb => {
+                      const sp = stellplaetze.find(x => x.id === sb.stellplatz_id)
+                      return (
+                        <option key={sb.id} value={sb.id}>
+                          {sp?.code ?? '?'} · {sb.artikelname ?? sb.artikelnummer ?? '—'}{sb.charge ? ` · Ch: ${sb.charge}` : ''} ({sb.menge} {sb.einheit ?? 'Stk'})
+                        </option>
+                      )
+                    })}
+                  </select>
+                  {vonBestand && (
+                    <div style={{ marginTop: 6, padding: '8px 12px', borderRadius: 8, background: 'rgba(22,132,255,.07)', border: '1px solid rgba(22,132,255,.18)', fontSize: 12, color: '#aeb9c8', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                      <span>📍 <b style={{ color: '#6cb6ff' }}>{vonSp?.code ?? '?'}</b></span>
+                      <span>📦 {vonBestand.artikelname}</span>
+                      {vonBestand.charge && <span>Charge: {vonBestand.charge}</span>}
+                      {vonBestand.mhd && <span>MHD: {vonBestand.mhd}</span>}
+                      <span>Verfügbar: <b style={{ color: '#4ddb7e' }}>{vonBestand.menge} {vonBestand.einheit ?? 'Stk'}</b></span>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  {/* Menge */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>
+                      Menge * {vonBestand && <span style={{ color: '#aeb9c8', fontWeight: 400 }}>(max. {vonBestand.menge})</span>}
+                    </label>
+                    <input
+                      className="pk-input"
+                      type="number"
+                      min="1"
+                      max={vonBestand?.menge}
+                      placeholder="z.B. 10"
+                      value={umlForm.menge}
+                      onChange={e => setUmlForm(p => ({ ...p, menge: e.target.value }))}
+                    />
+                  </div>
+
+                  {/* Ziel-Stellplatz */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Ziel-Stellplatz *</label>
+                    <select
+                      className="pk-input"
+                      value={umlForm.nachStellplatzId}
+                      onChange={e => setUmlForm(p => ({ ...p, nachStellplatzId: e.target.value }))}
+                    >
+                      <option value="">— Ziel wählen —</option>
+                      {stellplaetze
+                        .filter(sp => sp.aktiv !== false && sp.id !== vonBestand?.stellplatz_id)
+                        .map(sp => (
+                          <option key={sp.id} value={sp.id}>
+                            {sp.code}{sp.bereich ? ` (${sp.bereich})` : ''}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Grund */}
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Grund</label>
+                  <input
+                    className="pk-input"
+                    placeholder="z.B. Umsortierung, Qualitätsprüfung, Versand…"
+                    value={umlForm.grund}
+                    onChange={e => setUmlForm(p => ({ ...p, grund: e.target.value }))}
+                  />
+                </div>
+
+                {/* Notiz */}
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Notiz</label>
+                  <input
+                    className="pk-input"
+                    placeholder="Optionale Bemerkung"
+                    value={umlForm.notiz}
+                    onChange={e => setUmlForm(p => ({ ...p, notiz: e.target.value }))}
+                  />
+                </div>
+
+                <button
+                  className="pk-btn"
+                  onClick={handleUmlagerung}
+                  disabled={saving || !umlForm.vonBestandId || !umlForm.nachStellplatzId || !umlForm.menge}
+                  style={{ fontWeight: 700, minHeight: 44 }}
+                >
+                  {saving ? '⏳ Wird umgelagert…' : '↔️ Umlagerung ausführen'}
+                </button>
+              </div>
+            </div>
+
+            {/* Protokoll */}
+            <div style={{ marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>📋 Umlagerungs-Protokoll</div>
+              <div style={{ fontSize: 12, color: '#aeb9c8' }}>{umlagerungen.length} Einträge</div>
+            </div>
+            <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+              <div className="pk-table-wrap">
+                <table className="pk-table">
+                  <thead>
+                    <tr><th>Artikel</th><th>Von</th><th>Nach</th><th>Menge</th><th>Grund</th><th>Datum</th></tr>
+                  </thead>
+                  <tbody>
+                    {umlagerungen.length === 0 ? (
+                      <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>↔️ Noch keine Umlagerungen vorhanden.</td></tr>
+                    ) : umlagerungen.map(u => {
+                      const von = stellplaetze.find(sp => sp.id === u.von_stellplatz_id)
+                      const nach = stellplaetze.find(sp => sp.id === u.nach_stellplatz_id)
+                      return (
+                        <tr key={u.id}>
+                          <td style={{ fontWeight: 600 }}>{u.artikelname ?? '—'}<br /><span style={{ fontSize: 11, color: '#aeb9c8', fontFamily: 'monospace' }}>{u.artikelnummer ?? ''}</span></td>
+                          <td style={{ fontFamily: 'monospace', color: '#f59e0b', fontSize: 13, whiteSpace: 'nowrap' }}>{von?.code ?? u.von_stellplatz_id ?? '—'}</td>
+                          <td style={{ fontFamily: 'monospace', color: '#10b981', fontSize: 13, whiteSpace: 'nowrap' }}>{nach?.code ?? u.nach_stellplatz_id ?? '—'}</td>
+                          <td style={{ fontWeight: 700 }}>{u.menge}</td>
+                          <td style={{ color: '#aeb9c8', fontSize: 13 }}>{u.grund ?? '—'}</td>
+                          <td style={{ color: '#aeb9c8', fontSize: 13, whiteSpace: 'nowrap' }}>
+                            {u.datum ? new Date(u.datum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── ARTIKEL-HISTORIE ── */}
       {tab === 'historie' && (() => {
