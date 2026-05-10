@@ -508,6 +508,10 @@ export default function LagerPilotPage() {
   const [lbNurMhdKritisch, setLbNurMhdKritisch] = useState(false)
   const [lbDeleteConfirmId, setLbDeleteConfirmId] = useState<string | null>(null)
 
+  // Kommissionierung-State
+  const [pickSelected, setPickSelected] = useState<Set<string>>(new Set())
+  const [pickListOpen, setPickListOpen] = useState(false)
+
   // Daten laden
   useEffect(() => {
     if (isDemo) return
@@ -2084,31 +2088,77 @@ export default function LagerPilotPage() {
       {/* ── KOMMISSIONIERUNG ── */}
       {tab === 'kommissionierung' && (() => {
         // Nur Artikel mit Bestand > 0, sortiert nach Lagerplatz (optimale Laufwege)
-        const pickListe = [...artikel]
+        const allPickable = [...artikel]
           .filter(a => a.bestand > 0)
           .sort((a, b) => (a.lagerplatz ?? '').localeCompare(b.lagerplatz ?? ''))
 
-        // Bereich aus Lagerplatz-Prefix ableiten (z.B. "A-01-03" → "A")
-        const bereichVon = (lagerplatz: string) => lagerplatz.split('-')[0] ?? '?'
+        // Parse lagerplatz "A-01-03" → { bereich, regal, fach }
+        const parseLp = (lp: string | undefined) => {
+          const p = (lp ?? '').split('-')
+          return { bereich: p[0] ?? '?', regal: p[1] ?? '', fach: p[2] ?? '' }
+        }
 
-        // Bereiche für Gruppenzeilen
-        const bereiche = Array.from(new Set(pickListe.map(a => bereichVon(a.lagerplatz ?? ''))))
+        const bereichVon = (lp: string | undefined) => parseLp(lp).bereich
+        const bereiche = Array.from(new Set(allPickable.map(a => bereichVon(a.lagerplatz))))
+
+        const allIds = allPickable.map(a => a.id)
+        const allSelected = allIds.length > 0 && allIds.every(id => pickSelected.has(id))
+        const toggleAll = () => {
+          if (allSelected) {
+            setPickSelected(new Set())
+          } else {
+            setPickSelected(new Set(allIds))
+          }
+        }
+        const toggleOne = (id: string) => {
+          setPickSelected(prev => {
+            const next = new Set(prev)
+            next.has(id) ? next.delete(id) : next.add(id)
+            return next
+          })
+        }
+
+        // Pickliste: ausgewählte Artikel route-optimiert sortiert
+        const pickedArtikel = allPickable
+          .filter(a => pickSelected.has(a.id))
+          .sort((a, b) => {
+            const pa = parseLp(a.lagerplatz), pb = parseLp(b.lagerplatz)
+            return pa.bereich.localeCompare(pb.bereich) ||
+              pa.regal.localeCompare(pb.regal) ||
+              pa.fach.localeCompare(pb.fach)
+          })
+        const pickBereiche = Array.from(new Set(pickedArtikel.map(a => bereichVon(a.lagerplatz))))
 
         return (
           <div>
-            {/* Header-Info */}
-            <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(22,132,255,.07)', border: '1px solid rgba(22,132,255,.18)', fontSize: 13, color: '#aeb9c8' }}>
-              🧺 <b style={{ color: '#f8fbff' }}>Kommissionierung:</b> Artikel sind nach Lagerplatz sortiert für optimale Laufwege.
-              <span style={{ marginLeft: 12, color: '#6cb6ff' }}>{pickListe.length} Artikel verfügbar · {bereiche.length} Bereiche</span>
+            {/* Header-Info + Toolbar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, padding: '12px 16px', borderRadius: 10, background: 'rgba(22,132,255,.07)', border: '1px solid rgba(22,132,255,.18)', fontSize: 13, color: '#aeb9c8' }}>
+                🧺 <b style={{ color: '#f8fbff' }}>Kommissionierung:</b> Artikel auswählen → Pickliste nach optimalem Laufweg erstellen.
+                <span style={{ marginLeft: 12, color: '#6cb6ff' }}>{allPickable.length} Artikel verfügbar · {bereiche.length} Bereiche</span>
+              </div>
+              {pickSelected.size > 0 && (
+                <button className="pk-btn-ghost" onClick={() => { setPickSelected(new Set()); setPickListOpen(false) }} style={{ whiteSpace: 'nowrap' }}>
+                  Auswahl zurücksetzen
+                </button>
+              )}
+              <button
+                className="pk-btn"
+                disabled={pickSelected.size === 0}
+                onClick={() => setPickListOpen(v => !v)}
+                style={{ whiteSpace: 'nowrap', opacity: pickSelected.size === 0 ? .45 : 1 }}
+              >
+                🧺 Pickliste{pickSelected.size > 0 ? ` (${pickSelected.size})` : ''} {pickListOpen ? '▲' : '▼'}
+              </button>
             </div>
 
             {/* KPI-Zeile */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 18 }}>
               {[
-                { label: 'Artikel gesamt', value: pickListe.length, icon: '📦', color: '#1684ff' },
+                { label: 'Artikel gesamt', value: allPickable.length, icon: '📦', color: '#1684ff' },
                 { label: 'Bereiche', value: bereiche.length, icon: '🗺️', color: '#20c8ff' },
-                { label: 'Niedrig/Leer', value: pickListe.filter(a => a.status !== 'ok').length, icon: '⚠️', color: '#f59e0b' },
-                { label: 'Gesamtbestand', value: pickListe.reduce((s, a) => s + a.bestand, 0).toLocaleString('de-DE'), icon: '🔢', color: '#10b981' },
+                { label: 'Ausgewählt', value: pickSelected.size, icon: '✅', color: '#10b981' },
+                { label: 'Niedrig/Leer', value: allPickable.filter(a => a.status !== 'ok').length, icon: '⚠️', color: '#f59e0b' },
               ].map(s => (
                 <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '12px 8px' }}>
                   <div style={{ fontSize: 18, marginBottom: 3 }}>{s.icon}</div>
@@ -2118,8 +2168,64 @@ export default function LagerPilotPage() {
               ))}
             </div>
 
-            {/* Pick-Tabelle nach Bereichen gruppiert */}
-            {pickListe.length === 0 ? (
+            {/* Generierte Pickliste */}
+            {pickListOpen && pickedArtikel.length > 0 && (
+              <div className="pk-card fade-in" style={{ marginBottom: 18, padding: 0 }}>
+                <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid rgba(255,255,255,.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 800, fontSize: 15 }}>🧺 Pickliste — {pickedArtikel.length} Artikel · {pickBereiche.length} Bereiche</span>
+                  <span style={{ fontSize: 12, color: '#6cb6ff' }}>Sortiert: Bereich → Regal → Fach</span>
+                </div>
+                <div className="pk-table-wrap">
+                  <table className="pk-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 32 }}>#</th>
+                        <th>Lagerplatz</th>
+                        <th>Bezeichnung</th>
+                        <th>Bestand</th>
+                        <th>Einheit</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        let laufNr = 0
+                        return pickBereiche.map(bereich => {
+                          const zeilen = pickedArtikel.filter(a => bereichVon(a.lagerplatz) === bereich)
+                          return [
+                            <tr key={`pick-hdr-${bereich}`}>
+                              <td colSpan={6} style={{ background: 'rgba(16,185,129,.08)', padding: '6px 14px', fontWeight: 700, fontSize: 12, color: '#10b981', letterSpacing: '.06em' }}>
+                                📍 Bereich {bereich} — {zeilen.length} Positionen
+                              </td>
+                            </tr>,
+                            ...zeilen.map(a => {
+                              laufNr++
+                              return (
+                                <tr key={`pick-${a.id}`} style={{ background: 'rgba(16,185,129,.03)' }}>
+                                  <td style={{ color: '#10b981', fontWeight: 700, textAlign: 'center' }}>{laufNr}</td>
+                                  <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#6cb6ff', whiteSpace: 'nowrap' }}>{a.lagerplatz || '—'}</td>
+                                  <td style={{ fontWeight: 600 }}>{a.name}</td>
+                                  <td style={{ fontWeight: 700, color: a.status === 'leer' ? '#f43f5e' : a.status === 'niedrig' ? '#f59e0b' : '#f8fbff' }}>{a.bestand}</td>
+                                  <td style={{ color: '#aeb9c8' }}>{a.einheit}</td>
+                                  <td>
+                                    <span className={`badge ${a.status === 'ok' ? 'badge-green' : a.status === 'niedrig' ? 'badge-orange' : 'badge-red'}`}>
+                                      {a.status === 'ok' ? '✅ OK' : a.status === 'niedrig' ? '⚠️ Niedrig' : '🚨 Leer'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              )
+                            }),
+                          ]
+                        })
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Artikel-Auswahl-Tabelle */}
+            {allPickable.length === 0 ? (
               <div className="pk-card" style={{ textAlign: 'center', padding: 48 }}>
                 <div style={{ fontSize: 36, marginBottom: 10 }}>🧺</div>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>Kein Bestand verfügbar</div>
@@ -2131,6 +2237,15 @@ export default function LagerPilotPage() {
                   <table className="pk-table">
                     <thead>
                       <tr>
+                        <th style={{ width: 36, textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={toggleAll}
+                            title="Alle auswählen"
+                            style={{ cursor: 'pointer', width: 15, height: 15 }}
+                          />
+                        </th>
                         <th style={{ width: 32 }}>#</th>
                         <th>Lagerplatz</th>
                         <th>Art.-Nr.</th>
@@ -2143,23 +2258,29 @@ export default function LagerPilotPage() {
                     </thead>
                     <tbody>
                       {bereiche.map(bereich => {
-                        const zeilen = pickListe.filter(a => bereichVon(a.lagerplatz ?? '') === bereich)
+                        const zeilen = allPickable.filter(a => bereichVon(a.lagerplatz) === bereich)
                         return [
-                          // Bereichs-Trenner
                           <tr key={`hdr-${bereich}`}>
-                            <td colSpan={8} style={{ background: 'rgba(22,132,255,.08)', padding: '6px 14px', fontWeight: 700, fontSize: 12, color: '#6cb6ff', letterSpacing: '.06em' }}>
+                            <td colSpan={9} style={{ background: 'rgba(22,132,255,.08)', padding: '6px 14px', fontWeight: 700, fontSize: 12, color: '#6cb6ff', letterSpacing: '.06em' }}>
                               📍 Bereich {bereich} — {zeilen.length} Artikel
                             </td>
                           </tr>,
-                          // Artikel-Zeilen
                           ...zeilen.map((a, idx) => (
-                            <tr key={a.id}>
-                              <td style={{ color: '#aeb9c8', fontSize: 12, textAlign: 'center' }}>
-                                {idx + 1}
+                            <tr
+                              key={a.id}
+                              onClick={() => toggleOne(a.id)}
+                              style={{ cursor: 'pointer', background: pickSelected.has(a.id) ? 'rgba(16,185,129,.07)' : undefined }}
+                            >
+                              <td style={{ textAlign: 'center' }} onClick={e => { e.stopPropagation(); toggleOne(a.id) }}>
+                                <input
+                                  type="checkbox"
+                                  checked={pickSelected.has(a.id)}
+                                  onChange={() => toggleOne(a.id)}
+                                  style={{ cursor: 'pointer', width: 15, height: 15 }}
+                                />
                               </td>
-                              <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#6cb6ff', whiteSpace: 'nowrap' }}>
-                                {a.lagerplatz || '—'}
-                              </td>
+                              <td style={{ color: '#aeb9c8', fontSize: 12, textAlign: 'center' }}>{idx + 1}</td>
+                              <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#6cb6ff', whiteSpace: 'nowrap' }}>{a.lagerplatz || '—'}</td>
                               <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#aeb9c8' }}>{a.id}</td>
                               <td style={{ fontWeight: 600 }}>{a.name}</td>
                               <td><span className="badge badge-gray">{a.kategorie}</span></td>
@@ -2181,11 +2302,6 @@ export default function LagerPilotPage() {
                 </div>
               </div>
             )}
-
-            {/* Hinweis Pickliste */}
-            <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)', fontSize: 12, color: '#aeb9c8' }}>
-              💡 Picklisten-Export (PDF/CSV) folgt in einem späteren Schritt.
-            </div>
           </div>
         )
       })()}
