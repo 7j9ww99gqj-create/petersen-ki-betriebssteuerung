@@ -483,3 +483,80 @@ alter table steuer_konten enable row level security;
 
 create policy "steuer_konten_all" on steuer_konten
   for all using (auth.uid() = user_id);
+
+-- ── LAGER STELLPLÄTZE ─────────────────────────────────────────────────────────
+
+create table if not exists lager_stellplaetze (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid references auth.users default auth.uid(),
+  code            text not null,
+  name            text,
+  bereich         text,
+  zone            text,
+  gang            text,
+  regal           text,
+  ebene           text,
+  fach            text,
+  typ             text default 'Standard',
+  warengruppe     text,
+  warenobergruppe text,
+  temperaturzone  text,
+  max_gewicht     numeric,
+  max_volumen     numeric,
+  aktiv           boolean default true,
+  notiz           text,
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+
+alter table lager_stellplaetze enable row level security;
+
+create policy "lager_stellplaetze_all" on lager_stellplaetze
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ── LAGER STELLPLATZ-BESTAND ──────────────────────────────────────────────────
+
+create table if not exists lager_stellplatz_bestand (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid references auth.users default auth.uid(),
+  stellplatz_id   uuid references lager_stellplaetze(id) on delete cascade,
+  artikel_id      text references lager_artikel(id) on delete set null,
+  artikelnummer   text,
+  artikelname     text,
+  charge          text,
+  mhd             date,
+  menge           integer not null default 0,
+  einheit         text default 'Stk',
+  status          text default 'Verfügbar',
+  eingelagert_am  date default current_date,
+  notiz           text,
+  created_at      timestamptz default now()
+);
+
+alter table lager_stellplatz_bestand enable row level security;
+
+create policy "lager_stellplatz_bestand_all" on lager_stellplatz_bestand
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ── LAGER UMLAGERUNGEN ────────────────────────────────────────────────────────
+
+create table if not exists lager_umlagerungen (
+  id                  text primary key,
+  user_id             uuid references auth.users default auth.uid(),
+  artikel_id          text references lager_artikel(id),
+  artikelnummer       text,
+  artikelname         text,
+  von_stellplatz_id   uuid references lager_stellplaetze(id),
+  nach_stellplatz_id  uuid references lager_stellplaetze(id),
+  charge              text,
+  mhd                 date,
+  menge               integer not null,
+  grund               text,
+  datum               timestamptz default now(),
+  notiz               text
+);
+
+alter table lager_umlagerungen enable row level security;
+
+create policy "lager_umlagerungen_all" on lager_umlagerungen
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
