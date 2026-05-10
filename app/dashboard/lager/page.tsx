@@ -1483,6 +1483,19 @@ export default function LagerPilotPage() {
         const spBelegt = stellplaetze.filter(sp => belegteIds.has(sp.id)).length
         const spFrei = stellplaetze.filter(sp => !belegteIds.has(sp.id)).length
 
+        // Positionen pro Stellplatz zählen → überlastet wenn ≥ 3 verschiedene Artikel
+        const posPerSp = stellplatzBestand.reduce<Record<string, number>>((acc, sb) => {
+          acc[sb.stellplatz_id] = (acc[sb.stellplatz_id] ?? 0) + 1
+          return acc
+        }, {})
+        const spUeberlastet = stellplaetze.filter(sp => (posPerSp[sp.id] ?? 0) >= 3).length
+
+        // Kritische MHD: Positionen mit MHD abgelaufen oder < 30 Tage
+        const mhdKritisch = stellplatzBestand.filter(sb => {
+          const s = mhdStatus(sb.mhd)
+          return s === 'abgelaufen' || s === 'kritisch'
+        }).length
+
         const bereiche = ['Alle', ...Array.from(new Set(stellplaetze.map(sp => sp.bereich).filter(Boolean) as string[]))]
 
         const filtered = stellplaetze.filter(sp => {
@@ -1495,20 +1508,53 @@ export default function LagerPilotPage() {
         return (
           <div>
             {/* KPIs */}
-            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
+            <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 16 }}>
               {[
-                { label: 'Stellplätze gesamt', value: String(stellplaetze.length), icon: '📍', color: '#1684ff' },
-                { label: 'Aktiv', value: String(spAktiv), icon: '✅', color: '#10b981' },
-                { label: 'Belegt', value: String(spBelegt), icon: '📦', color: '#f59e0b' },
-                { label: 'Frei', value: String(spFrei), icon: '🟢', color: '#10b981' },
+                { label: 'Stellplätze gesamt', value: stellplaetze.length, icon: '📍', color: '#1684ff', badge: null },
+                { label: 'Belegt', value: spBelegt, icon: '📦', color: '#f59e0b', badge: null },
+                { label: 'Frei', value: spFrei, icon: '🟢', color: '#10b981', badge: null },
+                {
+                  label: 'Überlastet (≥3 Pos.)', value: spUeberlastet, icon: '⚠️',
+                  color: spUeberlastet === 0 ? '#10b981' : '#f59e0b',
+                  badge: spUeberlastet === 0 ? { cls: 'badge-green', text: '✅ OK' } : { cls: 'badge-orange', text: '🟠 Warnung' },
+                },
+                {
+                  label: 'MHD kritisch', value: mhdKritisch, icon: '🗓️',
+                  color: mhdKritisch === 0 ? '#10b981' : '#f43f5e',
+                  badge: mhdKritisch === 0 ? { cls: 'badge-green', text: '✅ OK' } : { cls: 'badge-red', text: '🔴 Kritisch' },
+                },
               ].map(s => (
                 <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
                   <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
                   <div style={{ fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</div>
                   <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+                  {s.badge && (
+                    <div style={{ marginTop: 6 }}>
+                      <span className={`badge ${s.badge.cls}`} style={{ fontSize: 10 }}>{s.badge.text}</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+
+            {/* Warn-Banner */}
+            {(spUeberlastet > 0 || mhdKritisch > 0) && (
+              <div style={{ marginBottom: 16, padding: '10px 16px', borderRadius: 10, background: 'rgba(244,63,94,.07)', border: '1px solid rgba(244,63,94,.2)', display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: 16 }}>🚨</span>
+                <span style={{ fontSize: 13, color: '#f87171', fontWeight: 600 }}>Optimierungsbedarf:</span>
+                {spUeberlastet > 0 && (
+                  <span style={{ fontSize: 13, color: '#fbbf24' }}>
+                    <b>{spUeberlastet}</b> Stellplatz{spUeberlastet > 1 ? 'e' : ''} mit ≥ 3 Positionen belegt
+                  </span>
+                )}
+                {mhdKritisch > 0 && (
+                  <span style={{ fontSize: 13, color: '#f87171' }}>
+                    <b>{mhdKritisch}</b> Position{mhdKritisch > 1 ? 'en' : ''} mit kritischem MHD
+                  </span>
+                )}
+              </div>
+            )}
+
 
             {/* Toolbar */}
             <div style={{ marginBottom: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
