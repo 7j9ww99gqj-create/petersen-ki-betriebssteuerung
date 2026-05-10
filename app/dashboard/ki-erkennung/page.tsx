@@ -72,7 +72,16 @@ type RecognitionResult = {
   raw: string
 }
 
-type ChatMessage = { role: 'user' | 'assistant'; content: string }
+type KiAction = {
+  type: 'umlagerung' | 'bestellung' | 'hinweis'
+  artikel?: string
+  von?: string
+  nach?: string
+  menge?: number
+  beschreibung?: string
+}
+
+type ChatMessage = { role: 'user' | 'assistant'; content: string; actions?: KiAction[] }
 
 type Tab = 'tagesbrief' | 'erkennung' | 'chat'
 
@@ -206,11 +215,16 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: newHistory.map(m => ({ role: m.role, content: m.content })),
-          system: 'Du bist der KI-Assistent der Petersen KI Betriebssteuerung, einem modularen Warenwirtschaftssystem. Du hilfst bei Fragen zu Lager, Wareneingang, Warenausgang, Artikeln, Dokumentenerkennung, Werkstatt, Planung und Betriebsabläufen. Antworte auf Deutsch, professionell und präzise. Halte Antworten kurz und hilfreich.',
+          system: 'Du bist der KI-Assistent der Petersen KI Betriebssteuerung, einem modularen Warenwirtschaftssystem. Du hilfst bei Fragen zu Lager, Wareneingang, Warenausgang, Artikeln, Dokumentenerkennung, Werkstatt, Planung und Betriebsabläufen.',
+          structuredOutput: true,
         }),
       })
-      const data = await res.json() as { reply: string }
-      setChatHistory(prev => [...prev, { role: 'assistant', content: data.reply || 'Keine Antwort erhalten.' }])
+      const data = await res.json() as { reply: string; actions?: KiAction[] }
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: data.reply || 'Keine Antwort erhalten.',
+        actions: data.actions ?? [],
+      }])
     } catch {
       setChatHistory(prev => [...prev, { role: 'assistant', content: 'Demo-Modus: ANTHROPIC_API_KEY in .env.local für echte KI-Antworten eintragen.' }])
     }
@@ -593,7 +607,8 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
           {/* Chat-Verlauf */}
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14, maxHeight: 420 }}>
             {chatHistory.map((msg, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: 6 }}>
+                {/* Textblase */}
                 <div style={{
                   maxWidth: '85%', padding: '10px 14px', borderRadius: 14, fontSize: 14, lineHeight: 1.55,
                   background: msg.role === 'user'
@@ -604,6 +619,46 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
                 }}>
                   {msg.content}
                 </div>
+                {/* Aktionskarten */}
+                {msg.role === 'assistant' && msg.actions && msg.actions.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: '85%', width: '100%' }}>
+                    {msg.actions.map((action, ai) => {
+                      const cfg = action.type === 'umlagerung'
+                        ? { icon: '📦', label: 'Umlagerung', color: '#1684ff', bg: 'rgba(22,132,255,.1)', border: 'rgba(22,132,255,.25)' }
+                        : action.type === 'bestellung'
+                        ? { icon: '🛒', label: 'Bestellung', color: '#f59e0b', bg: 'rgba(245,158,11,.1)', border: 'rgba(245,158,11,.25)' }
+                        : { icon: '💡', label: 'Hinweis', color: '#a78bfa', bg: 'rgba(167,139,250,.1)', border: 'rgba(167,139,250,.25)' }
+                      return (
+                        <div key={ai} style={{
+                          padding: '9px 13px', borderRadius: 10, fontSize: 13,
+                          background: cfg.bg, border: `1px solid ${cfg.border}`,
+                          display: 'flex', alignItems: 'flex-start', gap: 10,
+                        }}>
+                          <span style={{ fontSize: 15, flexShrink: 0 }}>{cfg.icon}</span>
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontWeight: 700, color: cfg.color, marginRight: 6 }}>{cfg.label}</span>
+                            {action.type === 'umlagerung' && (
+                              <span style={{ color: '#f8fbff' }}>
+                                <b>{action.artikel}</b>
+                                {action.von && action.nach && <> · {action.von} <span style={{ color: cfg.color }}>→</span> {action.nach}</>}
+                                {action.menge != null && <> · {action.menge} Einh.</>}
+                              </span>
+                            )}
+                            {(action.type === 'bestellung' || action.type === 'hinweis') && (
+                              <span style={{ color: '#f8fbff' }}>
+                                {action.artikel && <><b>{action.artikel}</b>{action.beschreibung ? ' · ' : ''}</>}
+                                {action.beschreibung && <span style={{ color: '#aeb9c8' }}>{action.beschreibung}</span>}
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: 11, color: '#aeb9c8', flexShrink: 0, alignSelf: 'center', padding: '2px 7px', borderRadius: 6, border: `1px solid ${cfg.border}`, fontWeight: 600 }}>
+                            Vorschlag
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             ))}
             {chatLoading && (

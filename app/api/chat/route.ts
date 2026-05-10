@@ -64,7 +64,7 @@ ${ctx.umlagerungen.map(u =>
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, system, context } = await req.json()
+    const { messages, system, context, structuredOutput } = await req.json()
 
     // Demo-Modus: Cookie aus Request lesen
     const isDemo = req.cookies.get('pk_demo')?.value === '1'
@@ -136,11 +136,32 @@ export async function POST(req: NextRequest) {
 
     const lagerContextBlock = buildContextBlock(systemContext)
 
+    const jsonInstruction = structuredOutput ? `
+Antworte IMMER als gültiges JSON-Objekt in folgendem Format (kein Markdown, keine Erklärung außerhalb):
+{
+  "message": "Dein Text an den User",
+  "actions": [
+    {
+      "type": "umlagerung",
+      "artikel": "Artikelname",
+      "von": "Stellplatz-Code",
+      "nach": "Stellplatz-Code",
+      "menge": 10
+    }
+  ]
+}
+Erlaubte action.type-Werte: "umlagerung", "bestellung", "hinweis".
+Für "bestellung" und "hinweis" reichen die Felder: type, artikel, beschreibung.
+Schlage nur Aktionen vor, wenn sie basierend auf den Lagerdaten konkret sinnvoll sind.
+Falls keine Aktion sinnvoll ist, gib "actions": [] zurück.
+` : ''
+
     const baseSystem = [
       'Du bist ein KI-Assistent für ein Warenwirtschaftssystem (Petersen KI Betriebssteuerung).',
       'Du hast Zugriff auf aktuelle Lagerdaten: Artikelbestand, Stellplätze und Lagerbewegungen.',
       'Antworte immer konkret basierend auf diesen Daten — nenne echte Artikelnamen, Mengen und Lagerplätze.',
       'Antworte auf Deutsch, professionell und präzise. Halte Antworten kurz und handlungsorientiert.',
+      jsonInstruction,
       system || '',
     ].filter(Boolean).join('\n')
 
@@ -167,9 +188,25 @@ export async function POST(req: NextRequest) {
     })
 
     const data = await response.json()
-    const reply = data.content?.[0]?.text || 'Keine Antwort erhalten.'
+    const rawText: string = data.content?.[0]?.text || 'Keine Antwort erhalten.'
 
-    return NextResponse.json({ reply })
+    // Bei structuredOutput: JSON parsen, sonst plain text zurückgeben
+    if (structuredOutput) {
+      try {
+        // Claude kann JSON in Markdown-Codeblöcken einwickeln — Strip
+        const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
+        const parsed = JSON.parse(cleaned) as { message?: string; actions?: unknown[] }
+        return NextResponse.json({
+          reply: parsed.message || rawText,
+          actions: Array.isArray(parsed.actions) ? parsed.actions : [],
+        })
+      } catch {
+        // Fallback: Antwort als plain text, keine Aktionen
+        return NextResponse.json({ reply: rawText, actions: [] })
+      }
+    }
+
+    return NextResponse.json({ reply: rawText })
   } catch (err) {
     console.error('AI API error:', err)
     return NextResponse.json({ reply: 'Fehler bei der KI-Anfrage. Bitte prüfen Sie Ihre Konfiguration.' }, { status: 500 })
