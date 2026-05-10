@@ -139,6 +139,70 @@ export async function upsertBueroRechnung(r: {
   return data
 }
 
+export async function getBueroEingangsrechnungen() {
+  const { data, error } = await db()
+    .from('buero_eingangsrechnungen')
+    .select('*')
+    .order('faelligkeit', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertBueroEingangsrechnung(r: {
+  id: string
+  lieferant: string
+  rechnungsnummer?: string
+  rechnungsdatum?: string
+  faelligkeit?: string
+  betrag_netto?: number
+  mwst?: number
+  betrag_brutto?: number
+  status?: string
+  kategorie?: string
+  iban?: string
+  verwendungszweck?: string
+  notiz?: string
+  dokument_url?: string
+  dokument_id?: string
+  bezahlt_am?: string
+}) {
+  const { data, error } = await db()
+    .from('buero_eingangsrechnungen')
+    .upsert({ ...r, updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteBueroEingangsrechnung(id: string) {
+  const { error } = await db().from('buero_eingangsrechnungen').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function markEingangsrechnungBezahlt(id: string, bezahlt_am?: string) {
+  const { data, error } = await db()
+    .from('buero_eingangsrechnungen')
+    .update({
+      status: 'bezahlt',
+      bezahlt_am: bezahlt_am ?? new Date().toISOString().slice(0, 10),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function updateEingangsrechnungStatus(id: string, status: string) {
+  const { data, error } = await db()
+    .from('buero_eingangsrechnungen')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+  if (error) throw error
+  return data
+}
+
 export async function getBueroDokumente() {
   const { data, error } = await db().from('buero_dokumente').select('*').order('created_at', { ascending: false })
   if (error) throw error

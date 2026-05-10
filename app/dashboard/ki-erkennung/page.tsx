@@ -263,18 +263,43 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
       ...docResult,
       extracted: { ...editableFields },
     }
+    const isInvoice = updated.documentType === 'rechnung'
+    const potentialIncomingInvoice = isInvoice && (
+      !!editableFields.lieferant ||
+      String(editableFields.kunde ?? '').toLowerCase().includes('petersen') ||
+      String(editableFields.empfaenger ?? '').toLowerCase().includes('petersen')
+    )
+    if (potentialIncomingInvoice) {
+      const gross = parseFloat(String(editableFields.betrag_brutto ?? editableFields.betrag ?? '0').replace(',', '.')) || 0
+      const tax = parseFloat(String(editableFields.mwst ?? '0').replace(',', '.')) || 0
+      const net = parseFloat(String(editableFields.betrag_netto ?? '').replace(',', '.')) || Math.max(0, gross - tax)
+      localStorage.setItem('pk_doc_ai_eingangsrechnung', JSON.stringify({
+        lieferant: editableFields.lieferant || '',
+        rechnungsnummer: editableFields.rechnungsnummer || '',
+        rechnungsdatum: editableFields.rechnungsdatum || editableFields.datum || '',
+        faelligkeit: editableFields.faelligkeit || '',
+        betrag_netto: net,
+        mwst: tax,
+        betrag_brutto: gross,
+        iban: editableFields.iban || '',
+        verwendungszweck: editableFields.rechnungsnummer || '',
+        kategorie: 'Dokumenten-KI',
+        status: 'offen',
+        notiz: `Aus KI-Dokumentenanalyse übernommen: ${updated.summary}`,
+      }))
+    }
 
     try {
       if (hasDemoCookie()) {
         setSavedDocs(prev => [updated, ...prev].slice(0, 5))
-        showToast('Demo: Dokument wurde lokal übernommen.', 'success')
+        showToast(potentialIncomingInvoice ? 'Demo: Eingangsrechnung für BüroPilot vorbereitet.' : 'Demo: Dokument wurde lokal übernommen.', 'success')
       } else {
         // TODO: Live-Übernahme gezielt je Dokumenttyp verdrahten:
         // - rechnung -> upsertSteuerBeleg oder upsertBueroRechnung nach Review
         // - lieferschein/wareneingang -> Wareneingang/Lagerbewegung nach Artikel-Mapping
         // Aktuell bewusst keine automatische Supabase-Schreibaktion.
         setSavedDocs(prev => [updated, ...prev].slice(0, 5))
-        showToast('Übernahme vorbereitet. Live-Speicherung ist noch nicht automatisch verdrahtet.', 'success')
+        showToast(potentialIncomingInvoice ? 'Eingangsrechnung für BüroPilot vorbereitet.' : 'Übernahme vorbereitet. Live-Speicherung ist noch nicht automatisch verdrahtet.', 'success')
       }
       setDocConfirm(false)
     } catch {

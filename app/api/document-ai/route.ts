@@ -73,6 +73,8 @@ export async function POST(req: NextRequest) {
         text: [
           'Analysiere dieses Geschäftsdokument für Petersen KI Betriebssteuerung.',
           'Extrahiere nur Daten, die im Dokument erkennbar sind.',
+          'Bei Rechnungen: Unterscheide Ausgangsrechnung vs. Eingangsrechnung/Lieferantenrechnung. Wenn Petersen KI oder Petersen als Empfänger/Kunde auftaucht und ein fremder Lieferant genannt ist, ist es wahrscheinlich eine Eingangsrechnung.',
+          'Setze bei Eingangsrechnungen lieferant, kunde/empfaenger, rechnungsnummer, rechnungsdatum, faelligkeit, betrag_netto, mwst, betrag_brutto, iban und positionen soweit erkennbar.',
           'Wenn ein Feld nicht sicher erkennbar ist, lasse es weg oder setze null.',
           'Gib konkrete suggestedActions zurück, aber keine automatische Speicherung.',
         ].join('\n'),

@@ -93,6 +93,30 @@ create table if not exists buero_rechnungen (
   updated_at  timestamptz default now()
 );
 
+-- Eingangsrechnungen / Lieferantenrechnungen
+-- WICHTIG: Nach Deployment im Supabase SQL-Editor ausführen, falls die Tabelle noch fehlt.
+create table if not exists buero_eingangsrechnungen (
+  id                text primary key,
+  user_id           uuid references auth.users not null default auth.uid(),
+  lieferant         text not null,
+  rechnungsnummer   text,
+  rechnungsdatum    date,
+  faelligkeit       date,
+  betrag_netto      numeric default 0,
+  mwst              numeric default 0,
+  betrag_brutto     numeric default 0,
+  status            text default 'offen' check (status in ('offen', 'geprüft', 'freigegeben', 'bezahlt', 'überfällig', 'abgelehnt')),
+  kategorie         text,
+  iban              text,
+  verwendungszweck  text,
+  notiz             text,
+  dokument_url      text,
+  dokument_id       text,
+  bezahlt_am        date,
+  created_at        timestamptz default now(),
+  updated_at        timestamptz default now()
+);
+
 create table if not exists buero_dokumente (
   id          text primary key,
   user_id     uuid references auth.users not null default auth.uid(),
@@ -110,13 +134,19 @@ alter table buero_kunden    enable row level security;
 alter table buero_angebote  enable row level security;
 alter table buero_auftraege enable row level security;
 alter table buero_rechnungen enable row level security;
+alter table buero_eingangsrechnungen enable row level security;
 alter table buero_dokumente enable row level security;
 
 create policy "buero_kunden_user"    on buero_kunden    for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "buero_angebote_user"  on buero_angebote  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "buero_auftraege_user" on buero_auftraege for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "buero_rechnungen_user" on buero_rechnungen for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "buero_eingangsrechnungen_user" on buero_eingangsrechnungen for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "buero_dokumente_user" on buero_dokumente for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create index if not exists idx_buero_eingangsrechnungen_user_status on buero_eingangsrechnungen(user_id, status);
+create index if not exists idx_buero_eingangsrechnungen_user_faelligkeit on buero_eingangsrechnungen(user_id, faelligkeit);
+create index if not exists idx_buero_eingangsrechnungen_lieferant on buero_eingangsrechnungen(user_id, lieferant);
 
 -- ── Einkauf / Lieferanten ───────────────────────────────────
 

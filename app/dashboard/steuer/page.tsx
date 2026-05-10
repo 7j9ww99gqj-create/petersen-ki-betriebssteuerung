@@ -19,6 +19,9 @@ type Beleg = {
   notiz?: string
 }
 
+// TODO: buero_eingangsrechnungen als steuerrelevante Eingangsbelege einbeziehen,
+// sobald die Live-Migration in Supabase ausgeführt wurde und das Mapping final ist.
+
 type Ustva = {
   id: string
   monat: string
