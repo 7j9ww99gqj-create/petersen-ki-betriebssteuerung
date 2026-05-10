@@ -830,7 +830,7 @@ export async function umlagerArtikel(params: {
       .eq('id', zielRows[0].id)
   } else {
     await supabase.from('lager_stellplatz_bestand').insert({
-      id: `SB-${Date.now().toString(36).toUpperCase()}`,
+      id: crypto.randomUUID(),
       stellplatz_id: params.nachStellplatzId,
       artikel_id: von.artikel_id,
       artikelnummer: von.artikelnummer,
