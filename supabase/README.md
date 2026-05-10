@@ -14,6 +14,7 @@ Die Migration ist idempotent und kann mehrfach ausgeführt werden. Sie legt nur 
 ## Enthalten
 
 - `lager_artikel.mindestbestand`
+- `firma_einstellungen` für Mandanten-/Briefpapierdaten
 - Einkauf-Tabellen
 - `buero_eingangsrechnungen`
 - Lager-Stellplatz-Tabellen

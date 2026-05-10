@@ -148,6 +148,20 @@ function parseBetrag(s: string): number {
   return parseFloat(cleaned) || 0
 }
 
+function getLocalFirmaDefaults() {
+  if (typeof window === 'undefined') return { zahlungsziel_tage: 30, standard_mwst: 19 }
+  try {
+    const raw = localStorage.getItem('pk_firma_einstellungen')
+    const data = raw ? JSON.parse(raw) as { zahlungsziel_tage?: number; standard_mwst?: number } : {}
+    return {
+      zahlungsziel_tage: Number(data.zahlungsziel_tage ?? 30),
+      standard_mwst: Number(data.standard_mwst ?? 19),
+    }
+  } catch {
+    return { zahlungsziel_tage: 30, standard_mwst: 19 }
+  }
+}
+
 // ── Hilfs-Komponenten ───────────────────────────────────────────────────────
 
 type Tab = 'kunden' | 'angebote' | 'auftraege' | 'rechnungen' | 'eingangsrechnungen' | 'dokumente' | 'einkauf'
@@ -557,13 +571,14 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege }: { isDemo: bool
   const handleSave = async () => {
     if (!form.kunde || !form.titel || !form.betrag) return
     const today = new Date()
+    const firmaDefaults = getLocalFirmaDefaults()
     const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const newAng: Angebot = {
       id: `ANG-2025-0${43 + angebote.length - demoAngebote.length}`,
       kunde: form.kunde, titel: form.titel,
       betrag: form.betrag.includes('€') ? form.betrag : `${form.betrag} €`,
       datum: fmt(today),
-      gueltig: form.gueltig || fmt(new Date(today.getTime() + 30 * 86400000)),
+      gueltig: form.gueltig || fmt(new Date(today.getTime() + firmaDefaults.zahlungsziel_tage * 86400000)),
       status: 'Entwurf',
     }
     if (!isDemo) {
@@ -1108,12 +1123,13 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
   const handleNeu = async () => {
     if (!form.kunde || !form.betrag) return
     const today = new Date()
+    const firmaDefaults = getLocalFirmaDefaults()
     const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const newRe: Rechnung = {
       id: `RE-2025-0${79 + rechnungen.length - demoRechnungen.length}`,
       kunde: form.kunde,
       betrag: form.betrag.includes('€') ? form.betrag : `${form.betrag} €`,
-      faellig: form.faellig || fmt(new Date(today.getTime() + 30 * 86400000)),
+      faellig: form.faellig || fmt(new Date(today.getTime() + firmaDefaults.zahlungsziel_tage * 86400000)),
       erstellt: fmt(today),
       status: 'Offen',
     }

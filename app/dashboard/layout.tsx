@@ -8,6 +8,7 @@ import SupportButton from '@/components/SupportButton'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { hasDemoCookie } from '@/lib/auth'
 import { ROLE_LABELS, type AppRole } from '@/lib/roles'
+import { getFirmaEinstellungen, upsertFirmaEinstellungen, uploadFirmenLogo, type FirmaEinstellungen } from '@/lib/db'
 
 // Bottom-Nav Einträge (Mobile)
 const bottomNavItems = [
@@ -26,6 +27,45 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [userName, setUserName] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [role, setRoleState] = useState<AppRole>('Admin')
+  const [companyChecked, setCompanyChecked] = useState(false)
+  const [showCompanyOnboarding, setShowCompanyOnboarding] = useState(false)
+  const [companySaving, setCompanySaving] = useState(false)
+  const [companyError, setCompanyError] = useState('')
+  const [companyLogo, setCompanyLogo] = useState<File | null>(null)
+  const [companyForm, setCompanyForm] = useState<FirmaEinstellungen>({
+    firmenname: '',
+    adresse: '',
+    plz: '',
+    ort: '',
+    land: 'Deutschland',
+    email: '',
+    telefon: '',
+    website: '',
+    ansprechpartner: '',
+    slogan: '',
+    branche: '',
+    ust_id: '',
+    steuernummer: '',
+    handelsregister: '',
+    geschaeftsfuehrer: '',
+    bankname: '',
+    iban: '',
+    bic: '',
+    zahlungsziel_tage: 14,
+    standard_mwst: 19,
+    standard_waehrung: 'EUR',
+    dokument_footer: '',
+    briefpapier_layout: {
+      logoPosition: 'links',
+      akzentfarbe: '#20c8ff',
+      showBankdaten: true,
+      showSteuernummer: true,
+      showUstId: true,
+      showGeschaeftsfuehrer: true,
+      showWebsite: true,
+    },
+    onboarding_completed: false,
+  })
 
   // Close sidebar on route change (mobile nav)
   useEffect(() => { setSidebarOpen(false) }, [pathname])
@@ -60,6 +100,59 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     return () => subscription?.unsubscribe()
   }, [router])
+
+  useEffect(() => {
+    if (!checked || companyChecked) return
+    if (hasDemoCookie() || role !== 'Admin') { setCompanyChecked(true); return }
+
+    getFirmaEinstellungen()
+      .then(data => {
+        if (data) {
+          localStorage.setItem('pk_firma_einstellungen', JSON.stringify(data))
+          setCompanyForm(prev => ({ ...prev, ...data, briefpapier_layout: { ...prev.briefpapier_layout, ...(data.briefpapier_layout || {}) } }))
+          if (!data.onboarding_completed || !data.firmenname) setShowCompanyOnboarding(true)
+        } else {
+          setShowCompanyOnboarding(true)
+        }
+      })
+      .catch(() => {
+        // Wenn die Live-Tabelle noch nicht migriert ist, darf das Dashboard nicht blockieren.
+        setCompanyError('Firmendaten konnten noch nicht geladen werden. Bitte Supabase-Schema prüfen.')
+      })
+      .finally(() => setCompanyChecked(true))
+  }, [checked, companyChecked, role])
+
+  const setCompanyField = <K extends keyof FirmaEinstellungen>(key: K, value: FirmaEinstellungen[K]) => {
+    setCompanyForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  async function saveCompanyOnboarding() {
+    if (!companyForm.firmenname.trim()) {
+      setCompanyError('Bitte mindestens den Firmennamen eintragen.')
+      return
+    }
+    setCompanySaving(true)
+    setCompanyError('')
+    try {
+      let logoUrl = companyForm.logo_url
+      if (companyLogo) {
+        const uploaded = await uploadFirmenLogo(companyLogo)
+        logoUrl = uploaded.url
+      }
+      const saved = await upsertFirmaEinstellungen({
+        ...companyForm,
+        logo_url: logoUrl,
+        onboarding_completed: true,
+      })
+      localStorage.setItem('pk_firma_einstellungen', JSON.stringify(saved))
+      setCompanyForm(saved)
+      setShowCompanyOnboarding(false)
+    } catch (err) {
+      setCompanyError(err instanceof Error ? err.message : 'Firmendaten konnten nicht gespeichert werden.')
+    } finally {
+      setCompanySaving(false)
+    }
+  }
 
   if (!checked) {
     return (
@@ -162,6 +255,103 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+
+      {showCompanyOnboarding && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 80,
+            background: 'rgba(0,0,0,.68)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 18,
+          }}
+        >
+          <div className="pk-card" style={{ width: 'min(760px, 100%)', maxHeight: '92vh', overflow: 'auto', padding: 22 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 12, color: '#6cb6ff', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                  Firmendaten-Onboarding
+                </div>
+                <h2 style={{ margin: '4px 0 4px', fontSize: 22, fontWeight: 900 }}>Briefpapier einmal einrichten</h2>
+                <p style={{ margin: 0, color: '#aeb9c8', fontSize: 13 }}>
+                  Diese Daten erscheinen später im Dashboard, in Angeboten, Rechnungen und Exporten.
+                </p>
+              </div>
+              <button className="pk-btn-ghost" onClick={() => setShowCompanyOnboarding(false)} disabled={companySaving}>
+                Später
+              </button>
+            </div>
+
+            {companyError && (
+              <div style={{ marginBottom: 14, padding: 12, borderRadius: 12, background: 'rgba(244,63,94,.12)', border: '1px solid rgba(244,63,94,.28)', color: '#ff8aa0', fontSize: 13 }}>
+                {companyError}
+              </div>
+            )}
+
+            <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ fontSize: 12, color: '#aeb9c8' }}>Firmenname *</span>
+                <input className="pk-input" value={companyForm.firmenname} onChange={e => setCompanyField('firmenname', e.target.value)} />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ fontSize: 12, color: '#aeb9c8' }}>Logo</span>
+                <input className="pk-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={e => setCompanyLogo(e.target.files?.[0] ?? null)} />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ fontSize: 12, color: '#aeb9c8' }}>Adresse</span>
+                <input className="pk-input" value={companyForm.adresse || ''} onChange={e => setCompanyField('adresse', e.target.value)} />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: 10 }}>
+                <label style={{ display: 'grid', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>PLZ</span>
+                  <input className="pk-input" value={companyForm.plz || ''} onChange={e => setCompanyField('plz', e.target.value)} />
+                </label>
+                <label style={{ display: 'grid', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>Ort</span>
+                  <input className="pk-input" value={companyForm.ort || ''} onChange={e => setCompanyField('ort', e.target.value)} />
+                </label>
+              </div>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ fontSize: 12, color: '#aeb9c8' }}>E-Mail</span>
+                <input className="pk-input" type="email" value={companyForm.email || ''} onChange={e => setCompanyField('email', e.target.value)} />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ fontSize: 12, color: '#aeb9c8' }}>Telefon</span>
+                <input className="pk-input" value={companyForm.telefon || ''} onChange={e => setCompanyField('telefon', e.target.value)} />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ fontSize: 12, color: '#aeb9c8' }}>Website</span>
+                <input className="pk-input" value={companyForm.website || ''} onChange={e => setCompanyField('website', e.target.value)} />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ fontSize: 12, color: '#aeb9c8' }}>Ansprechpartner</span>
+                <input className="pk-input" value={companyForm.ansprechpartner || ''} onChange={e => setCompanyField('ansprechpartner', e.target.value)} />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ fontSize: 12, color: '#aeb9c8' }}>USt-IdNr.</span>
+                <input className="pk-input" value={companyForm.ust_id || ''} onChange={e => setCompanyField('ust_id', e.target.value)} />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ fontSize: 12, color: '#aeb9c8' }}>IBAN</span>
+                <input className="pk-input" value={companyForm.iban || ''} onChange={e => setCompanyField('iban', e.target.value)} />
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+              <button className="pk-btn-ghost" onClick={() => setShowCompanyOnboarding(false)} disabled={companySaving}>
+                Überspringen
+              </button>
+              <button className="pk-btn" onClick={saveCompanyOnboarding} disabled={companySaving}>
+                {companySaving ? 'Speichern…' : 'Firmendaten speichern'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Bottom Navigation (Mobile) ── */}
       <nav className="bottom-nav" role="navigation" aria-label="Hauptnavigation">

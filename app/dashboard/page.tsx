@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
-import { getLagerArtikel, getBueroRechnungen, getBueroAuftraege } from '@/lib/db'
+import { getLagerArtikel, getBueroRechnungen, getBueroAuftraege, getFirmaEinstellungen, type FirmaEinstellungen } from '@/lib/db'
 
 const pilots = [
   { id: 'lager', label: 'LagerPilot', icon: '📦', desc: 'Wareneingang, Bestände, Lagerplätze, Inventur', href: '/dashboard/lager', color: '#1684ff', status: 'AKTIV' },
@@ -26,6 +26,15 @@ type KpiData = {
 const demoKpis: KpiData = {
   lagerArtikel: 8, kritischeBestände: 3, offeneRechnungen: 4,
   rechnungenWert: '14.300 €', laufendeAuftraege: 3, ueberfaelligeRechnungen: 2,
+}
+
+const demoFirma: FirmaEinstellungen = {
+  firmenname: 'Petersen Musterbetrieb',
+  slogan: 'Demo-Mandant für Petersen KI',
+  land: 'Deutschland',
+  standard_mwst: 19,
+  standard_waehrung: 'EUR',
+  onboarding_completed: true,
 }
 
 function useCountUp(target: number, duration = 1400, start = false) {
@@ -153,6 +162,7 @@ export default function DashboardPage() {
   const [headerVisible, setHeaderVisible] = useState(false)
   const [kpi, setKpi] = useState<KpiData>(demoKpis)
   const [kpiLoaded, setKpiLoaded] = useState(false)
+  const [firma, setFirma] = useState<FirmaEinstellungen | null>(null)
 
   useEffect(() => {
     const u = localStorage.getItem('pk_user')
@@ -160,6 +170,18 @@ export default function DashboardPage() {
     setTimeout(() => setHeaderVisible(true), 80)
 
     const isDemo = hasDemoCookie()
+    if (isDemo) {
+      setFirma(demoFirma)
+      localStorage.setItem('pk_firma_einstellungen', JSON.stringify(demoFirma))
+    } else {
+      getFirmaEinstellungen()
+        .then(data => {
+          setFirma(data)
+          if (data) localStorage.setItem('pk_firma_einstellungen', JSON.stringify(data))
+        })
+        .catch(() => setFirma(null))
+    }
+
     if (!isDemo) {
       Promise.allSettled([getLagerArtikel(), getBueroRechnungen(), getBueroAuftraege()])
         .then(([artikelRes, rechnungenRes, auftraegeRes]) => {
@@ -186,6 +208,13 @@ export default function DashboardPage() {
       setKpiLoaded(true)
     }
   }, [])
+
+  const firmaInitialen = (firma?.firmenname || 'PK')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w.charAt(0).toUpperCase())
+    .join('')
 
   const kpiCards = [
     { label: 'Artikel im Lager', value: String(kpi.lagerArtikel), icon: '📦', color: '#1684ff', href: '/dashboard/lager', delta: `${kpi.kritischeBestände} kritisch` },
@@ -215,7 +244,34 @@ export default function DashboardPage() {
             Ihre Betriebssteuerung – alles im Blick.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div
+            className="pk-card"
+            style={{
+              padding: '10px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              minWidth: 220,
+              maxWidth: 360,
+            }}
+          >
+            {firma?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={firma.logo_url} alt="" style={{ width: 38, height: 38, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255,255,255,.12)' }} />
+            ) : (
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, #1684ff33, #20c8ff22)', border: '1px solid rgba(22,132,255,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6cb6ff', fontWeight: 900 }}>
+                {firmaInitialen}
+              </div>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 10, color: '#aeb9c8', textTransform: 'uppercase', letterSpacing: '.06em' }}>Petersen KI für</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#f8fbff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {firma?.firmenname || 'Ihre Firma'}
+              </div>
+              {firma?.slogan && <div style={{ fontSize: 11, color: '#7f8da3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{firma.slogan}</div>}
+            </div>
+          </div>
           <button className="pk-btn-ghost" onClick={() => router.push('/dashboard/ki-erkennung')} style={{ fontSize: 13 }}>
             🧠 KI-Assistent
           </button>

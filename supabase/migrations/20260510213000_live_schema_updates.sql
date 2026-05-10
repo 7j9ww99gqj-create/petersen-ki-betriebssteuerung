@@ -4,6 +4,65 @@
 -- Idempotent: kann mehrfach ausgeführt werden, ohne bestehende Daten zu löschen.
 -- ============================================================
 
+-- ── Mandant / Firmeneinstellungen ───────────────────────────
+create table if not exists firma_einstellungen (
+  id                    uuid primary key default gen_random_uuid(),
+  user_id               uuid references auth.users not null default auth.uid(),
+  firmenname            text not null,
+  logo_url              text,
+  adresse               text,
+  plz                   text,
+  ort                   text,
+  land                  text default 'Deutschland',
+  email                 text,
+  telefon               text,
+  website               text,
+  ansprechpartner       text,
+  slogan                text,
+  branche               text,
+  ust_id                text,
+  steuernummer          text,
+  handelsregister       text,
+  geschaeftsfuehrer     text,
+  bankname              text,
+  iban                  text,
+  bic                   text,
+  zahlungsziel_tage     integer default 14,
+  standard_mwst         numeric default 19,
+  standard_waehrung     text default 'EUR',
+  dokument_footer       text,
+  briefpapier_layout    jsonb default '{}'::jsonb,
+  onboarding_completed  boolean default false,
+  created_at            timestamptz default now(),
+  updated_at            timestamptz default now(),
+  unique(user_id)
+);
+
+alter table firma_einstellungen enable row level security;
+drop policy if exists "firma_einstellungen_user" on firma_einstellungen;
+create policy "firma_einstellungen_user" on firma_einstellungen for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+insert into storage.buckets (id, name, public)
+values ('dokumente', 'dokumente', false)
+on conflict do nothing;
+
+drop policy if exists "dokumente_upload" on storage.objects;
+create policy "dokumente_upload" on storage.objects
+  for insert with check (bucket_id = 'dokumente' and auth.uid()::text = (storage.foldername(name))[1]);
+
+drop policy if exists "dokumente_select" on storage.objects;
+create policy "dokumente_select" on storage.objects
+  for select using (bucket_id = 'dokumente' and auth.uid()::text = (storage.foldername(name))[1]);
+
+drop policy if exists "dokumente_update" on storage.objects;
+create policy "dokumente_update" on storage.objects
+  for update using (bucket_id = 'dokumente' and auth.uid()::text = (storage.foldername(name))[1])
+  with check (bucket_id = 'dokumente' and auth.uid()::text = (storage.foldername(name))[1]);
+
+drop policy if exists "dokumente_delete" on storage.objects;
+create policy "dokumente_delete" on storage.objects
+  for delete using (bucket_id = 'dokumente' and auth.uid()::text = (storage.foldername(name))[1]);
+
 -- ── LagerPilot: Mindestbestand ──────────────────────────────
 alter table if exists lager_artikel
   add column if not exists mindestbestand integer default 0;

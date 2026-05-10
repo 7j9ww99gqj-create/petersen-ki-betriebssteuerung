@@ -3,6 +3,46 @@
 -- Einmal im Supabase SQL Editor ausführen
 -- ============================================================
 
+-- ── Mandant / Firmeneinstellungen ───────────────────────────
+
+create table if not exists firma_einstellungen (
+  id                    uuid primary key default gen_random_uuid(),
+  user_id               uuid references auth.users not null default auth.uid(),
+  firmenname            text not null,
+  logo_url              text,
+  adresse               text,
+  plz                   text,
+  ort                   text,
+  land                  text default 'Deutschland',
+  email                 text,
+  telefon               text,
+  website               text,
+  ansprechpartner       text,
+  slogan                text,
+  branche               text,
+  ust_id                text,
+  steuernummer          text,
+  handelsregister       text,
+  geschaeftsfuehrer     text,
+  bankname              text,
+  iban                  text,
+  bic                   text,
+  zahlungsziel_tage     integer default 14,
+  standard_mwst         numeric default 19,
+  standard_waehrung     text default 'EUR',
+  dokument_footer       text,
+  briefpapier_layout    jsonb default '{}'::jsonb,
+  onboarding_completed  boolean default false,
+  created_at            timestamptz default now(),
+  updated_at            timestamptz default now(),
+  unique(user_id)
+);
+
+alter table firma_einstellungen enable row level security;
+
+create policy "firma_einstellungen_user" on firma_einstellungen
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- ── LagerPilot ──────────────────────────────────────────────
 
 create table if not exists lager_artikel (

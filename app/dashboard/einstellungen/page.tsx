@@ -15,6 +15,8 @@ import {
   bulkImportLagerArtikel, bulkImportBueroKunden, bulkImportEinkaufLieferanten,
   bulkImportBueroRechnungen, bulkImportSteuerBelege, bulkImportSteuerBuchungen,
   bulkImportSteuerKonten,
+  getFirmaEinstellungen, upsertFirmaEinstellungen, uploadFirmenLogo,
+  type FirmaEinstellungen,
 } from '@/lib/db'
 
 type NotifSettings = {
@@ -24,7 +26,7 @@ type NotifSettings = {
 
 export default function EinstellungenPage() {
   const router = useRouter()
-  const [section, setSection] = useState<'profil' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
+  const [section, setSection] = useState<'profil' | 'firma' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
   const [toast, setToast] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [isDemo, setIsDemo] = useState(false)
@@ -140,7 +142,7 @@ export default function EinstellungenPage() {
         }}>⚙️</div>
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>Einstellungen</h1>
-          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Profil · Benachrichtigungen · App-Informationen</p>
+          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Profil · Firmendaten · Briefpapier · Benachrichtigungen</p>
         </div>
       </div>
 
@@ -156,6 +158,7 @@ export default function EinstellungenPage() {
       <div className="settings-layout" style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20, alignItems: 'start' }}>
         <div className="pk-card settings-nav" style={{ padding: '10px' }}>
           <NavItem id="profil" icon="👤" label="Profil" />
+          <NavItem id="firma" icon="🏢" label="Firmendaten" />
           <NavItem id="benachrichtigungen" icon="🔔" label="Benachricht." />
           <NavItem id="rollen" icon="🔑" label="Rollen" />
           <NavItem id="import" icon="📥" label="Import" />
@@ -235,6 +238,10 @@ export default function EinstellungenPage() {
                 </div>
               )}
             </div>
+          )}
+
+          {section === 'firma' && (
+            <CompanySettingsSection isDemo={isDemo} currentRole={currentRole} showToast={showToast} />
           )}
 
           {section === 'benachrichtigungen' && (
@@ -410,6 +417,226 @@ export default function EinstellungenPage() {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+const emptyFirma: FirmaEinstellungen = {
+  firmenname: '',
+  land: 'Deutschland',
+  zahlungsziel_tage: 14,
+  standard_mwst: 19,
+  standard_waehrung: 'EUR',
+  dokument_footer: 'Vielen Dank für Ihr Vertrauen.',
+  briefpapier_layout: {
+    logoPosition: 'links',
+    akzentfarbe: '#20c8ff',
+    showBankdaten: true,
+    showSteuernummer: true,
+    showUstId: true,
+    showGeschaeftsfuehrer: true,
+    showWebsite: true,
+  },
+  onboarding_completed: false,
+}
+
+function CompanySettingsSection({ isDemo, currentRole, showToast }: {
+  isDemo: boolean
+  currentRole: AppRole
+  showToast: (msg: string, type?: 'success' | 'error') => void
+}) {
+  const canEdit = currentRole === 'Admin'
+  const [firma, setFirma] = useState<FirmaEinstellungen>(isDemo ? {
+    ...emptyFirma,
+    firmenname: 'Petersen Musterbetrieb GmbH',
+    slogan: 'Betriebssteuerung mit KI',
+    adresse: 'Musterstraße 12',
+    plz: '20095',
+    ort: 'Hamburg',
+    email: 'info@petersen-ki-pilot.de',
+    telefon: '+49 40 123456',
+    website: 'petersen-ki-pilot.de',
+    ust_id: 'DE123456789',
+    bankname: 'Musterbank',
+    iban: 'DE02120300000000202051',
+    bic: 'MUSTDEHHXXX',
+    onboarding_completed: true,
+  } : emptyFirma)
+  const [loading, setLoading] = useState(!isDemo)
+  const [saving, setSaving] = useState(false)
+  const [logoUploading, setLogoUploading] = useState(false)
+
+  useEffect(() => {
+    if (isDemo) {
+      localStorage.setItem('pk_firma_einstellungen', JSON.stringify(firma))
+      return
+    }
+    getFirmaEinstellungen()
+      .then(data => {
+        if (data) {
+          setFirma({ ...emptyFirma, ...data, briefpapier_layout: { ...emptyFirma.briefpapier_layout, ...(data.briefpapier_layout ?? {}) } })
+          localStorage.setItem('pk_firma_einstellungen', JSON.stringify(data))
+        }
+      })
+      .catch(() => showToast('Firmendaten konnten nicht geladen werden', 'error'))
+      .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDemo])
+
+  const setField = <K extends keyof FirmaEinstellungen>(key: K, value: FirmaEinstellungen[K]) =>
+    setFirma(prev => ({ ...prev, [key]: value }))
+  const setLayout = (key: string, value: unknown) =>
+    setFirma(prev => ({ ...prev, briefpapier_layout: { ...(prev.briefpapier_layout ?? {}), [key]: value } }))
+  const layout = (firma.briefpapier_layout ?? {}) as Record<string, unknown>
+
+  const save = async (complete = true) => {
+    if (!canEdit) { showToast('Nur Admins dürfen Firmendaten bearbeiten', 'error'); return }
+    if (!firma.firmenname.trim()) { showToast('Firmenname ist Pflicht', 'error'); return }
+    setSaving(true)
+    try {
+      const payload = { ...firma, onboarding_completed: complete ? true : firma.onboarding_completed }
+      if (isDemo) {
+        setFirma(payload)
+        localStorage.setItem('pk_firma_einstellungen', JSON.stringify(payload))
+      } else {
+        const saved = await upsertFirmaEinstellungen(payload)
+        setFirma({ ...emptyFirma, ...saved, briefpapier_layout: { ...emptyFirma.briefpapier_layout, ...(saved.briefpapier_layout ?? {}) } })
+        localStorage.setItem('pk_firma_einstellungen', JSON.stringify(saved))
+      }
+      showToast('✅ Firmendaten gespeichert')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Fehler beim Speichern', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleLogo = async (file: File | null) => {
+    if (!file || !canEdit) return
+    setLogoUploading(true)
+    try {
+      if (isDemo) {
+        const url = URL.createObjectURL(file)
+        setField('logo_url', url)
+      } else {
+        const uploaded = await uploadFirmenLogo(file)
+        setField('logo_url', uploaded.url)
+      }
+      showToast('✅ Logo hochgeladen')
+    } catch {
+      showToast('Logo konnte nicht hochgeladen werden', 'error')
+    } finally {
+      setLogoUploading(false)
+    }
+  }
+
+  if (loading) return <div className="pk-card" style={{ color: '#aeb9c8' }}>Lade Firmendaten…</div>
+
+  const inputDisabled = !canEdit
+  const input = (key: keyof FirmaEinstellungen, label: string, placeholder = '', type = 'text') => (
+    <div>
+      <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{label}</label>
+      <input className="pk-input" type={type} disabled={inputDisabled} value={String(firma[key] ?? '')} onChange={e => setField(key, e.target.value as never)} placeholder={placeholder} />
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {!firma.onboarding_completed && (
+        <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.28)', color: '#fbbf24', fontSize: 13, fontWeight: 700 }}>
+          Firmendaten noch unvollständig. Die App bleibt nutzbar, aber PDFs nutzen Fallback-Daten.
+        </div>
+      )}
+      {!canEdit && (
+        <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', color: '#aeb9c8', fontSize: 13 }}>
+          Nur Admins dürfen Firmendaten und Briefpapier bearbeiten. Sie können die Daten hier ansehen.
+        </div>
+      )}
+
+      <div className="pk-card">
+        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800 }}>🏢 Firmendaten & Logo</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
+          <div style={{ width: 74, height: 74, borderRadius: 16, overflow: 'hidden', background: 'rgba(32,200,255,.12)', border: '1px solid rgba(32,200,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 900, color: '#20c8ff' }}>
+            {firma.logo_url ? <img src={firma.logo_url} alt="Firmenlogo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (firma.firmenname || 'F').slice(0, 2).toUpperCase()}
+          </div>
+          <label className="pk-btn-ghost" style={{ cursor: canEdit ? 'pointer' : 'not-allowed', opacity: canEdit ? 1 : .5 }}>
+            {logoUploading ? '⏳ Logo…' : 'Logo hochladen'}
+            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={!canEdit} onChange={e => handleLogo(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
+          </label>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+          {input('firmenname', 'Firmenname *')}
+          {input('slogan', 'Slogan')}
+          {input('branche', 'Branche')}
+          {input('ansprechpartner', 'Ansprechpartner')}
+          {input('adresse', 'Adresse')}
+          {input('plz', 'PLZ')}
+          {input('ort', 'Ort')}
+          {input('land', 'Land')}
+          {input('email', 'E-Mail', '', 'email')}
+          {input('telefon', 'Telefon')}
+          {input('website', 'Website')}
+        </div>
+      </div>
+
+      <div className="pk-card">
+        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800 }}>🧾 Steuerdaten & Bankverbindung</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+          {input('ust_id', 'USt-IdNr.')}
+          {input('steuernummer', 'Steuernummer')}
+          {input('handelsregister', 'Handelsregister')}
+          {input('geschaeftsfuehrer', 'Geschäftsführer')}
+          {input('bankname', 'Bankname')}
+          {input('iban', 'IBAN')}
+          {input('bic', 'BIC')}
+          {input('zahlungsziel_tage', 'Standard-Zahlungsziel', '', 'number')}
+          {input('standard_mwst', 'Standard-MwSt.', '', 'number')}
+          {input('standard_waehrung', 'Standard-Währung')}
+        </div>
+      </div>
+
+      <div className="pk-card">
+        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800 }}>📄 Briefpapier / Design</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Logo-Position</label>
+            <select className="pk-input" disabled={inputDisabled} value={String(layout.logoPosition ?? 'links')} onChange={e => setLayout('logoPosition', e.target.value)}>
+              <option value="links">links</option><option value="mitte">mitte</option><option value="rechts">rechts</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Akzentfarbe</label>
+            <input className="pk-input" type="color" disabled={inputDisabled} value={String(layout.akzentfarbe ?? '#20c8ff')} onChange={e => setLayout('akzentfarbe', e.target.value)} />
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Fußzeile</label>
+            <textarea className="pk-input" rows={3} disabled={inputDisabled} value={firma.dokument_footer ?? ''} onChange={e => setField('dokument_footer', e.target.value)} />
+          </div>
+        </div>
+        <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 6 }}>
+          {[
+            ['showBankdaten', 'Bankdaten anzeigen'],
+            ['showSteuernummer', 'Steuernummer anzeigen'],
+            ['showUstId', 'USt-IdNr. anzeigen'],
+            ['showGeschaeftsfuehrer', 'Geschäftsführer anzeigen'],
+            ['showWebsite', 'Website anzeigen'],
+          ].map(([key, label]) => (
+            <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#d0d9e8' }}>
+              <input type="checkbox" disabled={inputDisabled} checked={layout[key] !== false} onChange={e => setLayout(key, e.target.checked)} />
+              {label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button className="pk-btn" disabled={saving || !canEdit} onClick={() => save(true)} style={{ fontWeight: 700, opacity: canEdit ? 1 : .5 }}>
+          {saving ? '⏳ Speichern…' : 'Firmendaten speichern'}
+        </button>
+        {!firma.onboarding_completed && canEdit && (
+          <button className="pk-btn-ghost" onClick={() => save(false)}>Später vervollständigen</button>
+        )}
       </div>
     </div>
   )

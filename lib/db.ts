@@ -13,6 +13,94 @@ function today() {
   return new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+export type FirmaEinstellungen = {
+  id?: string
+  user_id?: string
+  firmenname: string
+  logo_url?: string
+  adresse?: string
+  plz?: string
+  ort?: string
+  land?: string
+  email?: string
+  telefon?: string
+  website?: string
+  ansprechpartner?: string
+  slogan?: string
+  branche?: string
+  ust_id?: string
+  steuernummer?: string
+  handelsregister?: string
+  geschaeftsfuehrer?: string
+  bankname?: string
+  iban?: string
+  bic?: string
+  zahlungsziel_tage?: number
+  standard_mwst?: number
+  standard_waehrung?: string
+  dokument_footer?: string
+  briefpapier_layout?: Record<string, unknown>
+  onboarding_completed?: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+// ── FIRMA / MANDANT ───────────────────────────────────────────────────────────
+
+export async function getFirmaEinstellungen() {
+  const { data, error } = await db()
+    .from('firma_einstellungen')
+    .select('*')
+    .maybeSingle()
+  if (error) throw error
+  return data as FirmaEinstellungen | null
+}
+
+export async function upsertFirmaEinstellungen(data: FirmaEinstellungen) {
+  const { data: saved, error } = await db()
+    .from('firma_einstellungen')
+    .upsert({
+      ...data,
+      land: data.land || 'Deutschland',
+      standard_waehrung: data.standard_waehrung || 'EUR',
+      onboarding_completed: data.onboarding_completed ?? true,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' })
+    .select()
+    .single()
+  if (error) throw error
+  return saved as FirmaEinstellungen
+}
+
+export async function uploadFirmenLogo(file: File) {
+  const supabase = db()
+  const { data: auth } = await supabase.auth.getUser()
+  const userId = auth.user?.id
+  if (!userId) throw new Error('Kein Benutzer für Logo-Upload gefunden.')
+  const ext = file.name.split('.').pop() || 'png'
+  const path = `${userId}/firma/logo_${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('dokumente').upload(path, file, { upsert: true })
+  if (error) throw error
+  const { data } = await supabase.storage.from('dokumente').createSignedUrl(path, 60 * 60 * 24 * 365)
+  return { path, url: data?.signedUrl ?? path }
+}
+
+export async function deleteFirmenLogo(pathOrUrl: string) {
+  const marker = '/object/sign/dokumente/'
+  const path = pathOrUrl.includes(marker)
+    ? decodeURIComponent(pathOrUrl.split(marker)[1]?.split('?')[0] ?? '')
+    : pathOrUrl
+  if (!path) return
+  const { error } = await db().storage.from('dokumente').remove([path])
+  if (error) throw error
+}
+
+export async function markFirmaOnboardingCompleted() {
+  const current = await getFirmaEinstellungen()
+  if (!current) throw new Error('Keine Firmendaten vorhanden.')
+  return upsertFirmaEinstellungen({ ...current, onboarding_completed: true })
+}
+
 // ── LAGER ────────────────────────────────────────────────────────────────────
 
 export async function getLagerArtikel() {
