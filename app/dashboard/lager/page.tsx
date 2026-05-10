@@ -1217,12 +1217,12 @@ export default function LagerPilotPage() {
             { id: 'kommissionierung', label: '🧺 Kommissionierung' },
           ],
         ] as ({ id: string; label: string; ki?: boolean } | null)[][]).map((row, ri) => (
-          <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+          <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', rowGap: 4, paddingBottom: ri === 0 ? 2 : 0 }}>
             {row.map((t, ti) => t === null ? (
               <span key={`div-${ri}-${ti}`} style={{ width: 1, height: 18, background: 'rgba(255,255,255,.12)', margin: '0 6px', flexShrink: 0 }} />
             ) : (
               <button key={t.id} onClick={() => setTab(t.id as LagerTab)} style={{
-                padding: '9px 13px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                padding: '9px 12px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
                 background: 'transparent', whiteSpace: 'nowrap', transition: 'color .15s',
                 borderBottom: tab === t.id ? '2px solid #1684ff' : '2px solid transparent',
                 color: tab === t.id ? '#6cb6ff' : t.ki ? '#a78bfa' : '#aeb9c8',
