@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { umlagerArtikel, getLagerStellplaetze, getLagerStellplatzBestand } from '@/lib/db'
+import { hasDemoCookie } from '@/lib/auth'
 
 // ─── Demo-Daten ───────────────────────────────────────────────────────────────
 
@@ -111,6 +113,9 @@ export default function KiErkennungPage() {
     { role: 'assistant', content: 'Hallo! Ich bin Ihr KI-Assistent. Fragen Sie mich zu Lager, Aufgaben, Rechnungen oder Betriebsabläufen.' },
   ])
   const [chatLoading, setChatLoading] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<{ msgIdx: number; actionIdx: number } | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [actionToast, setActionToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   // Tagesbrief beim ersten Laden generieren
@@ -197,6 +202,52 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
         setStage('done')
       }, 2200)
     }, 800)
+  }
+
+  // ── KI-Aktion ausführen ────────────────────────────────────────────────────
+
+  async function executeUmlagerung(action: KiAction, msgIdx: number, actionIdx: number) {
+    const key = `${msgIdx}-${actionIdx}`
+    setActionLoading(key)
+    const showToast = (msg: string, type: 'success' | 'error') => {
+      setActionToast({ msg, type })
+      setTimeout(() => setActionToast(null), 4500)
+    }
+
+    try {
+      if (hasDemoCookie()) {
+        await new Promise(r => setTimeout(r, 900))
+        showToast(`Demo: Umlagerung „${action.artikel}" erfolgreich simuliert`, 'success')
+      } else {
+        const [stellplaetze, bestand] = await Promise.all([
+          getLagerStellplaetze(),
+          getLagerStellplatzBestand(),
+        ])
+
+        const nachSp = stellplaetze.find((sp: { code: string }) => sp.code === action.nach)
+        if (!nachSp) throw new Error(`Stellplatz „${action.nach}" nicht gefunden`)
+
+        const vonRow = bestand.find((b: { artikelname?: string; lager_stellplaetze?: { code?: string } | null }) => {
+          const code = b.lager_stellplaetze?.code
+          return b.artikelname === action.artikel && code === action.von
+        })
+        if (!vonRow) throw new Error(`Kein Bestand für „${action.artikel}" auf „${action.von}"`)
+
+        await umlagerArtikel({
+          vonBestandId: (vonRow as { id: string }).id,
+          nachStellplatzId: (nachSp as { id: string }).id,
+          menge: action.menge ?? 0,
+          grund: 'KI-Vorschlag',
+          artikelname: action.artikel,
+        })
+        showToast(`Umlagerung „${action.artikel}" erfolgreich ausgeführt`, 'success')
+      }
+      setConfirmAction(null)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Fehler bei der Umlagerung', 'error')
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   // ── KI-Chat ────────────────────────────────────────────────────────────────
@@ -628,6 +679,9 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
                         : action.type === 'bestellung'
                         ? { icon: '🛒', label: 'Bestellung', color: '#f59e0b', bg: 'rgba(245,158,11,.1)', border: 'rgba(245,158,11,.25)' }
                         : { icon: '💡', label: 'Hinweis', color: '#a78bfa', bg: 'rgba(167,139,250,.1)', border: 'rgba(167,139,250,.25)' }
+                      const isConfirming = confirmAction?.msgIdx === i && confirmAction?.actionIdx === ai
+                      const actionKey = `${i}-${ai}`
+                      const isRunning = actionLoading === actionKey
                       return (
                         <div key={ai} style={{
                           padding: '9px 13px', borderRadius: 10, fontSize: 13,
@@ -636,24 +690,73 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
                         }}>
                           <span style={{ fontSize: 15, flexShrink: 0 }}>{cfg.icon}</span>
                           <div style={{ flex: 1 }}>
-                            <span style={{ fontWeight: 700, color: cfg.color, marginRight: 6 }}>{cfg.label}</span>
+                            <div>
+                              <span style={{ fontWeight: 700, color: cfg.color, marginRight: 6 }}>{cfg.label}</span>
+                              {action.type === 'umlagerung' && (
+                                <span style={{ color: '#f8fbff' }}>
+                                  <b>{action.artikel}</b>
+                                  {action.von && action.nach && <> · {action.von} <span style={{ color: cfg.color }}>→</span> {action.nach}</>}
+                                  {action.menge != null && <> · {action.menge} Einh.</>}
+                                </span>
+                              )}
+                              {(action.type === 'bestellung' || action.type === 'hinweis') && (
+                                <span style={{ color: '#f8fbff' }}>
+                                  {action.artikel && <><b>{action.artikel}</b>{action.beschreibung ? ' · ' : ''}</>}
+                                  {action.beschreibung && <span style={{ color: '#aeb9c8' }}>{action.beschreibung}</span>}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Bestätigungs-UI für Umlagerung */}
                             {action.type === 'umlagerung' && (
-                              <span style={{ color: '#f8fbff' }}>
-                                <b>{action.artikel}</b>
-                                {action.von && action.nach && <> · {action.von} <span style={{ color: cfg.color }}>→</span> {action.nach}</>}
-                                {action.menge != null && <> · {action.menge} Einh.</>}
-                              </span>
-                            )}
-                            {(action.type === 'bestellung' || action.type === 'hinweis') && (
-                              <span style={{ color: '#f8fbff' }}>
-                                {action.artikel && <><b>{action.artikel}</b>{action.beschreibung ? ' · ' : ''}</>}
-                                {action.beschreibung && <span style={{ color: '#aeb9c8' }}>{action.beschreibung}</span>}
-                              </span>
+                              <div style={{ marginTop: 8 }}>
+                                {isConfirming ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: 12, color: '#f8fbff', fontWeight: 600 }}>
+                                      Wirklich ausführen?
+                                    </span>
+                                    <button
+                                      onClick={() => executeUmlagerung(action, i, ai)}
+                                      disabled={isRunning}
+                                      style={{
+                                        fontSize: 12, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 700,
+                                        background: '#1684ff', border: 'none', color: '#fff',
+                                        opacity: isRunning ? .6 : 1,
+                                      }}
+                                    >
+                                      {isRunning ? '⏳ Wird ausgeführt…' : '✓ Ja, ausführen'}
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmAction(null)}
+                                      disabled={isRunning}
+                                      style={{
+                                        fontSize: 12, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 600,
+                                        background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', color: '#aeb9c8',
+                                      }}
+                                    >
+                                      Abbrechen
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setConfirmAction({ msgIdx: i, actionIdx: ai })}
+                                    style={{
+                                      fontSize: 12, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 600,
+                                      background: 'rgba(22,132,255,.15)', border: '1px solid rgba(22,132,255,.35)', color: '#6cb6ff',
+                                    }}
+                                  >
+                                    Umlagerung ausführen →
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </div>
-                          <span style={{ fontSize: 11, color: '#aeb9c8', flexShrink: 0, alignSelf: 'center', padding: '2px 7px', borderRadius: 6, border: `1px solid ${cfg.border}`, fontWeight: 600 }}>
-                            Vorschlag
-                          </span>
+
+                          {action.type !== 'umlagerung' && (
+                            <span style={{ fontSize: 11, color: '#aeb9c8', flexShrink: 0, alignSelf: 'center', padding: '2px 7px', borderRadius: 6, border: `1px solid ${cfg.border}`, fontWeight: 600 }}>
+                              Vorschlag
+                            </span>
+                          )}
                         </div>
                       )
                     })}
@@ -719,6 +822,20 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
           <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(167,139,250,.08)', border: '1px solid rgba(167,139,250,.2)', fontSize: 11, color: '#c4b5fd' }}>
             💡 Demo: ANTHROPIC_API_KEY in .env.local für echte KI-Antworten eintragen
           </div>
+        </div>
+      )}
+
+      {/* Aktions-Toast */}
+      {actionToast && (
+        <div style={{
+          position: 'fixed', bottom: 90, right: 24, zIndex: 9999,
+          padding: '14px 20px', borderRadius: 12, maxWidth: 380,
+          background: actionToast.type === 'error' ? 'rgba(255,80,80,.15)' : 'rgba(37,211,102,.12)',
+          border: `1px solid ${actionToast.type === 'error' ? 'rgba(255,80,80,.4)' : 'rgba(37,211,102,.35)'}`,
+          color: actionToast.type === 'error' ? '#ff8080' : '#4ddb7e',
+          fontSize: 14, fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,.4)',
+        }}>
+          {actionToast.msg}
         </div>
       )}
     </div>
