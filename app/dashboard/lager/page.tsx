@@ -1801,12 +1801,18 @@ export default function LagerPilotPage() {
                 {/* Grund */}
                 <div>
                   <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Grund</label>
-                  <input
+                  <select
                     className="pk-input"
-                    placeholder="z.B. Umsortierung, Qualitätsprüfung, Versand…"
                     value={umlForm.grund}
                     onChange={e => setUmlForm(p => ({ ...p, grund: e.target.value }))}
-                  />
+                  >
+                    <option value="">— Grund wählen —</option>
+                    <option>Umlagerung</option>
+                    <option>Kommissionierung</option>
+                    <option>Sperrlager</option>
+                    <option>Inventurkorrektur</option>
+                    <option>Versand</option>
+                  </select>
                 </div>
 
                 {/* Notiz */}
