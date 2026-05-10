@@ -22,7 +22,8 @@ type Bewegung = {
 
 type Stellplatz = {
   id: string; code: string; name?: string; bereich?: string; zone?: string
-  typ?: string; warengruppe?: string; aktiv?: boolean; notiz?: string
+  typ?: string; warengruppe?: string; warenobergruppe?: string
+  temperaturzone?: string; aktiv?: boolean; notiz?: string
 }
 type StellplatzBestand = {
   id: string; stellplatz_id: string; artikelnummer?: string; artikelname?: string
@@ -782,6 +783,46 @@ export default function LagerPilotPage() {
     return 'ok'
   }
 
+  function getBestStellplatz(a: Artikel | undefined): { stellplatz: Stellplatz; score: number; grund: string[] } | null {
+    if (!a) return null
+    const aktive = stellplaetze.filter(sp => sp.aktiv !== false)
+    if (aktive.length === 0) return null
+
+    const belegteIds = new Set(stellplatzBestand.map(sb => sb.stellplatz_id))
+
+    const scored = aktive.map(sp => {
+      let score = 0
+      const grund: string[] = []
+
+      // Warengruppe = Artikelkategorie
+      if (sp.warengruppe && sp.warengruppe.toLowerCase() === a.kategorie.toLowerCase()) {
+        score += 3; grund.push('gleiche Warengruppe')
+      }
+      // Warenobergruppe-Heuristik (z.B. Rohstoffe → Metall)
+      if (sp.warenobergruppe && a.kategorie.toLowerCase().includes(sp.warenobergruppe.toLowerCase())) {
+        score += 2; grund.push('passende Warenobergruppe')
+      }
+      // Aktueller Lagerplatz-Code passt zum Stellplatz-Code (Prefix)
+      if (a.lagerplatz && sp.code.startsWith(a.lagerplatz.slice(0, 2))) {
+        score += 1; grund.push('bekannter Bereich')
+      }
+      // Freier Stellplatz bevorzugen
+      if (!belegteIds.has(sp.id)) {
+        score += 2; grund.push('freier Stellplatz')
+      }
+      // Typ-Heuristik: Betriebsstoffe → Kühl/Tiefkühl
+      const kuehlKat = ['betriebsstoffe', 'kühlware', 'lebensmittel']
+      if (kuehlKat.some(k => a.kategorie.toLowerCase().includes(k)) && sp.typ && sp.typ.toLowerCase().includes('kühl')) {
+        score += 2; grund.push('passende Temperaturzone')
+      }
+
+      return { stellplatz: sp, score, grund }
+    })
+
+    const best = scored.sort((a, b) => b.score - a.score)[0]
+    return best.score > 0 ? best : { stellplatz: aktive[0], score: 0, grund: ['kein spezifischer Treffer – erster freier Stellplatz'] }
+  }
+
   const handleDeleteStellplatzBestand = async (id: string) => {
     if (!isDemo) {
       try { await deleteLagerStellplatzBestand(id) }
@@ -1223,11 +1264,37 @@ export default function LagerPilotPage() {
                 <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikel *</label>
                 <input className="pk-input" placeholder="Artikelname eingeben oder auswählen" value={newEingang.artikel} onChange={e => setNewEingang(p => ({ ...p, artikel: e.target.value }))} list="ei-artikel-list" />
                 <datalist id="ei-artikel-list">{artikel.map(a => <option key={a.id} value={a.name} />)}</datalist>
-                {newEingang.artikel && artikel.find(a => a.name === newEingang.artikel) && (
-                  <div style={{ marginTop: 6, fontSize: 12, color: '#aeb9c8' }}>
-                    Aktueller Bestand: <b style={{ color: '#f8fbff' }}>{artikel.find(a => a.name === newEingang.artikel)?.bestand} {artikel.find(a => a.name === newEingang.artikel)?.einheit}</b>
-                  </div>
-                )}
+                {newEingang.artikel && artikel.find(a => a.name === newEingang.artikel) && (() => {
+                  const found = artikel.find(a => a.name === newEingang.artikel)!
+                  const vorschlag = getBestStellplatz(found)
+                  return (
+                    <>
+                      <div style={{ marginTop: 6, fontSize: 12, color: '#aeb9c8' }}>
+                        Aktueller Bestand: <b style={{ color: '#f8fbff' }}>{found.bestand} {found.einheit}</b>
+                      </div>
+                      {vorschlag && stellplaetze.length > 0 && (
+                        <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.25)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 16 }}>📍</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#34d399' }}>
+                              Empfohlener Stellplatz: <span style={{ fontFamily: 'monospace' }}>{vorschlag.stellplatz.code}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>
+                              {vorschlag.grund.join(' · ')}
+                              {vorschlag.stellplatz.bereich ? ` · ${vorschlag.stellplatz.bereich}` : ''}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setNewEingang(p => ({ ...p, lagerplatz: vorschlag.stellplatz.code }))}
+                            style={{ background: 'rgba(16,185,129,.18)', border: '1px solid rgba(16,185,129,.4)', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', color: '#34d399', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}
+                          >
+                            ✅ Vorschlag übernehmen
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
