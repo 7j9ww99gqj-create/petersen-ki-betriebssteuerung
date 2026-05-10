@@ -555,6 +555,89 @@ export default function LagerPilotPage() {
   const [briefAktionLoading, setBriefAktionLoading] = useState<number | null>(null)
   const [proaktivLoading, setProaktivLoading] = useState(false)
   const [proaktivAntwort, setProaktivAntwort] = useState<{ text: string; aktionen: KiAktion[] } | null>(null)
+  const [aktiveFrage, setAktiveFrage] = useState<string | null>(null)
+
+  // ── KI-Tagesbericht: Funktionen auf Komponentenebene ────────────────────────
+
+  async function generateLagerBrief() {
+    setBriefLoading(true)
+    setBriefText(null)
+    setBriefProbleme([])
+    setBriefAktionen([])
+    setBriefConfirm(null)
+    setProaktivAntwort(null)
+    setAktiveFrage(null)
+    const mhdK = stellplatzBestand.filter(b => { const s = mhdStatus(b.mhd); return s === 'kritisch' || s === 'abgelaufen' })
+    const untM  = artikel.filter(a => a.status === 'leer' || a.status === 'niedrig')
+    const spZ   = new Map<string, { count: number; code: string }>()
+    stellplatzBestand.forEach(b => {
+      const code = (b.lager_stellplaetze as { code?: string } | null)?.code ?? b.stellplatz_id
+      const cur = spZ.get(b.stellplatz_id) ?? { count: 0, code }
+      spZ.set(b.stellplatz_id, { ...cur, count: cur.count + 1 })
+    })
+    const uebL = Array.from(spZ.values()).filter(v => v.count >= 3)
+    const kontextBlock = `Heutiger Lager-Status (${new Date().toLocaleDateString('de-DE')}):
+- MHD-kritische Positionen: ${mhdK.length} (${mhdK.map(b => b.artikelname).join(', ') || '—'})
+- Artikel unter Mindestbestand: ${untM.length} (${untM.map(a => a.name).join(', ') || '—'})
+- Überlastete Stellplätze (≥3 Pos.): ${uebL.length}
+- Aktive Stellplätze gesamt: ${stellplaetze.filter(s => s.aktiv).length}
+- Artikel gesamt: ${artikel.length}`.trim()
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context: kontextBlock, structuredOutput: true, messages: [{ role: 'user', content: 'Erstelle einen kurzen KI-Tagesbericht für das Lager. Was ist heute wichtig? Max. 3-4 Sätze als „message", konkrete Aktionen in „actions".' }] }),
+      })
+      const data = await res.json() as { reply: string; probleme?: { level: string; text: string }[]; actions?: KiAktion[] }
+      setBriefText(data.reply || '—')
+      setBriefProbleme(data.probleme ?? [])
+      setBriefAktionen((data.actions ?? []) as KiAktion[])
+    } catch { setBriefText('Fehler beim Generieren. KI nicht erreichbar.') }
+    setBriefLoading(false)
+  }
+
+  async function sendProaktivFrage(frage: string) {
+    setAktiveFrage(frage)
+    setProaktivLoading(true)
+    setProaktivAntwort(null)
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ structuredOutput: true, messages: [{ role: 'user', content: frage }] }),
+      })
+      const data = await res.json() as { reply: string; actions?: KiAktion[] }
+      setProaktivAntwort({ text: data.reply || '—', aktionen: (data.actions ?? []) as KiAktion[] })
+    } catch { setProaktivAntwort({ text: 'KI nicht erreichbar.', aktionen: [] }) }
+    setProaktivLoading(false)
+  }
+
+  async function executeBriefAktion(aktion: KiAktion, idx: number) {
+    setBriefAktionLoading(idx)
+    try {
+      if (isDemo) {
+        await new Promise(r => setTimeout(r, 800))
+        showToast(`Demo: „${aktion.artikel}" simuliert ausgeführt`)
+      } else {
+        const [sps, sb] = await Promise.all([getLagerStellplaetze(), getLagerStellplatzBestand()])
+        const nachSp = sps.find((s: { code: string }) => s.code === aktion.nach)
+        if (!nachSp) throw new Error(`Stellplatz „${aktion.nach}" nicht gefunden`)
+        const vonRow = sb.find((b: { artikelname?: string; lager_stellplaetze?: { code?: string } | null }) =>
+          b.artikelname === aktion.artikel && b.lager_stellplaetze?.code === aktion.von)
+        if (!vonRow) throw new Error(`Bestand für „${aktion.artikel}" auf „${aktion.von}" nicht gefunden`)
+        await umlagerArtikel({ vonBestandId: (vonRow as { id: string }).id, nachStellplatzId: (nachSp as { id: string }).id, menge: aktion.menge ?? 0, grund: 'KI-Tagesbericht', artikelname: aktion.artikel })
+        showToast(`Umlagerung „${aktion.artikel}" erfolgreich ausgeführt`)
+      }
+      setBriefConfirm(null)
+    } catch (err) { showToast(err instanceof Error ? err.message : 'Fehler bei der Aktion', false) }
+    setBriefAktionLoading(null)
+  }
+
+  // Auto-Generierung beim Tab-Wechsel
+  useEffect(() => {
+    if (tab === 'tagesbericht' && !briefText && !briefLoading) {
+      generateLagerBrief()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
 
   // ── Filter ──────────────────────────────────────────────────────────────────
 
@@ -1112,24 +1195,43 @@ export default function LagerPilotPage() {
       )}
 
       {/* Tabs */}
-      <div className="pk-tab-bar" style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)', overflowX: 'auto' }}>
-        {[
-          { id: 'tagesbericht', label: '🧠 KI-Tagesbericht' },
-          { id: 'bestand', label: '📦 Bestand' },
-          { id: 'bewegungen', label: '🔄 Bewegungen' },
-          { id: 'eingang', label: '📥 Wareneingang' },
-          { id: 'ausgang', label: '📤 Warenausgang' },
-          { id: 'inventur', label: '📋 Inventur' },
-          { id: 'bestellung', label: `🛒 Bestellvorschlag${bestellArtikel.length > 0 ? ` (${bestellArtikel.length})` : ''}` },
-          { id: 'historie', label: '📈 Artikel-Historie' },
-          { id: 'stellplaetze', label: '📍 Stellplätze' },
-          { id: 'lagerbelegung', label: '📊 Lagerbelegung' },
-          { id: 'umlagerung', label: '↔️ Umlagerung' },
-          { id: 'kommissionierung', label: '🧺 Kommissionierung' },
-        ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as LagerTab)} style={{ padding: '10px 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: 'transparent', borderBottom: tab === t.id ? '2px solid #1684ff' : '2px solid transparent', color: tab === t.id ? '#6cb6ff' : '#aeb9c8', marginBottom: -1, transition: 'color .15s', whiteSpace: 'nowrap' }}>
-            {t.label}
-          </button>
+      {/* Tab-Navigation: 2 Zeilen, kein horizontales Scrollen */}
+      <div style={{ marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+        {([
+          [
+            { id: 'tagesbericht', label: '🧠 KI-Tagesbericht', ki: true },
+            null,
+            { id: 'bestand', label: '📦 Bestand' },
+            { id: 'bewegungen', label: '🔄 Bewegungen' },
+            { id: 'eingang', label: '📥 Eingang' },
+            { id: 'ausgang', label: '📤 Ausgang' },
+            { id: 'inventur', label: '📋 Inventur' },
+          ],
+          [
+            { id: 'bestellung', label: `🛒 Bestellung${bestellArtikel.length > 0 ? ` (${bestellArtikel.length})` : ''}` },
+            { id: 'historie', label: '📈 Historie' },
+            null,
+            { id: 'stellplaetze', label: '📍 Stellplätze' },
+            { id: 'lagerbelegung', label: '📊 Lagerbelegung' },
+            { id: 'umlagerung', label: '↔️ Umlagerung' },
+            { id: 'kommissionierung', label: '🧺 Kommissionierung' },
+          ],
+        ] as ({ id: string; label: string; ki?: boolean } | null)[][]).map((row, ri) => (
+          <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+            {row.map((t, ti) => t === null ? (
+              <span key={`div-${ri}-${ti}`} style={{ width: 1, height: 18, background: 'rgba(255,255,255,.12)', margin: '0 6px', flexShrink: 0 }} />
+            ) : (
+              <button key={t.id} onClick={() => setTab(t.id as LagerTab)} style={{
+                padding: '9px 13px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                background: 'transparent', whiteSpace: 'nowrap', transition: 'color .15s',
+                borderBottom: tab === t.id ? '2px solid #1684ff' : '2px solid transparent',
+                color: tab === t.id ? '#6cb6ff' : t.ki ? '#a78bfa' : '#aeb9c8',
+                marginBottom: -1,
+              }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
         ))}
       </div>
 
@@ -2355,99 +2457,6 @@ export default function LagerPilotPage() {
           ),
         ]
 
-        // ── KI-Brief generieren ───────────────────────────────────────────────
-        async function generateLagerBrief() {
-          setBriefLoading(true)
-          setBriefText(null)
-          setBriefProbleme([])
-          setBriefAktionen([])
-          setBriefConfirm(null)
-          setProaktivAntwort(null)
-
-          const kontextBlock = `
-Heutiger Lager-Status (${new Date().toLocaleDateString('de-DE')}):
-- MHD-kritische Positionen: ${mhdKritisch.length} (${mhdKritisch.map(b => b.artikelname).join(', ') || '—'})
-- Artikel unter Mindestbestand: ${unterMindest.length} (${unterMindest.map(a => a.name).join(', ') || '—'})
-- Überlastete Stellplätze (≥3 Pos.): ${ueberlastet.length}
-- Aktive Stellplätze gesamt: ${stellplaetze.filter(s => s.aktiv).length}
-- Artikel gesamt: ${artikel.length}
-`.trim()
-
-          try {
-            const res = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                context: kontextBlock,
-                structuredOutput: true,
-                messages: [{
-                  role: 'user',
-                  content: 'Erstelle einen kurzen KI-Tagesbericht für das Lager. Was ist heute wichtig? Nenne konkrete Zahlen und schlage sinnvolle Aktionen vor. Maximal 3-4 Sätze als „message", spezifische Aktionen in „actions".',
-                }],
-              }),
-            })
-            const data = await res.json() as { reply: string; probleme?: { level: string; text: string }[]; actions?: KiAktion[] }
-            setBriefText(data.reply || '—')
-            setBriefProbleme(data.probleme ?? [])
-            setBriefAktionen((data.actions ?? []) as KiAktion[])
-          } catch {
-            setBriefText('Fehler beim Generieren des Briefings. KI nicht erreichbar.')
-          }
-          setBriefLoading(false)
-        }
-
-        // ── Proaktive Frage senden ─────────────────────────────────────────────
-        async function sendProaktivFrage(frage: string) {
-          setProaktivLoading(true)
-          setProaktivAntwort(null)
-          try {
-            const res = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                structuredOutput: true,
-                messages: [{ role: 'user', content: frage }],
-              }),
-            })
-            const data = await res.json() as { reply: string; actions?: KiAktion[] }
-            setProaktivAntwort({ text: data.reply || '—', aktionen: (data.actions ?? []) as KiAktion[] })
-          } catch {
-            setProaktivAntwort({ text: 'KI nicht erreichbar.', aktionen: [] })
-          }
-          setProaktivLoading(false)
-        }
-
-        // ── Umlagerung aus Briefing ausführen ─────────────────────────────────
-        async function executeBriefAktion(aktion: KiAktion, idx: number) {
-          setBriefAktionLoading(idx)
-          try {
-            if (isDemo) {
-              await new Promise(r => setTimeout(r, 800))
-              showToast(`Demo: „${aktion.artikel}" simuliert ausgeführt`)
-            } else {
-              const [sps, sb] = await Promise.all([getLagerStellplaetze(), getLagerStellplatzBestand()])
-              const nachSp = sps.find((s: { code: string }) => s.code === aktion.nach)
-              if (!nachSp) throw new Error(`Stellplatz „${aktion.nach}" nicht gefunden`)
-              const vonRow = sb.find((b: { artikelname?: string; lager_stellplaetze?: { code?: string } | null }) =>
-                b.artikelname === aktion.artikel && b.lager_stellplaetze?.code === aktion.von
-              )
-              if (!vonRow) throw new Error(`Bestand für „${aktion.artikel}" auf „${aktion.von}" nicht gefunden`)
-              await umlagerArtikel({
-                vonBestandId: (vonRow as { id: string }).id,
-                nachStellplatzId: (nachSp as { id: string }).id,
-                menge: aktion.menge ?? 0,
-                grund: 'KI-Tagesbericht',
-                artikelname: aktion.artikel,
-              })
-              showToast(`Umlagerung „${aktion.artikel}" erfolgreich ausgeführt`)
-            }
-            setBriefConfirm(null)
-          } catch (err) {
-            showToast(err instanceof Error ? err.message : 'Fehler bei der Aktion', false)
-          }
-          setBriefAktionLoading(null)
-        }
-
         const kpiCards = [
           { icon: '🔴', label: 'MHD kritisch/abgelaufen', value: mhdKritisch.length, color: mhdKritisch.length > 0 ? '#f43f5e' : '#10b981' },
           { icon: '⚠️', label: 'Unter Mindestbestand', value: unterMindest.length, color: unterMindest.length > 0 ? '#f59e0b' : '#10b981' },
@@ -2468,215 +2477,279 @@ Heutiger Lager-Status (${new Date().toLocaleDateString('de-DE')}):
               ))}
             </div>
 
-            {/* KI-Brief generieren */}
-            <div className="pk-card" style={{ marginBottom: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>🧠 KI-Tagesbericht</h3>
-                  <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>Was ist heute wichtig im Lager?</div>
+            {/* 2-Spalten-Layout: Links KI-Brief, Rechts KI-Assistent */}
+            <div style={{ display: 'grid', gridTemplateColumns: proaktivFragen.length > 0 ? 'minmax(0,1fr) 340px' : '1fr', gap: 16, alignItems: 'start' }}
+              className="mobile-1col">
+
+              {/* LINKE SPALTE: KI-Tagesbericht */}
+              <div>
+                <div className="pk-card" style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>🧠 KI-Tagesbericht</h3>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>Was ist heute wichtig im Lager?</div>
+                    </div>
+                    <button
+                      className="pk-btn"
+                      onClick={generateLagerBrief}
+                      disabled={briefLoading}
+                      style={{ opacity: briefLoading ? .6 : 1 }}
+                    >
+                      {briefLoading ? '⏳ Wird erstellt…' : briefText ? '🔄 Neu generieren' : '✨ Tagesbericht erstellen'}
+                    </button>
+                  </div>
+
+                  {/* Kategorisierte Probleme */}
+                  {briefProbleme.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                      {briefProbleme.map((p, pi) => {
+                        const cfg = p.level === 'dringend'
+                          ? { icon: '🔴', label: 'Dringend', color: '#f43f5e', bg: 'rgba(244,63,94,.08)', border: 'rgba(244,63,94,.25)' }
+                          : p.level === 'wichtig'
+                          ? { icon: '⚠️', label: 'Wichtig', color: '#f59e0b', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.25)' }
+                          : { icon: '📦', label: 'Info', color: '#1684ff', bg: 'rgba(22,132,255,.08)', border: 'rgba(22,132,255,.2)' }
+                        return (
+                          <div key={pi} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 13px', borderRadius: 9, background: cfg.bg, border: `1px solid ${cfg.border}`, fontSize: 13 }}>
+                            <span style={{ flexShrink: 0, fontSize: 15 }}>{cfg.icon}</span>
+                            <span style={{ flex: 1, color: '#f8fbff' }}>
+                              <span style={{ fontWeight: 700, color: cfg.color, marginRight: 6 }}>{cfg.label}:</span>
+                              {p.text}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {briefText && (
+                    <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(22,132,255,.07)', border: '1px solid rgba(22,132,255,.18)', fontSize: 14, lineHeight: 1.65, color: '#f8fbff', marginBottom: briefAktionen.length > 0 ? 14 : 0 }}>
+                      {briefText}
+                    </div>
+                  )}
+
+                  {!briefText && !briefLoading && (
+                    <div style={{ textAlign: 'center', padding: '28px 0', color: '#aeb9c8', fontSize: 13 }}>
+                      KI-Tagesbericht wird automatisch generiert…
+                    </div>
+                  )}
+
+                  {/* Vorgeschlagene Aktionen aus Brief */}
+                  {briefAktionen.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#aeb9c8', letterSpacing: '.05em' }}>KI-VORSCHLÄGE</div>
+                      {briefAktionen.map((aktion, idx) => {
+                        const cfg = aktion.type === 'umlagerung'
+                          ? { icon: '📦', label: 'Umlagerung', color: '#1684ff', bg: 'rgba(22,132,255,.1)', border: 'rgba(22,132,255,.25)' }
+                          : aktion.type === 'bestellung'
+                          ? { icon: '🛒', label: 'Bestellung', color: '#f59e0b', bg: 'rgba(245,158,11,.1)', border: 'rgba(245,158,11,.25)' }
+                          : { icon: '💡', label: 'Hinweis', color: '#a78bfa', bg: 'rgba(167,139,250,.1)', border: 'rgba(167,139,250,.25)' }
+                        const isRunning = briefAktionLoading === idx
+                        const isConfirming = briefConfirm === idx
+                        return (
+                          <div key={idx} style={{ padding: '10px 14px', borderRadius: 10, fontSize: 13, background: cfg.bg, border: `1px solid ${cfg.border}`, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                            <span style={{ fontSize: 16 }}>{cfg.icon}</span>
+                            <div style={{ flex: 1 }}>
+                              <div>
+                                <span style={{ fontWeight: 700, color: cfg.color, marginRight: 6 }}>{cfg.label}</span>
+                                {aktion.type === 'umlagerung' && (
+                                  <span style={{ color: '#f8fbff' }}>
+                                    <b>{aktion.artikel}</b>
+                                    {aktion.von && aktion.nach && <> · {aktion.von} <span style={{ color: cfg.color }}>→</span> {aktion.nach}</>}
+                                    {aktion.menge != null && <> · {aktion.menge} Einh.</>}
+                                  </span>
+                                )}
+                                {(aktion.type === 'bestellung' || aktion.type === 'hinweis') && (
+                                  <span style={{ color: '#f8fbff' }}>
+                                    {aktion.artikel && <b>{aktion.artikel}</b>}
+                                    {aktion.beschreibung && <span style={{ color: '#aeb9c8' }}> · {aktion.beschreibung}</span>}
+                                  </span>
+                                )}
+                              </div>
+                              {aktion.type === 'umlagerung' && (
+                                <div style={{ marginTop: 8 }}>
+                                  {isConfirming ? (
+                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                                      <span style={{ fontSize: 12, fontWeight: 600 }}>Wirklich ausführen?</span>
+                                      <button
+                                        disabled={isRunning}
+                                        onClick={() => executeBriefAktion(aktion, idx)}
+                                        style={{ fontSize: 12, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 700, background: '#1684ff', border: 'none', color: '#fff', opacity: isRunning ? .6 : 1 }}
+                                      >
+                                        {isRunning ? '⏳ Läuft…' : '✓ Ja, ausführen'}
+                                      </button>
+                                      <button
+                                        disabled={isRunning}
+                                        onClick={() => setBriefConfirm(null)}
+                                        style={{ fontSize: 12, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', color: '#aeb9c8' }}
+                                      >
+                                        Abbrechen
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => setBriefConfirm(idx)}
+                                      style={{ fontSize: 12, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, background: 'rgba(22,132,255,.15)', border: '1px solid rgba(22,132,255,.35)', color: '#6cb6ff' }}
+                                    >
+                                      Umlagerung ausführen →
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
-                <button
-                  className="pk-btn"
-                  onClick={generateLagerBrief}
-                  disabled={briefLoading}
-                  style={{ opacity: briefLoading ? .6 : 1 }}
-                >
-                  {briefLoading ? '⏳ Wird erstellt…' : briefText ? '🔄 Neu generieren' : '✨ Tagesbericht erstellen'}
-                </button>
+
+                {/* Detailliste kritische Artikel */}
+                {(mhdKritisch.length > 0 || unterMindest.length > 0) && (
+                  <div className="pk-card" style={{ padding: 0 }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,.07)', fontWeight: 700, fontSize: 14 }}>
+                      📋 Handlungsbedarf im Detail
+                    </div>
+                    <div className="pk-table-wrap">
+                      <table className="pk-table">
+                        <thead>
+                          <tr>
+                            <th>Priorität</th>
+                            <th>Artikel</th>
+                            <th>Problem</th>
+                            <th>Details</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mhdKritisch.map(b => (
+                            <tr key={`mhd-${b.id}`}>
+                              <td><span className={`badge ${mhdStatus(b.mhd) === 'abgelaufen' ? 'badge-red' : 'badge-orange'}`}>{mhdStatus(b.mhd) === 'abgelaufen' ? '🔴 Abgelaufen' : '⚠️ Kritisch'}</span></td>
+                              <td style={{ fontWeight: 600 }}>{b.artikelname || '—'}</td>
+                              <td style={{ color: '#aeb9c8' }}>MHD überschritten / läuft ab</td>
+                              <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#f59e0b' }}>{b.mhd}</td>
+                            </tr>
+                          ))}
+                          {unterMindest.map(a => (
+                            <tr key={`mind-${a.id}`}>
+                              <td><span className={`badge ${a.status === 'leer' ? 'badge-red' : 'badge-orange'}`}>{a.status === 'leer' ? '🔴 Leer' : '⚠️ Niedrig'}</span></td>
+                              <td style={{ fontWeight: 600 }}>{a.name}</td>
+                              <td style={{ color: '#aeb9c8' }}>Unter Mindestbestand</td>
+                              <td style={{ fontSize: 12, color: '#aeb9c8' }}>{a.bestand} / {a.mindestbestand ?? 0} {a.einheit}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Kategorisierte Probleme */}
-              {briefProbleme.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-                  {briefProbleme.map((p, pi) => {
-                    const cfg = p.level === 'dringend'
-                      ? { icon: '🔴', label: 'Dringend', color: '#f43f5e', bg: 'rgba(244,63,94,.08)', border: 'rgba(244,63,94,.25)' }
-                      : p.level === 'wichtig'
-                      ? { icon: '⚠️', label: 'Wichtig', color: '#f59e0b', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.25)' }
-                      : { icon: '📦', label: 'Info', color: '#1684ff', bg: 'rgba(22,132,255,.08)', border: 'rgba(22,132,255,.2)' }
-                    return (
-                      <div key={pi} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 13px', borderRadius: 9, background: cfg.bg, border: `1px solid ${cfg.border}`, fontSize: 13 }}>
-                        <span style={{ flexShrink: 0, fontSize: 15 }}>{cfg.icon}</span>
-                        <span style={{ flex: 1, color: '#f8fbff' }}>
-                          <span style={{ fontWeight: 700, color: cfg.color, marginRight: 6 }}>{cfg.label}:</span>
-                          {p.text}
-                        </span>
+              {/* RECHTE SPALTE: KI-Assistent Chat */}
+              {proaktivFragen.length > 0 && (
+                <div className="pk-card" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
+                  {/* Header */}
+                  <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,.07)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #1684ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>🧠</div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: 14, color: '#f8fbff' }}>KI fragt selbst nach</div>
+                      <div style={{ fontSize: 11, color: '#10b981', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                        KI-Assistent aktiv
                       </div>
-                    )
-                  })}
-                </div>
-              )}
+                    </div>
+                  </div>
 
-              {briefText && (
-                <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(22,132,255,.07)', border: '1px solid rgba(22,132,255,.18)', fontSize: 14, lineHeight: 1.65, color: '#f8fbff', marginBottom: briefAktionen.length > 0 ? 14 : 0 }}>
-                  {briefText}
-                </div>
-              )}
+                  {/* Chat-Bereich */}
+                  <div style={{ padding: '14px 14px 10px', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+                    {/* KI-Begrüßung */}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #1684ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>🧠</div>
+                      <div style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: '0 12px 12px 12px', padding: '10px 13px', fontSize: 13, color: '#f8fbff', lineHeight: 1.5 }}>
+                        Ich habe Ihren Lager-Status analysiert. Soll ich etwas für Sie erledigen?
+                      </div>
+                    </div>
 
-              {!briefText && !briefLoading && (
-                <div style={{ textAlign: 'center', padding: '28px 0', color: '#aeb9c8', fontSize: 13 }}>
-                  Klicken Sie auf „Tagesbericht erstellen" für eine KI-gestützte Lageübersicht.
-                </div>
-              )}
+                    {/* Frage-Chips */}
+                    {!aktiveFrage && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 7, paddingLeft: 36 }}>
+                        {proaktivFragen.map((frage, fi) => (
+                          <button
+                            key={fi}
+                            disabled={proaktivLoading}
+                            onClick={() => sendProaktivFrage(frage)}
+                            style={{
+                              textAlign: 'left', padding: '8px 13px', borderRadius: 20, cursor: 'pointer',
+                              fontWeight: 500, fontSize: 12, lineHeight: 1.4,
+                              background: 'rgba(22,132,255,.1)', border: '1px solid rgba(22,132,255,.3)',
+                              color: '#6cb6ff', transition: 'background .15s',
+                              opacity: proaktivLoading ? .5 : 1,
+                            }}
+                          >
+                            💬 {frage}
+                          </button>
+                        ))}
+                      </div>
+                    )}
 
-              {/* Vorgeschlagene Aktionen aus Brief */}
-              {briefAktionen.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#aeb9c8', letterSpacing: '.05em' }}>KI-VORSCHLÄGE</div>
-                  {briefAktionen.map((aktion, idx) => {
-                    const cfg = aktion.type === 'umlagerung'
-                      ? { icon: '📦', label: 'Umlagerung', color: '#1684ff', bg: 'rgba(22,132,255,.1)', border: 'rgba(22,132,255,.25)' }
-                      : aktion.type === 'bestellung'
-                      ? { icon: '🛒', label: 'Bestellung', color: '#f59e0b', bg: 'rgba(245,158,11,.1)', border: 'rgba(245,158,11,.25)' }
-                      : { icon: '💡', label: 'Hinweis', color: '#a78bfa', bg: 'rgba(167,139,250,.1)', border: 'rgba(167,139,250,.25)' }
-                    const isRunning = briefAktionLoading === idx
-                    const isConfirming = briefConfirm === idx
-                    return (
-                      <div key={idx} style={{ padding: '10px 14px', borderRadius: 10, fontSize: 13, background: cfg.bg, border: `1px solid ${cfg.border}`, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                        <span style={{ fontSize: 16 }}>{cfg.icon}</span>
+                    {/* User-Bubble */}
+                    {aktiveFrage && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <div style={{ background: 'rgba(22,132,255,.18)', border: '1px solid rgba(22,132,255,.35)', borderRadius: '12px 0 12px 12px', padding: '10px 13px', fontSize: 13, color: '#f8fbff', lineHeight: 1.5, maxWidth: '85%' }}>
+                          {aktiveFrage}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Typing-Indikator */}
+                    {proaktivLoading && (
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #1684ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>🧠</div>
+                        <div style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: '0 12px 12px 12px', padding: '14px 16px', display: 'flex', gap: 5, alignItems: 'center' }}>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#aeb9c8', display: 'inline-block', opacity: .4 }} />
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#aeb9c8', display: 'inline-block', opacity: .7 }} />
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#aeb9c8', display: 'inline-block', opacity: 1 }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* KI-Antwort */}
+                    {proaktivAntwort && !proaktivLoading && (
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #1684ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>🧠</div>
                         <div style={{ flex: 1 }}>
-                          <div>
-                            <span style={{ fontWeight: 700, color: cfg.color, marginRight: 6 }}>{cfg.label}</span>
-                            {aktion.type === 'umlagerung' && (
-                              <span style={{ color: '#f8fbff' }}>
-                                <b>{aktion.artikel}</b>
-                                {aktion.von && aktion.nach && <> · {aktion.von} <span style={{ color: cfg.color }}>→</span> {aktion.nach}</>}
-                                {aktion.menge != null && <> · {aktion.menge} Einh.</>}
-                              </span>
-                            )}
-                            {(aktion.type === 'bestellung' || aktion.type === 'hinweis') && (
-                              <span style={{ color: '#f8fbff' }}>
-                                {aktion.artikel && <b>{aktion.artikel}</b>}
-                                {aktion.beschreibung && <span style={{ color: '#aeb9c8' }}> · {aktion.beschreibung}</span>}
-                              </span>
-                            )}
+                          <div style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: '0 12px 12px 12px', padding: '10px 13px', fontSize: 13, color: '#f8fbff', lineHeight: 1.5 }}>
+                            {proaktivAntwort.text}
                           </div>
-                          {aktion.type === 'umlagerung' && (
-                            <div style={{ marginTop: 8 }}>
-                              {isConfirming ? (
-                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                                  <span style={{ fontSize: 12, fontWeight: 600 }}>Wirklich ausführen?</span>
-                                  <button
-                                    disabled={isRunning}
-                                    onClick={() => executeBriefAktion(aktion, idx)}
-                                    style={{ fontSize: 12, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 700, background: '#1684ff', border: 'none', color: '#fff', opacity: isRunning ? .6 : 1 }}
-                                  >
-                                    {isRunning ? '⏳ Läuft…' : '✓ Ja, ausführen'}
-                                  </button>
-                                  <button
-                                    disabled={isRunning}
-                                    onClick={() => setBriefConfirm(null)}
-                                    style={{ fontSize: 12, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', color: '#aeb9c8' }}
-                                  >
-                                    Abbrechen
-                                  </button>
+                          {proaktivAntwort.aktionen.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 8 }}>
+                              {proaktivAntwort.aktionen.map((a, ai) => (
+                                <div key={ai} style={{ padding: '7px 11px', borderRadius: 9, fontSize: 12, background: 'rgba(22,132,255,.1)', border: '1px solid rgba(22,132,255,.25)', color: '#6cb6ff' }}>
+                                  {a.type === 'umlagerung' ? '📦' : a.type === 'bestellung' ? '🛒' : '💡'}{' '}
+                                  <b>{a.artikel}</b>
+                                  {a.von && a.nach && <> · {a.von} → {a.nach}</>}
+                                  {a.beschreibung && <> · <span style={{ color: '#aeb9c8' }}>{a.beschreibung}</span></>}
                                 </div>
-                              ) : (
-                                <button
-                                  onClick={() => setBriefConfirm(idx)}
-                                  style={{ fontSize: 12, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, background: 'rgba(22,132,255,.15)', border: '1px solid rgba(22,132,255,.35)', color: '#6cb6ff' }}
-                                >
-                                  Umlagerung ausführen →
-                                </button>
-                              )}
+                              ))}
                             </div>
                           )}
                         </div>
                       </div>
-                    )
-                  })}
+                    )}
+                  </div>
+
+                  {/* Footer: Neue Frage */}
+                  {aktiveFrage && (
+                    <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                      <button
+                        onClick={() => { setAktiveFrage(null); setProaktivAntwort(null) }}
+                        style={{ width: '100%', padding: '9px 0', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', color: '#aeb9c8' }}
+                      >
+                        ← Neue Frage stellen
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-
-            {/* KI fragt selbst nach */}
-            {proaktivFragen.length > 0 && (
-              <div className="pk-card" style={{ marginBottom: 18 }}>
-                <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800 }}>💬 KI fragt selbst nach</h3>
-                <p style={{ margin: '0 0 14px', color: '#aeb9c8', fontSize: 13 }}>Soll ich etwas erledigen? Klicken Sie auf eine Frage:</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {proaktivFragen.map((frage, fi) => (
-                    <button
-                      key={fi}
-                      disabled={proaktivLoading}
-                      onClick={() => sendProaktivFrage(frage)}
-                      style={{
-                        textAlign: 'left', padding: '10px 14px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 13,
-                        background: 'rgba(22,132,255,.07)', border: '1px solid rgba(22,132,255,.18)', color: '#6cb6ff',
-                        opacity: proaktivLoading ? .6 : 1, transition: 'background .15s',
-                      }}
-                    >
-                      💬 {frage}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Antwort auf Proaktiv-Frage */}
-                {proaktivLoading && (
-                  <div style={{ marginTop: 14, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', color: '#aeb9c8', fontSize: 13 }}>
-                    ⏳ KI denkt nach…
-                  </div>
-                )}
-                {proaktivAntwort && !proaktivLoading && (
-                  <div style={{ marginTop: 14 }}>
-                    <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(22,132,255,.07)', border: '1px solid rgba(22,132,255,.18)', fontSize: 14, lineHeight: 1.6, color: '#f8fbff', marginBottom: proaktivAntwort.aktionen.length > 0 ? 10 : 0 }}>
-                      {proaktivAntwort.text}
-                    </div>
-                    {proaktivAntwort.aktionen.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-                        {proaktivAntwort.aktionen.map((a, ai) => (
-                          <div key={ai} style={{ padding: '8px 12px', borderRadius: 9, fontSize: 12, background: 'rgba(22,132,255,.1)', border: '1px solid rgba(22,132,255,.25)', color: '#6cb6ff' }}>
-                            {a.type === 'umlagerung' ? '📦' : a.type === 'bestellung' ? '🛒' : '💡'}{' '}
-                            <b>{a.artikel}</b>
-                            {a.von && a.nach && <> · {a.von} → {a.nach}</>}
-                            {a.beschreibung && <> · <span style={{ color: '#aeb9c8' }}>{a.beschreibung}</span></>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Detailliste kritische Artikel */}
-            {(mhdKritisch.length > 0 || unterMindest.length > 0) && (
-              <div className="pk-card" style={{ padding: 0 }}>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,.07)', fontWeight: 700, fontSize: 14 }}>
-                  📋 Handlungsbedarf im Detail
-                </div>
-                <div className="pk-table-wrap">
-                  <table className="pk-table">
-                    <thead>
-                      <tr>
-                        <th>Priorität</th>
-                        <th>Artikel</th>
-                        <th>Problem</th>
-                        <th>Details</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mhdKritisch.map(b => (
-                        <tr key={`mhd-${b.id}`}>
-                          <td><span className={`badge ${mhdStatus(b.mhd) === 'abgelaufen' ? 'badge-red' : 'badge-orange'}`}>{mhdStatus(b.mhd) === 'abgelaufen' ? '🔴 Abgelaufen' : '⚠️ Kritisch'}</span></td>
-                          <td style={{ fontWeight: 600 }}>{b.artikelname || '—'}</td>
-                          <td style={{ color: '#aeb9c8' }}>MHD überschritten / läuft ab</td>
-                          <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#f59e0b' }}>{b.mhd}</td>
-                        </tr>
-                      ))}
-                      {unterMindest.map(a => (
-                        <tr key={`mind-${a.id}`}>
-                          <td><span className={`badge ${a.status === 'leer' ? 'badge-red' : 'badge-orange'}`}>{a.status === 'leer' ? '🔴 Leer' : '⚠️ Niedrig'}</span></td>
-                          <td style={{ fontWeight: 600 }}>{a.name}</td>
-                          <td style={{ color: '#aeb9c8' }}>Unter Mindestbestand</td>
-                          <td style={{ fontSize: 12, color: '#aeb9c8' }}>{a.bestand} / {a.mindestbestand ?? 0} {a.einheit}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
           </div>
         )
       })()}
