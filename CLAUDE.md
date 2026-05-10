@@ -3,8 +3,8 @@
 ## Projektübersicht
 KI-gestütztes Warenwirtschaftssystem als produktive SaaS-WebApp.
 
-**Stack:** Next.js 14 · TypeScript · Tailwind CSS · App Router
-**Live:** https://petersen-ki-betriebssteuerung.vercel.app
+**Stack:** Next.js 14 · TypeScript · Tailwind CSS · App Router  
+**Live:** https://petersen-ki-betriebssteuerung.vercel.app  
 **Repo:** https://github.com/7j9ww99gqj-create/petersen-ki-betriebssteuerung
 
 ---
@@ -41,17 +41,38 @@ npm run dev
 - Storage-Bucket: `dokumente` (Upload/Select/Delete Policies)
 - **WICHTIG:** Schema muss manuell im Supabase SQL-Editor ausgeführt werden
 
-### Tabellen
+### Tabellen-Übersicht
 | Pilot | Tabellen |
 |-------|---------|
-| Lager | `lager_artikel` (+ `mindestbestand` Spalte!), `lager_bewegungen` |
+| Lager | `lager_artikel` (+ `mindestbestand` Spalte!), `lager_bewegungen`, `lager_stellplaetze`*, `lager_stellplatz_bestand`*, `lager_umlagerungen`* |
 | Büro | `buero_kunden`, `buero_angebote`, `buero_auftraege`, `buero_rechnungen`, `buero_dokumente` |
-| Einkauf | `einkauf_lieferanten`, `einkauf_bestellungen`, `einkauf_wareneingaenge` ⚠️ neu – noch im SQL-Editor ausführen! |
+| Einkauf | `einkauf_lieferanten`⚠️, `einkauf_bestellungen`⚠️, `einkauf_wareneingaenge`⚠️ |
 | Werkstatt | `werkstatt_karten`, `werkstatt_zeitbuchungen`, `werkstatt_material`, `werkstatt_pruefprotokolle` |
 | Marketing | `marketing_kampagnen`, `marketing_leads`, `marketing_newsletter` |
 | Planung | `planung_projekte`, `planung_aufgaben`, `planung_termine`, `planung_ressourcen` |
 
-### Neue DB-Funktionen in `lib/db.ts` (Einkauf-Modul)
+*) Neue Lager-Tabellen — im Supabase SQL-Editor ausführen!  
+⚠️) Neue Einkauf-Tabellen — im Supabase SQL-Editor ausführen!
+
+### DB-Funktionen in `lib/db.ts` — Lager-Stellplätze (NEU)
+```ts
+getLagerStellplaetze()
+upsertLagerStellplatz(s: { id, code, name?, bereich?, zone?, gang?, regal?, ebene?, fach?,
+  typ?, warengruppe?, warenobergruppe?, temperaturzone?, max_gewicht?, max_volumen?, aktiv?, notiz? })
+deleteLagerStellplatz(id: string)
+getLagerStellplatzBestand()    // joined mit lager_stellplaetze(code, bereich, ...)
+upsertLagerStellplatzBestand(b: { id, stellplatz_id, artikelnummer?, artikelname?, charge?,
+  mhd?, menge, einheit?, status?, eingelagert_am?, notiz? })
+deleteLagerStellplatzBestand(id: string)
+getLagerUmlagerungen()
+insertLagerUmlagerung(u: { id, artikel_id?, artikelname?, von_stellplatz_id?,
+  nach_stellplatz_id?, menge, grund?, datum?, notiz? })
+umlagerArtikel({ vonBestandId, nachStellplatzId, menge, charge?, mhd?, grund?,
+  notiz?, artikelname?, artikelnummer?, artikelId?, vonStellplatzId? })
+// → 4-Schritt Transaktion: Quelle reduzieren → Ziel erhöhen/erstellen → Umlagerung loggen
+```
+
+### DB-Funktionen — Einkauf
 ```ts
 getEinkaufLieferanten()
 upsertEinkaufLieferant(l: { id?, name, kategorie, ansprechpartner, email, telefon, zahlungsziel, bewertung, notiz })
@@ -66,42 +87,139 @@ insertEinkaufWareneingang(w: { bestellung_id, eingangsdatum, menge_bestellt, men
 
 ## Piloten – Aktueller Stand
 
-| Pilot | Route | Features |
-|-------|-------|---------|
-| LagerPilot | `/dashboard/lager` | Bestand (CRUD), Bewegungen, Wareneingang, Warenausgang, Inventur, Bestellvorschlag-Tab, CSV-Export, Inline-Delete, Spalten-Sortierung, **Mindestbestand-Alarm** (rotes Banner + Bestellvorschlag-Modal), **Alle bestellen**-Button, **Historie-Tab** (Bewegungsfilter je Artikel, Statistik-Karten) |
-| BüroPilot | `/dashboard/buero` | Kunden/Angebote/Aufträge/Rechnungen/Dokumente (alle CRUD+Edit), PDF-Export (jsPDF), Angebot→Auftrag-Konvertierung, echtes File-Upload, **Einkauf/Lieferanten-Tab** (Lieferanten-CRUD+Bewertung, Bestellungen-Workflow, Wareneingänge+Qualitätskontrolle, KPI-Karten) |
-| WerkstattPilot | `/dashboard/werkstatt` | Arbeitskarten (CRUD+Edit+Fortschritt-Slider), Zeiterfassung, Materialverbrauch, Prüfprotokoll (Ergebnis inline), KPI-Karten |
-| MarketingPilot | `/dashboard/marketing` | Kampagnen, Leads, Newsletter |
-| AnalysePilot | `/dashboard/analyse` | Charts (recharts v3): Bar, Line, Area, Pie |
-| PlanungPilot | `/dashboard/planung` | Projekte (CRUD+Edit+Meilensteine), Kalender (CRUD+Edit), Ressourcen (CRUD), Aufgaben (CRUD+Edit+Status) |
-| KI-Assistent | `/dashboard/ki-erkennung` | Tab Tagesbrief (Was heute / Nachbestellung / Kunden), Tab Dokument-Erkennung, Tab Chat (via /api/chat) |
-| Cloud & Sync | `/dashboard/cloud` | Sync-Status, Storage-Übersicht |
-| Archiv | `/dashboard/archiv` | Dokumentenarchiv |
-| Einstellungen | `/dashboard/einstellungen` | Profil, Benachrichtigungen, Rollen & Rechte (Tabelle + Wechsel) |
+| Pilot | Route | Status | Tabs |
+|-------|-------|--------|------|
+| LagerPilot | `/dashboard/lager` | ✅ Vollständig | 12 Tabs (siehe unten) |
+| BüroPilot | `/dashboard/buero` | ✅ Vollständig | kunden/angebote/auftraege/rechnungen/dokumente/einkauf |
+| WerkstattPilot | `/dashboard/werkstatt` | ✅ Vollständig | Karten/Zeit/Material/Prüfprotokoll |
+| MarketingPilot | `/dashboard/marketing` | ⚠️ Teilweise | Create OK, Edit/Delete fehlt |
+| AnalysePilot | `/dashboard/analyse` | ⚠️ Demo-Daten | Charts laufen, kein Supabase |
+| PlanungPilot | `/dashboard/planung` | ✅ Vollständig | Projekte/Aufgaben/Kalender/Ressourcen |
+| KI-Assistent | `/dashboard/ki-erkennung` | ✅ Vollständig | Tagesbrief/Erkennung/Chat + Aktions-Ausführung |
+| Cloud & Sync | `/dashboard/cloud` | ✅ Basis | Sync-Status, Storage |
+| Archiv | `/dashboard/archiv` | ✅ Basis | Dokumentenarchiv |
+| Einstellungen | `/dashboard/einstellungen` | ✅ Vollständig | Profil/Benachrichtigungen/Rollen |
 
-### LagerPilot Tab-Typen
+### LagerPilot — Alle Tabs
 ```ts
-type LagerTab = 'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur' | 'bestellung' | 'historie'
+type LagerTab =
+  | 'tagesbericht'    // 🧠 KI-Tagesbericht (NEU)
+  | 'bestand'         // 📦 Artikelbestand CRUD
+  | 'bewegungen'      // 🔄 Lagerbewegungen read-only
+  | 'eingang'         // 📥 Wareneingang + getBestStellplatz-Vorschlag
+  | 'ausgang'         // 📤 Warenausgang
+  | 'inventur'        // 📋 Inventurliste
+  | 'bestellung'      // 🛒 Bestellvorschlag-Modal
+  | 'historie'        // 📈 Artikel-Bewegungshistorie
+  | 'stellplaetze'    // 📍 Stellplatz-CRUD + KPIs + Optimierungsvorschläge
+  | 'lagerbelegung'   // 📊 Stellplatz-Bestand + MHD-Filter
+  | 'umlagerung'      // ↔️ Umlagerungs-Formular + Protokoll
+  | 'kommissionierung'// 🧺 Artikel-Auswahl + Pickliste (route-optimiert)
 ```
-- **Bestellvorschlag-Flow**: Warenausgang → prüft Mindestbestand → zeigt `bestellHint`-Banner → Modal mit Bestellmenge + E-Mail-Vorschau
-- **Alle bestellen**: Bulk-Bestellung aller offenen Vorschläge auf einmal
-- **📈-Button** per Artikelzeile → navigiert zu Historie-Tab gefiltert auf diesen Artikel
-- **BestellDetailModal**: Artikel-Info, editierbare Menge, E-Mail-Simulation
 
-### BüroPilot Einkauf-Tab (`EinkaufTab`-Komponente)
+**Stellplaetze-Tab Features:**
+- CRUD mit Modal (Code, Bereich, Zone, Gang, Regal, Ebene, Fach, Typ, Warengruppe, Temperaturzone, Max-Gewicht/-Volumen)
+- 5 KPI-Karten: Gesamt / Aktiv / Überlastet / MHD-kritisch / Frei
+- Warn-Banner bei kritischen Zuständen
+- 4 Optimierungsvorschläge (regelbasiert): überlastete SP / MHD-kritische Chargen / Sperr-Typ-Artikel / freie Kapazität
+- Inline-Delete (kein `confirm()`)
+
+**Lagerbelegung-Tab Features:**
+- Alle Positionen aus lager_stellplatz_bestand
+- Filter: Bereich / MHD-kritisch / Suche
+- MHD-Status-Badge (abgelaufen/kritisch/ok/kein) via `mhdStatus()`
+- Inline-Delete
+
+**Umlagerungs-Tab Features:**
+- Formular: Quell-Position auswählen (Dropdown aus Bestand), Ziel-Stellplatz, Menge, Grund (Select), Notiz
+- Validierung: Pflichtfelder + Menge ≤ verfügbarer Menge + Quelle ≠ Ziel
+- Demo: lokaler State; Live: `umlagerArtikel()` → 4-Schritt Transaktion
+- Protokoll-Tabelle darunter
+
+**Kommissionierungs-Tab Features:**
+- Artikel mit Bestand > 0, sortiert nach Lagerplatz
+- Checkbox-Auswahl je Artikel + "Alle auswählen" im Tabellenkopf
+- Zeilenklick = Toggle-Auswahl
+- "🧺 Pickliste (N)"-Button: öffnet/schließt Pickliste
+- Pickliste sortiert nach: Bereich → Regal → Fach (parsed aus "A-01-03")
+- Gruppiert nach Bereichen mit Laufnummern
+- "Auswahl zurücksetzen"-Button
+
+**KI-Tagesbericht-Tab Features (NEU):**
+- 4 KPI-Karten (lokal berechnet, ohne KI): MHD kritisch/abgelaufen, Unter Mindestbestand, Überlastete Stellplätze, Artikel gesamt
+- "✨ Tagesbericht erstellen"-Button → /api/chat mit structuredOutput
+- KI-Antwort mit kategorisierten Problemen: 🔴 Dringend / ⚠️ Wichtig / 📦 Info
+- KI-Aktions-Vorschläge mit Inline-Bestätigung + Ausführung
+- "💬 KI fragt selbst nach"-Buttons (aus Echtdaten generiert)
+- Detailliste aller kritischen Artikel
+
+### KI-Assistent — Chat mit Aktionen
+```
+app/dashboard/ki-erkennung/page.tsx
+  ├── Tab: Tagesbrief    allgemeiner Brief (Aufgaben/Rechnungen/Karten/Artikel)
+  ├── Tab: Erkennung     OCR-Simulation
+  └── Tab: Chat
+        ├── KiAction-Typ: { type, artikel, von, nach, menge, beschreibung }
+        ├── structuredOutput: true → JSON-Antwort mit message + actions
+        ├── Aktionskarten: 📦 Umlagerung (blau) / 🛒 Bestellung (orange) / 💡 Hinweis (lila)
+        └── Inline-Bestätigung → executeUmlagerung() → codes→UUIDs→umlagerArtikel()
+```
+
+---
+
+## KI-Integration (`app/api/chat/route.ts`)
+
+### Request-Format
 ```ts
-type Tab = 'kunden' | 'angebote' | 'auftraege' | 'rechnungen' | 'dokumente' | 'einkauf'
+POST /api/chat
+{
+  messages: { role: 'user'|'assistant', content: string }[]
+  system?: string          // überschreibt System-Prompt teilweise
+  context?: string         // wird vor Lagerdaten eingefügt
+  structuredOutput?: boolean  // true → JSON-Antwort mit probleme + actions
+}
 ```
-- **Sub-Tabs**: Lieferanten · Bestellungen · Wareneingänge
-- **Lieferanten**: CRUD, Sternebewertung (★/☆), Zahlungsziel, Kategorie, 🛒-Quicklink zu Bestellung
-- **Bestellungen**: Status-Workflow Entwurf→Bestellt→Teillieferung→Geliefert, "WE buchen"-Quicklink
-- **Wareneingänge**: Qualitätskontrolle (OK/Mängel/Abgelehnt), auto Bestellstatus-Update
-- ⚠️ Aktuell Demo-State (db.ts-Funktionen vorbereitet aber noch nicht in EinkaufTab verdrahtet)
 
-### Dashboard KPIs (P4)
-- `app/dashboard/page.tsx` lädt echte Supabase-Daten via `Promise.allSettled` (graceful degradation)
-- Im Demo-Modus: statische `demoKpis`-Werte
-- 6 klickbare KPI-Cards mit Navigation zum jeweiligen Piloten
+### Response-Format (structuredOutput: false)
+```ts
+{ reply: string }
+```
+
+### Response-Format (structuredOutput: true)
+```ts
+{
+  reply: string                                    // parsed aus JSON.message
+  probleme: { level: 'dringend'|'wichtig'|'info', text: string }[]
+  actions: {
+    type: 'umlagerung'|'bestellung'|'hinweis'
+    artikel?: string
+    von?: string         // Stellplatz-Code (für Umlagerung)
+    nach?: string        // Stellplatz-Code (für Umlagerung)
+    menge?: number
+    beschreibung?: string
+  }[]
+}
+```
+
+### Daten-Loading in route.ts
+- `pk_demo` Cookie aus Request → Demo: statische `DEMO_CONTEXT`-Daten
+- Live: `Promise.allSettled([getLagerArtikel(), getLagerStellplaetze(), getLagerStellplatzBestand(), getLagerUmlagerungen()])`
+- **Bekannte Einschränkung:** `createBrowserClient` hat keine User-Session in API-Routes → RLS gibt leere Arrays zurück. Fix: auf `createServerClient` mit Cookie-Forwarding umstellen (noch offen)
+
+### buildContextBlock — Was im Prompt steht
+```
+=== AKTUELLE LAGERDATEN (DD.MM.YYYY) ===
+ARTIKELBESTAND (N Artikel):
+- Name [ID]: X Einheit | Lagerplatz: ... | Mindest: N | Status: ok/niedrig/leer
+
+=== VORBERECHNETE PROBLEM-ANALYSE ===
+🔴 DRINGEND: MHD ABGELAUFEN: ... / BESTAND LEER: ...
+⚠️ WICHTIG:  MHD KRITISCH: ... / BESTAND NIEDRIG: ...
+📦 INFO:     ÜBERLASTET: SP mit ≥3 Positionen / VERTEILT: Artikel auf ≥2 Stellplätzen
+
+STELLPLÄTZE: code | Bereich | Typ
+LETZTE UMLAGERUNGEN: datum: Artikel (menge) von → nach [grund]
+```
 
 ---
 
@@ -113,8 +231,6 @@ export const viewport: Viewport = {
   width: 'device-width', initialScale: 1, maximumScale: 1,
   userScalable: false, viewportFit: 'cover', themeColor: '#05070b',
 }
-// PWA Meta-Tags: apple-mobile-web-app-capable, apple-mobile-web-app-status-bar-style
-// manifest.json in public/manifest.json
 ```
 
 ### Bottom Navigation (app/dashboard/layout.tsx)
@@ -125,17 +241,16 @@ const bottomNavItems = [
   { href: '/dashboard/buero',        icon: '🧾', label: 'Büro' },
   { href: '/dashboard/werkstatt',    icon: '🛠️', label: 'Werkstatt' },
   { href: '/dashboard/ki-erkennung', icon: '🧠', label: 'KI' },
-  { href: '#menu',                   icon: '☰',  label: 'Menü' },  // öffnet Sidebar
+  { href: '#menu',                   icon: '☰',  label: 'Menü' },
 ]
-// Sichtbar bei ≤768px via CSS display:flex
 ```
 
 ### iOS-Fixes
 - `font-size: 16px !important` auf `.pk-input` (verhindert Auto-Zoom)
-- `min-height: 44px` auf `.pk-btn`, `.pk-btn-ghost` (Touch-Target Apple HIG)
-- `env(safe-area-inset-*)` in padding-Werten für Notch/Home-Indicator
-- `100dvh` statt `100vh` (behebt iOS Safari-Viewport-Bug)
-- `-webkit-overflow-scrolling: touch` auf `.pk-table-wrap` (in globals.css)
+- `min-height: 44px` auf `.pk-btn`, `.pk-btn-ghost`
+- `env(safe-area-inset-*)` für Notch/Home-Indicator
+- `100dvh` statt `100vh`
+- `-webkit-overflow-scrolling: touch` auf `.pk-table-wrap`
 
 ---
 
@@ -164,20 +279,16 @@ function Modal({ title, onClose, children }) {
 
 ### Toast (fixed bottom-right)
 ```tsx
-function Toast({ msg, type = 'success' }) {
-  if (!msg) return null
-  const isErr = type === 'error'
-  return (
-    <div style={{
-      position:'fixed', bottom:90, right:24, zIndex:9999,
-      padding:'14px 20px', borderRadius:12, maxWidth:360,
-      background: isErr ? 'rgba(255,80,80,.15)' : 'rgba(37,211,102,.12)',
-      border: `1px solid ${isErr ? 'rgba(255,80,80,.4)' : 'rgba(37,211,102,.35)'}`,
-      color: isErr ? '#ff8080' : '#4ddb7e',
-      fontSize:14, fontWeight:600, boxShadow:'0 8px 32px rgba(0,0,0,.4)',
-    }}>{msg}</div>
-  )
-}
+// In Lager-Seite: showToast(msg, ok=true) — nutzt { msg, ok } State
+// In KI-Erkennung: actionToast { msg, type: 'success'|'error' }
+<div style={{
+  position:'fixed', bottom:90, right:24, zIndex:9999,
+  padding:'14px 20px', borderRadius:12, maxWidth:380,
+  background: isErr ? 'rgba(255,80,80,.15)' : 'rgba(37,211,102,.12)',
+  border: `1px solid ${isErr ? 'rgba(255,80,80,.4)' : 'rgba(37,211,102,.35)'}`,
+  color: isErr ? '#ff8080' : '#4ddb7e',
+  fontSize:14, fontWeight:600, boxShadow:'0 8px 32px rgba(0,0,0,.4)',
+}}>{msg}</div>
 ```
 
 ### Inline Delete (kein Browser confirm()!)
@@ -192,11 +303,55 @@ function Toast({ msg, type = 'success' }) {
 )}
 ```
 
+### Inline Bestätigung für KI-Aktionen
+```tsx
+{isConfirming ? (
+  <div style={{ display:'flex', gap:8 }}>
+    <span>Wirklich ausführen?</span>
+    <button onClick={() => executeAktion(aktion)} disabled={isRunning}>
+      {isRunning ? '⏳ Läuft…' : '✓ Ja, ausführen'}
+    </button>
+    <button onClick={() => setConfirm(null)}>Abbrechen</button>
+  </div>
+) : (
+  <button onClick={() => setConfirm(idx)}>Umlagerung ausführen →</button>
+)}
+```
+
+### IIFE-Pattern für komplexe Tabs
+```tsx
+{tab === 'stellplaetze' && (() => {
+  // lokale Berechnungen, Hilfsfunktionen, async functions
+  const filtered = stellplaetze.filter(...)
+  async function handleSave() { ... }
+  return ( <div>...</div> )
+})()}
+```
+
 ### ID-Generierung
 ```ts
-function genId(prefix: string) {
-  return `${prefix}-${Date.now().toString(36).toUpperCase()}`
+// Demo-Modus:
+`SP-${Date.now().toString(36).toUpperCase()}`   // Stellplatz
+`SB-${Date.now().toString(36).toUpperCase()}`   // Stellplatz-Bestand
+// Live-Modus: crypto.randomUUID() für UUIDs (lager_stellplaetze PK ist uuid)
+```
+
+### mhdStatus-Funktion (lager/page.tsx)
+```ts
+function mhdStatus(mhd: string | undefined): 'abgelaufen' | 'kritisch' | 'ok' | 'kein' {
+  if (!mhd) return 'kein'
+  const diff = (new Date(mhd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+  if (diff < 0) return 'abgelaufen'
+  if (diff < 30) return 'kritisch'
+  return 'ok'
 }
+```
+
+### getBestStellplatz (lager/page.tsx — Wareneingang-Tab)
+```ts
+// Scoring: warengruppe-Match +3, warenobergruppe-Match +2, lagerplatz-Prefix +1, freier SP +2, Kühl-Typ +2
+// Gibt höchsten Score zurück, Fallback auf ersten aktiven SP
+function getBestStellplatz(a: Artikel | undefined): { stellplatz, score, grund[] } | null
 ```
 
 ---
@@ -214,17 +369,14 @@ CSS-Klassen:
 - `.pk-btn-ghost` – Sekundär-Button (min-height 44px)
 - `.pk-input` – Input-Feld (font-size 16px auf Mobile → kein iOS-Zoom)
 - `.pk-table` – Tabellen-Stil
+- `.pk-table-wrap` – Scroll-Container mit `-webkit-overflow-scrolling: touch`
 - `.badge .badge-green/blue/orange/gray/red/purple` – Status-Badges
 - `.fade-in` / `.fade-in-scale` – Animationen
-- `.hamburger-btn` – Mobiler Menü-Button (per CSS sichtbar, Desktop versteckt)
-- `.bottom-nav` – Bottom Navigation Bar (nur Mobile ≤768px)
-- `.bottom-nav-item` – Einzelner Nav-Eintrag (flex column, touch-target)
-- `.bn-icon` – Icon in Bottom Nav
-- `.stats-grid` – Responsive KPI-Grid (1–4 Spalten je Viewport)
-- `.mobile-1col` – Erzwingt 1-Spalten-Layout auf Mobile
 - `.pk-tab-bar` – Horizontaler Tab-Container (scroll ohne Scrollbar)
-- `.support-btn-wrap` – SupportButton-Wrapper (hebt Button über Bottom-Nav auf Mobile)
-- `.role-badge-desktop` – Rollen-Badge (nur Desktop sichtbar)
+- `.bottom-nav` – Bottom Navigation Bar (nur Mobile ≤768px)
+- `.stats-grid` – Responsive KPI-Grid (1–4 Spalten)
+- `.mobile-1col` – Erzwingt 1-Spalten-Layout auf Mobile
+- `.support-btn-wrap` – SupportButton-Wrapper (über Bottom-Nav)
 - `.hide-xs` – Versteckt Element auf sehr kleinen Screens
 
 ### Piloten-Farben
@@ -236,17 +388,20 @@ CSS-Klassen:
 | MarketingPilot | Orange | `#f59e0b` |
 | AnalysePilot | Grün | `#10b981` |
 | PlanungPilot | Pink/Rot | `#f43f5e` / `#e11d48` |
+| KI-Assistent | Lila | `#7c3aed` / `#a78bfa` |
 
 ---
 
-## Neue Lib-Dateien
+## Lib-Dateien
 
 | Datei | Beschreibung |
 |-------|-------------|
-| `lib/roles.ts` | Rollen & Rechte: `AppRole`, `PERMISSIONS`, `useRole()`, `getRole()`, `setRole()` |
-| `lib/warnings.ts` | Warnsystem: `getAppWarnings(isDemo)` liest Lager/Büro/Werkstatt/Planung |
-| `lib/pdf.ts` | PDF-Generierung: `generateRechnungPDF()`, `generateAngebotPDF()` via jsPDF |
-| `lib/db.ts` | Zentrale Datenschicht für alle Piloten (Supabase CRUD) inkl. Einkauf-Funktionen |
+| `lib/supabase.ts` | `createSupabaseClient()` (createBrowserClient), `isSupabaseConfigured()` |
+| `lib/auth.ts` | `hasDemoCookie()`, `setDemoCookie()`, `clearDemoCookie()`, `isDemoUser()` |
+| `lib/db.ts` | Alle CRUD-Funktionen für alle Piloten (inkl. neue Lager-Stellplatz-Funktionen) |
+| `lib/roles.ts` | `AppRole`, `PERMISSIONS`, `useRole()`, `getRole()`, `setRole()` |
+| `lib/warnings.ts` | `getAppWarnings(isDemo)` → Notification Bell |
+| `lib/pdf.ts` | `generateRechnungPDF()`, `generateAngebotPDF()` via jsPDF |
 
 ### Rollen-System (`lib/roles.ts`)
 ```ts
@@ -255,52 +410,19 @@ PERMISSIONS.canDelete(role)  // nur Admin
 PERMISSIONS.canCreate(role)  // Admin + Mitarbeiter
 PERMISSIONS.canEdit(role)    // alle außer Lager
 PERMISSIONS.canExport(role)  // Admin + Büro
-// Gespeichert in localStorage 'pk_role', Demo immer 'Admin'
 const { role, setRole, permissions } = useRole()
 ```
 
-### Warnsystem (`lib/warnings.ts`)
-```ts
-// Liest Supabase-Daten und generiert Warning-Objekte
-// Bei isDemo: 6 statische Beispiel-Warnungen
-await getAppWarnings(isDemo: boolean): Promise<Warning[]>
-```
-
-### PDF (`lib/pdf.ts`)
-```ts
-// Dynamic import von jsPDF (SSR-sicher)
-await generateRechnungPDF(rechnung: PDFRechnung, kundenName: string)
-await generateAngebotPDF(angebot: PDFAngebot, kundenName: string)
-```
+---
 
 ## Komponenten (components/)
 
 | Datei | Beschreibung |
 |-------|-------------|
-| `Sidebar.tsx` | Navigations-Sidebar mit allen Piloten-Links |
-| `NotificationBell.tsx` | Echte Live-Warnungen (Tabs: Alle/Fehler/Warnung), Auto-Refresh 60s, Links zu Piloten |
+| `Sidebar.tsx` | Navigation mit allen Piloten-Links, Logo, NotificationBell, GlobalSearch |
+| `NotificationBell.tsx` | Live-Warnungen (Auto-Refresh 60s), Tabs: Alle/Fehler/Warnung |
 | `GlobalSearch.tsx` | ⌘K Suchmodal |
-| `SupportButton.tsx` | Floating Support-Button (WhatsApp, E-Mail, Telefon) – fixed bottom-right, className="support-btn-wrap" für Mobile-Override |
-
----
-
-## UI-Features
-
-- **Globale Suche**: `⌘K` öffnet Suchmodal
-- **SupportButton**: Fixed bottom-right, 3 Kontaktoptionen (WhatsApp `+4917656392975`, E-Mail `info@petersen-ki-pilot.de`, Telefon)
-- **Animierte Zähler**: Dashboard-Stats zählen bei Laden hoch
-- **Logo**: `/public/logo.jpg` – in Sidebar + Login
-- **recharts v3**: Installiert für AnalysePilot
-- **Mobile Bottom-Nav**: 6 Einträge, sichtbar ≤768px, '#menu'-Eintrag öffnet Sidebar
-- **PWA**: `public/manifest.json`, Viewport-Meta in `app/layout.tsx`
-
----
-
-## KI-Integration
-
-1. `ANTHROPIC_API_KEY` in `.env.local`
-2. Chat läuft über `app/api/chat/route.ts`
-3. Ohne API-Key: simulierte Antworten
+| `SupportButton.tsx` | Fixed bottom-right: WhatsApp `+4917656392975`, E-Mail, Telefon |
 
 ---
 
@@ -310,11 +432,12 @@ await generateAngebotPDF(angebot: PDFAngebot, kundenName: string)
 - **Bestehende Funktionalität nie entfernen**
 - **Kein Browser `confirm()`** – immer Inline-Bestätigung
 - **Toasts immer fixed bottom-right** (zIndex 9999, bottom 90px – über SupportButton)
-- **IDs immer via `genId(prefix)`** (Date.now().toString(36))
 - **snake_case in DB-Typen**: z.B. `bezahlt_am` nicht `bezahltAm`
 - **Nach jeder Änderung**: `git add <datei> && git commit -m "..." && git push`
 - **TypeScript prüfen**: `npx tsc --noEmit` nach größeren Änderungen
-- UI sauber und konsistent halten
+- **UUID vs. text PKs**: `lager_stellplaetze` hat UUID PK → `crypto.randomUUID()` im Live-Modus
+- **IIFE-Pattern** für komplexe Tabs mit lokalen Funktionen und Berechnungen
+- **No auto-execute**: KI-Aktionen brauchen immer User-Bestätigung (2 Klicks)
 
 ---
 
@@ -323,21 +446,32 @@ await generateAngebotPDF(angebot: PDFAngebot, kundenName: string)
 - Auto-Deploy bei Push auf `main`
 - Node.js Version: 18.x (in Vercel Settings setzen!)
 - Env-Vars in Vercel: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `ANTHROPIC_API_KEY`
-- Bei Build-Fehler: Vercel Build-Log prüfen, `npx tsc --noEmit` lokal testen
+- Bei Build-Fehler: `npx tsc --noEmit` lokal testen
 
 ---
 
 ## Offene Punkte / Nächste Schritte
 
-### Dringend (Supabase)
-- [ ] `supabase/schema.sql` im Supabase SQL-Editor ausführen – 3 neue Einkauf-Tabellen + `ALTER TABLE lager_artikel ADD COLUMN mindestbestand integer default 0`
+### 🔴 Dringend (Supabase-SQL)
+- [ ] Neue Lager-Tabellen im SQL-Editor ausführen: `lager_stellplaetze`, `lager_stellplatz_bestand`, `lager_umlagerungen`
+- [ ] Einkauf-Tabellen ausführen: `einkauf_lieferanten`, `einkauf_bestellungen`, `einkauf_wareneingaenge`
+- [ ] `ALTER TABLE lager_artikel ADD COLUMN mindestbestand integer default 0` — falls noch nicht ausgeführt
 
-### Features
-- [ ] EinkaufTab: Demo-State auf echte Supabase-Calls umstellen (db.ts-Funktionen bereits fertig)
-- [ ] MarketingPilot vollständig ausbauen (Edit/Delete fehlt noch)
-- [ ] AnalysePilot: echte Daten aus Supabase statt Demo-Charts
+### 🟡 KI-Features
+- [ ] **Supabase SSR-Auth in API-Route**: `createServerClient` mit Cookie-Forwarding statt `createBrowserClient` → Live-Nutzer bekommen echte Lagerdaten im KI-Chat
+- [ ] **KI-Aktion "Bestellung"** ausführbar machen (analog zu Umlagerung — derzeit nur angezeigt)
+- [ ] **KI-Aktion "Hinweis"** — Link zu relevantem Tab
+
+### 🟡 Feature-Vervollständigung
+- [ ] **EinkaufTab**: Demo-State auf echte Supabase-Calls umstellen (db.ts-Funktionen fertig)
+- [ ] **MarketingPilot**: Edit + Delete implementieren
+- [ ] **AnalysePilot**: echte Daten aus Supabase statt Demo-Charts
+
+### 🟢 Langfristig
 - [ ] Stripe Integration (Abos/Bezahlung)
-- [ ] E-Mail-Benachrichtigungen bei Mindestbestand-Unterschreitung (aktuell nur simuliert)
-- [ ] Rollen-basierte Sidebar-Filterung (aktuell nur in Einstellungen wählbar)
-- [ ] Benutzer-Verwaltung für Admin (andere User Rollen zuweisen)
-- [ ] PDF-Vorlagen: Firmenlogo und echte Adressdaten einbinden
+- [ ] E-Mail-Benachrichtigungen bei Mindestbestand (echte E-Mail, aktuell simuliert)
+- [ ] Rollen-basierte Sidebar-Filterung
+- [ ] Benutzer-Verwaltung für Admin
+- [ ] PDF-Vorlagen: Firmenlogo + echte Adressdaten
+- [ ] Push-Benachrichtigungen (PWA Service Worker)
+- [ ] Offline-Modus
