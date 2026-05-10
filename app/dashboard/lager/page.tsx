@@ -56,7 +56,7 @@ const SP_TYPEN = ['Standard', 'Kühl', 'Tiefkühl', 'Eingang', 'Ausgang', 'Sperr
 
 type SortKey = 'id' | 'name' | 'bestand' | 'status'
 type SortDir = 'asc' | 'desc'
-type LagerTab = 'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur' | 'bestellung' | 'historie' | 'stellplaetze' | 'lagerbelegung' | 'umlagerung'
+type LagerTab = 'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur' | 'bestellung' | 'historie' | 'stellplaetze' | 'lagerbelegung' | 'umlagerung' | 'kommissionierung'
 
 const EINHEITEN = ['Stk', 'Liter', 'kg', 'Rollen', 'Meter', 'Paar', 'Karton', 'Palette']
 const KATEGORIEN = ['Rohstoffe', 'Kleinteile', 'Betriebsstoffe', 'Verbrauchsmaterial', 'Werkzeug', 'Schutzausrüstung', 'Sonstiges']
@@ -1101,6 +1101,7 @@ export default function LagerPilotPage() {
           { id: 'stellplaetze', label: '📍 Stellplätze' },
           { id: 'lagerbelegung', label: '📊 Lagerbelegung' },
           { id: 'umlagerung', label: '↔️ Umlagerung' },
+          { id: 'kommissionierung', label: '🧺 Kommissionierung' },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as LagerTab)} style={{ padding: '10px 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: 'transparent', borderBottom: tab === t.id ? '2px solid #1684ff' : '2px solid transparent', color: tab === t.id ? '#6cb6ff' : '#aeb9c8', marginBottom: -1, transition: 'color .15s', whiteSpace: 'nowrap' }}>
             {t.label}
@@ -2075,6 +2076,115 @@ export default function LagerPilotPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── KOMMISSIONIERUNG ── */}
+      {tab === 'kommissionierung' && (() => {
+        // Nur Artikel mit Bestand > 0, sortiert nach Lagerplatz (optimale Laufwege)
+        const pickListe = [...artikel]
+          .filter(a => a.bestand > 0)
+          .sort((a, b) => (a.lagerplatz ?? '').localeCompare(b.lagerplatz ?? ''))
+
+        // Bereich aus Lagerplatz-Prefix ableiten (z.B. "A-01-03" → "A")
+        const bereichVon = (lagerplatz: string) => lagerplatz.split('-')[0] ?? '?'
+
+        // Bereiche für Gruppenzeilen
+        const bereiche = Array.from(new Set(pickListe.map(a => bereichVon(a.lagerplatz ?? ''))))
+
+        return (
+          <div>
+            {/* Header-Info */}
+            <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(22,132,255,.07)', border: '1px solid rgba(22,132,255,.18)', fontSize: 13, color: '#aeb9c8' }}>
+              🧺 <b style={{ color: '#f8fbff' }}>Kommissionierung:</b> Artikel sind nach Lagerplatz sortiert für optimale Laufwege.
+              <span style={{ marginLeft: 12, color: '#6cb6ff' }}>{pickListe.length} Artikel verfügbar · {bereiche.length} Bereiche</span>
+            </div>
+
+            {/* KPI-Zeile */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 18 }}>
+              {[
+                { label: 'Artikel gesamt', value: pickListe.length, icon: '📦', color: '#1684ff' },
+                { label: 'Bereiche', value: bereiche.length, icon: '🗺️', color: '#20c8ff' },
+                { label: 'Niedrig/Leer', value: pickListe.filter(a => a.status !== 'ok').length, icon: '⚠️', color: '#f59e0b' },
+                { label: 'Gesamtbestand', value: pickListe.reduce((s, a) => s + a.bestand, 0).toLocaleString('de-DE'), icon: '🔢', color: '#10b981' },
+              ].map(s => (
+                <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '12px 8px' }}>
+                  <div style={{ fontSize: 18, marginBottom: 3 }}>{s.icon}</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: s.color }}>{s.value}</div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pick-Tabelle nach Bereichen gruppiert */}
+            {pickListe.length === 0 ? (
+              <div className="pk-card" style={{ textAlign: 'center', padding: 48 }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>🧺</div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>Kein Bestand verfügbar</div>
+                <div style={{ color: '#aeb9c8', fontSize: 13, marginTop: 4 }}>Alle Artikel haben Bestand 0.</div>
+              </div>
+            ) : (
+              <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+                <div className="pk-table-wrap">
+                  <table className="pk-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 32 }}>#</th>
+                        <th>Lagerplatz</th>
+                        <th>Art.-Nr.</th>
+                        <th>Bezeichnung</th>
+                        <th>Kategorie</th>
+                        <th>Bestand</th>
+                        <th>Mindest</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bereiche.map(bereich => {
+                        const zeilen = pickListe.filter(a => bereichVon(a.lagerplatz ?? '') === bereich)
+                        return [
+                          // Bereichs-Trenner
+                          <tr key={`hdr-${bereich}`}>
+                            <td colSpan={8} style={{ background: 'rgba(22,132,255,.08)', padding: '6px 14px', fontWeight: 700, fontSize: 12, color: '#6cb6ff', letterSpacing: '.06em' }}>
+                              📍 Bereich {bereich} — {zeilen.length} Artikel
+                            </td>
+                          </tr>,
+                          // Artikel-Zeilen
+                          ...zeilen.map((a, idx) => (
+                            <tr key={a.id}>
+                              <td style={{ color: '#aeb9c8', fontSize: 12, textAlign: 'center' }}>
+                                {idx + 1}
+                              </td>
+                              <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#6cb6ff', whiteSpace: 'nowrap' }}>
+                                {a.lagerplatz || '—'}
+                              </td>
+                              <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#aeb9c8' }}>{a.id}</td>
+                              <td style={{ fontWeight: 600 }}>{a.name}</td>
+                              <td><span className="badge badge-gray">{a.kategorie}</span></td>
+                              <td style={{ fontWeight: 700, color: a.status === 'leer' ? '#f43f5e' : a.status === 'niedrig' ? '#f59e0b' : '#f8fbff' }}>
+                                {a.bestand} {a.einheit}
+                              </td>
+                              <td style={{ color: '#aeb9c8', fontSize: 13 }}>{a.mindestbestand ?? 0} {a.einheit}</td>
+                              <td>
+                                <span className={`badge ${a.status === 'ok' ? 'badge-green' : a.status === 'niedrig' ? 'badge-orange' : 'badge-red'}`}>
+                                  {a.status === 'ok' ? '✅ OK' : a.status === 'niedrig' ? '⚠️ Niedrig' : '🚨 Leer'}
+                                </span>
+                              </td>
+                            </tr>
+                          )),
+                        ]
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Hinweis Pickliste */}
+            <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)', fontSize: 12, color: '#aeb9c8' }}>
+              💡 Picklisten-Export (PDF/CSV) folgt in einem späteren Schritt.
             </div>
           </div>
         )
