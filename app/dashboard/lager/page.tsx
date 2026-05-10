@@ -549,6 +549,7 @@ export default function LagerPilotPage() {
   // ── KI-Tagesbericht State ────────────────────────────────────────────────────
   const [briefLoading, setBriefLoading] = useState(false)
   const [briefText, setBriefText] = useState<string | null>(null)
+  const [briefProbleme, setBriefProbleme] = useState<{ level: string; text: string }[]>([])
   const [briefAktionen, setBriefAktionen] = useState<KiAktion[]>([])
   const [briefConfirm, setBriefConfirm] = useState<number | null>(null)
   const [briefAktionLoading, setBriefAktionLoading] = useState<number | null>(null)
@@ -2358,6 +2359,7 @@ export default function LagerPilotPage() {
         async function generateLagerBrief() {
           setBriefLoading(true)
           setBriefText(null)
+          setBriefProbleme([])
           setBriefAktionen([])
           setBriefConfirm(null)
           setProaktivAntwort(null)
@@ -2384,8 +2386,9 @@ Heutiger Lager-Status (${new Date().toLocaleDateString('de-DE')}):
                 }],
               }),
             })
-            const data = await res.json() as { reply: string; actions?: KiAktion[] }
+            const data = await res.json() as { reply: string; probleme?: { level: string; text: string }[]; actions?: KiAktion[] }
             setBriefText(data.reply || '—')
+            setBriefProbleme(data.probleme ?? [])
             setBriefAktionen((data.actions ?? []) as KiAktion[])
           } catch {
             setBriefText('Fehler beim Generieren des Briefings. KI nicht erreichbar.')
@@ -2481,6 +2484,28 @@ Heutiger Lager-Status (${new Date().toLocaleDateString('de-DE')}):
                   {briefLoading ? '⏳ Wird erstellt…' : briefText ? '🔄 Neu generieren' : '✨ Tagesbericht erstellen'}
                 </button>
               </div>
+
+              {/* Kategorisierte Probleme */}
+              {briefProbleme.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                  {briefProbleme.map((p, pi) => {
+                    const cfg = p.level === 'dringend'
+                      ? { icon: '🔴', label: 'Dringend', color: '#f43f5e', bg: 'rgba(244,63,94,.08)', border: 'rgba(244,63,94,.25)' }
+                      : p.level === 'wichtig'
+                      ? { icon: '⚠️', label: 'Wichtig', color: '#f59e0b', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.25)' }
+                      : { icon: '📦', label: 'Info', color: '#1684ff', bg: 'rgba(22,132,255,.08)', border: 'rgba(22,132,255,.2)' }
+                    return (
+                      <div key={pi} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 13px', borderRadius: 9, background: cfg.bg, border: `1px solid ${cfg.border}`, fontSize: 13 }}>
+                        <span style={{ flexShrink: 0, fontSize: 15 }}>{cfg.icon}</span>
+                        <span style={{ flex: 1, color: '#f8fbff' }}>
+                          <span style={{ fontWeight: 700, color: cfg.color, marginRight: 6 }}>{cfg.label}:</span>
+                          {p.text}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
               {briefText && (
                 <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(22,132,255,.07)', border: '1px solid rgba(22,132,255,.18)', fontSize: 14, lineHeight: 1.65, color: '#f8fbff', marginBottom: briefAktionen.length > 0 ? 14 : 0 }}>

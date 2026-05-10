@@ -32,30 +32,70 @@ const DEMO_CONTEXT = {
 // ── Systemkontext als kompakter Prompt-Block ─────────────────────────────────
 
 function buildContextBlock(ctx: typeof DEMO_CONTEXT): string {
-  const niedrig = ctx.artikel.filter(a => a.status === 'niedrig' || a.status === 'leer')
-  const freieStellplaetze = ctx.stellplaetze.filter(sp => sp.aktiv).length
+  const today = new Date()
+  const in30 = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
 
-  return `=== AKTUELLE LAGERDATEN (${new Date().toLocaleDateString('de-DE')}) ===
+  // Artikel-Probleme
+  const artikelLeer  = ctx.artikel.filter(a => a.status === 'leer')
+  const artikelNiedrig = ctx.artikel.filter(a => a.status === 'niedrig')
+
+  // MHD-Analyse auf Bestandsebene
+  const mhdAbgelaufen = ctx.bestand.filter(b => b.mhd && new Date(b.mhd) < today)
+  const mhdKritisch   = ctx.bestand.filter(b => b.mhd && new Date(b.mhd) >= today && new Date(b.mhd) <= in30)
+
+  // Überlastete Stellplätze (≥3 Positionen)
+  const spCount = new Map<string, number>()
+  ctx.bestand.forEach(b => spCount.set(b.stellplatz_code, (spCount.get(b.stellplatz_code) ?? 0) + 1))
+  const ueberlastet = Array.from(spCount.entries()).filter(([, n]) => n >= 3)
+
+  // Artikel auf mehreren Stellplätzen verteilt (≥2 verschiedene Codes)
+  const artikelSp = new Map<string, Set<string>>()
+  ctx.bestand.forEach(b => {
+    if (!artikelSp.has(b.artikelname)) artikelSp.set(b.artikelname, new Set())
+    artikelSp.get(b.artikelname)!.add(b.stellplatz_code)
+  })
+  const verteilt = Array.from(artikelSp.entries()).filter(([, codes]) => codes.size >= 2)
+
+  const none = (arr: unknown[]) => arr.length === 0
+
+  return `=== AKTUELLE LAGERDATEN (${today.toLocaleDateString('de-DE')}) ===
 
 ARTIKELBESTAND (${ctx.artikel.length} Artikel):
 ${ctx.artikel.map(a =>
-  `- ${a.name} [${a.id}]: ${a.bestand} ${a.einheit} auf Platz ${a.lagerplatz} | Mindest: ${a.mindestbestand} | Status: ${a.status}`
+  `- ${a.name} [${a.id}]: ${a.bestand} ${a.einheit} | Lagerplatz: ${a.lagerplatz} | Mindest: ${a.mindestbestand} | Status: ${a.status}`
 ).join('\n')}
 
-NACHBESTELLBEDARF (${niedrig.length} Artikel):
-${niedrig.length === 0 ? '- Kein Nachbestellbedarf' : niedrig.map(a =>
-  `- ${a.name}: nur noch ${a.bestand} ${a.einheit} (Mindest: ${a.mindestbestand})`
-).join('\n')}
-
-STELLPLÄTZE (${ctx.stellplaetze.length} gesamt, ${freieStellplaetze} aktiv):
-${ctx.stellplaetze.map(sp =>
-  `- ${sp.code} | Bereich: ${sp.bereich} | Typ: ${sp.typ}`
-).join('\n')}
+STELLPLÄTZE (${ctx.stellplaetze.length} gesamt, ${ctx.stellplaetze.filter(sp => sp.aktiv).length} aktiv):
+${ctx.stellplaetze.map(sp => `- ${sp.code} | Bereich: ${sp.bereich} | Typ: ${sp.typ}`).join('\n')}
 
 LETZTE UMLAGERUNGEN (${ctx.umlagerungen.length}):
-${ctx.umlagerungen.map(u =>
-  `- ${u.datum}: ${u.artikelname} (${u.menge}) von ${u.von} → ${u.nach} [${u.grund}]`
-).join('\n')}
+${ctx.umlagerungen.map(u => `- ${u.datum}: ${u.artikelname} (${u.menge}) von ${u.von} → ${u.nach} [${u.grund}]`).join('\n')}
+
+=== VORBERECHNETE PROBLEM-ANALYSE ===
+
+🔴 DRINGEND (${mhdAbgelaufen.length + artikelLeer.length} Probleme):
+${none([...mhdAbgelaufen, ...artikelLeer])
+  ? '- Keine dringenden Probleme'
+  : [
+    ...mhdAbgelaufen.map(b => `- MHD ABGELAUFEN: "${b.artikelname}" auf ${b.stellplatz_code} (MHD war ${b.mhd}) — sofort aussondern`),
+    ...artikelLeer.map(a => `- BESTAND LEER: "${a.name}" — 0 ${a.einheit}, Mindest ${a.mindestbestand} — Nachbestellung dringend`),
+  ].join('\n')}
+
+⚠️ WICHTIG (${mhdKritisch.length + artikelNiedrig.length} Warnungen):
+${none([...mhdKritisch, ...artikelNiedrig])
+  ? '- Keine wichtigen Warnungen'
+  : [
+    ...mhdKritisch.map(b => `- MHD KRITISCH: "${b.artikelname}" auf ${b.stellplatz_code} — läuft ab ${b.mhd} (< 30 Tage)`),
+    ...artikelNiedrig.map(a => `- BESTAND NIEDRIG: "${a.name}" — nur ${a.bestand} ${a.einheit} (Mindest: ${a.mindestbestand})`),
+  ].join('\n')}
+
+📦 INFO (${ueberlastet.length + verteilt.length} Hinweise):
+${none([...ueberlastet, ...verteilt])
+  ? '- Keine weiteren Hinweise'
+  : [
+    ...ueberlastet.map(([code, n]) => `- ÜBERLASTET: Stellplatz ${code} hat ${n} Positionen — Umlagerung prüfen`),
+    ...verteilt.map(([name, codes]) => `- VERTEILT: "${name}" liegt auf ${codes.size} Stellplätzen (${Array.from(codes).join(', ')}) — Konsolidierung sinnvoll`),
+  ].join('\n')}
 
 === ENDE LAGERDATEN ===`
 }
@@ -137,9 +177,14 @@ export async function POST(req: NextRequest) {
     const lagerContextBlock = buildContextBlock(systemContext)
 
     const jsonInstruction = structuredOutput ? `
-Antworte IMMER als gültiges JSON-Objekt in folgendem Format (kein Markdown, keine Erklärung außerhalb):
+Antworte IMMER als gültiges JSON-Objekt (kein Markdown, kein Text außerhalb):
 {
-  "message": "Dein Text an den User",
+  "message": "Kurze Zusammenfassung in 1-3 Sätzen",
+  "probleme": [
+    { "level": "dringend", "text": "Konkretes Problem mit Artikelname und Zahlenwert" },
+    { "level": "wichtig",  "text": "Warnung mit Kontext" },
+    { "level": "info",     "text": "Hinweis zur Optimierung" }
+  ],
   "actions": [
     {
       "type": "umlagerung",
@@ -150,16 +195,16 @@ Antworte IMMER als gültiges JSON-Objekt in folgendem Format (kein Markdown, kei
     }
   ]
 }
-Erlaubte action.type-Werte: "umlagerung", "bestellung", "hinweis".
-Für "bestellung" und "hinweis" reichen die Felder: type, artikel, beschreibung.
-Schlage nur Aktionen vor, wenn sie basierend auf den Lagerdaten konkret sinnvoll sind.
-Falls keine Aktion sinnvoll ist, gib "actions": [] zurück.
+Regeln:
+- "probleme": NUR Einträge die wirklich auf den Daten basieren. Level: "dringend" (MHD abgelaufen, Bestand leer), "wichtig" (MHD kritisch, Bestand niedrig), "info" (Optimierungshinweise). Leeres Array [] wenn keine Probleme.
+- "actions": Erlaubte Typen: "umlagerung", "bestellung", "hinweis". Nur vorschlagen wenn konkret sinnvoll, sonst [].
+- Für Bestellung/Hinweis: Felder type, artikel, beschreibung.
 ` : ''
 
     const baseSystem = [
       'Du bist ein KI-Assistent für ein Warenwirtschaftssystem (Petersen KI Betriebssteuerung).',
-      'Du hast Zugriff auf aktuelle Lagerdaten: Artikelbestand, Stellplätze und Lagerbewegungen.',
-      'Antworte immer konkret basierend auf diesen Daten — nenne echte Artikelnamen, Mengen und Lagerplätze.',
+      'Du analysierst Lagerdaten und erkennst proaktiv Probleme: MHD-Überschreitungen, Mindestbestand-Unterschreitungen, überlastete Stellplätze, ineffizient verteilte Artikel.',
+      'Antworte immer konkret basierend auf den Daten — nenne echte Artikelnamen, Mengen und Lagerplatz-Codes.',
       'Antworte auf Deutsch, professionell und präzise. Halte Antworten kurz und handlungsorientiert.',
       jsonInstruction,
       system || '',
@@ -195,9 +240,10 @@ Falls keine Aktion sinnvoll ist, gib "actions": [] zurück.
       try {
         // Claude kann JSON in Markdown-Codeblöcken einwickeln — Strip
         const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
-        const parsed = JSON.parse(cleaned) as { message?: string; actions?: unknown[] }
+        const parsed = JSON.parse(cleaned) as { message?: string; probleme?: unknown[]; actions?: unknown[] }
         return NextResponse.json({
           reply: parsed.message || rawText,
+          probleme: Array.isArray(parsed.probleme) ? parsed.probleme : [],
           actions: Array.isArray(parsed.actions) ? parsed.actions : [],
         })
       } catch {
