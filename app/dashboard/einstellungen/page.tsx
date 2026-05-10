@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
-import { isDemoUser, hasDemoCookie } from '@/lib/auth'
+import { isDemoUser, hasDemoCookie, performLogout } from '@/lib/auth'
 import { type AppRole, ROLE_LABELS, ROLE_PILOTS, PERMISSIONS, useRole, setRole as saveRole } from '@/lib/roles'
 import {
   parseCsvFile, validateImportRows, autoMapColumns, buildImportRows,
@@ -92,11 +92,7 @@ export default function EinstellungenPage() {
     showToast('✅ Benachrichtigungseinstellungen gespeichert')
   }
 
-  const handleLogout = async () => {
-    const supabase = createSupabaseClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
+  const handleLogout = () => performLogout()
 
   const NavItem = ({ id, icon, label }: { id: typeof section; icon: string; label: string }) => (
     <button onClick={() => setSection(id)} data-active={section === id} style={{

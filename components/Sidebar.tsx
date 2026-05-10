@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
-import { hasDemoCookie, clearDemoCookie } from '@/lib/auth'
+import { hasDemoCookie, performLogout } from '@/lib/auth'
 
 const pilots = [
   { id: 'lager',     label: 'LagerPilot',     icon: '📦', href: '/dashboard/lager' },
@@ -48,13 +48,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     onClose?.()
   }
 
-  const logout = async () => {
-    clearDemoCookie()
-    try {
-      if (isSupabaseConfigured()) await createSupabaseClient().auth.signOut()
-    } catch {}
-    router.push('/login')
-  }
+  const logout = () => performLogout()
 
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
