@@ -17,7 +17,7 @@ const pilots = [
 
 const navItems = [
   { label: 'Dashboard',     icon: '⊞', href: '/dashboard' },
-  { label: 'KI Erkennung',  icon: '🧠', href: '/dashboard/ki-erkennung' },
+  { label: 'KI-Assistent',  icon: '🧠', href: '/dashboard/ki-erkennung' },
   { label: 'Cloud & Sync',  icon: '☁️', href: '/dashboard/cloud' },
   { label: 'Archiv',        icon: '🗂️', href: '/dashboard/archiv' },
   { label: 'Einstellungen', icon: '⚙️', href: '/dashboard/einstellungen' },

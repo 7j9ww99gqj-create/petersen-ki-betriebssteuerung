@@ -1487,7 +1487,7 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
           <div style={{ fontSize: 12, color: '#aeb9c8' }}>Dokumente automatisch erkennen, klassifizieren und Daten extrahieren lassen</div>
         </div>
         <button className="pk-btn-ghost" onClick={() => window.location.href = '/dashboard/ki-erkennung'} style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-          🧠 KI Erkennung öffnen
+          🧠 KI-Assistent öffnen
         </button>
       </div>
     </div>

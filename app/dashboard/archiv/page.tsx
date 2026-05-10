@@ -6,7 +6,7 @@ const archivData = [
   { id: 'DOC-002', name: 'Rechnung RE-2025-1123', typ: 'Rechnung', pilot: 'BüroPilot', datum: '05.05.2025', groesse: '89 KB', tags: ['Ausgang', 'Kunde'] },
   { id: 'DOC-003', name: 'Arbeitsauftrag AA-2025-034', typ: 'Arbeitsauftrag', pilot: 'WerkstattPilot', datum: '05.05.2025', groesse: '56 KB', tags: ['Werkstatt', 'Offen'] },
   { id: 'DOC-004', name: 'Inventurliste April 2025', typ: 'Inventur', pilot: 'LagerPilot', datum: '30.04.2025', groesse: '312 KB', tags: ['Inventur', 'Abgeschlossen'] },
-  { id: 'DOC-005', name: 'KI-Erkennungsprotokoll Woche 18', typ: 'KI-Protokoll', pilot: 'KI Erkennung', datum: '04.05.2025', groesse: '45 KB', tags: ['KI', 'Automatisch'] },
+  { id: 'DOC-005', name: 'KI-Assistentenprotokoll Woche 18', typ: 'KI-Protokoll', pilot: 'KI-Assistent', datum: '04.05.2025', groesse: '45 KB', tags: ['KI', 'Automatisch'] },
   { id: 'DOC-006', name: 'Lieferschein LS-2025-08800', typ: 'Lieferschein', pilot: 'LagerPilot', datum: '02.05.2025', groesse: '98 KB', tags: ['Eingang'] },
 ]
 

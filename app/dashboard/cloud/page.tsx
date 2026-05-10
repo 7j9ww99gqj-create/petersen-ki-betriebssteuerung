@@ -8,7 +8,7 @@ export default function CloudPage() {
   const [syncLog, setSyncLog] = useState([
     { time: '14:22', action: 'LagerPilot Bestände synchronisiert', status: 'ok' },
     { time: '14:20', action: 'Neuer Wareneingang gespeichert', status: 'ok' },
-    { time: '13:58', action: 'KI-Erkennung Ergebnis archiviert', status: 'ok' },
+    { time: '13:58', action: 'KI-Assistent Ergebnis archiviert', status: 'ok' },
     { time: '13:40', action: 'BüroPilot Rechnungen synchronisiert', status: 'ok' },
     { time: '12:15', action: 'Verbindung kurz unterbrochen', status: 'warn' },
     { time: '12:16', action: 'Automatisch wiederverbunden', status: 'ok' },
@@ -94,7 +94,7 @@ export default function CloudPage() {
                 <div style={{ fontSize: 13, color: '#aeb9c8' }}>
                   {syncProgress < 30 && '📦 LagerPilot wird synchronisiert…'}
                   {syncProgress >= 30 && syncProgress < 60 && '🧾 BüroPilot wird synchronisiert…'}
-                  {syncProgress >= 60 && syncProgress < 85 && '🧠 KI-Erkennungen werden gesichert…'}
+                  {syncProgress >= 60 && syncProgress < 85 && '🧠 KI-Assistenten-Auswertungen werden gesichert…'}
                   {syncProgress >= 85 && '✅ Abschließende Prüfung…'}
                 </div>
               </div>
@@ -124,7 +124,7 @@ export default function CloudPage() {
             {[
               { name: 'LagerPilot', size: '820 MB', status: 'sync', icon: '📦' },
               { name: 'BüroPilot', size: '340 MB', status: 'sync', icon: '🧾' },
-              { name: 'KI-Erkennungen', size: '1,1 GB', status: 'sync', icon: '🧠' },
+              { name: 'KI-Assistenten-Auswertungen', size: '1,1 GB', status: 'sync', icon: '🧠' },
               { name: 'WerkstattPilot', size: '95 MB', status: 'sync', icon: '🛠️' },
               { name: 'Archiv', size: '65 MB', status: 'sync', icon: '🗂️' },
             ].map(m => (

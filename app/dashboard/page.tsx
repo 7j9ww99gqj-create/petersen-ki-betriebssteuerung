@@ -8,6 +8,7 @@ const pilots = [
   { id: 'lager', label: 'LagerPilot', icon: '📦', desc: 'Wareneingang, Bestände, Lagerplätze, Inventur', href: '/dashboard/lager', color: '#1684ff', status: 'AKTIV' },
   { id: 'buero', label: 'BüroPilot', icon: '🧾', desc: 'Kunden, Aufträge, Rechnungen, Dokumente, Einkauf', href: '/dashboard/buero', color: '#20c8ff', status: 'AKTIV' },
   { id: 'werkstatt', label: 'WerkstattPilot', icon: '🛠️', desc: 'Arbeitskarten, Zeiterfassung, Qualität', href: '/dashboard/werkstatt', color: '#a78bfa', status: 'AKTIV' },
+  { id: 'steuer', label: 'SteuerPilot', icon: '🧾', desc: 'Belege, UStVA, DATEV-Export, Buchungen', href: '/dashboard/steuer', color: '#4ddb7e', status: 'AKTIV' },
   { id: 'marketing', label: 'MarketingPilot', icon: '📣', desc: 'Kampagnen, E-Mail, Social Media, Leads', href: '/dashboard/marketing', color: '#f59e0b', status: 'AKTIV' },
   { id: 'analyse', label: 'AnalysePilot', icon: '📊', desc: 'Dashboards, KPIs, Prognosen, Berichte', href: '/dashboard/analyse', color: '#10b981', status: 'AKTIV' },
   { id: 'planung', label: 'PlanungPilot', icon: '📅', desc: 'Produktion, Ressourcen, Termine, Projekte', href: '/dashboard/planung', color: '#f43f5e', status: 'AKTIV' },
@@ -216,7 +217,7 @@ export default function DashboardPage() {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="pk-btn-ghost" onClick={() => router.push('/dashboard/ki-erkennung')} style={{ fontSize: 13 }}>
-            🧠 KI Erkennung
+            🧠 KI-Assistent
           </button>
           <button className="pk-btn" onClick={() => router.push('/dashboard/cloud')} style={{ fontSize: 13 }}>
             ☁️ Cloud Sync
@@ -259,7 +260,7 @@ export default function DashboardPage() {
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>KI-Piloten</h2>
-          <span style={{ fontSize: 12, color: '#aeb9c8' }}>6 Piloten verfügbar</span>
+          <span style={{ fontSize: 12, color: '#aeb9c8' }}>{pilots.length} Piloten verfügbar</span>
         </div>
         <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
           {pilots.map((p, i) => <PilotCard key={p.id} pilot={p} delay={200 + i * 60} />)}
@@ -269,7 +270,7 @@ export default function DashboardPage() {
       {/* Quick actions */}
       <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
         {[
-          { label: 'KI Erkennung', desc: 'Dokumente & Fotos automatisch erfassen', icon: '🧠', href: '/dashboard/ki-erkennung', color: '#a78bfa' },
+          { label: 'KI-Assistent', desc: 'Dokumente & Fotos automatisch erfassen', icon: '🧠', href: '/dashboard/ki-erkennung', color: '#a78bfa' },
           { label: 'Cloud & Sync', desc: 'Datensicherung & Cloud-Status', icon: '☁️', href: '/dashboard/cloud', color: '#20c8ff' },
           { label: 'Archiv', desc: 'Alle gespeicherten Dokumente & Vorgänge', icon: '🗂️', href: '/dashboard/archiv', color: '#f59e0b' },
           { label: 'Einstellungen', desc: 'Profil, Benachrichtigungen, App-Info', icon: '⚙️', href: '/dashboard/einstellungen', color: '#aeb9c8' },

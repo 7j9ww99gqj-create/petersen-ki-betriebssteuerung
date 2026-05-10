@@ -74,6 +74,14 @@ type RecognitionResult = {
   raw: string
 }
 
+type DocumentAiResult = {
+  documentType: 'rechnung' | 'angebot' | 'auftrag' | 'lieferschein' | 'wareneingang' | 'kunden_dokument' | 'sonstiges'
+  confidence: number
+  summary: string
+  extracted: Record<string, unknown>
+  suggestedActions: string[]
+}
+
 type KiAction = {
   type: 'umlagerung' | 'bestellung' | 'hinweis'
   artikel?: string
@@ -85,12 +93,32 @@ type KiAction = {
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string; actions?: KiAction[] }
 
-type Tab = 'tagesbrief' | 'erkennung' | 'chat'
+type Tab = 'tagesbrief' | 'dokumente' | 'chat'
 
 // ─── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
 function formatEuro(val: number) {
   return val.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
+}
+
+function fieldToString(value: unknown): string {
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return JSON.stringify(value)
+}
+
+function labelForDocumentType(type: DocumentAiResult['documentType']) {
+  const labels: Record<DocumentAiResult['documentType'], string> = {
+    rechnung: 'Rechnung',
+    angebot: 'Angebot',
+    auftrag: 'Auftrag',
+    lieferschein: 'Lieferschein',
+    wareneingang: 'Wareneingang',
+    kunden_dokument: 'Kundendokument',
+    sonstiges: 'Sonstiges',
+  }
+  return labels[type]
 }
 
 // ─── Hauptkomponente ──────────────────────────────────────────────────────────
@@ -103,14 +131,20 @@ export default function KiErkennungPage() {
   const [briefLoading, setBriefLoading] = useState(false)
   const [briefText, setBriefText] = useState<string | null>(null)
 
-  // Tab: Erkennung
+  // Tab: Dokumente
   const [stage, setStage] = useState<'idle' | 'uploading' | 'analyzing' | 'done'>('idle')
   const [result, setResult] = useState<RecognitionResult | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [docResult, setDocResult] = useState<DocumentAiResult | null>(null)
+  const [editableFields, setEditableFields] = useState<Record<string, string>>({})
+  const [docError, setDocError] = useState<string | null>(null)
+  const [docConfirm, setDocConfirm] = useState(false)
+  const [savedDocs, setSavedDocs] = useState<DocumentAiResult[]>([])
 
   // Tab: Chat
   const [chatMsg, setChatMsg] = useState('')
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-    { role: 'assistant', content: 'Hallo! Ich bin Ihr KI-Assistent. Fragen Sie mich zu Lager, Aufgaben, Rechnungen oder Betriebsabläufen.' },
+    { role: 'assistant', content: 'Hallo! Dieser allgemeine Chat läuft vorerst im Demo-Modus. Echte KI-Analyse ist im Tab „Dokumente" aktiv.' },
   ])
   const [chatLoading, setChatLoading] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ msgIdx: number; actionIdx: number } | null>(null)
@@ -150,25 +184,10 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
 
     const prompt = `Erstelle einen kurzen, konkreten Tagesbrief (max. 4 Sätze) basierend auf folgenden Daten. Beginne mit "Heute, [Wochentag]," und gib am Ende 1-2 priorisierte Empfehlungen.`
 
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          context: contextStr,
-          messages: [{ role: 'user', content: prompt }],
-          system: 'Du bist der KI-Tagesassistent der Petersen KI Betriebssteuerung. Antworte präzise auf Deutsch.',
-        }),
-      })
-      const data = await res.json() as { reply: string }
-      if (data.reply && !data.reply.startsWith('Demo-Modus')) {
-        setBriefText(data.reply)
-      } else {
-        setBriefText(buildStaticBrief(offeneAufgaben.length, nachbestellArtikel.length, ueberfaelligeRechnungen.length, kritischeKarten.length))
-      }
-    } catch {
-      setBriefText(buildStaticBrief(offeneAufgaben.length, nachbestellArtikel.length, ueberfaelligeRechnungen.length, kritischeKarten.length))
-    }
+    void contextStr
+    void prompt
+    await new Promise(r => setTimeout(r, 450))
+    setBriefText(buildStaticBrief(offeneAufgaben.length, nachbestellArtikel.length, ueberfaelligeRechnungen.length, kritischeKarten.length))
 
     setBriefLoading(false)
   }
@@ -178,30 +197,89 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     return `Heute, ${tag}, sind ${aufgaben} Aufgaben offen, ${karten} Arbeitskarte${karten !== 1 ? 'n' : ''} kritisch/hoch priorisiert, ${artikel} Artikel müssen nachbestellt werden und ${rechnungen} Rechnung${rechnungen !== 1 ? 'en sind' : ' ist'} überfällig. Empfehlung: Starten Sie mit der kritischen Werkstatt-Arbeitskarte, prüfen Sie dann die überfälligen Rechnungen und lösen Sie den Bestellvorschlag aus.`
   }
 
-  // ── Dokument-Erkennung ─────────────────────────────────────────────────────
+  // ── Dokumente analysieren ──────────────────────────────────────────────────
 
-  function simulateRecognition() {
+  async function analyzeDocument(file = selectedFile) {
+    if (!file) {
+      setDocError('Bitte zuerst eine PDF- oder Bilddatei auswählen.')
+      return
+    }
+
+    setDocError(null)
+    setDocConfirm(false)
+    setDocResult(null)
+    setEditableFields({})
     setStage('uploading')
-    setTimeout(() => {
+
+    try {
+      const form = new FormData()
+      form.append('file', file)
       setStage('analyzing')
-      setTimeout(() => {
-        setResult({
-          type: 'Lieferschein',
-          confidence: 97,
-          fields: {
-            'Lieferant': 'Metallbau GmbH & Co. KG',
-            'Lieferschein-Nr.': 'LS-2025-08847',
-            'Datum': '06.05.2025',
-            'Artikel 1': 'Stahlrohr 40x40 – 50 Stk',
-            'Artikel 2': 'Schrauben M8x30 – 500 Stk',
-            'Gewicht gesamt': '124,5 kg',
-            'Empfänger': 'Petersen KI Betriebssteuerung',
-          },
-          raw: 'Lieferschein erkannt mit 97% Konfidenz. Alle Felder wurden automatisch extrahiert und können jetzt in den Wareneingang übertragen werden.',
-        })
-        setStage('done')
-      }, 2200)
-    }, 800)
+
+      const res = await fetch('/api/document-ai', { method: 'POST', body: form })
+      const data = await res.json() as DocumentAiResult
+      if (!res.ok) throw new Error(data.summary || 'Dokumentenanalyse fehlgeschlagen.')
+
+      setDocResult(data)
+      setEditableFields(Object.fromEntries(
+        Object.entries(data.extracted ?? {}).map(([key, value]) => [key, fieldToString(value)]),
+      ))
+      setResult({
+        type: labelForDocumentType(data.documentType),
+        confidence: Math.round((data.confidence ?? 0) * 100),
+        fields: Object.fromEntries(Object.entries(data.extracted ?? {}).map(([key, value]) => [key, fieldToString(value)])),
+        raw: data.summary,
+      })
+      setStage('done')
+    } catch (err) {
+      setDocError(err instanceof Error ? err.message : 'Dokumentenanalyse fehlgeschlagen.')
+      setStage('idle')
+    }
+  }
+
+  function resetDocument() {
+    setStage('idle')
+    setResult(null)
+    setSelectedFile(null)
+    setDocResult(null)
+    setEditableFields({})
+    setDocError(null)
+    setDocConfirm(false)
+  }
+
+  async function applyDocumentResult() {
+    if (!docResult) return
+    if (!docConfirm) {
+      setDocConfirm(true)
+      return
+    }
+
+    const showToast = (msg: string, type: 'success' | 'error') => {
+      setActionToast({ msg, type })
+      setTimeout(() => setActionToast(null), 4500)
+    }
+
+    const updated: DocumentAiResult = {
+      ...docResult,
+      extracted: { ...editableFields },
+    }
+
+    try {
+      if (hasDemoCookie()) {
+        setSavedDocs(prev => [updated, ...prev].slice(0, 5))
+        showToast('Demo: Dokument wurde lokal übernommen.', 'success')
+      } else {
+        // TODO: Live-Übernahme gezielt je Dokumenttyp verdrahten:
+        // - rechnung -> upsertSteuerBeleg oder upsertBueroRechnung nach Review
+        // - lieferschein/wareneingang -> Wareneingang/Lagerbewegung nach Artikel-Mapping
+        // Aktuell bewusst keine automatische Supabase-Schreibaktion.
+        setSavedDocs(prev => [updated, ...prev].slice(0, 5))
+        showToast('Übernahme vorbereitet. Live-Speicherung ist noch nicht automatisch verdrahtet.', 'success')
+      }
+      setDocConfirm(false)
+    } catch {
+      showToast('Dokument konnte nicht übernommen werden.', 'error')
+    }
   }
 
   // ── KI-Aktion ausführen ────────────────────────────────────────────────────
@@ -250,7 +328,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     }
   }
 
-  // ── KI-Chat ────────────────────────────────────────────────────────────────
+  // ── Demo-Chat ──────────────────────────────────────────────────────────────
 
   async function sendChat() {
     if (!chatMsg.trim() || chatLoading) return
@@ -260,25 +338,16 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     setChatHistory(newHistory)
     setChatLoading(true)
 
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: newHistory.map(m => ({ role: m.role, content: m.content })),
-          system: 'Du bist der KI-Assistent der Petersen KI Betriebssteuerung, einem modularen Warenwirtschaftssystem. Du hilfst bei Fragen zu Lager, Wareneingang, Warenausgang, Artikeln, Dokumentenerkennung, Werkstatt, Planung und Betriebsabläufen.',
-          structuredOutput: true,
-        }),
-      })
-      const data = await res.json() as { reply: string; actions?: KiAction[] }
-      setChatHistory(prev => [...prev, {
-        role: 'assistant',
-        content: data.reply || 'Keine Antwort erhalten.',
-        actions: data.actions ?? [],
-      }])
-    } catch {
-      setChatHistory(prev => [...prev, { role: 'assistant', content: 'Demo-Modus: ANTHROPIC_API_KEY in .env.local für echte KI-Antworten eintragen.' }])
-    }
+    await new Promise(r => setTimeout(r, 550))
+    const q = userMsg.toLowerCase()
+    const reply = q.includes('bestand') || q.includes('artikel')
+      ? 'Demo-Chat: 4 Artikel haben aktuell niedrigen oder leeren Bestand. Öffnen Sie den LagerPilot für Bestellvorschläge und Mindestbestand-Prüfung.'
+      : q.includes('rechnung') || q.includes('zahlung')
+      ? 'Demo-Chat: 2 Rechnungen sind überfällig oder in Mahnung. Details stehen im BüroPilot.'
+      : q.includes('dokument') || q.includes('scan')
+      ? 'Demo-Chat: Echte KI ist hier nur im Tab „Dokumente" aktiv. Laden Sie dort eine PDF- oder Bilddatei hoch.'
+      : 'Demo-Chat: Ich simuliere den allgemeinen Assistenten weiterhin ohne echte KI-Antworten. Echte OpenAI-Analyse ist nur für Dokumente aktiviert.'
+    setChatHistory(prev => [...prev, { role: 'assistant', content: reply, actions: [] }])
     setChatLoading(false)
   }
 
@@ -308,15 +377,15 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
         }}>🧠</div>
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>KI-Assistent</h1>
-          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Tagesbrief · Dokument-Erkennung · Chat</p>
+          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Tagesbrief · Dokumente · Demo-Chat</p>
         </div>
       </div>
 
       {/* Tab-Leiste */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,.07)', paddingBottom: 0 }}>
         <button style={tabStyle('tagesbrief')} onClick={() => setActiveTab('tagesbrief')}>🧠 Tagesbrief</button>
-        <button style={tabStyle('erkennung')} onClick={() => setActiveTab('erkennung')}>📸 Dokument-Erkennung</button>
-        <button style={tabStyle('chat')} onClick={() => setActiveTab('chat')}>💬 KI-Chat</button>
+        <button style={tabStyle('dokumente')} onClick={() => setActiveTab('dokumente')}>📄 Dokumente</button>
+        <button style={tabStyle('chat')} onClick={() => setActiveTab('chat')}>💬 Demo-Chat</button>
       </div>
 
       {/* ── Tab 1: Tagesbrief ── */}
@@ -500,44 +569,64 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
         </div>
       )}
 
-      {/* ── Tab 2: Dokument-Erkennung ── */}
-      {activeTab === 'erkennung' && (
+      {/* ── Tab 2: Dokumente ── */}
+      {activeTab === 'dokumente' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-          {/* Erkennung Hauptbereich */}
           <div>
             <div className="pk-card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>📸 Dokument-Erkennung</h3>
+              <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>📄 Dokumente analysieren</h3>
               <p style={{ margin: '0 0 16px', color: '#aeb9c8', fontSize: 13 }}>
-                Laden Sie ein Foto eines Lieferscheins, einer Rechnung oder eines Dokuments hoch – die KI extrahiert alle relevanten Daten automatisch.
+                PDF- und Bilddateien hochladen. Nur dieser Bereich nutzt echte OpenAI-Dokumenten-KI.
               </p>
 
               {stage === 'idle' && (
                 <div>
-                  <div
+                  <label
                     style={{
                       border: '2px dashed rgba(22,132,255,.3)', borderRadius: 16,
                       padding: '40px 20px', textAlign: 'center', marginBottom: 14,
                       background: 'rgba(22,132,255,.04)', cursor: 'pointer',
-                      transition: 'border-color .2s, background .2s',
+                      transition: 'border-color .2s, background .2s', display: 'block',
                     }}
-                    onClick={simulateRecognition}
                     onMouseEnter={e => {
-                      const el = e.currentTarget as HTMLDivElement
+                      const el = e.currentTarget as HTMLLabelElement
                       el.style.borderColor = 'rgba(22,132,255,.6)'
                       el.style.background = 'rgba(22,132,255,.08)'
                     }}
                     onMouseLeave={e => {
-                      const el = e.currentTarget as HTMLDivElement
+                      const el = e.currentTarget as HTMLLabelElement
                       el.style.borderColor = 'rgba(22,132,255,.3)'
                       el.style.background = 'rgba(22,132,255,.04)'
                     }}
                   >
+                    <input
+                      type="file"
+                      accept=".pdf,image/png,image/jpeg,image/webp"
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        const file = e.target.files?.[0] ?? null
+                        setSelectedFile(file)
+                        setDocError(null)
+                      }}
+                    />
                     <div style={{ fontSize: 40, marginBottom: 12 }}>📄</div>
                     <div style={{ fontWeight: 700, marginBottom: 4 }}>Dokument hochladen</div>
-                    <div style={{ color: '#aeb9c8', fontSize: 13 }}>Klicken zum Demo-Start · JPG, PNG, PDF</div>
-                  </div>
-                  <button className="pk-btn" onClick={simulateRecognition} style={{ width: '100%', fontWeight: 700 }}>
-                    🧠 Demo: Lieferschein erkennen
+                    <div style={{ color: '#aeb9c8', fontSize: 13 }}>
+                      PDF, PNG, JPG/JPEG, WEBP · max. 12 MB
+                    </div>
+                    {selectedFile && (
+                      <div style={{ marginTop: 10, color: '#6cb6ff', fontSize: 13, fontWeight: 700 }}>
+                        Ausgewählt: {selectedFile.name}
+                      </div>
+                    )}
+                  </label>
+                  {docError && (
+                    <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 9, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>
+                      {docError}
+                    </div>
+                  )}
+                  <button className="pk-btn" onClick={() => analyzeDocument()} disabled={!selectedFile} style={{ width: '100%', fontWeight: 700, opacity: selectedFile ? 1 : .55 }}>
+                    🧠 Dokument mit OpenAI analysieren
                   </button>
                 </div>
               )}
@@ -558,7 +647,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
                 </div>
               )}
 
-              {stage === 'done' && result && (
+              {stage === 'done' && docResult && (
                 <div>
                   <div style={{
                     padding: '12px 16px', borderRadius: 12, marginBottom: 16,
@@ -568,30 +657,50 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
                     <span style={{ fontSize: 20 }}>✅</span>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 14, color: '#4ddb7e' }}>
-                        {result.type} erkannt – {result.confidence}% Konfidenz
+                        {labelForDocumentType(docResult.documentType)} erkannt – {Math.round((docResult.confidence ?? 0) * 100)}% Konfidenz
                       </div>
-                      <div style={{ fontSize: 12, color: '#aeb9c8' }}>{result.raw}</div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8' }}>{docResult.summary}</div>
                     </div>
                   </div>
 
                   <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
-                    {Object.entries(result.fields).map(([key, val]) => (
+                    {Object.entries(editableFields).map(([key, val]) => (
                       <div key={key} style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        display: 'grid', gridTemplateColumns: '150px 1fr', gap: 10, alignItems: 'center',
                         padding: '8px 12px', borderRadius: 8,
                         background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.06)',
                       }}>
                         <span style={{ fontSize: 12, color: '#aeb9c8' }}>{key}</span>
-                        <span style={{ fontSize: 13, fontWeight: 600 }}>{val}</span>
+                        <input
+                          className="pk-input"
+                          value={val}
+                          onChange={e => setEditableFields(prev => ({ ...prev, [key]: e.target.value }))}
+                          style={{ minHeight: 34, fontSize: 13 }}
+                        />
                       </div>
                     ))}
                   </div>
 
+                  {docResult.suggestedActions.length > 0 && (
+                    <div style={{ display: 'grid', gap: 6, marginBottom: 16 }}>
+                      {docResult.suggestedActions.map((a, i) => (
+                        <div key={i} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(167,139,250,.08)', border: '1px solid rgba(167,139,250,.18)', fontSize: 13, color: '#c4b5fd' }}>
+                          💡 {a}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: 10 }}>
-                    <button className="pk-btn" style={{ flex: 1, fontWeight: 700, fontSize: 13 }}>
-                      📥 In Wareneingang übernehmen
+                    <button className="pk-btn" onClick={applyDocumentResult} style={{ flex: 1, fontWeight: 700, fontSize: 13 }}>
+                      {docConfirm ? '✅ Ja, übernehmen' : '📥 Ergebnis übernehmen'}
                     </button>
-                    <button className="pk-btn-ghost" onClick={() => setStage('idle')} style={{ fontSize: 13 }}>
+                    {docConfirm && (
+                      <button className="pk-btn-ghost" onClick={() => setDocConfirm(false)} style={{ fontSize: 13 }}>
+                        Abbrechen
+                      </button>
+                    )}
+                    <button className="pk-btn-ghost" onClick={resetDocument} style={{ fontSize: 13 }}>
                       Neu
                     </button>
                   </div>
@@ -599,24 +708,23 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
               )}
             </div>
 
-            {/* Letzte Erkennungen */}
+            {/* Letzte Dokumente */}
             <div className="pk-card">
-              <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 800 }}>Letzte Erkennungen</h3>
-              {[
-                { doc: 'Lieferschein LS-2025-08844', time: 'Vor 2h', conf: 99, typ: '📄' },
-                { doc: 'Rechnung RE-2025-1123', time: 'Gestern', conf: 95, typ: '🧾' },
-                { doc: 'Artikelfoto Stahlrohr', time: 'Gestern', conf: 88, typ: '📸' },
-              ].map(r => (
-                <div key={r.doc} style={{
+              <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 800 }}>Letzte Dokumente</h3>
+              {(savedDocs.length > 0 ? savedDocs : [
+                { documentType: 'lieferschein', summary: 'Demo: Lieferschein LS-2025-08844', confidence: .99, extracted: {}, suggestedActions: [] },
+                { documentType: 'rechnung', summary: 'Demo: Rechnung RE-2025-1123', confidence: .95, extracted: {}, suggestedActions: [] },
+              ] as DocumentAiResult[]).map((r, i) => (
+                <div key={`${r.summary}-${i}`} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0',
                   borderBottom: '1px solid rgba(255,255,255,.05)',
                 }}>
-                  <span style={{ fontSize: 20 }}>{r.typ}</span>
+                  <span style={{ fontSize: 20 }}>{r.documentType === 'rechnung' ? '🧾' : '📄'}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{r.doc}</div>
-                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>{r.time}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{labelForDocumentType(r.documentType)}</div>
+                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>{r.summary}</div>
                   </div>
-                  <span className="badge badge-green">{r.conf}%</span>
+                  <span className="badge badge-green">{Math.round(r.confidence * 100)}%</span>
                 </div>
               ))}
             </div>
@@ -641,18 +749,18 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
               </div>
             ))}
             <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 10, background: 'rgba(167,139,250,.08)', border: '1px solid rgba(167,139,250,.2)', fontSize: 12, color: '#c4b5fd' }}>
-              💡 Im Demo-Modus werden Erkennungsergebnisse simuliert. Mit ANTHROPIC_API_KEY wird echte OCR-Erkennung aktiviert.
+              💡 Echte KI läuft nur hier im Dokumente-Tab über OPENAI_API_KEY. Der normale Chat bleibt Simulation.
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Tab 3: KI-Chat ── */}
+      {/* ── Tab 3: Demo-Chat ── */}
       {activeTab === 'chat' && (
         <div className="pk-card" style={{ display: 'flex', flexDirection: 'column', minHeight: 560 }}>
-          <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>💬 KI-Assistent</h3>
+          <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>💬 Demo-Chat</h3>
           <p style={{ margin: '0 0 14px', color: '#aeb9c8', fontSize: 13 }}>
-            Stellen Sie Fragen zu Ihrem Lager, Artikeln, Aufgaben oder Betriebsprozessen.
+            Simulierter Assistent ohne echte KI-Antworten. Echte KI wird nur im Tab „Dokumente" verwendet.
           </p>
 
           {/* Chat-Verlauf */}
@@ -820,7 +928,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
           </div>
 
           <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(167,139,250,.08)', border: '1px solid rgba(167,139,250,.2)', fontSize: 11, color: '#c4b5fd' }}>
-            💡 Demo: ANTHROPIC_API_KEY in .env.local für echte KI-Antworten eintragen
+            💡 Der allgemeine Chat bleibt absichtlich Simulation. OPENAI_API_KEY wird nur für Dokumente genutzt.
           </div>
         </div>
       )}

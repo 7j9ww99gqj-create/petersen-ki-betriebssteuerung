@@ -246,7 +246,7 @@ export default function EinstellungenPage() {
               <Toggle checked={notif.auftraege} onChange={() => setNotif(p => ({ ...p, auftraege: !p.auftraege }))} label="Auftrags-Updates" desc="Statusänderungen bei Werkstatt-Aufträgen und Arbeitskarten" />
               <Toggle checked={notif.rechnungen} onChange={() => setNotif(p => ({ ...p, rechnungen: !p.rechnungen }))} label="Überfällige Rechnungen" desc="Erinnerung bei Zahlungsverzug im BüroPilot" />
               <Toggle checked={notif.cloudSync} onChange={() => setNotif(p => ({ ...p, cloudSync: !p.cloudSync }))} label="Cloud-Sync Status" desc="Meldungen zu Backup und Synchronisierungsstatus" />
-              <Toggle checked={notif.kiErkennungen} onChange={() => setNotif(p => ({ ...p, kiErkennungen: !p.kiErkennungen }))} label="KI-Erkennungen" desc="Benachrichtigungen nach automatischer Dokumentenanalyse" />
+              <Toggle checked={notif.kiErkennungen} onChange={() => setNotif(p => ({ ...p, kiErkennungen: !p.kiErkennungen }))} label="KI-Assistenten-Auswertungen" desc="Benachrichtigungen nach automatischer Dokumentenanalyse" />
               <div style={{ marginTop: 20 }}>
                 <button className="pk-btn" onClick={handleNotifSave} style={{ fontWeight: 700 }}>Einstellungen speichern</button>
               </div>
@@ -258,8 +258,8 @@ export default function EinstellungenPage() {
               Admin: 'Vollzugriff auf alle Funktionen und Einstellungen',
               Mitarbeiter: 'Zugriff auf Kernfunktionen, kein Löschen',
               Büro: 'Büro, Analyse, Archiv und Einstellungen',
-              Werkstatt: 'Werkstatt, Lager, Planung und KI-Erkennung',
-              Lager: 'Nur Lagerverwaltung und KI-Erkennung',
+              Werkstatt: 'Werkstatt, Lager, Planung und KI-Assistent',
+              Lager: 'Nur Lagerverwaltung und KI-Assistent',
             }
             const allRoles = Object.keys(ROLE_LABELS) as AppRole[]
             return (

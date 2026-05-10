@@ -1446,9 +1446,9 @@ export default function LagerPilotPage() {
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <span style={{ fontSize: 22 }}>🧠</span>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>KI-Erkennung</div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>KI-Assistent</div>
                 <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>Lieferschein fotografieren → Daten automatisch erfassen</div>
-                <button className="pk-btn-ghost" onClick={() => window.location.href = '/dashboard/ki-erkennung'} style={{ fontSize: 12, marginTop: 10, padding: '7px 14px' }}>📸 KI Erkennung öffnen</button>
+                <button className="pk-btn-ghost" onClick={() => window.location.href = '/dashboard/ki-erkennung'} style={{ fontSize: 12, marginTop: 10, padding: '7px 14px' }}>📸 KI-Assistent öffnen</button>
               </div>
             </div>
           </div>

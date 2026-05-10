@@ -144,7 +144,7 @@ export default function AnalysePilotPage() {
             <KPICard icon="💶" label="Umsatz (lfd. Monat)" value="47.200 €" delta="+8%" color="#10b981" />
             <KPICard icon="📈" label="Gewinn (lfd. Monat)" value="18.800 €" delta="+12%" color="#1684ff" />
             <KPICard icon="📦" label="Artikel im Lager" value="1.248" delta="+12" color="#f59e0b" sub="Davon 3 niedrig" />
-            <KPICard icon="🧠" label="KI-Erkennungen" value="847" delta="+14%" color="#a78bfa" sub="Diese Woche" />
+            <KPICard icon="🧠" label="KI-Assistenten-Auswertungen" value="847" delta="+14%" color="#a78bfa" sub="Diese Woche" />
             <KPICard icon="✅" label="Auftragsquote" value="94%" color="#10b981" sub="Pünktlich abgeschlossen" />
             <KPICard icon="👥" label="Aktive Kunden" value="5" color="#20c8ff" sub="1 Inaktiv" />
             <KPICard icon="📋" label="Offene Angebote" value="4" color="#f59e0b" sub="Wert: 38.150 €" />
@@ -364,7 +364,7 @@ export default function AnalysePilotPage() {
           </div>
 
           <div className="pk-card" style={{ marginBottom: 16 }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>🧠 KI-Erkennungen pro Tag (diese Woche)</h3>
+            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>🧠 KI-Assistenten-Auswertungen pro Tag (diese Woche)</h3>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={kiErkennungData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barGap={2}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" vertical={false} />

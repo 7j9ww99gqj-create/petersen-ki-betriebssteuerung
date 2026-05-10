@@ -15,7 +15,7 @@ const bottomNavItems = [
   { href: '/dashboard/lager',       icon: '📦', label: 'Lager' },
   { href: '/dashboard/buero',       icon: '🧾', label: 'Büro' },
   { href: '/dashboard/werkstatt',   icon: '🛠️', label: 'Werkstatt' },
-  { href: '/dashboard/ki-erkennung',icon: '🧠', label: 'KI' },
+  { href: '/dashboard/ki-erkennung',icon: '🧠', label: 'KI-Assist' },
   { href: '#menu',                  icon: '☰',  label: 'Menü' },
 ]
 
