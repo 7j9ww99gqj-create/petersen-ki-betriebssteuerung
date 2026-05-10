@@ -1556,6 +1556,98 @@ export default function LagerPilotPage() {
             )}
 
 
+            {/* Optimierungsvorschläge */}
+            {(() => {
+              type Vorschlag = { icon: string; text: string; typ: 'kritisch' | 'warnung' | 'info' }
+              const vorschlaege: Vorschlag[] = []
+
+              // Regel 1: Stellplatz mit ≥ 3 Positionen (überfüllt)
+              stellplaetze.forEach(sp => {
+                const pos = stellplatzBestand.filter(sb => sb.stellplatz_id === sp.id)
+                if (pos.length >= 3) {
+                  vorschlaege.push({
+                    icon: '📦',
+                    text: `Stellplatz ${sp.code} ist mit ${pos.length} Positionen überfüllt → Teile umlagern`,
+                    typ: 'warnung',
+                  })
+                }
+              })
+
+              // Regel 2: Gleicher Artikel auf ≥ 3 Stellplätzen → zusammenführen
+              const artNrMap: Record<string, string[]> = {}
+              stellplatzBestand.forEach(sb => {
+                const key = sb.artikelnummer ?? sb.artikelname ?? ''
+                if (!key) return
+                if (!artNrMap[key]) artNrMap[key] = []
+                if (!artNrMap[key].includes(sb.stellplatz_id)) artNrMap[key].push(sb.stellplatz_id)
+              })
+              Object.entries(artNrMap).forEach(([key, spIds]) => {
+                if (spIds.length >= 3) {
+                  const name = stellplatzBestand.find(sb => (sb.artikelnummer ?? sb.artikelname) === key)?.artikelname ?? key
+                  const codes = spIds.map(id => stellplaetze.find(sp => sp.id === id)?.code ?? id).join(', ')
+                  vorschlaege.push({
+                    icon: '🔀',
+                    text: `„${name}" liegt auf ${spIds.length} Stellplätzen (${codes}) → Bestände zusammenführen`,
+                    typ: 'info',
+                  })
+                }
+              })
+
+              // Regel 3: Stellplatz mit nur 1 Position und Menge = 1 (ineffizient)
+              stellplaetze.forEach(sp => {
+                const pos = stellplatzBestand.filter(sb => sb.stellplatz_id === sp.id)
+                if (pos.length === 1 && pos[0].menge === 1) {
+                  vorschlaege.push({
+                    icon: '💡',
+                    text: `Stellplatz ${sp.code} hält nur 1 Einheit von „${pos[0].artikelname ?? '?'}" → konsolidieren`,
+                    typ: 'info',
+                  })
+                }
+              })
+
+              // Regel 4: MHD abgelaufen
+              stellplatzBestand.filter(sb => mhdStatus(sb.mhd) === 'abgelaufen').forEach(sb => {
+                const sp = stellplaetze.find(x => x.id === sb.stellplatz_id)
+                vorschlaege.push({
+                  icon: '🚨',
+                  text: `MHD abgelaufen: „${sb.artikelname ?? '?'}" auf ${sp?.code ?? '?'} (MHD ${sb.mhd}) → sofort prüfen`,
+                  typ: 'kritisch',
+                })
+              })
+
+              if (vorschlaege.length === 0) return null
+
+              const farbe: Record<Vorschlag['typ'], string> = {
+                kritisch: 'rgba(244,63,94,.08)',
+                warnung: 'rgba(245,158,11,.08)',
+                info: 'rgba(22,132,255,.07)',
+              }
+              const rand: Record<Vorschlag['typ'], string> = {
+                kritisch: 'rgba(244,63,94,.25)',
+                warnung: 'rgba(245,158,11,.25)',
+                info: 'rgba(22,132,255,.2)',
+              }
+              const textCol: Record<Vorschlag['typ'], string> = {
+                kritisch: '#f87171',
+                warnung: '#fbbf24',
+                info: '#6cb6ff',
+              }
+
+              return (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fbff', marginBottom: 8 }}>💡 Optimierungsvorschläge ({vorschlaege.length})</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {vorschlaege.map((v, i) => (
+                      <div key={i} className="pk-card" style={{ padding: '10px 14px', background: farbe[v.typ], border: `1px solid ${rand[v.typ]}`, display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{v.icon}</span>
+                        <span style={{ fontSize: 13, color: textCol[v.typ], fontWeight: 500 }}>{v.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Toolbar */}
             <div style={{ marginBottom: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
               <input
