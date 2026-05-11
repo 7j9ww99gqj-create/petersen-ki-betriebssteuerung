@@ -9,6 +9,9 @@ import {
   getBueroEingangsrechnungen, upsertBueroEingangsrechnung, deleteBueroEingangsrechnung,
   markEingangsrechnungBezahlt, updateEingangsrechnungStatus,
   getBueroDokumente, insertBueroDokument, deleteBueroDokument,
+  getEinkaufLieferanten, upsertEinkaufLieferant, deleteEinkaufLieferant,
+  getEinkaufBestellungen, upsertEinkaufBestellung,
+  getEinkaufWareneingaenge, insertEinkaufWareneingang,
 } from '@/lib/db'
 import { generateRechnungPDF, generateAngebotPDF } from '@/lib/pdf'
 
@@ -1829,6 +1832,7 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
   const [showForm, setShowForm] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [editLieferant, setEditLieferant] = useState<Lieferant | null>(null)
+  const [loading, setLoading] = useState(!isDemo)
 
   // Lieferant-Formular
   const [lfForm, setLfForm] = useState({ name: '', kontakt: '', email: '', telefon: '', ort: '', kategorie: 'Rohstoffe', zahlungsziel: '30 Tage netto' })
@@ -1843,12 +1847,28 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
   }
   const heute = () => new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
+  useEffect(() => {
+    if (isDemo) return
+    Promise.all([getEinkaufLieferanten(), getEinkaufBestellungen(), getEinkaufWareneingaenge()])
+      .then(([l, b, w]) => {
+        setLieferanten(l as Lieferant[])
+        setBestellungen(b as EinkaufsBestellung[])
+        setWareneingaenge(w as Wareneingang[])
+      })
+      .catch(() => showToast('Einkaufsdaten konnten nicht geladen werden', true))
+      .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDemo])
+
   // ── Lieferanten CRUD ──────────────────────────────────────────────────────
 
-  const handleLieferantSave = () => {
+  const handleLieferantSave = async () => {
     if (!lfForm.name || !lfForm.email) return
     if (editLieferant) {
       const updated: Lieferant = { ...editLieferant, ...lfForm, bewertung: editLieferant.bewertung }
+      if (!isDemo) {
+        try { await upsertEinkaufLieferant(updated) } catch { showToast('Fehler beim Speichern', true); return }
+      }
       setLieferanten(prev => prev.map(l => l.id === editLieferant.id ? updated : l))
       setEditLieferant(null)
       showToast(`✅ Lieferant "${updated.name}" aktualisiert`)
@@ -1856,6 +1876,9 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
       const neu: Lieferant = {
         id: `LF-${String(lieferanten.length + 1).padStart(3, '0')}`,
         ...lfForm, status: 'Aktiv', bewertung: 4,
+      }
+      if (!isDemo) {
+        try { await upsertEinkaufLieferant(neu) } catch { showToast('Fehler beim Speichern', true); return }
       }
       setLieferanten(prev => [neu, ...prev])
       showToast(`✅ Lieferant "${neu.name}" wurde angelegt`)
@@ -1873,7 +1896,7 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
 
   // ── Bestellung anlegen ─────────────────────────────────────────────────────
 
-  const handleBestellungSave = () => {
+  const handleBestellungSave = async () => {
     if (!bsForm.lieferant || !bsForm.artikel || !bsForm.menge || !bsForm.einkaufspreis) return
     const menge = parseFloat(bsForm.menge) || 0
     const ep = parseFloat(bsForm.einkaufspreis.replace(',', '.')) || 0
@@ -1885,25 +1908,36 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
       gesamt, status: 'Entwurf', bestellt_am: heute(), erwartet_am: bsForm.erwartet_am || '',
       notiz: bsForm.notiz || undefined,
     }
+    if (!isDemo) {
+      try { await upsertEinkaufBestellung(neu) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setBestellungen(prev => [neu, ...prev])
     setBsForm({ lieferant: '', artikel: '', menge: '', einheit: 'Stk', einkaufspreis: '', erwartet_am: '', notiz: '' })
     setShowForm(false)
     showToast(`✅ Bestellung "${neu.id}" wurde als Entwurf gespeichert`)
   }
 
-  const handleBestellungAusloesen = (id: string) => {
+  const handleBestellungAusloesen = async (id: string) => {
+    const bestellung = bestellungen.find(b => b.id === id)
+    if (!isDemo && bestellung) {
+      try { await upsertEinkaufBestellung({ ...bestellung, status: 'Bestellt' }) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setBestellungen(prev => prev.map(b => b.id === id ? { ...b, status: 'Bestellt' } : b))
     showToast(`📤 Bestellung ${id} wurde ausgelöst`)
   }
 
-  const handleBestellungGeliefert = (id: string) => {
+  const handleBestellungGeliefert = async (id: string) => {
+    const bestellung = bestellungen.find(b => b.id === id)
+    if (!isDemo && bestellung) {
+      try { await upsertEinkaufBestellung({ ...bestellung, status: 'Geliefert', geliefert_am: heute() }) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setBestellungen(prev => prev.map(b => b.id === id ? { ...b, status: 'Geliefert', geliefert_am: heute() } : b))
     showToast(`✅ Bestellung ${id} als geliefert markiert`)
   }
 
   // ── Wareneingang buchen ───────────────────────────────────────────────────
 
-  const handleWareneingangSave = () => {
+  const handleWareneingangSave = async () => {
     if (!weForm.bestellung_id || !weForm.artikel || !weForm.menge) return
     const bestellung = bestellungen.find(b => b.id === weForm.bestellung_id)
     const neu: Wareneingang = {
@@ -1914,6 +1948,9 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
       einheit: weForm.einheit, datum: heute(),
       qualitaet: weForm.qualitaet, mitarbeiter: weForm.mitarbeiter || '—',
     }
+    if (!isDemo) {
+      try { await insertEinkaufWareneingang(neu) } catch { showToast('Fehler beim Speichern', true); return }
+    }
     setWareneingaenge(prev => [neu, ...prev])
     if (bestellung && bestellung.menge === neu.menge) {
       setBestellungen(prev => prev.map(b => b.id === neu.bestellung_id ? { ...b, status: 'Geliefert', geliefert_am: heute() } : b))
@@ -1923,6 +1960,15 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
     setWeForm({ bestellung_id: '', lieferant: '', artikel: '', menge: '', einheit: 'Stk', qualitaet: 'OK', mitarbeiter: '' })
     setShowForm(false)
     showToast(`✅ Wareneingang "${neu.id}" gebucht – ${neu.menge} ${neu.einheit} "${neu.artikel}"`)
+  }
+
+  const handleLieferantDelete = async (id: string) => {
+    if (!isDemo) {
+      try { await deleteEinkaufLieferant(id) } catch { showToast('Fehler beim Löschen', true); return }
+    }
+    setLieferanten(prev => prev.filter(l => l.id !== id))
+    setDeleteId(null)
+    showToast('🗑️ Lieferant gelöscht')
   }
 
   // KPIs
@@ -1939,6 +1985,8 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
   const weQualColor: Record<string, string> = { OK: 'badge-green', Mängel: 'badge-orange', Abgelehnt: 'badge-red' }
   const KATEGORIEN_LF = ['Rohstoffe', 'Kleinteile', 'Betriebsstoffe', 'Verbrauchsmaterial', 'Werkzeug', 'Schutzausrüstung', 'Büromaterial', 'Sonstiges']
   const EINHEITEN_LF = ['Stk', 'Liter', 'kg', 'Meter', 'Rollen', 'Paar', 'Karton', 'Palette']
+
+  if (loading) return <div className="pk-card" style={{ color: '#aeb9c8' }}>Lade Einkaufsdaten…</div>
 
   return (
     <div>
@@ -2037,7 +2085,7 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
                       <td><span className={`badge ${l.status === 'Aktiv' ? 'badge-green' : 'badge-gray'}`}>{l.status}</span></td>
                       <td>
                         {deleteId === l.id ? (
-                          <DeleteConfirm label={l.name} onConfirm={() => { setLieferanten(prev => prev.filter(x => x.id !== l.id)); setDeleteId(null); showToast('🗑️ Lieferant gelöscht') }} onCancel={() => setDeleteId(null)} />
+                          <DeleteConfirm label={l.name} onConfirm={() => handleLieferantDelete(l.id)} onCancel={() => setDeleteId(null)} />
                         ) : (
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button onClick={() => openEditLieferant(l)} style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>

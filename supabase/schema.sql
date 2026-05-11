@@ -86,6 +86,9 @@ create table if not exists buero_kunden (
   ansprechpartner text,
   email           text,
   telefon         text,
+  adresse         text,
+  kundennummer    text,
+  notizen         text,
   ort             text,
   umsatz          text,
   status          text default 'Aktiv',
@@ -124,11 +127,16 @@ create table if not exists buero_rechnungen (
   id          text primary key,
   user_id     uuid references auth.users not null default auth.uid(),
   kunde       text,
+  nummer      text,
   betrag      text,
+  summe       numeric default 0,
+  datum       text,
   faellig     text,
+  faellig_am  text,
   erstellt    text,
   status      text default 'Offen',
   bezahlt_am  text,
+  notiz       text,
   created_at  timestamptz default now(),
   updated_at  timestamptz default now()
 );
@@ -248,6 +256,11 @@ create policy "einkauf_wareneingaenge_user" on einkauf_wareneingaenge for all us
 
 -- lager_artikel benötigt auch mindestbestand-Spalte (falls noch nicht vorhanden):
 alter table lager_artikel add column if not exists mindestbestand integer default 0;
+alter table lager_artikel add column if not exists artikelnummer text;
+alter table lager_artikel add column if not exists beschreibung text;
+alter table lager_artikel add column if not exists einkaufspreis numeric default 0;
+alter table lager_artikel add column if not exists verkaufspreis numeric default 0;
+alter table lager_artikel add column if not exists lagerort text;
 
 -- ── WerkstattPilot ──────────────────────────────────────────
 
@@ -493,6 +506,8 @@ create table if not exists steuer_belege (
   datum date not null,
   status text not null default 'offen',
   datei_url text,
+  belegnummer text,
+  kategorie text,
   notiz text,
   erstellt_am timestamp default now()
 );
