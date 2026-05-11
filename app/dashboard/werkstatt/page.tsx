@@ -4,6 +4,7 @@ import { hasDemoCookie } from '@/lib/auth'
 import {
   getWerkstattKarten, upsertWerkstattKarte, deleteWerkstattKarte,
   getWerkstattMitarbeiter, upsertWerkstattMitarbeiter, deleteWerkstattMitarbeiter,
+  getWerkstattBereiche, upsertWerkstattBereich, deleteWerkstattBereich,
   getWerkstattZeitbuchungen, insertWerkstattZeitbuchung,
   getWerkstattMaterial, insertWerkstattMaterial,
   getWerkstattPruefprotokolle, insertWerkstattPruefprotokoll,
@@ -39,6 +40,11 @@ type Pruefprotokoll = {
 type Mitarbeiter = {
   id: string; name: string; rolle?: string; email?: string; telefon?: string
   aktiv?: boolean; notiz?: string; created_at?: string; updated_at?: string
+}
+
+type WerkstattBereich = {
+  id: string; name: string; typ?: string; aktiv?: boolean; notiz?: string
+  created_at?: string; updated_at?: string
 }
 
 // ── Demo-Daten ────────────────────────────────────────────────────────────────
@@ -82,7 +88,14 @@ const demoMitarbeiter: Mitarbeiter[] = mitarbeiterListe.map((name, index) => ({
   rolle: index < 2 ? 'Mechanik' : index < 4 ? 'Fertigung' : 'Aushilfe',
   aktiv: true,
 }))
-const maschineListe = ['HP-Station-3', 'Schweißbereich-B', 'Förderband-2', 'Elektro-Werkstatt', 'CNC-Fräse-1', 'Drehmaschine-2', '—']
+const demoBereiche: WerkstattBereich[] = [
+  { id: 'WB-001', name: 'HP-Station-3', typ: 'Maschine', aktiv: true, notiz: 'Hydraulikpresse Station 3' },
+  { id: 'WB-002', name: 'Schweißbereich-B', typ: 'Bereich', aktiv: true },
+  { id: 'WB-003', name: 'Förderband-2', typ: 'Anlage', aktiv: true },
+  { id: 'WB-004', name: 'Elektro-Werkstatt', typ: 'Bereich', aktiv: true },
+  { id: 'WB-005', name: 'CNC-Fräse-1', typ: 'Maschine', aktiv: true },
+  { id: 'WB-006', name: 'Drehmaschine-2', typ: 'Maschine', aktiv: true },
+]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -146,11 +159,12 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 // ── Edit-Modal für Arbeitskarten ──────────────────────────────────────────────
 
-function EditKarteModal({ karte, onClose, onSave, mitarbeiterNamen }: {
+function EditKarteModal({ karte, onClose, onSave, mitarbeiterNamen, bereichNamen }: {
   karte: Arbeitskarte
   onClose: () => void
   onSave: (updated: Arbeitskarte) => void
   mitarbeiterNamen: string[]
+  bereichNamen: string[]
 }) {
   const [form, setForm] = useState({
     auftragsnr: karte.auftragsnr,
@@ -204,7 +218,7 @@ function EditKarteModal({ karte, onClose, onSave, mitarbeiterNamen }: {
           <label style={labelStyle}>Maschine / Bereich</label>
           <select className="pk-input" value={form.maschine} onChange={e => setForm(p => ({ ...p, maschine: e.target.value }))} style={{ cursor: 'pointer' }}>
             <option value="">Maschine wählen…</option>
-            {maschineListe.map(m => <option key={m}>{m}</option>)}
+            {bereichNamen.map(m => <option key={m}>{m}</option>)}
           </select>
         </div>
         <div>
@@ -251,7 +265,7 @@ function EditKarteModal({ karte, onClose, onSave, mitarbeiterNamen }: {
 
 // ── Arbeitskarten-Tab ─────────────────────────────────────────────────────────
 
-function ArbeitskartentTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeiterNamen: string[] }) {
+function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen }: { isDemo: boolean; mitarbeiterNamen: string[]; bereichNamen: string[] }) {
   const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
@@ -444,8 +458,9 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mita
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Maschine / Bereich</label>
               <select className="pk-input" value={form.maschine} onChange={e => setForm(p => ({ ...p, maschine: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option value="">Maschine wählen…</option>
-                {maschineListe.map(m => <option key={m}>{m}</option>)}
+                {bereichNamen.map(m => <option key={m}>{m}</option>)}
               </select>
+              {bereichNamen.length === 0 && <div style={{ marginTop: 5, fontSize: 11, color: '#f59e0b' }}>Noch keine Maschinen/Bereiche angelegt.</div>}
             </div>
             <div>
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Priorität</label>
@@ -581,6 +596,7 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mita
           onClose={() => setEditKarte(null)}
           onSave={handleEditSave}
           mitarbeiterNamen={mitarbeiterNamen}
+          bereichNamen={bereichNamen}
         />
       )}
     </div>
@@ -1177,7 +1193,137 @@ function MitarbeiterTab({ isDemo, mitarbeiter, setMitarbeiter }: {
   )
 }
 
-type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet' | 'mitarbeiter'
+function BereicheTab({ isDemo, bereiche, setBereiche }: {
+  isDemo: boolean
+  bereiche: WerkstattBereich[]
+  setBereiche: React.Dispatch<React.SetStateAction<WerkstattBereich[]>>
+}) {
+  const [form, setForm] = useState({ name: '', typ: 'Bereich', aktiv: true, notiz: '' })
+  const [editId, setEditId] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [toast, setToast] = useState('')
+  const [toastError, setToastError] = useState(false)
+
+  const showToast = (msg: string, error = false) => {
+    setToast(msg); setToastError(error)
+    setTimeout(() => { setToast(''); setToastError(false) }, 3500)
+  }
+
+  const reset = () => {
+    setForm({ name: '', typ: 'Bereich', aktiv: true, notiz: '' })
+    setEditId(null)
+  }
+
+  const save = async () => {
+    if (!form.name.trim()) { showToast('Name ist Pflicht', true); return }
+    const duplicate = bereiche.some(b => b.name.toLowerCase() === form.name.trim().toLowerCase() && b.id !== editId)
+    if (duplicate) { showToast('Dieser Name existiert bereits', true); return }
+    const payload: WerkstattBereich = {
+      id: editId ?? `WB-${Date.now().toString(36).toUpperCase()}`,
+      name: form.name.trim(),
+      typ: form.typ || 'Bereich',
+      aktiv: form.aktiv,
+      notiz: form.notiz || undefined,
+    }
+    if (!isDemo) {
+      try { await upsertWerkstattBereich(payload) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setBereiche(prev => editId ? prev.map(b => b.id === editId ? payload : b) : [payload, ...prev])
+    reset()
+    showToast(editId ? '✅ Bereich aktualisiert' : '✅ Bereich angelegt')
+  }
+
+  const remove = async (id: string) => {
+    if (!isDemo) {
+      try { await deleteWerkstattBereich(id) } catch { showToast('Fehler beim Löschen', true); return }
+    }
+    setBereiche(prev => prev.filter(b => b.id !== id))
+    setDeleteId(null)
+    showToast('🗑️ Bereich entfernt')
+  }
+
+  const edit = (b: WerkstattBereich) => {
+    setEditId(b.id)
+    setForm({ name: b.name, typ: b.typ ?? 'Bereich', aktiv: b.aktiv !== false, notiz: b.notiz ?? '' })
+  }
+
+  const active = bereiche.filter(b => b.aktiv !== false).length
+
+  return (
+    <div>
+      <Toast msg={toast} isError={toastError} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+        {[
+          { label: 'Gesamt', value: String(bereiche.length), icon: '🏭', color: '#a78bfa' },
+          { label: 'Aktiv', value: String(active), icon: '✅', color: '#10b981' },
+          { label: 'Inaktiv', value: String(bereiche.length - active), icon: '⏸️', color: '#f59e0b' },
+        ].map(s => (
+          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="pk-card" style={{ marginBottom: 16, border: '1px solid rgba(167,139,250,.22)' }}>
+        <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 800 }}>{editId ? '✏️ Maschine/Bereich bearbeiten' : '+ Maschine/Bereich anlegen'}</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <input className="pk-input" placeholder="Name *" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+          <select className="pk-input" value={form.typ} onChange={e => setForm(p => ({ ...p, typ: e.target.value }))}>
+            <option>Bereich</option>
+            <option>Maschine</option>
+            <option>Anlage</option>
+            <option>Arbeitsplatz</option>
+            <option>Sonstiges</option>
+          </select>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#d0d9e8', fontSize: 13 }}>
+            <input type="checkbox" checked={form.aktiv} onChange={e => setForm(p => ({ ...p, aktiv: e.target.checked }))} />
+            Aktiv
+          </label>
+        </div>
+        <textarea className="pk-input" rows={3} placeholder="Notiz" value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} style={{ marginTop: 12 }} />
+        <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+          <button className="pk-btn" onClick={save}>{editId ? 'Speichern' : 'Maschine/Bereich anlegen'}</button>
+          {editId && <button className="pk-btn-ghost" onClick={reset}>Abbrechen</button>}
+        </div>
+      </div>
+
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+        <table className="pk-table">
+          <thead><tr><th>Name</th><th>Typ</th><th>Status</th><th>Notiz</th><th>Aktionen</th></tr></thead>
+          <tbody>
+            {bereiche.length === 0 ? (
+              <tr><td colSpan={5} style={{ textAlign: 'center', padding: 36, color: '#aeb9c8' }}>Noch keine Maschinen oder Bereiche angelegt.</td></tr>
+            ) : bereiche.map(b => (
+              <tr key={b.id}>
+                <td style={{ fontWeight: 800 }}>🏭 {b.name}</td>
+                <td><span className="badge badge-gray">{b.typ ?? 'Bereich'}</span></td>
+                <td><span className={`badge ${b.aktiv === false ? 'badge-gray' : 'badge-green'}`}>{b.aktiv === false ? 'Inaktiv' : 'Aktiv'}</span></td>
+                <td style={{ color: '#aeb9c8', fontSize: 12 }}>{b.notiz ?? '—'}</td>
+                <td>
+                  {deleteId === b.id ? (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => remove(b.id)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.4)', background: 'rgba(244,63,94,.1)', color: '#fb7185', cursor: 'pointer', fontWeight: 700 }}>Ja</button>
+                      <button onClick={() => setDeleteId(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,.15)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => edit(b)} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(167,139,250,.25)', background: 'rgba(167,139,250,.08)', color: '#c4b5fd', cursor: 'pointer' }}>✏️</button>
+                      <button onClick={() => setDeleteId(b.id)} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.2)', background: 'transparent', color: '#fb7185', cursor: 'pointer' }}>🗑️</button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet' | 'mitarbeiter' | 'bereiche'
 
 export default function WerkstattPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
@@ -1185,13 +1331,14 @@ export default function WerkstattPilotPage() {
   const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
   const [zeitbuchungen, setZeitbuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])
   const [mitarbeiter, setMitarbeiter] = useState<Mitarbeiter[]>(isDemo ? demoMitarbeiter : [])
+  const [bereiche, setBereiche] = useState<WerkstattBereich[]>(isDemo ? demoBereiche : [])
   const [loading, setLoading] = useState(!isDemo)
   const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
     if (isDemo) return
-    Promise.all([getWerkstattKarten(), getWerkstattZeitbuchungen(), getWerkstattMitarbeiter()])
-      .then(([k, z, m]) => { setKarten(k as Arbeitskarte[]); setZeitbuchungen(z as Zeitbuchung[]); setMitarbeiter(m as Mitarbeiter[]) })
+    Promise.all([getWerkstattKarten(), getWerkstattZeitbuchungen(), getWerkstattMitarbeiter(), getWerkstattBereiche()])
+      .then(([k, z, m, b]) => { setKarten(k as Arbeitskarte[]); setZeitbuchungen(z as Zeitbuchung[]); setMitarbeiter(m as Mitarbeiter[]); setBereiche(b as WerkstattBereich[]) })
       .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
   }, [isDemo])
@@ -1202,6 +1349,7 @@ export default function WerkstattPilotPage() {
   const heuteStunden = zeitbuchungen.filter(b => b.datum === today).reduce((s, b) => s + b.stunden, 0)
   const aktiveMitarbeiter = mitarbeiter.filter(m => m.aktiv !== false)
   const mitarbeiterNamen = aktiveMitarbeiter.map(m => m.name)
+  const bereichNamen = bereiche.filter(b => b.aktiv !== false).map(b => b.name)
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
@@ -1237,6 +1385,7 @@ export default function WerkstattPilotPage() {
           { label: 'Kritisch', value: String(kritisch), icon: '🔴', color: '#f43f5e' },
           { label: 'Stunden heute', value: `${heuteStunden}h`, icon: '⏱️', color: '#10b981' },
           { label: 'Mitarbeiter', value: String(aktiveMitarbeiter.length), icon: '👷', color: '#f59e0b' },
+          { label: 'Bereiche', value: String(bereichNamen.length), icon: '🏭', color: '#38bdf8' },
         ].map(s => (
           <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
             <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
@@ -1254,6 +1403,7 @@ export default function WerkstattPilotPage() {
           { id: 'material', label: '🔩 Material' },
           { id: 'qualitaet', label: '✅ Qualität' },
           { id: 'mitarbeiter', label: '👷 Mitarbeiter' },
+          { id: 'bereiche', label: '🏭 Maschinen/Bereiche' },
         ] as const).map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding: '10px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
@@ -1263,11 +1413,12 @@ export default function WerkstattPilotPage() {
         ))}
       </div>
 
-      {tab === 'karten' && <ArbeitskartentTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
+      {tab === 'karten' && <ArbeitskartentTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} bereichNamen={bereichNamen} />}
       {tab === 'zeit' && <ZeiterfassungTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
       {tab === 'material' && <MaterialverbrauchTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
       {tab === 'qualitaet' && <QualitaetTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
       {tab === 'mitarbeiter' && <MitarbeiterTab isDemo={isDemo} mitarbeiter={mitarbeiter} setMitarbeiter={setMitarbeiter} />}
+      {tab === 'bereiche' && <BereicheTab isDemo={isDemo} bereiche={bereiche} setBereiche={setBereiche} />}
     </div>
   )
 }

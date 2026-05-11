@@ -132,12 +132,6 @@ const demoUmlagerungen: Umlagerung[] = [
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
-function nextArtikelId(liste: Artikel[]) {
-  const nums = liste.map(a => parseInt(a.id.replace('ART-', '')) || 0)
-  const max = nums.length ? Math.max(...nums) : 0
-  return `ART-${String(max + 1).padStart(3, '0')}`
-}
-
 function calcStatus(bestand: number, mindestbestand: number): string {
   if (bestand === 0) return 'leer'
   if (bestand <= mindestbestand) return 'niedrig'
@@ -172,8 +166,8 @@ function exportCSV(data: Artikel[]) {
 
 // ── Modal-Komponente ─────────────────────────────────────────────────────────
 
-type ArtikelForm = { name: string; kategorie: string; bestand: string; einheit: string; lagerplatz: string; mindestbestand: string }
-const emptyForm: ArtikelForm = { name: '', kategorie: 'Rohstoffe', bestand: '0', einheit: 'Stk', lagerplatz: '', mindestbestand: '0' }
+type ArtikelForm = { id: string; name: string; kategorie: string; einheit: string; mindestbestand: string }
+const emptyForm: ArtikelForm = { id: '', name: '', kategorie: 'Rohstoffe', einheit: 'Stk', mindestbestand: '0' }
 
 function ArtikelModal({ artikel, onSave, onClose }: {
   artikel?: Artikel | null
@@ -181,11 +175,10 @@ function ArtikelModal({ artikel, onSave, onClose }: {
   onClose: () => void
 }) {
   const [form, setForm] = useState<ArtikelForm>(artikel ? {
+    id: artikel.id,
     name: artikel.name,
     kategorie: artikel.kategorie,
-    bestand: String(artikel.bestand),
     einheit: artikel.einheit,
-    lagerplatz: artikel.lagerplatz,
     mindestbestand: String(artikel.mindestbestand ?? 0),
   } : emptyForm)
 
@@ -200,6 +193,11 @@ function ArtikelModal({ artikel, onSave, onClose }: {
           {artikel ? '✏️ Artikel bearbeiten' : '➕ Neuer Artikel'}
         </h3>
         <div style={{ display: 'grid', gap: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikelnummer *</label>
+            <input className="pk-input" placeholder="z.B. ST-40X40 oder ART-001" value={form.id} onChange={set('id')} disabled={Boolean(artikel)} style={{ opacity: artikel ? .65 : 1, cursor: artikel ? 'not-allowed' : 'text' }} />
+            {artikel && <div style={{ marginTop: 5, fontSize: 11, color: '#7f8ea3' }}>Artikelnummern bleiben beim Bearbeiten unverändert.</div>}
+          </div>
           <div>
             <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikelbezeichnung *</label>
             <input className="pk-input" placeholder="z.B. Stahlrohr 40x40" value={form.name} onChange={set('name')} />
@@ -218,23 +216,14 @@ function ArtikelModal({ artikel, onSave, onClose }: {
               </select>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Aktueller Bestand</label>
-              <input className="pk-input" type="number" min="0" value={form.bestand} onChange={set('bestand')} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Mindestbestand ⚠️</label>
-              <input className="pk-input" type="number" min="0" value={form.mindestbestand} onChange={set('mindestbestand')} />
-            </div>
-          </div>
           <div>
-            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Lagerplatz</label>
-            <input className="pk-input" placeholder="z.B. A-01-03" value={form.lagerplatz} onChange={set('lagerplatz')} />
+            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Mindestbestand ⚠️</label>
+            <input className="pk-input" type="number" min="0" value={form.mindestbestand} onChange={set('mindestbestand')} />
+            <div style={{ marginTop: 5, fontSize: 11, color: '#7f8ea3' }}>Menge und Stellplatz werden erst bei der Einlagerung gebucht.</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-          <button className="pk-btn" onClick={() => { if (form.name.trim()) onSave(form) }} style={{ flex: 1, fontWeight: 700 }}>
+          <button className="pk-btn" onClick={() => { if (form.id.trim() && form.name.trim()) onSave(form) }} style={{ flex: 1, fontWeight: 700 }}>
             {artikel ? 'Speichern' : 'Artikel anlegen'}
           </button>
           <button className="pk-btn-ghost" onClick={onClose} style={{ flex: 1 }}>Abbrechen</button>
@@ -817,12 +806,21 @@ export default function LagerPilotPage() {
   // ── Artikel CRUD ─────────────────────────────────────────────────────────────
 
   const handleSaveArtikel = async (form: ArtikelForm) => {
-    const bestand = parseInt(form.bestand) || 0
+    const inputId = form.id.trim()
+    if (!inputId) { showToast('Artikelnummer ist Pflicht', false); return }
+    if (!form.name.trim()) { showToast('Artikelbezeichnung ist Pflicht', false); return }
     const mindestbestand = parseInt(form.mindestbestand) || 0
-    const status = calcStatus(bestand, mindestbestand)
     const isEdit = modal !== null && modal !== 'new'
-    const id = isEdit ? (modal as Artikel).id : nextArtikelId(artikel)
-    const a: Artikel = { id, name: form.name, kategorie: form.kategorie, bestand, einheit: form.einheit, lagerplatz: form.lagerplatz, status, mindestbestand }
+    const id = isEdit ? (modal as Artikel).id : inputId
+    if (!isEdit && artikel.some(a => a.id.toLowerCase() === id.toLowerCase())) {
+      showToast('Diese Artikelnummer existiert bereits', false)
+      return
+    }
+    const existing = isEdit ? (modal as Artikel) : null
+    const bestand = existing?.bestand ?? 0
+    const lagerplatz = existing?.lagerplatz ?? ''
+    const status = calcStatus(bestand, mindestbestand)
+    const a: Artikel = { id, name: form.name.trim(), kategorie: form.kategorie, bestand, einheit: form.einheit, lagerplatz, status, mindestbestand }
 
     setSaving(true)
     if (!isDemo) {

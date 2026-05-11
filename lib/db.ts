@@ -376,6 +376,31 @@ export async function deleteWerkstattMitarbeiter(id: string) {
   if (error) throw error
 }
 
+export async function getWerkstattBereiche() {
+  const { data, error } = await db()
+    .from('werkstatt_bereiche')
+    .select('*')
+    .order('name')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertWerkstattBereich(b: {
+  id: string; name: string; typ?: string; aktiv?: boolean; notiz?: string
+}) {
+  const { data, error } = await db()
+    .from('werkstatt_bereiche')
+    .upsert({ ...b, updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteWerkstattBereich(id: string) {
+  const { error } = await db().from('werkstatt_bereiche').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function getWerkstattZeitbuchungen() {
   const { data, error } = await db()
     .from('werkstatt_zeitbuchungen')
