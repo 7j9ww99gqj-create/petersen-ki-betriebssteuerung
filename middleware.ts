@@ -9,6 +9,10 @@ export async function middleware(request: NextRequest) {
   const isDashboard = path.startsWith('/dashboard')
   const isLogin = path === '/login'
   const isRegister = path === '/register'
+  const isAuthCallback = path.startsWith('/auth/callback')
+
+  // Auth callback must always pass through
+  if (isAuthCallback) return NextResponse.next()
 
   // Demo cookie set? → always allow dashboard access
   const demoCookie = request.cookies.get('pk_demo')?.value === '1'
