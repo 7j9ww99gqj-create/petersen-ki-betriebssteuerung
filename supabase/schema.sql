@@ -175,7 +175,15 @@ create table if not exists buero_dokumente (
   kategorie   text,
   bezug       text,
   storage_path text,
-  created_at  timestamptz default now()
+  status      text default 'erkannt',
+  document_type text,
+  confidence  numeric default 0,
+  summary     text,
+  extracted   jsonb default '{}',
+  suggested_actions jsonb default '[]',
+  search_text text,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
 );
 
 alter table buero_kunden    enable row level security;

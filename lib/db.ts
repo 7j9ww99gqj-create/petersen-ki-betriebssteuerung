@@ -300,8 +300,25 @@ export async function getBueroDokumente() {
 export async function insertBueroDokument(d: {
   id: string; name: string; typ?: string; groesse?: string
   datum?: string; kategorie?: string; bezug?: string; storage_path?: string
+  status?: string; document_type?: string; confidence?: number; summary?: string
+  extracted?: Record<string, unknown>; suggested_actions?: unknown[]; search_text?: string
 }) {
   const { data, error } = await db().from('buero_dokumente').insert(d).select()
+  if (error) throw error
+  return data
+}
+
+export async function updateBueroDokument(id: string, d: {
+  name?: string; typ?: string; groesse?: string; datum?: string; kategorie?: string
+  bezug?: string; storage_path?: string; status?: string; document_type?: string
+  confidence?: number; summary?: string; extracted?: Record<string, unknown>
+  suggested_actions?: unknown[]; search_text?: string
+}) {
+  const { data, error } = await db()
+    .from('buero_dokumente')
+    .update({ ...d, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
   if (error) throw error
   return data
 }

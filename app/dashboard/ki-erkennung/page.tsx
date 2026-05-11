@@ -1,8 +1,14 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { umlagerArtikel, getLagerStellplaetze, getLagerStellplatzBestand } from '@/lib/db'
+import {
+  umlagerArtikel, getLagerStellplaetze, getLagerStellplatzBestand,
+  getBueroDokumente, insertBueroDokument, updateBueroDokument, uploadDokument,
+  upsertBueroEingangsrechnung, upsertBueroRechnung, upsertBueroAngebot,
+  insertEinkaufWareneingang,
+} from '@/lib/db'
 import { hasDemoCookie } from '@/lib/auth'
+import { createSupabaseClient } from '@/lib/supabase'
 
 // ─── Demo-Daten ───────────────────────────────────────────────────────────────
 
@@ -82,6 +88,23 @@ type DocumentAiResult = {
   suggestedActions: string[]
 }
 
+type DocumentStatus = 'erkannt' | 'geprüft' | 'übernommen' | 'archiviert'
+type HandoverTarget = 'eingangsrechnung' | 'rechnung' | 'angebot' | 'lieferschein' | 'wareneingang'
+
+type DocumentWorkflowRecord = {
+  id: string
+  name: string
+  status: DocumentStatus
+  documentType: DocumentAiResult['documentType']
+  confidence: number
+  summary: string
+  extracted: Record<string, unknown>
+  suggestedActions: string[]
+  storagePath?: string
+  searchText: string
+  createdAt: string
+}
+
 type KiAction = {
   type: 'umlagerung' | 'bestellung' | 'hinweis'
   artikel?: string
@@ -121,6 +144,50 @@ function labelForDocumentType(type: DocumentAiResult['documentType']) {
   return labels[type]
 }
 
+function genId(prefix: string) {
+  return `${prefix}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+}
+
+function parseMoney(value: unknown): number {
+  const text = fieldToString(value).replace(/[^\d,.-]/g, '').replace(',', '.')
+  return parseFloat(text) || 0
+}
+
+function buildSearchText(name: string, result: DocumentAiResult, fields: Record<string, string>) {
+  return [
+    name,
+    result.documentType,
+    result.summary,
+    ...Object.keys(fields),
+    ...Object.values(fields),
+    ...(result.suggestedActions ?? []),
+  ].join(' ').toLowerCase()
+}
+
+function toDocRecord(params: {
+  id: string
+  name: string
+  result: DocumentAiResult
+  fields: Record<string, string>
+  status?: DocumentStatus
+  storagePath?: string
+  createdAt?: string
+}): DocumentWorkflowRecord {
+  return {
+    id: params.id,
+    name: params.name,
+    status: params.status ?? 'erkannt',
+    documentType: params.result.documentType,
+    confidence: params.result.confidence ?? 0,
+    summary: params.result.summary,
+    extracted: { ...params.fields },
+    suggestedActions: params.result.suggestedActions ?? [],
+    storagePath: params.storagePath,
+    searchText: buildSearchText(params.name, params.result, params.fields),
+    createdAt: params.createdAt ?? new Date().toISOString(),
+  }
+}
+
 // ─── Hauptkomponente ──────────────────────────────────────────────────────────
 
 export default function KiErkennungPage() {
@@ -140,7 +207,10 @@ export default function KiErkennungPage() {
   const [editableFields, setEditableFields] = useState<Record<string, string>>({})
   const [docError, setDocError] = useState<string | null>(null)
   const [docConfirm, setDocConfirm] = useState(false)
-  const [savedDocs, setSavedDocs] = useState<DocumentAiResult[]>([])
+  const [savedDocs, setSavedDocs] = useState<DocumentWorkflowRecord[]>([])
+  const [activeDocId, setActiveDocId] = useState<string | null>(null)
+  const [docSearch, setDocSearch] = useState('')
+  const [handoverConfirm, setHandoverConfirm] = useState<HandoverTarget | null>(null)
 
   // Tab: Chat
   const [chatMsg, setChatMsg] = useState('')
@@ -161,6 +231,35 @@ export default function KiErkennungPage() {
     generateBrief()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (isDemo) return
+    getBueroDokumente()
+      .then(rows => {
+        setSavedDocs((rows as Array<Record<string, unknown>>).map(row => {
+          const documentType = (row.document_type || row.typ || 'sonstiges') as DocumentAiResult['documentType']
+          const extracted = (row.extracted && typeof row.extracted === 'object' ? row.extracted : {}) as Record<string, unknown>
+          const fields = Object.fromEntries(Object.entries(extracted).map(([k, v]) => [k, fieldToString(v)]))
+          const result: DocumentAiResult = {
+            documentType,
+            confidence: Number(row.confidence ?? 0),
+            summary: String(row.summary ?? row.bezug ?? ''),
+            extracted,
+            suggestedActions: Array.isArray(row.suggested_actions) ? row.suggested_actions.map(String) : [],
+          }
+          return toDocRecord({
+            id: String(row.id),
+            name: String(row.name ?? 'Dokument'),
+            result,
+            fields,
+            status: (row.status as DocumentStatus) ?? 'erkannt',
+            storagePath: row.storage_path ? String(row.storage_path) : undefined,
+            createdAt: row.created_at ? String(row.created_at) : undefined,
+          })
+        }))
+      })
+      .catch(() => {})
+  }, [isDemo])
 
   // Chat auto-scroll
   useEffect(() => {
@@ -235,12 +334,40 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
       setEditableFields(Object.fromEntries(
         Object.entries(data.extracted ?? {}).map(([key, value]) => [key, fieldToString(value)]),
       ))
+      const fields = Object.fromEntries(Object.entries(data.extracted ?? {}).map(([key, value]) => [key, fieldToString(value)]))
       setResult({
         type: labelForDocumentType(data.documentType),
         confidence: Math.round((data.confidence ?? 0) * 100),
-        fields: Object.fromEntries(Object.entries(data.extracted ?? {}).map(([key, value]) => [key, fieldToString(value)])),
+        fields,
         raw: data.summary,
       })
+      const docId = genId('DOK')
+      let storagePath: string | undefined
+      if (!hasDemoCookie()) {
+        const { data: auth } = await createSupabaseClient().auth.getUser()
+        const userId = auth.user?.id
+        if (userId) storagePath = await uploadDokument(file, userId)
+        await insertBueroDokument({
+          id: docId,
+          name: file.name,
+          typ: labelForDocumentType(data.documentType),
+          groesse: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+          datum: new Date().toISOString().slice(0, 10),
+          kategorie: 'KI-Dokument',
+          bezug: data.summary,
+          storage_path: storagePath,
+          status: 'erkannt',
+          document_type: data.documentType,
+          confidence: data.confidence,
+          summary: data.summary,
+          extracted: fields,
+          suggested_actions: data.suggestedActions ?? [],
+          search_text: buildSearchText(file.name, data, fields),
+        })
+      }
+      const record = toDocRecord({ id: docId, name: file.name, result: data, fields, storagePath })
+      setSavedDocs(prev => [record, ...prev].slice(0, 30))
+      setActiveDocId(docId)
       setStage('done')
     } catch (err) {
       setDocError(err instanceof Error ? err.message : 'Dokumentenanalyse fehlgeschlagen.')
@@ -256,6 +383,14 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     setEditableFields({})
     setDocError(null)
     setDocConfirm(false)
+    setHandoverConfirm(null)
+  }
+
+  async function setDocumentStatus(id: string, status: DocumentStatus) {
+    setSavedDocs(prev => prev.map(d => d.id === id ? { ...d, status } : d))
+    if (!hasDemoCookie()) {
+      await updateBueroDokument(id, { status })
+    }
   }
 
   async function applyDocumentResult() {
@@ -301,20 +436,110 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     }
 
     try {
+      if (activeDocId) {
+        await setDocumentStatus(activeDocId, 'geprüft')
+      }
       if (hasDemoCookie()) {
-        setSavedDocs(prev => [updated, ...prev].slice(0, 5))
+        const docId = activeDocId ?? genId('DOK')
+        const record = toDocRecord({ id: docId, name: selectedFile?.name ?? 'Demo-Dokument', result: updated, fields: editableFields, status: 'geprüft' })
+        setSavedDocs(prev => prev.some(d => d.id === docId) ? prev.map(d => d.id === docId ? record : d) : [record, ...prev].slice(0, 30))
         showToast(potentialIncomingInvoice ? 'Demo: Eingangsrechnung für BüroPilot vorbereitet.' : 'Demo: Dokument wurde lokal übernommen.', 'success')
       } else {
-        // TODO: Live-Übernahme gezielt je Dokumenttyp verdrahten:
-        // - rechnung -> upsertSteuerBeleg oder upsertBueroRechnung nach Review
-        // - lieferschein/wareneingang -> Wareneingang/Lagerbewegung nach Artikel-Mapping
-        // Aktuell bewusst keine automatische Supabase-Schreibaktion.
-        setSavedDocs(prev => [updated, ...prev].slice(0, 5))
-        showToast(potentialIncomingInvoice ? 'Eingangsrechnung für BüroPilot vorbereitet.' : 'Übernahme vorbereitet. Live-Speicherung ist noch nicht automatisch verdrahtet.', 'success')
+        showToast(potentialIncomingInvoice ? 'Eingangsrechnung für BüroPilot vorbereitet.' : 'Dokument als geprüft markiert.', 'success')
       }
       setDocConfirm(false)
     } catch {
       showToast('Dokument konnte nicht übernommen werden.', 'error')
+    }
+  }
+
+  async function handoverDocument(target: HandoverTarget) {
+    if (!docResult) return
+    const showToast = (msg: string, type: 'success' | 'error') => {
+      setActionToast({ msg, type })
+      setTimeout(() => setActionToast(null), 4500)
+    }
+    if (handoverConfirm !== target) {
+      setHandoverConfirm(target)
+      return
+    }
+
+    try {
+      const docId = activeDocId ?? genId('DOK')
+      const storagePath = savedDocs.find(d => d.id === docId)?.storagePath
+      const gross = parseMoney(editableFields.betrag_brutto || editableFields.betrag || editableFields.summe)
+      const tax = parseMoney(editableFields.mwst || editableFields.steuerbetrag)
+      const net = parseMoney(editableFields.betrag_netto) || Math.max(0, gross - tax)
+
+      if (target === 'eingangsrechnung') {
+        const payload = {
+          id: genId('ER'),
+          lieferant: editableFields.lieferant || editableFields.kunde || 'Unbekannter Lieferant',
+          rechnungsnummer: editableFields.rechnungsnummer || '',
+          rechnungsdatum: editableFields.rechnungsdatum || editableFields.datum || undefined,
+          faelligkeit: editableFields.faelligkeit || undefined,
+          betrag_netto: net,
+          mwst: tax,
+          betrag_brutto: gross,
+          status: 'offen',
+          kategorie: 'Dokumenten-KI',
+          iban: editableFields.iban || undefined,
+          verwendungszweck: editableFields.rechnungsnummer || undefined,
+          notiz: docResult.summary,
+          dokument_id: docId,
+          dokument_url: storagePath,
+        }
+        if (hasDemoCookie()) localStorage.setItem('pk_doc_ai_eingangsrechnung', JSON.stringify(payload))
+        else await upsertBueroEingangsrechnung(payload)
+      }
+
+      if (target === 'rechnung') {
+        const payload = {
+          id: editableFields.rechnungsnummer || genId('RE'),
+          kunde: editableFields.kunde || editableFields.empfaenger || '',
+          betrag: gross ? `${gross.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €` : fieldToString(editableFields.betrag),
+          faellig: editableFields.faelligkeit || '',
+          erstellt: editableFields.rechnungsdatum || editableFields.datum || new Date().toLocaleDateString('de-DE'),
+          status: 'Offen',
+        }
+        if (!hasDemoCookie()) await upsertBueroRechnung(payload)
+      }
+
+      if (target === 'angebot') {
+        const payload = {
+          id: editableFields.angebotsnummer || genId('ANG'),
+          kunde: editableFields.kunde || '',
+          titel: editableFields.titel || 'Aus Dokument übernommen',
+          betrag: fieldToString(editableFields.betrag || editableFields.betrag_brutto),
+          datum: editableFields.datum || new Date().toLocaleDateString('de-DE'),
+          gueltig: editableFields.gueltig_bis || '',
+          status: 'Entwurf',
+        }
+        if (!hasDemoCookie()) await upsertBueroAngebot(payload)
+      }
+
+      if (target === 'wareneingang' || target === 'lieferschein') {
+        const artikelText = fieldToString(editableFields.artikel || editableFields.positionen || editableFields.titel || 'Dokument-Wareneingang')
+        const mengeText = fieldToString(editableFields.mengen || '0')
+        const payload = {
+          id: genId('WE'),
+          bestellung_id: editableFields.bestellnummer || undefined,
+          lieferant: editableFields.lieferant || '',
+          artikel: artikelText.slice(0, 250),
+          menge: parseMoney(mengeText),
+          einheit: 'Stk',
+          datum: editableFields.lieferdatum || editableFields.datum || new Date().toLocaleDateString('de-DE'),
+          qualitaet: 'OK',
+          mitarbeiter: 'Dokumenten-KI',
+        }
+        if (!hasDemoCookie()) await insertEinkaufWareneingang(payload)
+      }
+
+      if (activeDocId) await setDocumentStatus(activeDocId, 'übernommen')
+      setHandoverConfirm(null)
+      showToast(`Dokument wurde als ${target} übernommen`, 'success')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Übernahme fehlgeschlagen', 'error')
     }
   }
 
@@ -403,6 +628,21 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     color: activeTab === t ? '#a78bfa' : '#aeb9c8',
     borderBottom: activeTab === t ? '2px solid #a78bfa' : '2px solid transparent',
   })
+
+  const filteredDocs = savedDocs.filter(d =>
+    !docSearch.trim() ||
+    d.searchText.includes(docSearch.toLowerCase()) ||
+    d.name.toLowerCase().includes(docSearch.toLowerCase()) ||
+    d.summary.toLowerCase().includes(docSearch.toLowerCase())
+  )
+
+  const handoverOptions: { id: HandoverTarget; label: string; icon: string }[] = [
+    { id: 'eingangsrechnung', label: 'Als Eingangsrechnung übernehmen', icon: '📥' },
+    { id: 'rechnung', label: 'Als Rechnung übernehmen', icon: '🧾' },
+    { id: 'angebot', label: 'Als Angebot übernehmen', icon: '📄' },
+    { id: 'lieferschein', label: 'Als Lieferschein übernehmen', icon: '🚚' },
+    { id: 'wareneingang', label: 'Als Wareneingang übernehmen', icon: '📦' },
+  ]
 
   return (
     <div className="fade-in">
@@ -742,7 +982,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
 
                   <div style={{ display: 'flex', gap: 10 }}>
                     <button className="pk-btn" onClick={applyDocumentResult} style={{ flex: 1, fontWeight: 700, fontSize: 13 }}>
-                      {docConfirm ? '✅ Ja, übernehmen' : '📥 Ergebnis übernehmen'}
+                      {docConfirm ? '✅ Ja, als geprüft markieren' : '✓ Felder geprüft'}
                     </button>
                     {docConfirm && (
                       <button className="pk-btn-ghost" onClick={() => setDocConfirm(false)} style={{ fontSize: 13 }}>
@@ -753,27 +993,58 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
                       Neu
                     </button>
                   </div>
+                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,.08)' }}>
+                    <div style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 800, textTransform: 'uppercase', marginBottom: 8 }}>Übernahme in Pilot</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8 }}>
+                      {handoverOptions.map(option => (
+                        <button
+                          key={option.id}
+                          className={handoverConfirm === option.id ? 'pk-btn' : 'pk-btn-ghost'}
+                          onClick={() => handoverDocument(option.id)}
+                          style={{ fontSize: 12, fontWeight: 750, justifyContent: 'center' }}
+                        >
+                          {handoverConfirm === option.id ? 'Wirklich ausführen?' : `${option.icon} ${option.label}`}
+                        </button>
+                      ))}
+                    </div>
+                    {handoverConfirm && (
+                      <button className="pk-btn-ghost" onClick={() => setHandoverConfirm(null)} style={{ marginTop: 8, fontSize: 12 }}>
+                        Übernahme abbrechen
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Letzte Dokumente */}
             <div className="pk-card">
-              <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 800 }}>Letzte Dokumente</h3>
-              {(savedDocs.length > 0 ? savedDocs : [
-                { documentType: 'lieferschein', summary: 'Demo: Lieferschein LS-2025-08844', confidence: .99, extracted: {}, suggestedActions: [] },
-                { documentType: 'rechnung', summary: 'Demo: Rechnung RE-2025-1123', confidence: .95, extracted: {}, suggestedActions: [] },
-              ] as DocumentAiResult[]).map((r, i) => (
-                <div key={`${r.summary}-${i}`} style={{
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>Dokumentenworkflow</h3>
+                <input className="pk-input" placeholder="Suche…" value={docSearch} onChange={e => setDocSearch(e.target.value)} style={{ maxWidth: 190, minHeight: 34, fontSize: 12 }} />
+              </div>
+              {(filteredDocs.length > 0 ? filteredDocs : [
+                toDocRecord({ id: 'DEMO-DOK-1', name: 'Demo Lieferschein.pdf', result: { documentType: 'lieferschein', summary: 'Demo: Lieferschein LS-2025-08844', confidence: .99, extracted: {}, suggestedActions: [] }, fields: {}, status: 'archiviert' }),
+                toDocRecord({ id: 'DEMO-DOK-2', name: 'Demo Rechnung.pdf', result: { documentType: 'rechnung', summary: 'Demo: Rechnung RE-2025-1123', confidence: .95, extracted: {}, suggestedActions: [] }, fields: {}, status: 'übernommen' }),
+              ]).map(r => (
+                <div key={r.id} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0',
                   borderBottom: '1px solid rgba(255,255,255,.05)',
                 }}>
                   <span style={{ fontSize: 20 }}>{r.documentType === 'rechnung' ? '🧾' : '📄'}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{labelForDocumentType(r.documentType)}</div>
-                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>{r.summary}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{r.name}</div>
+                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>{labelForDocumentType(r.documentType)} · {r.summary}</div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                      <span className={r.status === 'übernommen' ? 'badge badge-green' : r.status === 'archiviert' ? 'badge badge-gray' : r.status === 'geprüft' ? 'badge badge-blue' : 'badge badge-orange'}>{r.status}</span>
+                      <span className="badge badge-gray">{Math.round(r.confidence * 100)}%</span>
+                    </div>
                   </div>
-                  <span className="badge badge-green">{Math.round(r.confidence * 100)}%</span>
+                  {r.status !== 'archiviert' && savedDocs.some(d => d.id === r.id) && (
+                    <button className="pk-btn-ghost" onClick={() => setDocumentStatus(r.id, 'archiviert').catch(() => {})} style={{ fontSize: 11 }}>
+                      Archivieren
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
