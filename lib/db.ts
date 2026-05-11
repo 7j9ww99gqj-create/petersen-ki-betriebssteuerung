@@ -858,10 +858,14 @@ export async function upsertLagerStellplatzBestand(b: {
   artikelnummer?: string; artikelname?: string; charge?: string
   mhd?: string; menge: number; einheit?: string; status?: string
   eingelagert_am?: string; notiz?: string
+  lager_stellplaetze?: unknown
 }) {
+  const { lager_stellplaetze: _displayOnly, ...payload } = b
+  void _displayOnly
+
   const { data, error } = await db()
     .from('lager_stellplatz_bestand')
-    .upsert(b)
+    .upsert(payload)
     .select()
   if (error) throw error
   return data

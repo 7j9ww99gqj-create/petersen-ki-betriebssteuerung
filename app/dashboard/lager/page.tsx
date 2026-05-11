@@ -1155,10 +1155,13 @@ export default function LagerPilotPage() {
       setSaving(true)
       if (!isDemo) {
         try {
-          await upsertLagerStellplatzBestand(row)
+          const { lager_stellplaetze: _displayOnly, ...persistableRow } = row
+          void _displayOnly
+          await upsertLagerStellplatzBestand(persistableRow)
           await persistArtikelBestand(a.id, menge)
-        } catch {
-          showToast('Fehler beim Einlagern', false); setSaving(false); return
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Fehler beim Einlagern'
+          showToast(message, false); setSaving(false); return
         }
       }
       setStellplatzBestand(prev => existing ? prev.map(sb => sb.id === existing.id ? row : sb) : [row, ...prev])
