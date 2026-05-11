@@ -13,12 +13,14 @@
     "@supabase/supabase-js": "^2.105.3",
     "jspdf": "^4.2.1",
     "next": "14.2.5",
+    "qrcode": "^1.5.4",
     "react": "^18",
     "react-dom": "^18",
     "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",

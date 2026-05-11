@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
 import {
   getLagerArtikel, getLagerBewegungen,
@@ -72,6 +72,17 @@ const SP_TYPEN = ['Standard', 'Kühl', 'Tiefkühl', 'Eingang', 'Ausgang', 'Sperr
 type SortKey = 'id' | 'name' | 'bestand' | 'status'
 type SortDir = 'asc' | 'desc'
 type LagerTab = 'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur' | 'bestellung' | 'historie' | 'stellplaetze' | 'lagerbelegung' | 'umlagerung' | 'kommissionierung' | 'tagesbericht'
+type PickStatus = 'offen' | 'gepickt' | 'abgeschlossen'
+type Pickliste = {
+  id: string
+  status: PickStatus
+  artikelIds: string[]
+  created_at: string
+  updated_at?: string
+}
+type LabelTarget =
+  | { type: 'artikel'; artikel: Artikel }
+  | { type: 'stellplatz'; stellplatz: Stellplatz }
 
 type KiAktion = {
   type: 'umlagerung' | 'bestellung' | 'hinweis'
@@ -162,6 +173,26 @@ function exportCSV(data: Artikel[]) {
   link.download = `lager-export-${new Date().toISOString().slice(0, 10)}.csv`
   link.click()
   URL.revokeObjectURL(url)
+}
+
+function artikelQrCode(a: Artikel) {
+  return `PK|ART|${a.id}`
+}
+
+function stellplatzQrCode(sp: Stellplatz) {
+  return `PK|SP|${sp.code}`
+}
+
+function pickStatusBadgeClass(status: PickStatus) {
+  if (status === 'abgeschlossen') return 'badge-green'
+  if (status === 'gepickt') return 'badge-orange'
+  return 'badge-gray'
+}
+
+function pickStatusLabel(status: PickStatus) {
+  if (status === 'abgeschlossen') return '✅ Abgeschlossen'
+  if (status === 'gepickt') return '🟠 Gepickt'
+  return '⚪ Offen'
 }
 
 // ── Modal-Komponente ─────────────────────────────────────────────────────────
@@ -593,6 +624,160 @@ function LagerBuchungModal({ form, artikel, stellplaetze, stellplatzBestand, sav
   )
 }
 
+// ── QR-/Etikett-Modal ───────────────────────────────────────────────────────
+
+function LabelModal({ target, onClose }: {
+  target: LabelTarget
+  onClose: () => void
+}) {
+  const [qrDataUrl, setQrDataUrl] = useState('')
+  const value = target.type === 'artikel' ? artikelQrCode(target.artikel) : stellplatzQrCode(target.stellplatz)
+  const title = target.type === 'artikel' ? target.artikel.name : target.stellplatz.code
+  const subtitle = target.type === 'artikel'
+    ? `${target.artikel.id} · ${target.artikel.kategorie}`
+    : `${target.stellplatz.name ?? 'Stellplatz'} · ${target.stellplatz.bereich ?? 'ohne Bereich'}`
+
+  useEffect(() => {
+    let active = true
+    import('qrcode')
+      .then(QRCode => QRCode.toDataURL(value, { margin: 1, width: 240, errorCorrectionLevel: 'M' }))
+      .then(url => { if (active) setQrDataUrl(url) })
+      .catch(() => { if (active) setQrDataUrl('') })
+    return () => { active = false }
+  }, [value])
+
+  const printLabel = () => {
+    const win = window.open('', '_blank', 'width=420,height=620')
+    if (!win) return
+    win.document.write(`
+      <html><head><title>Etikett ${title}</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:24px;color:#111}
+        .label{border:2px solid #111;border-radius:12px;padding:20px;max-width:320px}
+        h1{font-size:20px;margin:0 0 8px}
+        p{font-size:12px;margin:0 0 16px;color:#444}
+        img{width:220px;height:220px;display:block;margin:0 auto 14px}
+        code{display:block;text-align:center;font-size:13px;word-break:break-all}
+      </style></head><body>
+      <div class="label"><h1>${title}</h1><p>${subtitle}</p>${qrDataUrl ? `<img src="${qrDataUrl}" />` : ''}<code>${value}</code></div>
+      <script>window.onload=()=>{window.print()}</script></body></html>
+    `)
+    win.document.close()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.74)', backdropFilter: 'blur(4px)' }} />
+      <div className="pk-card fade-in-scale" style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 430, padding: 26 }}>
+        <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900 }}>🏷️ QR-/Barcode-Etikett</h3>
+        <div style={{ color: '#aeb9c8', fontSize: 13, marginBottom: 18 }}>{subtitle}</div>
+        <div style={{ borderRadius: 14, background: '#fff', padding: 18, display: 'grid', justifyItems: 'center', gap: 10 }}>
+          {qrDataUrl ? <img src={qrDataUrl} alt={`QR-Code ${title}`} style={{ width: 220, height: 220 }} /> : <div style={{ color: '#111', padding: 40 }}>QR wird erzeugt…</div>}
+          <div style={{ color: '#111', fontWeight: 900, fontSize: 17, textAlign: 'center' }}>{title}</div>
+          <code style={{ color: '#111', fontSize: 12, wordBreak: 'break-all', textAlign: 'center' }}>{value}</code>
+        </div>
+        <div style={{ marginTop: 14, padding: '10px 12px', borderRadius: 10, background: 'rgba(22,132,255,.07)', border: '1px solid rgba(22,132,255,.18)', color: '#aeb9c8', fontSize: 12, lineHeight: 1.55 }}>
+          Der QR-Code enthält eine interne Kennung. Beim Scan öffnet der LagerPilot direkt die passende Einlagerung oder Stellplatzauswahl.
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+          <button className="pk-btn" onClick={printLabel} disabled={!qrDataUrl} style={{ flex: 1, fontWeight: 800 }}>Drucken</button>
+          <button className="pk-btn-ghost" onClick={onClose} style={{ flex: 1 }}>Schließen</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Scanner-Modal ───────────────────────────────────────────────────────────
+
+function ScannerModal({ onClose, onScan }: {
+  onClose: () => void
+  onScan: (value: string) => void
+}) {
+  const [manual, setManual] = useState('')
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const [cameraRunning, setCameraRunning] = useState(false)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
+  useEffect(() => {
+    let interval: number | undefined
+    let cancelled = false
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+        if (cancelled) {
+          stream.getTracks().forEach(track => track.stop())
+          return
+        }
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          await videoRef.current.play()
+        }
+        setCameraRunning(true)
+
+        const Detector = (window as unknown as {
+          BarcodeDetector?: new (options?: { formats?: string[] }) => {
+            detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>
+          }
+        }).BarcodeDetector
+
+        if (!Detector) {
+          setCameraError('Kamera aktiv. Automatisches Scannen wird von diesem Browser nicht unterstützt, bitte Code manuell eingeben.')
+          return
+        }
+
+        const detector = new Detector({ formats: ['qr_code', 'code_128', 'ean_13', 'ean_8'] })
+        interval = window.setInterval(async () => {
+          if (!videoRef.current) return
+          try {
+            const codes = await detector.detect(videoRef.current)
+            const raw = codes[0]?.rawValue?.trim()
+            if (raw) onScan(raw)
+          } catch {
+            // Einzelne Detection-Fehler ignorieren, die Kamera läuft weiter.
+          }
+        }, 700)
+      } catch {
+        setCameraError('Kamera konnte nicht gestartet werden. Manuelle Eingabe bleibt möglich.')
+      }
+    }
+
+    startCamera()
+    return () => {
+      cancelled = true
+      if (interval) window.clearInterval(interval)
+      streamRef.current?.getTracks().forEach(track => track.stop())
+    }
+  }, [onScan])
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 245, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.76)', backdropFilter: 'blur(4px)' }} />
+      <div className="pk-card fade-in-scale" style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: 24 }}>
+        <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900 }}>📷 Lager-Scan</h3>
+        <div style={{ color: '#aeb9c8', fontSize: 13, marginBottom: 16 }}>QR-Code von Artikel oder Stellplatz scannen oder Code manuell eingeben.</div>
+        <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,.12)', background: '#050914', minHeight: 260, display: 'grid', placeItems: 'center', marginBottom: 14 }}>
+          <video ref={videoRef} playsInline muted style={{ width: '100%', maxHeight: 320, objectFit: 'cover', display: cameraRunning ? 'block' : 'none' }} />
+          {!cameraRunning && <div style={{ color: '#aeb9c8', fontSize: 13 }}>Kamera wird gestartet…</div>}
+        </div>
+        {cameraError && (
+          <div style={{ marginBottom: 14, padding: '10px 12px', borderRadius: 10, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.24)', color: '#fbbf24', fontSize: 12 }}>
+            {cameraError}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <input className="pk-input" placeholder="z.B. PK|ART|ART-001 oder TL-A-01-01" value={manual} onChange={e => setManual(e.target.value)} style={{ flex: '1 1 260px' }} />
+          <button className="pk-btn" onClick={() => manual.trim() && onScan(manual.trim())} disabled={!manual.trim()}>Code prüfen</button>
+          <button className="pk-btn-ghost" onClick={onClose}>Schließen</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Hauptkomponente ──────────────────────────────────────────────────────────
 
 export default function LagerPilotPage() {
@@ -647,10 +832,14 @@ export default function LagerPilotPage() {
   const [lbNurMhdKritisch, setLbNurMhdKritisch] = useState(false)
   const [lbDeleteConfirmId, setLbDeleteConfirmId] = useState<string | null>(null)
   const [lbBuchungModal, setLbBuchungModal] = useState<LagerBuchungForm | null>(null)
+  const [labelModal, setLabelModal] = useState<LabelTarget | null>(null)
+  const [scanModal, setScanModal] = useState(false)
 
   // Kommissionierung-State
   const [pickSelected, setPickSelected] = useState<Set<string>>(new Set())
   const [pickListOpen, setPickListOpen] = useState(false)
+  const [picklisten, setPicklisten] = useState<Pickliste[]>([])
+  const [activePickId, setActivePickId] = useState<string | null>(null)
 
   // Daten laden
   useEffect(() => {
@@ -1079,14 +1268,14 @@ export default function LagerPilotPage() {
     showToast('🗑 Bestand-Position entfernt')
   }
 
-  const openEinlagern = (artikelId?: string) => {
+  const openEinlagern = (artikelId?: string, stellplatzId?: string) => {
     const a = artikelId ? artikel.find(x => x.id === artikelId) : undefined
     const best = a ? getBestStellplatz(a)?.stellplatz : undefined
     setLbBuchungModal({
       ...emptyLagerBuchungForm,
       modus: 'einlagern',
       artikelId: a?.id ?? '',
-      stellplatzId: best?.id ?? '',
+      stellplatzId: stellplatzId ?? best?.id ?? '',
     })
   }
 
@@ -1102,6 +1291,93 @@ export default function LagerPilotPage() {
       charge: b?.charge ?? '',
       mhd: b?.mhd ?? '',
     })
+  }
+
+  const handleScannerCode = (rawValue: string) => {
+    const raw = rawValue.trim()
+    const parts = raw.split('|')
+    const isInternal = parts[0] === 'PK'
+    const type = isInternal ? parts[1] : ''
+    const value = isInternal ? (parts[2] ?? '').trim() : raw
+
+    if (type === 'ART') {
+      const a = artikel.find(x => x.id.toLowerCase() === value.toLowerCase())
+      if (!a) { showToast(`Artikel „${value}" nicht gefunden`, false); return }
+      setScanModal(false)
+      openEinlagern(a.id)
+      showToast(`Artikel „${a.name}" erkannt`)
+      return
+    }
+
+    if (type === 'SP') {
+      const sp = stellplaetze.find(x => x.code.toLowerCase() === value.toLowerCase() || x.id.toLowerCase() === value.toLowerCase())
+      if (!sp) { showToast(`Stellplatz „${value}" nicht gefunden`, false); return }
+      setScanModal(false)
+      openEinlagern(undefined, sp.id)
+      showToast(`Stellplatz „${sp.code}" erkannt`)
+      return
+    }
+
+    const byArtikel = artikel.find(a =>
+      a.id.toLowerCase() === raw.toLowerCase() ||
+      a.name.toLowerCase() === raw.toLowerCase()
+    )
+    if (byArtikel) {
+      setScanModal(false)
+      openEinlagern(byArtikel.id)
+      showToast(`Artikel „${byArtikel.name}" erkannt`)
+      return
+    }
+
+    const byStellplatz = stellplaetze.find(sp =>
+      sp.code.toLowerCase() === raw.toLowerCase() ||
+      sp.id.toLowerCase() === raw.toLowerCase()
+    )
+    if (byStellplatz) {
+      setScanModal(false)
+      openEinlagern(undefined, byStellplatz.id)
+      showToast(`Stellplatz „${byStellplatz.code}" erkannt`)
+      return
+    }
+
+    const byBestand = stellplatzBestand.find(sb =>
+      sb.id.toLowerCase() === raw.toLowerCase() ||
+      (sb.artikelnummer ?? '').toLowerCase() === raw.toLowerCase()
+    )
+    if (byBestand) {
+      setScanModal(false)
+      openEntnehmen(byBestand.id)
+      showToast(`Regalposition „${byBestand.artikelname ?? byBestand.artikelnummer}" erkannt`)
+      return
+    }
+
+    showToast('Code konnte keinem Artikel oder Stellplatz zugeordnet werden', false)
+  }
+
+  const createOrOpenPickliste = () => {
+    const ids = Array.from(pickSelected)
+    if (ids.length === 0) return
+    if (activePickId && picklisten.some(p => p.id === activePickId)) {
+      setPicklisten(prev => prev.map(p => p.id === activePickId ? { ...p, artikelIds: ids, updated_at: new Date().toISOString() } : p))
+      setPickListOpen(true)
+      return
+    }
+    const next: Pickliste = {
+      id: `PICK-${Date.now().toString(36).toUpperCase()}`,
+      status: 'offen',
+      artikelIds: ids,
+      created_at: new Date().toISOString(),
+    }
+    setPicklisten(prev => [next, ...prev])
+    setActivePickId(next.id)
+    setPickListOpen(true)
+    showToast(`Pickliste ${next.id} erstellt`)
+  }
+
+  const updateActivePickStatus = (status: PickStatus) => {
+    if (!activePickId) return
+    setPicklisten(prev => prev.map(p => p.id === activePickId ? { ...p, status, updated_at: new Date().toISOString() } : p))
+    showToast(`Pickliste auf „${pickStatusLabel(status).replace(/^[^ ]+ /, '')}" gesetzt`)
   }
 
   const updateArtikelBestandLocal = (artikelId: string, delta: number) => {
@@ -1374,6 +1650,22 @@ export default function LagerPilotPage() {
         />
       )}
 
+      {/* QR-/Etikett-Modal */}
+      {labelModal !== null && (
+        <LabelModal
+          target={labelModal}
+          onClose={() => setLabelModal(null)}
+        />
+      )}
+
+      {/* Scanner-Modal */}
+      {scanModal && (
+        <ScannerModal
+          onClose={() => setScanModal(false)}
+          onScan={handleScannerCode}
+        />
+      )}
+
       {/* Toast */}
       {toast && (
         <div style={{
@@ -1395,6 +1687,7 @@ export default function LagerPilotPage() {
           <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Wareneingang · Warenausgang · Bestände · Inventur</p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="pk-btn-ghost" onClick={() => setScanModal(true)} style={{ fontSize: 13 }}>📷 Scan</button>
           <button className="pk-btn" onClick={() => setModal('new')} style={{ fontSize: 13 }}>+ Artikel anlegen</button>
           <span className="badge badge-green">● AKTIV</span>
         </div>
@@ -1559,7 +1852,7 @@ export default function LagerPilotPage() {
                     >
                       Status{sortArrow('status')}
                     </th>
-                    <th style={{ width: 110 }}>Aktionen</th>
+                    <th style={{ width: 150 }}>Aktionen</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1602,6 +1895,7 @@ export default function LagerPilotPage() {
                             <div style={{ display: 'flex', gap: 6 }}>
                               <button onClick={() => setModal(a)} title="Bearbeiten" style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>
                               <button onClick={() => openEinlagern(a.id)} title="Auf Stellplatz buchen" style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#34d399', fontSize: 13 }}>📥</button>
+                              <button onClick={() => setLabelModal({ type: 'artikel', artikel: a })} title="QR-/Etikett drucken" style={{ background: 'rgba(167,139,250,.1)', border: '1px solid rgba(167,139,250,.24)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#c4b5fd', fontSize: 13 }}>🏷️</button>
                               <button onClick={() => { setHistArtikel(a.id); setTab('historie') }} title="Artikel-Historie" style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#34d399', fontSize: 13 }}>📈</button>
                               <button onClick={() => setDeleteConfirmId(a.id)} title="Löschen" style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}>🗑</button>
                             </div>
@@ -2140,7 +2434,7 @@ export default function LagerPilotPage() {
               <div className="pk-table-wrap">
                 <table className="pk-table">
                   <thead>
-                    <tr><th>Code</th><th>Bezeichnung</th><th>Bereich</th><th>Typ</th><th>Status</th><th style={{ width: 110 }}>Aktionen</th></tr>
+                    <tr><th>Code</th><th>Bezeichnung</th><th>Bereich</th><th>Typ</th><th>Status</th><th style={{ width: 140 }}>Aktionen</th></tr>
                   </thead>
                   <tbody>
                     {filtered.length === 0 ? (
@@ -2173,6 +2467,7 @@ export default function LagerPilotPage() {
                           ) : (
                             <div style={{ display: 'flex', gap: 6 }}>
                               <button onClick={() => setSpModal(sp)} title="Bearbeiten" style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>
+                              <button onClick={() => setLabelModal({ type: 'stellplatz', stellplatz: sp })} title="QR-/Etikett drucken" style={{ background: 'rgba(167,139,250,.1)', border: '1px solid rgba(167,139,250,.24)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#c4b5fd', fontSize: 13 }}>🏷️</button>
                               <button onClick={() => setSpDeleteConfirmId(sp.id)} title="Löschen" style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}>🗑</button>
                             </div>
                           )}
@@ -2531,6 +2826,7 @@ export default function LagerPilotPage() {
               pa.fach.localeCompare(pb.fach)
           })
         const pickBereiche = Array.from(new Set(pickedArtikel.map(a => bereichVon(a.lagerplatz))))
+        const activePick = activePickId ? picklisten.find(p => p.id === activePickId) : null
 
         return (
           <div>
@@ -2541,17 +2837,17 @@ export default function LagerPilotPage() {
                 <span style={{ marginLeft: 12, color: '#6cb6ff' }}>{allPickable.length} Artikel verfügbar · {bereiche.length} Bereiche</span>
               </div>
               {pickSelected.size > 0 && (
-                <button className="pk-btn-ghost" onClick={() => { setPickSelected(new Set()); setPickListOpen(false) }} style={{ whiteSpace: 'nowrap' }}>
+                <button className="pk-btn-ghost" onClick={() => { setPickSelected(new Set()); setPickListOpen(false); setActivePickId(null) }} style={{ whiteSpace: 'nowrap' }}>
                   Auswahl zurücksetzen
                 </button>
               )}
               <button
                 className="pk-btn"
                 disabled={pickSelected.size === 0}
-                onClick={() => setPickListOpen(v => !v)}
+                onClick={createOrOpenPickliste}
                 style={{ whiteSpace: 'nowrap', opacity: pickSelected.size === 0 ? .45 : 1 }}
               >
-                🧺 Pickliste{pickSelected.size > 0 ? ` (${pickSelected.size})` : ''} {pickListOpen ? '▲' : '▼'}
+                🧺 Pickliste erstellen{pickSelected.size > 0 ? ` (${pickSelected.size})` : ''}
               </button>
             </div>
 
@@ -2561,7 +2857,7 @@ export default function LagerPilotPage() {
                 { label: 'Artikel gesamt', value: allPickable.length, icon: '📦', color: '#1684ff' },
                 { label: 'Bereiche', value: bereiche.length, icon: '🗺️', color: '#20c8ff' },
                 { label: 'Ausgewählt', value: pickSelected.size, icon: '✅', color: '#10b981' },
-                { label: 'Niedrig/Leer', value: allPickable.filter(a => a.status !== 'ok').length, icon: '⚠️', color: '#f59e0b' },
+                { label: 'Offene Picklisten', value: picklisten.filter(p => p.status !== 'abgeschlossen').length, icon: '🧾', color: '#f59e0b' },
               ].map(s => (
                 <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '12px 8px' }}>
                   <div style={{ fontSize: 18, marginBottom: 3 }}>{s.icon}</div>
@@ -2574,9 +2870,17 @@ export default function LagerPilotPage() {
             {/* Generierte Pickliste */}
             {pickListOpen && pickedArtikel.length > 0 && (
               <div className="pk-card fade-in" style={{ marginBottom: 18, padding: 0 }}>
-                <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid rgba(255,255,255,.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 800, fontSize: 15 }}>🧺 Pickliste — {pickedArtikel.length} Artikel · {pickBereiche.length} Bereiche</span>
-                  <span style={{ fontSize: 12, color: '#6cb6ff' }}>Sortiert: Bereich → Regal → Fach</span>
+                <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid rgba(255,255,255,.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <div>
+                    <span style={{ fontWeight: 800, fontSize: 15 }}>🧺 Pickliste {activePick?.id ?? ''} — {pickedArtikel.length} Artikel · {pickBereiche.length} Bereiche</span>
+                    <div style={{ fontSize: 12, color: '#6cb6ff', marginTop: 4 }}>Sortiert: Bereich → Regal → Fach</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span className={`badge ${pickStatusBadgeClass(activePick?.status ?? 'offen')}`}>{pickStatusLabel(activePick?.status ?? 'offen')}</span>
+                    <button className="pk-btn-ghost" onClick={() => updateActivePickStatus('offen')} disabled={!activePick || activePick.status === 'offen'} style={{ fontSize: 12 }}>Offen</button>
+                    <button className="pk-btn-ghost" onClick={() => updateActivePickStatus('gepickt')} disabled={!activePick || activePick.status === 'gepickt'} style={{ fontSize: 12 }}>Gepickt</button>
+                    <button className="pk-btn" onClick={() => updateActivePickStatus('abgeschlossen')} disabled={!activePick || activePick.status === 'abgeschlossen'} style={{ fontSize: 12 }}>Abschließen</button>
+                  </div>
                 </div>
                 <div className="pk-table-wrap">
                   <table className="pk-table">
