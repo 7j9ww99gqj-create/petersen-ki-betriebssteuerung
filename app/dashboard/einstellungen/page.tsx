@@ -18,6 +18,7 @@ import {
   getFirmaEinstellungen, upsertFirmaEinstellungen, uploadFirmenLogo,
   type FirmaEinstellungen,
 } from '@/lib/db'
+import { PricingSettingsPage } from '@/components/billing/PricingSettingsPage'
 
 type NotifSettings = {
   wareneingaenge: boolean; niedrigerBestand: boolean; auftraege: boolean
@@ -26,7 +27,7 @@ type NotifSettings = {
 
 export default function EinstellungenPage() {
   const router = useRouter()
-  const [section, setSection] = useState<'profil' | 'firma' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
+  const [section, setSection] = useState<'profil' | 'firma' | 'billing' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
   const [toast, setToast] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [isDemo, setIsDemo] = useState(false)
@@ -155,6 +156,7 @@ export default function EinstellungenPage() {
         <div className="pk-card settings-nav" style={{ padding: '10px' }}>
           <NavItem id="profil" icon="👤" label="Profil" />
           <NavItem id="firma" icon="🏢" label="Firmendaten" />
+          <NavItem id="billing" icon="💳" label="Buchung & Abonnement" />
           <NavItem id="benachrichtigungen" icon="🔔" label="Benachricht." />
           <NavItem id="rollen" icon="🔑" label="Rollen" />
           <NavItem id="import" icon="📥" label="Import" />
@@ -238,6 +240,10 @@ export default function EinstellungenPage() {
 
           {section === 'firma' && (
             <CompanySettingsSection isDemo={isDemo} currentRole={currentRole} showToast={showToast} />
+          )}
+
+          {section === 'billing' && (
+            <PricingSettingsPage isDemo={isDemo} showToast={showToast} />
           )}
 
           {section === 'benachrichtigungen' && (
