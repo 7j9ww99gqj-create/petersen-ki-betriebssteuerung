@@ -347,12 +347,44 @@ create table if not exists werkstatt_pruefprotokolle (
   created_at   timestamptz default now()
 );
 
+create table if not exists werkstatt_wartungen (
+  id              text primary key,
+  user_id         uuid references auth.users not null default auth.uid(),
+  maschine        text not null,
+  intervall       text,
+  faellig_am      date not null,
+  letzte_wartung  date,
+  verantwortlich  text,
+  status          text default 'geplant',
+  notiz           text,
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+
+create table if not exists werkstatt_stoerungen (
+  id            text primary key,
+  user_id       uuid references auth.users not null default auth.uid(),
+  maschine      text not null,
+  titel         text not null,
+  beschreibung  text,
+  prioritaet    text default 'Mittel',
+  status        text default 'offen',
+  gemeldet_von  text,
+  gemeldet_am   date default current_date,
+  behoben_am    date,
+  notiz         text,
+  created_at    timestamptz default now(),
+  updated_at    timestamptz default now()
+);
+
 alter table werkstatt_karten          enable row level security;
 alter table werkstatt_mitarbeiter     enable row level security;
 alter table werkstatt_bereiche        enable row level security;
 alter table werkstatt_zeitbuchungen   enable row level security;
 alter table werkstatt_material        enable row level security;
 alter table werkstatt_pruefprotokolle enable row level security;
+alter table werkstatt_wartungen       enable row level security;
+alter table werkstatt_stoerungen      enable row level security;
 
 create policy "werkstatt_karten_user"          on werkstatt_karten          for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "werkstatt_mitarbeiter_user"     on werkstatt_mitarbeiter     for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
@@ -360,6 +392,11 @@ create policy "werkstatt_bereiche_user"        on werkstatt_bereiche        for 
 create policy "werkstatt_zeitbuchungen_user"   on werkstatt_zeitbuchungen   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "werkstatt_material_user"        on werkstatt_material        for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "werkstatt_pruefprotokolle_user" on werkstatt_pruefprotokolle for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "werkstatt_wartungen_user"       on werkstatt_wartungen       for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "werkstatt_stoerungen_user"      on werkstatt_stoerungen      for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create index if not exists idx_werkstatt_wartungen_user_faellig on werkstatt_wartungen(user_id, faellig_am);
+create index if not exists idx_werkstatt_stoerungen_user_status on werkstatt_stoerungen(user_id, status);
 
 -- ── MarketingPilot ──────────────────────────────────────────
 

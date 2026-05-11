@@ -483,6 +483,59 @@ export async function insertWerkstattPruefprotokoll(p: {
   return data
 }
 
+export async function getWerkstattWartungen() {
+  const { data, error } = await db()
+    .from('werkstatt_wartungen')
+    .select('*')
+    .order('faellig_am', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertWerkstattWartung(w: {
+  id: string; maschine: string; intervall?: string; faellig_am: string
+  letzte_wartung?: string; verantwortlich?: string; status?: string; notiz?: string
+}) {
+  const { data, error } = await db()
+    .from('werkstatt_wartungen')
+    .upsert({ ...w, updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteWerkstattWartung(id: string) {
+  const { error } = await db().from('werkstatt_wartungen').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function getWerkstattStoerungen() {
+  const { data, error } = await db()
+    .from('werkstatt_stoerungen')
+    .select('*')
+    .order('gemeldet_am', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertWerkstattStoerung(s: {
+  id: string; maschine: string; titel: string; beschreibung?: string
+  prioritaet?: string; status?: string; gemeldet_von?: string; gemeldet_am?: string
+  behoben_am?: string; notiz?: string
+}) {
+  const { data, error } = await db()
+    .from('werkstatt_stoerungen')
+    .upsert({ ...s, gemeldet_am: s.gemeldet_am ?? today(), updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteWerkstattStoerung(id: string) {
+  const { error } = await db().from('werkstatt_stoerungen').delete().eq('id', id)
+  if (error) throw error
+}
+
 // ── MARKETING ────────────────────────────────────────────────────────────────
 
 export async function getMarketingKampagnen() {

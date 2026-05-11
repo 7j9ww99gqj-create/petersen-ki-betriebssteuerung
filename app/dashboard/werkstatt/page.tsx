@@ -8,6 +8,8 @@ import {
   getWerkstattZeitbuchungen, insertWerkstattZeitbuchung,
   getWerkstattMaterial, insertWerkstattMaterial,
   getWerkstattPruefprotokolle, insertWerkstattPruefprotokoll,
+  getWerkstattWartungen, upsertWerkstattWartung, deleteWerkstattWartung,
+  getWerkstattStoerungen, upsertWerkstattStoerung, deleteWerkstattStoerung,
 } from '@/lib/db'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
@@ -44,6 +46,21 @@ type Mitarbeiter = {
 
 type WerkstattBereich = {
   id: string; name: string; typ?: string; aktiv?: boolean; notiz?: string
+  created_at?: string; updated_at?: string
+}
+
+type WartungStatus = 'fällig' | 'geplant' | 'erledigt' | 'überfällig'
+type WerkstattWartung = {
+  id: string; maschine: string; intervall?: string; faellig_am: string
+  letzte_wartung?: string; verantwortlich?: string; status: WartungStatus
+  notiz?: string; created_at?: string; updated_at?: string
+}
+
+type StoerungStatus = 'offen' | 'in_bearbeitung' | 'behoben'
+type WerkstattStoerung = {
+  id: string; maschine: string; titel: string; beschreibung?: string
+  prioritaet: Prioritaet; status: StoerungStatus; gemeldet_von?: string
+  gemeldet_am: string; behoben_am?: string; notiz?: string
   created_at?: string; updated_at?: string
 }
 
@@ -97,6 +114,18 @@ const demoBereiche: WerkstattBereich[] = [
   { id: 'WB-006', name: 'Drehmaschine-2', typ: 'Maschine', aktiv: true },
 ]
 
+const demoWartungen: WerkstattWartung[] = [
+  { id: 'WT-001', maschine: 'HP-Station-3', intervall: 'monatlich', faellig_am: '2026-05-15', letzte_wartung: '2026-04-15', verantwortlich: 'K. Meier', status: 'fällig', notiz: 'Hydrauliköl, Filter und Sicherheitskreis prüfen' },
+  { id: 'WT-002', maschine: 'CNC-Fräse-1', intervall: 'quartalsweise', faellig_am: '2026-06-01', letzte_wartung: '2026-03-01', verantwortlich: 'M. Fischer', status: 'geplant', notiz: 'Spindellager und Kühlung prüfen' },
+  { id: 'WT-003', maschine: 'Förderband-2', intervall: 'monatlich', faellig_am: '2026-04-28', letzte_wartung: '2026-03-28', verantwortlich: 'T. Schulz', status: 'überfällig', notiz: 'Bandlauf kontrollieren' },
+]
+
+const demoStoerungen: WerkstattStoerung[] = [
+  { id: 'ST-001', maschine: 'Förderband-2', titel: 'Band läuft unruhig', beschreibung: 'Seitlicher Versatz bei hoher Last', prioritaet: 'Hoch', status: 'offen', gemeldet_von: 'T. Schulz', gemeldet_am: '2026-05-09' },
+  { id: 'ST-002', maschine: 'CNC-Fräse-1', titel: 'Kühlmittelstand niedrig', prioritaet: 'Mittel', status: 'in_bearbeitung', gemeldet_von: 'M. Fischer', gemeldet_am: '2026-05-10' },
+  { id: 'ST-003', maschine: 'HP-Station-3', titel: 'Drucksensor kalibriert', prioritaet: 'Niedrig', status: 'behoben', gemeldet_von: 'K. Meier', gemeldet_am: '2026-05-03', behoben_am: '2026-05-04' },
+]
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const prioBadge: Record<Prioritaet, string> = {
@@ -111,9 +140,27 @@ const statusBadge: Record<AKStatus, string> = {
 const statusIcon: Record<AKStatus, string> = {
   Offen: '📋', 'In Arbeit': '⚙️', Warten: '⏸️', Fertig: '✅', Storniert: '✕',
 }
+const wartungBadge: Record<WartungStatus, string> = {
+  fällig: 'badge-orange', geplant: 'badge-blue', erledigt: 'badge-green', überfällig: 'badge-red',
+}
+const stoerungBadge: Record<StoerungStatus, string> = {
+  offen: 'badge-red', in_bearbeitung: 'badge-orange', behoben: 'badge-green',
+}
+const stoerungLabel: Record<StoerungStatus, string> = {
+  offen: 'Offen', in_bearbeitung: 'In Bearbeitung', behoben: 'Behoben',
+}
 
 function genId() {
   return `AK-${Date.now().toString(36).toUpperCase()}`
+}
+
+function isoToday() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function isPastDate(value?: string) {
+  if (!value) return false
+  return new Date(value).getTime() < new Date(isoToday()).getTime()
 }
 
 function ProgressBar({ value, color }: { value: number; color: string }) {
@@ -1323,7 +1370,347 @@ function BereicheTab({ isDemo, bereiche, setBereiche }: {
   )
 }
 
-type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet' | 'mitarbeiter' | 'bereiche'
+function WartungTab({ isDemo, bereiche, mitarbeiterNamen, wartungen, setWartungen }: {
+  isDemo: boolean
+  bereiche: WerkstattBereich[]
+  mitarbeiterNamen: string[]
+  wartungen: WerkstattWartung[]
+  setWartungen: React.Dispatch<React.SetStateAction<WerkstattWartung[]>>
+}) {
+  const [form, setForm] = useState({ maschine: '', intervall: 'monatlich', faellig_am: isoToday(), letzte_wartung: '', verantwortlich: '', status: 'geplant' as WartungStatus, notiz: '' })
+  const [editId, setEditId] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [toast, setToast] = useState('')
+  const [toastError, setToastError] = useState(false)
+  const maschinen = bereiche.filter(b => b.aktiv !== false && ['Maschine', 'Anlage', 'Arbeitsplatz'].includes(b.typ ?? ''))
+
+  const showToast = (msg: string, error = false) => {
+    setToast(msg); setToastError(error)
+    setTimeout(() => { setToast(''); setToastError(false) }, 3500)
+  }
+  const reset = () => {
+    setForm({ maschine: '', intervall: 'monatlich', faellig_am: isoToday(), letzte_wartung: '', verantwortlich: '', status: 'geplant', notiz: '' })
+    setEditId(null)
+  }
+  const save = async () => {
+    if (!form.maschine || !form.faellig_am) { showToast('Maschine und Fälligkeit sind Pflicht', true); return }
+    const status = isPastDate(form.faellig_am) && form.status !== 'erledigt' ? 'überfällig' : form.status
+    const payload: WerkstattWartung = {
+      id: editId ?? `WT-${Date.now().toString(36).toUpperCase()}`,
+      maschine: form.maschine,
+      intervall: form.intervall || undefined,
+      faellig_am: form.faellig_am,
+      letzte_wartung: form.letzte_wartung || undefined,
+      verantwortlich: form.verantwortlich || undefined,
+      status,
+      notiz: form.notiz || undefined,
+    }
+    if (!isDemo) {
+      try { await upsertWerkstattWartung(payload) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setWartungen(prev => editId ? prev.map(w => w.id === editId ? payload : w) : [payload, ...prev])
+    reset()
+    showToast(editId ? '✅ Wartung aktualisiert' : '✅ Wartung angelegt')
+  }
+  const remove = async (id: string) => {
+    if (!isDemo) {
+      try { await deleteWerkstattWartung(id) } catch { showToast('Fehler beim Löschen', true); return }
+    }
+    setWartungen(prev => prev.filter(w => w.id !== id))
+    setDeleteId(null)
+    showToast('🗑️ Wartung gelöscht')
+  }
+  const markDone = async (w: WerkstattWartung) => {
+    const payload = { ...w, status: 'erledigt' as WartungStatus, letzte_wartung: isoToday() }
+    if (!isDemo) {
+      try { await upsertWerkstattWartung(payload) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setWartungen(prev => prev.map(x => x.id === w.id ? payload : x))
+    showToast('✅ Wartung erledigt')
+  }
+  const edit = (w: WerkstattWartung) => {
+    setEditId(w.id)
+    setForm({
+      maschine: w.maschine,
+      intervall: w.intervall ?? 'monatlich',
+      faellig_am: w.faellig_am,
+      letzte_wartung: w.letzte_wartung ?? '',
+      verantwortlich: w.verantwortlich ?? '',
+      status: w.status,
+      notiz: w.notiz ?? '',
+    })
+  }
+  const sorted = [...wartungen].sort((a, b) => a.faellig_am.localeCompare(b.faellig_am))
+  const faellig = wartungen.filter(w => w.status === 'fällig' || w.status === 'überfällig' || (isPastDate(w.faellig_am) && w.status !== 'erledigt')).length
+
+  return (
+    <div>
+      <Toast msg={toast} isError={toastError} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
+        {[
+          { label: 'Wartungen', value: wartungen.length, icon: '🧰', color: '#a78bfa' },
+          { label: 'Fällig/Überfällig', value: faellig, icon: '⚠️', color: faellig > 0 ? '#f59e0b' : '#10b981' },
+          { label: 'Erledigt', value: wartungen.filter(w => w.status === 'erledigt').length, icon: '✅', color: '#10b981' },
+        ].map(s => (
+          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8' }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="pk-card" style={{ marginBottom: 16, border: '1px solid rgba(167,139,250,.22)' }}>
+        <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 800 }}>{editId ? '✏️ Wartung bearbeiten' : '+ Wartung planen'}</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <select className="pk-input" value={form.maschine} onChange={e => setForm(p => ({ ...p, maschine: e.target.value }))}>
+            <option value="">Maschine wählen *</option>
+            {maschinen.map(m => <option key={m.id}>{m.name}</option>)}
+          </select>
+          <select className="pk-input" value={form.intervall} onChange={e => setForm(p => ({ ...p, intervall: e.target.value }))}>
+            {['wöchentlich', 'monatlich', 'quartalsweise', 'halbjährlich', 'jährlich', 'einmalig'].map(i => <option key={i}>{i}</option>)}
+          </select>
+          <input className="pk-input" type="date" value={form.faellig_am} onChange={e => setForm(p => ({ ...p, faellig_am: e.target.value }))} />
+          <input className="pk-input" type="date" value={form.letzte_wartung} onChange={e => setForm(p => ({ ...p, letzte_wartung: e.target.value }))} />
+          <select className="pk-input" value={form.verantwortlich} onChange={e => setForm(p => ({ ...p, verantwortlich: e.target.value }))}>
+            <option value="">Verantwortlich</option>
+            {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
+          </select>
+          <select className="pk-input" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as WartungStatus }))}>
+            <option value="geplant">geplant</option>
+            <option value="fällig">fällig</option>
+            <option value="erledigt">erledigt</option>
+            <option value="überfällig">überfällig</option>
+          </select>
+        </div>
+        <textarea className="pk-input" rows={3} placeholder="Checkliste / Notiz" value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} style={{ marginTop: 12 }} />
+        <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+          <button className="pk-btn" onClick={save}>{editId ? 'Speichern' : 'Wartung anlegen'}</button>
+          {editId && <button className="pk-btn-ghost" onClick={reset}>Abbrechen</button>}
+        </div>
+      </div>
+
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+        <table className="pk-table">
+          <thead><tr><th>Maschine</th><th>Intervall</th><th>Fällig</th><th>Letzte Wartung</th><th>Verantwortlich</th><th>Status</th><th>Notiz</th><th>Aktionen</th></tr></thead>
+          <tbody>
+            {sorted.length === 0 ? (
+              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 36, color: '#aeb9c8' }}>Noch keine Wartungen geplant.</td></tr>
+            ) : sorted.map(w => {
+              const status = isPastDate(w.faellig_am) && w.status !== 'erledigt' ? 'überfällig' : w.status
+              return (
+                <tr key={w.id}>
+                  <td style={{ fontWeight: 800 }}>🏭 {w.maschine}</td>
+                  <td style={{ color: '#aeb9c8' }}>{w.intervall ?? '—'}</td>
+                  <td style={{ color: status === 'überfällig' ? '#fb7185' : '#aeb9c8', fontWeight: status === 'überfällig' ? 800 : 500 }}>{w.faellig_am}</td>
+                  <td style={{ color: '#aeb9c8' }}>{w.letzte_wartung ?? '—'}</td>
+                  <td style={{ color: '#aeb9c8' }}>{w.verantwortlich ?? '—'}</td>
+                  <td><span className={`badge ${wartungBadge[status]}`}>{status}</span></td>
+                  <td style={{ color: '#aeb9c8', fontSize: 12 }}>{w.notiz ?? '—'}</td>
+                  <td>
+                    {deleteId === w.id ? (
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button onClick={() => remove(w.id)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.4)', background: 'rgba(244,63,94,.1)', color: '#fb7185', cursor: 'pointer', fontWeight: 700 }}>Ja</button>
+                        <button onClick={() => setDeleteId(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,.15)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => markDone(w)} title="Erledigt" style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(37,211,102,.25)', background: 'rgba(37,211,102,.08)', color: '#4ddb7e', cursor: 'pointer' }}>✅</button>
+                        <button onClick={() => edit(w)} title="Bearbeiten" style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(167,139,250,.25)', background: 'rgba(167,139,250,.08)', color: '#c4b5fd', cursor: 'pointer' }}>✏️</button>
+                        <button onClick={() => setDeleteId(w.id)} title="Löschen" style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.2)', background: 'transparent', color: '#fb7185', cursor: 'pointer' }}>🗑️</button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function StoerungenTab({ isDemo, bereiche, mitarbeiterNamen, stoerungen, setStoerungen }: {
+  isDemo: boolean
+  bereiche: WerkstattBereich[]
+  mitarbeiterNamen: string[]
+  stoerungen: WerkstattStoerung[]
+  setStoerungen: React.Dispatch<React.SetStateAction<WerkstattStoerung[]>>
+}) {
+  const [form, setForm] = useState({ maschine: '', titel: '', beschreibung: '', prioritaet: 'Mittel' as Prioritaet, gemeldet_von: '', notiz: '' })
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [toast, setToast] = useState('')
+  const [toastError, setToastError] = useState(false)
+  const maschinen = bereiche.filter(b => b.aktiv !== false && ['Maschine', 'Anlage', 'Arbeitsplatz'].includes(b.typ ?? ''))
+
+  const showToast = (msg: string, error = false) => {
+    setToast(msg); setToastError(error)
+    setTimeout(() => { setToast(''); setToastError(false) }, 3500)
+  }
+  const save = async () => {
+    if (!form.maschine || !form.titel.trim()) { showToast('Maschine und Titel sind Pflicht', true); return }
+    const payload: WerkstattStoerung = {
+      id: `ST-${Date.now().toString(36).toUpperCase()}`,
+      maschine: form.maschine,
+      titel: form.titel.trim(),
+      beschreibung: form.beschreibung || undefined,
+      prioritaet: form.prioritaet,
+      status: 'offen',
+      gemeldet_von: form.gemeldet_von || undefined,
+      gemeldet_am: isoToday(),
+      notiz: form.notiz || undefined,
+    }
+    if (!isDemo) {
+      try { await upsertWerkstattStoerung(payload) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setStoerungen(prev => [payload, ...prev])
+    setForm({ maschine: '', titel: '', beschreibung: '', prioritaet: 'Mittel', gemeldet_von: '', notiz: '' })
+    showToast('✅ Störung gemeldet')
+  }
+  const setStatus = async (s: WerkstattStoerung, status: StoerungStatus) => {
+    const payload = { ...s, status, behoben_am: status === 'behoben' ? isoToday() : undefined }
+    if (!isDemo) {
+      try { await upsertWerkstattStoerung(payload) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setStoerungen(prev => prev.map(x => x.id === s.id ? payload : x))
+    showToast(`✅ Störung auf "${stoerungLabel[status]}" gesetzt`)
+  }
+  const remove = async (id: string) => {
+    if (!isDemo) {
+      try { await deleteWerkstattStoerung(id) } catch { showToast('Fehler beim Löschen', true); return }
+    }
+    setStoerungen(prev => prev.filter(s => s.id !== id))
+    setDeleteId(null)
+    showToast('🗑️ Störung gelöscht')
+  }
+  const offen = stoerungen.filter(s => s.status !== 'behoben').length
+
+  return (
+    <div>
+      <Toast msg={toast} isError={toastError} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
+        {[
+          { label: 'Offene Störungen', value: offen, icon: '🚨', color: offen > 0 ? '#f43f5e' : '#10b981' },
+          { label: 'In Bearbeitung', value: stoerungen.filter(s => s.status === 'in_bearbeitung').length, icon: '🛠️', color: '#f59e0b' },
+          { label: 'Behoben', value: stoerungen.filter(s => s.status === 'behoben').length, icon: '✅', color: '#10b981' },
+        ].map(s => (
+          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8' }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="pk-card" style={{ marginBottom: 16, border: '1px solid rgba(244,63,94,.18)' }}>
+        <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 800 }}>🚨 Störung melden</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <select className="pk-input" value={form.maschine} onChange={e => setForm(p => ({ ...p, maschine: e.target.value }))}>
+            <option value="">Maschine wählen *</option>
+            {maschinen.map(m => <option key={m.id}>{m.name}</option>)}
+          </select>
+          <input className="pk-input" placeholder="Titel *" value={form.titel} onChange={e => setForm(p => ({ ...p, titel: e.target.value }))} />
+          <select className="pk-input" value={form.prioritaet} onChange={e => setForm(p => ({ ...p, prioritaet: e.target.value as Prioritaet }))}>
+            <option>Niedrig</option><option>Mittel</option><option>Hoch</option><option>Kritisch</option>
+          </select>
+          <select className="pk-input" value={form.gemeldet_von} onChange={e => setForm(p => ({ ...p, gemeldet_von: e.target.value }))}>
+            <option value="">Gemeldet von</option>
+            {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
+          </select>
+        </div>
+        <textarea className="pk-input" rows={3} placeholder="Beschreibung / Notiz" value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} style={{ marginTop: 12 }} />
+        <button className="pk-btn" onClick={save} style={{ marginTop: 12 }}>Störung melden</button>
+      </div>
+
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+        <table className="pk-table">
+          <thead><tr><th>Maschine</th><th>Störung</th><th>Priorität</th><th>Status</th><th>Gemeldet</th><th>Aktionen</th></tr></thead>
+          <tbody>
+            {stoerungen.length === 0 ? (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 36, color: '#aeb9c8' }}>Keine Störungen gemeldet.</td></tr>
+            ) : stoerungen.map(s => (
+              <tr key={s.id}>
+                <td style={{ fontWeight: 800 }}>🏭 {s.maschine}</td>
+                <td><b>{s.titel}</b><div style={{ color: '#aeb9c8', fontSize: 12 }}>{s.beschreibung ?? '—'}</div></td>
+                <td><span className={`badge ${prioBadge[s.prioritaet]}`}>{s.prioritaet}</span></td>
+                <td><span className={`badge ${stoerungBadge[s.status]}`}>{stoerungLabel[s.status]}</span></td>
+                <td style={{ color: '#aeb9c8', fontSize: 12 }}>{s.gemeldet_am}{s.gemeldet_von ? ` · ${s.gemeldet_von}` : ''}</td>
+                <td>
+                  {deleteId === s.id ? (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => remove(s.id)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.4)', background: 'rgba(244,63,94,.1)', color: '#fb7185', cursor: 'pointer', fontWeight: 700 }}>Ja</button>
+                      <button onClick={() => setDeleteId(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,.15)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {s.status === 'offen' && <button onClick={() => setStatus(s, 'in_bearbeitung')} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(245,158,11,.25)', background: 'rgba(245,158,11,.08)', color: '#fbbf24', cursor: 'pointer' }}>Start</button>}
+                      {s.status !== 'behoben' && <button onClick={() => setStatus(s, 'behoben')} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(37,211,102,.25)', background: 'rgba(37,211,102,.08)', color: '#4ddb7e', cursor: 'pointer' }}>Behoben</button>}
+                      <button onClick={() => setDeleteId(s.id)} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.2)', background: 'transparent', color: '#fb7185', cursor: 'pointer' }}>🗑️</button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function MaschinenakteTab({ bereiche, karten, wartungen, stoerungen }: {
+  bereiche: WerkstattBereich[]
+  karten: Arbeitskarte[]
+  wartungen: WerkstattWartung[]
+  stoerungen: WerkstattStoerung[]
+}) {
+  const maschinen = bereiche.filter(b => b.aktiv !== false && ['Maschine', 'Anlage', 'Arbeitsplatz'].includes(b.typ ?? ''))
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      {maschinen.length === 0 ? (
+        <div className="pk-card" style={{ textAlign: 'center', padding: 42, color: '#aeb9c8' }}>Noch keine Maschinen/Akten vorhanden.</div>
+      ) : maschinen.map(m => {
+        const offeneKarten = karten.filter(k => k.maschine === m.name && k.status !== 'Fertig' && k.status !== 'Storniert')
+        const offeneStoerungen = stoerungen.filter(s => s.maschine === m.name && s.status !== 'behoben')
+        const nextWartung = wartungen.filter(w => w.maschine === m.name && w.status !== 'erledigt').sort((a, b) => a.faellig_am.localeCompare(b.faellig_am))[0]
+        return (
+          <div key={m.id} className="pk-card" style={{ border: offeneStoerungen.length > 0 ? '1px solid rgba(244,63,94,.25)' : '1px solid rgba(255,255,255,.08)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <div>
+                <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 900 }}>🏭 {m.name}</h3>
+                <div style={{ color: '#aeb9c8', fontSize: 13 }}>{m.typ ?? 'Maschine'} · {m.notiz ?? 'Keine Notiz'}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <span className="badge badge-blue">{offeneKarten.length} offene Karten</span>
+                <span className={`badge ${offeneStoerungen.length > 0 ? 'badge-red' : 'badge-green'}`}>{offeneStoerungen.length} Störungen</span>
+                <span className={`badge ${nextWartung && isPastDate(nextWartung.faellig_am) ? 'badge-orange' : 'badge-gray'}`}>Wartung: {nextWartung?.faellig_am ?? '—'}</span>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginTop: 14 }}>
+              <div style={{ padding: 12, borderRadius: 10, background: 'rgba(255,255,255,.03)' }}>
+                <div style={{ color: '#aeb9c8', fontSize: 11, marginBottom: 6, fontWeight: 800, textTransform: 'uppercase' }}>Aktuelle Arbeiten</div>
+                {offeneKarten.slice(0, 3).map(k => <div key={k.id} style={{ fontSize: 13, marginBottom: 5 }}>{k.auftragsnr} · {k.beschreibung}</div>)}
+                {offeneKarten.length === 0 && <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine offenen Arbeiten.</div>}
+              </div>
+              <div style={{ padding: 12, borderRadius: 10, background: 'rgba(255,255,255,.03)' }}>
+                <div style={{ color: '#aeb9c8', fontSize: 11, marginBottom: 6, fontWeight: 800, textTransform: 'uppercase' }}>Störungen</div>
+                {offeneStoerungen.slice(0, 3).map(s => <div key={s.id} style={{ fontSize: 13, marginBottom: 5, color: s.prioritaet === 'Kritisch' ? '#fb7185' : '#f8fbff' }}>{s.titel} · {stoerungLabel[s.status]}</div>)}
+                {offeneStoerungen.length === 0 && <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine offenen Störungen.</div>}
+              </div>
+              <div style={{ padding: 12, borderRadius: 10, background: 'rgba(255,255,255,.03)' }}>
+                <div style={{ color: '#aeb9c8', fontSize: 11, marginBottom: 6, fontWeight: 800, textTransform: 'uppercase' }}>Nächste Wartung</div>
+                <div style={{ fontSize: 13 }}>{nextWartung ? `${nextWartung.faellig_am} · ${nextWartung.intervall ?? 'Intervall offen'} · ${nextWartung.verantwortlich ?? 'ohne Verantwortlichen'}` : 'Keine Wartung geplant.'}</div>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet' | 'wartung' | 'stoerungen' | 'maschinenakte' | 'mitarbeiter' | 'bereiche'
 
 export default function WerkstattPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
@@ -1332,13 +1719,22 @@ export default function WerkstattPilotPage() {
   const [zeitbuchungen, setZeitbuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])
   const [mitarbeiter, setMitarbeiter] = useState<Mitarbeiter[]>(isDemo ? demoMitarbeiter : [])
   const [bereiche, setBereiche] = useState<WerkstattBereich[]>(isDemo ? demoBereiche : [])
+  const [wartungen, setWartungen] = useState<WerkstattWartung[]>(isDemo ? demoWartungen : [])
+  const [stoerungen, setStoerungen] = useState<WerkstattStoerung[]>(isDemo ? demoStoerungen : [])
   const [loading, setLoading] = useState(!isDemo)
   const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
     if (isDemo) return
-    Promise.all([getWerkstattKarten(), getWerkstattZeitbuchungen(), getWerkstattMitarbeiter(), getWerkstattBereiche()])
-      .then(([k, z, m, b]) => { setKarten(k as Arbeitskarte[]); setZeitbuchungen(z as Zeitbuchung[]); setMitarbeiter(m as Mitarbeiter[]); setBereiche(b as WerkstattBereich[]) })
+    Promise.all([getWerkstattKarten(), getWerkstattZeitbuchungen(), getWerkstattMitarbeiter(), getWerkstattBereiche(), getWerkstattWartungen(), getWerkstattStoerungen()])
+      .then(([k, z, m, b, w, s]) => {
+        setKarten(k as Arbeitskarte[])
+        setZeitbuchungen(z as Zeitbuchung[])
+        setMitarbeiter(m as Mitarbeiter[])
+        setBereiche(b as WerkstattBereich[])
+        setWartungen(w as WerkstattWartung[])
+        setStoerungen(s as WerkstattStoerung[])
+      })
       .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
   }, [isDemo])
@@ -1350,6 +1746,8 @@ export default function WerkstattPilotPage() {
   const aktiveMitarbeiter = mitarbeiter.filter(m => m.aktiv !== false)
   const mitarbeiterNamen = aktiveMitarbeiter.map(m => m.name)
   const bereichNamen = bereiche.filter(b => b.aktiv !== false).map(b => b.name)
+  const offeneStoerungen = stoerungen.filter(s => s.status !== 'behoben').length
+  const faelligeWartungen = wartungen.filter(w => w.status === 'fällig' || w.status === 'überfällig' || (isPastDate(w.faellig_am) && w.status !== 'erledigt')).length
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
@@ -1386,6 +1784,8 @@ export default function WerkstattPilotPage() {
           { label: 'Stunden heute', value: `${heuteStunden}h`, icon: '⏱️', color: '#10b981' },
           { label: 'Mitarbeiter', value: String(aktiveMitarbeiter.length), icon: '👷', color: '#f59e0b' },
           { label: 'Bereiche', value: String(bereichNamen.length), icon: '🏭', color: '#38bdf8' },
+          { label: 'Wartung fällig', value: String(faelligeWartungen), icon: '🧰', color: faelligeWartungen > 0 ? '#f59e0b' : '#10b981' },
+          { label: 'Störungen offen', value: String(offeneStoerungen), icon: '🚨', color: offeneStoerungen > 0 ? '#f43f5e' : '#10b981' },
         ].map(s => (
           <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
             <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
@@ -1396,12 +1796,15 @@ export default function WerkstattPilotPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)', flexWrap: 'wrap' }}>
         {([
           { id: 'karten', label: '📋 Arbeitskarten' },
           { id: 'zeit', label: '⏱️ Zeiterfassung' },
           { id: 'material', label: '🔩 Material' },
           { id: 'qualitaet', label: '✅ Qualität' },
+          { id: 'wartung', label: '🧰 Wartung' },
+          { id: 'stoerungen', label: '🚨 Störungen' },
+          { id: 'maschinenakte', label: '📘 Maschinenakte' },
           { id: 'mitarbeiter', label: '👷 Mitarbeiter' },
           { id: 'bereiche', label: '🏭 Maschinen/Bereiche' },
         ] as const).map(t => (
@@ -1417,6 +1820,9 @@ export default function WerkstattPilotPage() {
       {tab === 'zeit' && <ZeiterfassungTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
       {tab === 'material' && <MaterialverbrauchTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
       {tab === 'qualitaet' && <QualitaetTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
+      {tab === 'wartung' && <WartungTab isDemo={isDemo} bereiche={bereiche} mitarbeiterNamen={mitarbeiterNamen} wartungen={wartungen} setWartungen={setWartungen} />}
+      {tab === 'stoerungen' && <StoerungenTab isDemo={isDemo} bereiche={bereiche} mitarbeiterNamen={mitarbeiterNamen} stoerungen={stoerungen} setStoerungen={setStoerungen} />}
+      {tab === 'maschinenakte' && <MaschinenakteTab bereiche={bereiche} karten={karten} wartungen={wartungen} stoerungen={stoerungen} />}
       {tab === 'mitarbeiter' && <MitarbeiterTab isDemo={isDemo} mitarbeiter={mitarbeiter} setMitarbeiter={setMitarbeiter} />}
       {tab === 'bereiche' && <BereicheTab isDemo={isDemo} bereiche={bereiche} setBereiche={setBereiche} />}
     </div>
