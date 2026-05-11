@@ -268,6 +268,19 @@ create table if not exists werkstatt_karten (
   updated_at   timestamptz default now()
 );
 
+create table if not exists werkstatt_mitarbeiter (
+  id         text primary key,
+  user_id    uuid references auth.users not null default auth.uid(),
+  name       text not null,
+  rolle      text,
+  email      text,
+  telefon    text,
+  aktiv      boolean default true,
+  notiz      text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 create table if not exists werkstatt_zeitbuchungen (
   id           bigserial primary key,
   user_id      uuid references auth.users not null default auth.uid(),
@@ -303,11 +316,13 @@ create table if not exists werkstatt_pruefprotokolle (
 );
 
 alter table werkstatt_karten          enable row level security;
+alter table werkstatt_mitarbeiter     enable row level security;
 alter table werkstatt_zeitbuchungen   enable row level security;
 alter table werkstatt_material        enable row level security;
 alter table werkstatt_pruefprotokolle enable row level security;
 
 create policy "werkstatt_karten_user"          on werkstatt_karten          for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "werkstatt_mitarbeiter_user"     on werkstatt_mitarbeiter     for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "werkstatt_zeitbuchungen_user"   on werkstatt_zeitbuchungen   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "werkstatt_material_user"        on werkstatt_material        for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "werkstatt_pruefprotokolle_user" on werkstatt_pruefprotokolle for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

@@ -6,7 +6,7 @@ import {
   upsertLagerArtikel, insertLagerBewegung, deleteLagerArtikel,
   getLagerStellplaetze, getLagerStellplatzBestand, getLagerUmlagerungen,
   upsertLagerStellplatz, deleteLagerStellplatz,
-  deleteLagerStellplatzBestand, umlagerArtikel,
+  upsertLagerStellplatzBestand, deleteLagerStellplatzBestand, umlagerArtikel,
 } from '@/lib/db'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ type Stellplatz = {
   temperaturzone?: string; aktiv?: boolean; notiz?: string
 }
 type StellplatzBestand = {
-  id: string; stellplatz_id: string; artikelnummer?: string; artikelname?: string
+  id: string; stellplatz_id: string; artikel_id?: string; artikelnummer?: string; artikelname?: string
   charge?: string; mhd?: string; menge: number; einheit?: string; status?: string
   eingelagert_am?: string; notiz?: string
   lager_stellplaetze?: { code: string; bereich?: string }
@@ -50,6 +50,21 @@ const emptyStellplatzForm: StellplatzForm = {
 }
 type UmlagerungForm = { vonBestandId: string; nachStellplatzId: string; menge: string; grund: string; notiz: string }
 const emptyUmlagerungForm: UmlagerungForm = { vonBestandId: '', nachStellplatzId: '', menge: '', grund: '', notiz: '' }
+
+type LagerBuchungForm = {
+  modus: 'einlagern' | 'entnehmen'
+  artikelId: string
+  stellplatzId: string
+  bestandId: string
+  menge: string
+  charge: string
+  mhd: string
+  notiz: string
+}
+const emptyLagerBuchungForm: LagerBuchungForm = {
+  modus: 'einlagern', artikelId: '', stellplatzId: '', bestandId: '',
+  menge: '', charge: '', mhd: '', notiz: '',
+}
 
 const SP_BEREICHE = ['Trockenlager', 'Kühlbereich', 'Wareneingang', 'Versand', 'Sperrlager', 'Außenlager', 'Sonstiges']
 const SP_TYPEN = ['Standard', 'Kühl', 'Tiefkühl', 'Eingang', 'Ausgang', 'Sperr', 'Bodenplatz', 'Hochregal']
@@ -463,6 +478,132 @@ function StellplatzModal({ stellplatz, onSave, onClose }: {
   )
 }
 
+// ── Lagerbuchung-Modal ───────────────────────────────────────────────────────
+
+function LagerBuchungModal({ form, artikel, stellplaetze, stellplatzBestand, saving, onChange, onSave, onClose }: {
+  form: LagerBuchungForm
+  artikel: Artikel[]
+  stellplaetze: Stellplatz[]
+  stellplatzBestand: StellplatzBestand[]
+  saving: boolean
+  onChange: (next: LagerBuchungForm) => void
+  onSave: () => void
+  onClose: () => void
+}) {
+  const isEinlagern = form.modus === 'einlagern'
+  const selectedBestand = stellplatzBestand.find(sb => sb.id === form.bestandId)
+  const selectedArtikel = artikel.find(a => a.id === form.artikelId)
+
+  const set = (key: keyof LagerBuchungForm, value: string) => onChange({ ...form, [key]: value })
+  const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} />
+      <div className="pk-card fade-in-scale" style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 620, padding: 26, maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3 style={{ margin: '0 0 18px', fontSize: 18, fontWeight: 900 }}>
+          {isEinlagern ? '📥 Artikel auf Stellplatz buchen' : '📤 Artikel aus Regal entnehmen'}
+        </h3>
+
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {(['einlagern', 'entnehmen'] as const).map(mode => (
+              <button
+                key={mode}
+                className={form.modus === mode ? 'pk-btn' : 'pk-btn-ghost'}
+                onClick={() => onChange({ ...emptyLagerBuchungForm, modus: mode })}
+                style={{ fontSize: 13 }}
+              >
+                {mode === 'einlagern' ? '📥 Einlagern' : '📤 Entnehmen'}
+              </button>
+            ))}
+          </div>
+
+          {isEinlagern ? (
+            <>
+              <div>
+                <label style={labelStyle}>Artikel *</label>
+                <select className="pk-input" value={form.artikelId} onChange={e => set('artikelId', e.target.value)}>
+                  <option value="">Artikel wählen…</option>
+                  {artikel.map(a => <option key={a.id} value={a.id}>{a.id} · {a.name} ({a.bestand} {a.einheit})</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Ziel-Stellplatz *</label>
+                <select className="pk-input" value={form.stellplatzId} onChange={e => set('stellplatzId', e.target.value)}>
+                  <option value="">Stellplatz wählen…</option>
+                  {stellplaetze.filter(sp => sp.aktiv !== false).map(sp => <option key={sp.id} value={sp.id}>{sp.code} · {sp.bereich ?? 'ohne Bereich'}</option>)}
+                </select>
+              </div>
+            </>
+          ) : (
+            <div>
+              <label style={labelStyle}>Position im Regal *</label>
+              <select className="pk-input" value={form.bestandId} onChange={e => {
+                const sb = stellplatzBestand.find(x => x.id === e.target.value)
+                onChange({
+                  ...form,
+                  bestandId: e.target.value,
+                  artikelId: sb?.artikel_id || sb?.artikelnummer || '',
+                  stellplatzId: sb?.stellplatz_id ?? '',
+                  charge: sb?.charge ?? '',
+                  mhd: sb?.mhd ?? '',
+                })
+              }}>
+                <option value="">Position wählen…</option>
+                {stellplatzBestand.filter(sb => sb.menge > 0).map(sb => {
+                  const sp = stellplaetze.find(x => x.id === sb.stellplatz_id)
+                  return <option key={sb.id} value={sb.id}>{sp?.code ?? sb.stellplatz_id} · {sb.artikelname ?? sb.artikelnummer} · {sb.menge} {sb.einheit}</option>
+                })}
+              </select>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Menge *</label>
+              <input className="pk-input" type="number" min="1" max={!isEinlagern && selectedBestand ? selectedBestand.menge : undefined} value={form.menge} onChange={e => set('menge', e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>Charge</label>
+              <input className="pk-input" value={form.charge} onChange={e => set('charge', e.target.value)} disabled={!isEinlagern} />
+            </div>
+            <div>
+              <label style={labelStyle}>MHD</label>
+              <input className="pk-input" type="date" value={form.mhd} onChange={e => set('mhd', e.target.value)} disabled={!isEinlagern} />
+            </div>
+          </div>
+
+          <div className="pk-card" style={{ padding: 12, background: 'rgba(255,255,255,.03)' }}>
+            <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Buchungsübersicht</div>
+            {isEinlagern ? (
+              <div style={{ fontSize: 14 }}>
+                {selectedArtikel ? <b>{selectedArtikel.name}</b> : 'Kein Artikel gewählt'} wird auf den gewählten Stellplatz gebucht.
+              </div>
+            ) : (
+              <div style={{ fontSize: 14 }}>
+                {selectedBestand ? <><b>{selectedBestand.artikelname ?? selectedBestand.artikelnummer}</b> · verfügbar: {selectedBestand.menge} {selectedBestand.einheit}</> : 'Keine Regalposition gewählt'}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label style={labelStyle}>Notiz</label>
+            <textarea className="pk-input" rows={3} value={form.notiz} onChange={e => set('notiz', e.target.value)} placeholder="Optionaler Buchungshinweis…" />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+          <button className="pk-btn" onClick={onSave} disabled={saving} style={{ flex: 1, fontWeight: 800 }}>
+            {saving ? 'Speichern…' : isEinlagern ? 'Einlagern' : 'Entnehmen'}
+          </button>
+          <button className="pk-btn-ghost" onClick={onClose} disabled={saving} style={{ flex: 1 }}>Abbrechen</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Hauptkomponente ──────────────────────────────────────────────────────────
 
 export default function LagerPilotPage() {
@@ -516,6 +657,7 @@ export default function LagerPilotPage() {
   const [lbFilterBereich, setLbFilterBereich] = useState('Alle')
   const [lbNurMhdKritisch, setLbNurMhdKritisch] = useState(false)
   const [lbDeleteConfirmId, setLbDeleteConfirmId] = useState<string | null>(null)
+  const [lbBuchungModal, setLbBuchungModal] = useState<LagerBuchungForm | null>(null)
 
   // Kommissionierung-State
   const [pickSelected, setPickSelected] = useState<Set<string>>(new Set())
@@ -939,6 +1081,123 @@ export default function LagerPilotPage() {
     showToast('🗑 Bestand-Position entfernt')
   }
 
+  const openEinlagern = (artikelId?: string) => {
+    const a = artikelId ? artikel.find(x => x.id === artikelId) : undefined
+    const best = a ? getBestStellplatz(a)?.stellplatz : undefined
+    setLbBuchungModal({
+      ...emptyLagerBuchungForm,
+      modus: 'einlagern',
+      artikelId: a?.id ?? '',
+      stellplatzId: best?.id ?? '',
+    })
+  }
+
+  const openEntnehmen = (bestandId: string) => {
+    const b = stellplatzBestand.find(x => x.id === bestandId)
+    setLbBuchungModal({
+      ...emptyLagerBuchungForm,
+      modus: 'entnehmen',
+      bestandId,
+      artikelId: b?.artikel_id || b?.artikelnummer || '',
+      stellplatzId: b?.stellplatz_id ?? '',
+      menge: b?.menge ? String(Math.min(1, b.menge)) : '',
+      charge: b?.charge ?? '',
+      mhd: b?.mhd ?? '',
+    })
+  }
+
+  const updateArtikelBestandLocal = (artikelId: string, delta: number) => {
+    setArtikel(prev => prev.map(a => {
+      if (a.id !== artikelId) return a
+      const bestand = Math.max(0, a.bestand + delta)
+      return { ...a, bestand, status: calcStatus(bestand, a.mindestbestand ?? 0) }
+    }))
+  }
+
+  const persistArtikelBestand = async (artikelId: string, delta: number) => {
+    const a = artikel.find(x => x.id === artikelId)
+    if (!a) return
+    const bestand = Math.max(0, a.bestand + delta)
+    await upsertLagerArtikel({ ...a, bestand, status: calcStatus(bestand, a.mindestbestand ?? 0) })
+  }
+
+  const handleLagerBuchung = async () => {
+    if (!lbBuchungModal) return
+    const menge = parseInt(lbBuchungModal.menge)
+    if (isNaN(menge) || menge <= 0) { showToast('Bitte eine gültige Menge eintragen', false); return }
+
+    if (lbBuchungModal.modus === 'einlagern') {
+      const a = artikel.find(x => x.id === lbBuchungModal.artikelId)
+      const sp = stellplaetze.find(x => x.id === lbBuchungModal.stellplatzId)
+      if (!a || !sp) { showToast('Artikel und Stellplatz sind Pflicht', false); return }
+      const existing = stellplatzBestand.find(sb =>
+        sb.stellplatz_id === sp.id &&
+        (sb.artikel_id === a.id || sb.artikelnummer === a.id) &&
+        (sb.charge ?? '') === (lbBuchungModal.charge || '') &&
+        (sb.mhd ?? '') === (lbBuchungModal.mhd || '')
+      )
+      const row: StellplatzBestand = {
+        id: existing?.id ?? (isDemo ? `SB-${Date.now().toString(36).toUpperCase()}` : crypto.randomUUID()),
+        stellplatz_id: sp.id,
+        artikel_id: a.id,
+        artikelnummer: a.id,
+        artikelname: a.name,
+        charge: lbBuchungModal.charge || undefined,
+        mhd: lbBuchungModal.mhd || undefined,
+        menge: (existing?.menge ?? 0) + menge,
+        einheit: a.einheit,
+        status: 'Verfügbar',
+        eingelagert_am: existing?.eingelagert_am ?? new Date().toISOString().slice(0, 10),
+        notiz: lbBuchungModal.notiz || undefined,
+        lager_stellplaetze: { code: sp.code, bereich: sp.bereich },
+      }
+
+      setSaving(true)
+      if (!isDemo) {
+        try {
+          await upsertLagerStellplatzBestand(row)
+          await persistArtikelBestand(a.id, menge)
+        } catch {
+          showToast('Fehler beim Einlagern', false); setSaving(false); return
+        }
+      }
+      setStellplatzBestand(prev => existing ? prev.map(sb => sb.id === existing.id ? row : sb) : [row, ...prev])
+      updateArtikelBestandLocal(a.id, menge)
+      setLbBuchungModal(null)
+      setSaving(false)
+      showToast(`✅ ${menge} ${a.einheit} "${a.name}" auf ${sp.code} eingelagert`)
+      return
+    }
+
+    const source = stellplatzBestand.find(sb => sb.id === lbBuchungModal.bestandId)
+    if (!source) { showToast('Bestand-Position nicht gefunden', false); return }
+    if (source.menge < menge) { showToast(`Nur ${source.menge} ${source.einheit ?? ''} verfügbar`, false); return }
+    const artikelId = source.artikel_id || source.artikelnummer || ''
+
+    setSaving(true)
+    if (!isDemo) {
+      try {
+        if (source.menge === menge) await deleteLagerStellplatzBestand(source.id)
+        else {
+          const { lager_stellplaetze: _ignored, ...persistable } = source
+          void _ignored
+          await upsertLagerStellplatzBestand({ ...persistable, menge: source.menge - menge })
+        }
+        if (artikelId) await persistArtikelBestand(artikelId, -menge)
+      } catch {
+        showToast('Fehler beim Entnehmen', false); setSaving(false); return
+      }
+    }
+    setStellplatzBestand(prev => source.menge === menge
+      ? prev.filter(sb => sb.id !== source.id)
+      : prev.map(sb => sb.id === source.id ? { ...sb, menge: sb.menge - menge } : sb)
+    )
+    if (artikelId) updateArtikelBestandLocal(artikelId, -menge)
+    setLbBuchungModal(null)
+    setSaving(false)
+    showToast(`✅ ${menge} ${source.einheit ?? ''} "${source.artikelname ?? source.artikelnummer}" aus dem Regal entnommen`)
+  }
+
   // ── Umlagerung ───────────────────────────────────────────────────────────────
 
   const handleUmlagerung = async () => {
@@ -1097,6 +1356,20 @@ export default function LagerPilotPage() {
           stellplatz={spModal === 'new' ? null : spModal}
           onSave={handleSaveStellplatz}
           onClose={() => setSpModal(null)}
+        />
+      )}
+
+      {/* Lagerbuchung-Modal */}
+      {lbBuchungModal !== null && (
+        <LagerBuchungModal
+          form={lbBuchungModal}
+          artikel={artikel}
+          stellplaetze={stellplaetze}
+          stellplatzBestand={stellplatzBestand}
+          saving={saving}
+          onChange={setLbBuchungModal}
+          onSave={handleLagerBuchung}
+          onClose={() => setLbBuchungModal(null)}
         />
       )}
 
@@ -1327,6 +1600,7 @@ export default function LagerPilotPage() {
                           ) : (
                             <div style={{ display: 'flex', gap: 6 }}>
                               <button onClick={() => setModal(a)} title="Bearbeiten" style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>
+                              <button onClick={() => openEinlagern(a.id)} title="Auf Stellplatz buchen" style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#34d399', fontSize: 13 }}>📥</button>
                               <button onClick={() => { setHistArtikel(a.id); setTab('historie') }} title="Artikel-Historie" style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#34d399', fontSize: 13 }}>📈</button>
                               <button onClick={() => setDeleteConfirmId(a.id)} title="Löschen" style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}>🗑</button>
                             </div>
@@ -1968,6 +2242,12 @@ export default function LagerPilotPage() {
                 Nur MHD-kritisch
               </label>
               <span style={{ fontSize: 12, color: '#aeb9c8' }}>{filtered.length} von {stellplatzBestand.length} Positionen</span>
+              <button className="pk-btn" onClick={() => openEinlagern()} style={{ marginLeft: 'auto', fontSize: 13 }}>
+                📥 Artikel einlagern
+              </button>
+              <button className="pk-btn-ghost" onClick={() => setLbBuchungModal({ ...emptyLagerBuchungForm, modus: 'entnehmen' })} style={{ fontSize: 13 }}>
+                📤 Aus Regal nehmen
+              </button>
             </div>
 
             {/* Tabelle */}
@@ -2029,10 +2309,10 @@ export default function LagerPilotPage() {
                             ) : (
                               <div style={{ display: 'flex', gap: 5 }}>
                                 <button
-                                  title="Bearbeiten (folgt)"
-                                  disabled
-                                  style={{ background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.15)', borderRadius: 6, padding: '4px 8px', cursor: 'not-allowed', color: '#4a6080', fontSize: 13 }}
-                                >✏️</button>
+                                  onClick={() => openEntnehmen(sb.id)}
+                                  title="Aus Regal nehmen"
+                                  style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f59e0b', fontSize: 13 }}
+                                >📤</button>
                                 <button
                                   onClick={() => setLbDeleteConfirmId(sb.id)}
                                   title="Entfernen"

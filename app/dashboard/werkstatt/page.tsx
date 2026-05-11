@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
 import {
   getWerkstattKarten, upsertWerkstattKarte, deleteWerkstattKarte,
+  getWerkstattMitarbeiter, upsertWerkstattMitarbeiter, deleteWerkstattMitarbeiter,
   getWerkstattZeitbuchungen, insertWerkstattZeitbuchung,
   getWerkstattMaterial, insertWerkstattMaterial,
   getWerkstattPruefprotokolle, insertWerkstattPruefprotokoll,
@@ -33,6 +34,11 @@ type Materialverbrauch = {
 type Pruefprotokoll = {
   id: number; auftragsnr: string; pruefpunkt: string
   ergebnis: 'OK' | 'Fehler' | 'Offen'; pruefer: string; datum: string
+}
+
+type Mitarbeiter = {
+  id: string; name: string; rolle?: string; email?: string; telefon?: string
+  aktiv?: boolean; notiz?: string; created_at?: string; updated_at?: string
 }
 
 // ── Demo-Daten ────────────────────────────────────────────────────────────────
@@ -70,6 +76,12 @@ const demoPruefung: Pruefprotokoll[] = [
 ]
 
 const mitarbeiterListe = ['K. Meier', 'M. Fischer', 'T. Schulz', 'J. Brand', 'S. Richter', 'L. Hoffmann']
+const demoMitarbeiter: Mitarbeiter[] = mitarbeiterListe.map((name, index) => ({
+  id: `MA-${String(index + 1).padStart(3, '0')}`,
+  name,
+  rolle: index < 2 ? 'Mechanik' : index < 4 ? 'Fertigung' : 'Aushilfe',
+  aktiv: true,
+}))
 const maschineListe = ['HP-Station-3', 'Schweißbereich-B', 'Förderband-2', 'Elektro-Werkstatt', 'CNC-Fräse-1', 'Drehmaschine-2', '—']
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -134,10 +146,11 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 // ── Edit-Modal für Arbeitskarten ──────────────────────────────────────────────
 
-function EditKarteModal({ karte, onClose, onSave }: {
+function EditKarteModal({ karte, onClose, onSave, mitarbeiterNamen }: {
   karte: Arbeitskarte
   onClose: () => void
   onSave: (updated: Arbeitskarte) => void
+  mitarbeiterNamen: string[]
 }) {
   const [form, setForm] = useState({
     auftragsnr: karte.auftragsnr,
@@ -184,7 +197,7 @@ function EditKarteModal({ karte, onClose, onSave }: {
           <label style={labelStyle}>Mitarbeiter *</label>
           <select className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
             <option value="">Mitarbeiter wählen…</option>
-            {mitarbeiterListe.map(m => <option key={m}>{m}</option>)}
+            {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
           </select>
         </div>
         <div>
@@ -238,7 +251,7 @@ function EditKarteModal({ karte, onClose, onSave }: {
 
 // ── Arbeitskarten-Tab ─────────────────────────────────────────────────────────
 
-function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
+function ArbeitskartentTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeiterNamen: string[] }) {
   const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
@@ -424,7 +437,7 @@ function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Mitarbeiter *</label>
               <select className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option value="">Mitarbeiter wählen…</option>
-                {mitarbeiterListe.map(m => <option key={m}>{m}</option>)}
+                {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
               </select>
             </div>
             <div>
@@ -567,6 +580,7 @@ function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
           karte={editKarte}
           onClose={() => setEditKarte(null)}
           onSave={handleEditSave}
+          mitarbeiterNamen={mitarbeiterNamen}
         />
       )}
     </div>
@@ -575,7 +589,7 @@ function ArbeitskartentTab({ isDemo }: { isDemo: boolean }) {
 
 // ── Zeiterfassung-Tab ─────────────────────────────────────────────────────────
 
-function ZeiterfassungTab({ isDemo }: { isDemo: boolean }) {
+function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeiterNamen: string[] }) {
   const [buchungen, setBuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])
   const [form, setForm] = useState({ mitarbeiter: '', auftragsnr: '', stunden: '', taetigkeit: '' })
   const [toast, setToast] = useState('')
@@ -653,7 +667,7 @@ function ZeiterfassungTab({ isDemo }: { isDemo: boolean }) {
             <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Mitarbeiter</label>
             <select className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
               <option value="">Wählen…</option>
-              {mitarbeiterListe.map(m => <option key={m}>{m}</option>)}
+              {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
             </select>
           </div>
           <div>
@@ -715,7 +729,7 @@ function ZeiterfassungTab({ isDemo }: { isDemo: boolean }) {
 
 // ── Materialverbrauch-Tab ────────────────────────────────────────────────────
 
-function MaterialverbrauchTab({ isDemo }: { isDemo: boolean }) {
+function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeiterNamen: string[] }) {
   const [material, setMaterial] = useState<Materialverbrauch[]>(isDemo ? demoMaterial : [])
   const [form, setForm] = useState({ artikel: '', menge: '', einheit: 'Stk', auftragsnr: '', mitarbeiter: '' })
   const [toast, setToast] = useState('')
@@ -793,7 +807,7 @@ function MaterialverbrauchTab({ isDemo }: { isDemo: boolean }) {
             <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Mitarbeiter</label>
             <select className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
               <option value="">Wählen…</option>
-              {mitarbeiterListe.map(m => <option key={m}>{m}</option>)}
+              {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
             </select>
           </div>
         </div>
@@ -843,7 +857,7 @@ function MaterialverbrauchTab({ isDemo }: { isDemo: boolean }) {
 
 // ── Qualitätskontrolle-Tab ────────────────────────────────────────────────────
 
-function QualitaetTab({ isDemo }: { isDemo: boolean }) {
+function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeiterNamen: string[] }) {
   const [protokolle, setProtokolle] = useState<Pruefprotokoll[]>(isDemo ? demoPruefung : [])
   const [form, setForm] = useState({ auftragsnr: '', pruefpunkt: '', pruefer: '' })
   const [toast, setToast] = useState('')
@@ -957,7 +971,7 @@ function QualitaetTab({ isDemo }: { isDemo: boolean }) {
             <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Prüfer</label>
             <select className="pk-input" value={form.pruefer} onChange={e => setForm(p => ({ ...p, pruefer: e.target.value }))} style={{ cursor: 'pointer' }}>
               <option value="">Wählen…</option>
-              {mitarbeiterListe.map(m => <option key={m}>{m}</option>)}
+              {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
             </select>
           </div>
         </div>
@@ -1028,20 +1042,156 @@ function QualitaetTab({ isDemo }: { isDemo: boolean }) {
 
 // ── Haupt-Seite ───────────────────────────────────────────────────────────────
 
-type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet'
+function MitarbeiterTab({ isDemo, mitarbeiter, setMitarbeiter }: {
+  isDemo: boolean
+  mitarbeiter: Mitarbeiter[]
+  setMitarbeiter: React.Dispatch<React.SetStateAction<Mitarbeiter[]>>
+}) {
+  const [form, setForm] = useState({ id: '', name: '', rolle: '', email: '', telefon: '', aktiv: true, notiz: '' })
+  const [editId, setEditId] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [toast, setToast] = useState('')
+  const [toastError, setToastError] = useState(false)
+
+  const showToast = (msg: string, error = false) => {
+    setToast(msg); setToastError(error)
+    setTimeout(() => { setToast(''); setToastError(false) }, 3500)
+  }
+
+  const reset = () => {
+    setForm({ id: '', name: '', rolle: '', email: '', telefon: '', aktiv: true, notiz: '' })
+    setEditId(null)
+  }
+
+  const save = async () => {
+    if (!form.name.trim()) { showToast('Name ist Pflicht', true); return }
+    const payload: Mitarbeiter = {
+      id: editId ?? `MA-${Date.now().toString(36).toUpperCase()}`,
+      name: form.name.trim(),
+      rolle: form.rolle || undefined,
+      email: form.email || undefined,
+      telefon: form.telefon || undefined,
+      aktiv: form.aktiv,
+      notiz: form.notiz || undefined,
+    }
+    if (!isDemo) {
+      try { await upsertWerkstattMitarbeiter(payload) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setMitarbeiter(prev => editId ? prev.map(m => m.id === editId ? payload : m) : [payload, ...prev])
+    reset()
+    showToast(editId ? '✅ Mitarbeiter aktualisiert' : '✅ Mitarbeiter angelegt')
+  }
+
+  const remove = async (id: string) => {
+    if (!isDemo) {
+      try { await deleteWerkstattMitarbeiter(id) } catch { showToast('Fehler beim Entfernen', true); return }
+    }
+    setMitarbeiter(prev => prev.filter(m => m.id !== id))
+    setDeleteId(null)
+    showToast('🗑️ Mitarbeiter entfernt')
+  }
+
+  const edit = (m: Mitarbeiter) => {
+    setEditId(m.id)
+    setForm({
+      id: m.id,
+      name: m.name,
+      rolle: m.rolle ?? '',
+      email: m.email ?? '',
+      telefon: m.telefon ?? '',
+      aktiv: m.aktiv !== false,
+      notiz: m.notiz ?? '',
+    })
+  }
+
+  const active = mitarbeiter.filter(m => m.aktiv !== false).length
+
+  return (
+    <div>
+      <Toast msg={toast} isError={toastError} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+        {[
+          { label: 'Mitarbeiter gesamt', value: String(mitarbeiter.length), icon: '👷', color: '#a78bfa' },
+          { label: 'Aktiv', value: String(active), icon: '✅', color: '#10b981' },
+          { label: 'Inaktiv', value: String(mitarbeiter.length - active), icon: '⏸️', color: '#f59e0b' },
+        ].map(s => (
+          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="pk-card" style={{ marginBottom: 16, border: '1px solid rgba(167,139,250,.22)' }}>
+        <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 800 }}>{editId ? '✏️ Mitarbeiter bearbeiten' : '+ Mitarbeiter anlegen'}</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <input className="pk-input" placeholder="Name *" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+          <input className="pk-input" placeholder="Rolle / Bereich" value={form.rolle} onChange={e => setForm(p => ({ ...p, rolle: e.target.value }))} />
+          <input className="pk-input" placeholder="E-Mail" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
+          <input className="pk-input" placeholder="Telefon" value={form.telefon} onChange={e => setForm(p => ({ ...p, telefon: e.target.value }))} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#d0d9e8', fontSize: 13 }}>
+            <input type="checkbox" checked={form.aktiv} onChange={e => setForm(p => ({ ...p, aktiv: e.target.checked }))} />
+            Aktiv
+          </label>
+        </div>
+        <textarea className="pk-input" rows={3} placeholder="Notiz" value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} style={{ marginTop: 12 }} />
+        <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+          <button className="pk-btn" onClick={save}>{editId ? 'Speichern' : 'Mitarbeiter anlegen'}</button>
+          {editId && <button className="pk-btn-ghost" onClick={reset}>Abbrechen</button>}
+        </div>
+      </div>
+
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+        <table className="pk-table">
+          <thead><tr><th>Name</th><th>Rolle</th><th>Kontakt</th><th>Status</th><th>Notiz</th><th>Aktionen</th></tr></thead>
+          <tbody>
+            {mitarbeiter.length === 0 ? (
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 36, color: '#aeb9c8' }}>Noch keine Mitarbeiter angelegt.</td></tr>
+            ) : mitarbeiter.map(m => (
+              <tr key={m.id}>
+                <td style={{ fontWeight: 800 }}>👷 {m.name}</td>
+                <td style={{ color: '#aeb9c8' }}>{m.rolle ?? '—'}</td>
+                <td style={{ color: '#aeb9c8', fontSize: 12 }}>{m.email || m.telefon ? `${m.email ?? ''}${m.email && m.telefon ? ' · ' : ''}${m.telefon ?? ''}` : '—'}</td>
+                <td><span className={`badge ${m.aktiv === false ? 'badge-gray' : 'badge-green'}`}>{m.aktiv === false ? 'Inaktiv' : 'Aktiv'}</span></td>
+                <td style={{ color: '#aeb9c8', fontSize: 12 }}>{m.notiz ?? '—'}</td>
+                <td>
+                  {deleteId === m.id ? (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => remove(m.id)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.4)', background: 'rgba(244,63,94,.1)', color: '#fb7185', cursor: 'pointer', fontWeight: 700 }}>Ja</button>
+                      <button onClick={() => setDeleteId(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,.15)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => edit(m)} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(167,139,250,.25)', background: 'rgba(167,139,250,.08)', color: '#c4b5fd', cursor: 'pointer' }}>✏️</button>
+                      <button onClick={() => setDeleteId(m.id)} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(244,63,94,.2)', background: 'transparent', color: '#fb7185', cursor: 'pointer' }}>🗑️</button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet' | 'mitarbeiter'
 
 export default function WerkstattPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
   const [tab, setTab] = useState<Tab>('karten')
   const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
   const [zeitbuchungen, setZeitbuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])
+  const [mitarbeiter, setMitarbeiter] = useState<Mitarbeiter[]>(isDemo ? demoMitarbeiter : [])
   const [loading, setLoading] = useState(!isDemo)
   const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
     if (isDemo) return
-    Promise.all([getWerkstattKarten(), getWerkstattZeitbuchungen()])
-      .then(([k, z]) => { setKarten(k as Arbeitskarte[]); setZeitbuchungen(z as Zeitbuchung[]) })
+    Promise.all([getWerkstattKarten(), getWerkstattZeitbuchungen(), getWerkstattMitarbeiter()])
+      .then(([k, z, m]) => { setKarten(k as Arbeitskarte[]); setZeitbuchungen(z as Zeitbuchung[]); setMitarbeiter(m as Mitarbeiter[]) })
       .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
   }, [isDemo])
@@ -1050,6 +1200,8 @@ export default function WerkstattPilotPage() {
   const kritisch = karten.filter(k => k.prioritaet === 'Kritisch' && k.status !== 'Fertig').length
   const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
   const heuteStunden = zeitbuchungen.filter(b => b.datum === today).reduce((s, b) => s + b.stunden, 0)
+  const aktiveMitarbeiter = mitarbeiter.filter(m => m.aktiv !== false)
+  const mitarbeiterNamen = aktiveMitarbeiter.map(m => m.name)
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
@@ -1084,7 +1236,7 @@ export default function WerkstattPilotPage() {
           { label: 'Offene Karten', value: String(offeneKarten), icon: '🛠️', color: '#a78bfa' },
           { label: 'Kritisch', value: String(kritisch), icon: '🔴', color: '#f43f5e' },
           { label: 'Stunden heute', value: `${heuteStunden}h`, icon: '⏱️', color: '#10b981' },
-          { label: 'Mitarbeiter', value: '4', icon: '👷', color: '#f59e0b' },
+          { label: 'Mitarbeiter', value: String(aktiveMitarbeiter.length), icon: '👷', color: '#f59e0b' },
         ].map(s => (
           <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
             <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
@@ -1101,6 +1253,7 @@ export default function WerkstattPilotPage() {
           { id: 'zeit', label: '⏱️ Zeiterfassung' },
           { id: 'material', label: '🔩 Material' },
           { id: 'qualitaet', label: '✅ Qualität' },
+          { id: 'mitarbeiter', label: '👷 Mitarbeiter' },
         ] as const).map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding: '10px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
@@ -1110,10 +1263,11 @@ export default function WerkstattPilotPage() {
         ))}
       </div>
 
-      {tab === 'karten' && <ArbeitskartentTab isDemo={isDemo} />}
-      {tab === 'zeit' && <ZeiterfassungTab isDemo={isDemo} />}
-      {tab === 'material' && <MaterialverbrauchTab isDemo={isDemo} />}
-      {tab === 'qualitaet' && <QualitaetTab isDemo={isDemo} />}
+      {tab === 'karten' && <ArbeitskartentTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
+      {tab === 'zeit' && <ZeiterfassungTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
+      {tab === 'material' && <MaterialverbrauchTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
+      {tab === 'qualitaet' && <QualitaetTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
+      {tab === 'mitarbeiter' && <MitarbeiterTab isDemo={isDemo} mitarbeiter={mitarbeiter} setMitarbeiter={setMitarbeiter} />}
     </div>
   )
 }

@@ -125,6 +125,7 @@ function labelForDocumentType(type: DocumentAiResult['documentType']) {
 
 export default function KiErkennungPage() {
   const router = useRouter()
+  const [isDemo] = useState(() => hasDemoCookie())
   const [activeTab, setActiveTab] = useState<Tab>('tagesbrief')
 
   // Tab: Tagesbrief
@@ -144,7 +145,10 @@ export default function KiErkennungPage() {
   // Tab: Chat
   const [chatMsg, setChatMsg] = useState('')
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-    { role: 'assistant', content: 'Hallo! Dieser allgemeine Chat läuft vorerst im Demo-Modus. Echte KI-Analyse ist im Tab „Dokumente" aktiv.' },
+    { role: 'assistant', content: hasDemoCookie()
+      ? 'Hallo! Dieser allgemeine Chat läuft vorerst im Demo-Modus. Echte KI-Analyse ist im Tab „Dokumente" aktiv.'
+      : 'Hallo! Für diesen neuen Account ist der Assistent noch leer. Echte KI-Analyse ist im Tab „Dokumente" aktiv; Betriebsdaten erscheinen hier erst, wenn Sie eigene Daten anlegen.'
+    },
   ])
   const [chatLoading, setChatLoading] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ msgIdx: number; actionIdx: number } | null>(null)
@@ -168,6 +172,13 @@ export default function KiErkennungPage() {
   async function generateBrief() {
     setBriefLoading(true)
     setBriefText(null)
+
+    if (!isDemo) {
+      await new Promise(r => setTimeout(r, 250))
+      setBriefText('Heute liegen für diesen Live-Account noch keine eigenen Auswertungsdaten im KI-Assistenten vor. Legen Sie Lagerartikel, Werkstattkarten oder Rechnungen an; danach kann der Tagesbrief konkrete Hinweise aus Ihren echten Daten anzeigen.')
+      setBriefLoading(false)
+      return
+    }
 
     const offeneAufgaben = demoAufgaben.filter(a => a.status === 'Offen' || a.status === 'In Arbeit')
     const kritischeKarten = demoKarten.filter(k => k.status !== 'Fertig' && (k.prioritaet === 'Kritisch' || k.prioritaet === 'Hoch'))
@@ -365,7 +376,9 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
 
     await new Promise(r => setTimeout(r, 550))
     const q = userMsg.toLowerCase()
-    const reply = q.includes('bestand') || q.includes('artikel')
+    const reply = !isDemo
+      ? 'Dieser Chat bleibt vorerst im Simulationsmodus und verwendet keine Demo-Betriebsdaten für Live-Accounts. Nutzen Sie den Tab „Dokumente" für echte KI-Dokumentenanalyse oder legen Sie eigene Daten in den Piloten an.'
+      : q.includes('bestand') || q.includes('artikel')
       ? 'Demo-Chat: 4 Artikel haben aktuell niedrigen oder leeren Bestand. Öffnen Sie den LagerPilot für Bestellvorschläge und Mindestbestand-Prüfung.'
       : q.includes('rechnung') || q.includes('zahlung')
       ? 'Demo-Chat: 2 Rechnungen sind überfällig oder in Mahnung. Details stehen im BüroPilot.'
@@ -402,7 +415,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
         }}>🧠</div>
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>KI-Assistent</h1>
-          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Tagesbrief · Dokumente · Demo-Chat</p>
+          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Tagesbrief · Dokumente · Chat</p>
         </div>
       </div>
 
@@ -410,7 +423,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
       <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,.07)', paddingBottom: 0 }}>
         <button style={tabStyle('tagesbrief')} onClick={() => setActiveTab('tagesbrief')}>🧠 Tagesbrief</button>
         <button style={tabStyle('dokumente')} onClick={() => setActiveTab('dokumente')}>📄 Dokumente</button>
-        <button style={tabStyle('chat')} onClick={() => setActiveTab('chat')}>💬 Demo-Chat</button>
+        <button style={tabStyle('chat')} onClick={() => setActiveTab('chat')}>💬 Chat</button>
       </div>
 
       {/* ── Tab 1: Tagesbrief ── */}
@@ -442,6 +455,15 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
             ) : null}
           </div>
 
+          {!isDemo ? (
+            <div className="pk-card">
+              <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 800 }}>Noch keine Live-Daten im KI-Assistenten</h3>
+              <p style={{ margin: 0, color: '#aeb9c8', fontSize: 13, lineHeight: 1.6 }}>
+                Für neue Firmenaccounts werden keine Demo-Aufgaben, Demo-Artikel oder Demo-Rechnungen mehr angezeigt. Sobald echte Daten in LagerPilot, BüroPilot oder WerkstattPilot angelegt sind, kann der Assistent darauf aufbauen.
+              </p>
+            </div>
+          ) : (
+          <>
           {/* Karte 1: Was muss heute erledigt werden? */}
           <div className="pk-card">
             <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>📋 Was muss heute erledigt werden?</h3>
@@ -591,6 +613,8 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
               ))}
             </div>
           </div>
+          </>
+          )}
         </div>
       )}
 

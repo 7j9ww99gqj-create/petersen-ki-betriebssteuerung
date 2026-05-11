@@ -350,6 +350,32 @@ export async function deleteWerkstattKarte(id: string) {
   if (error) throw error
 }
 
+export async function getWerkstattMitarbeiter() {
+  const { data, error } = await db()
+    .from('werkstatt_mitarbeiter')
+    .select('*')
+    .order('name')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertWerkstattMitarbeiter(m: {
+  id: string; name: string; rolle?: string; email?: string; telefon?: string
+  aktiv?: boolean; notiz?: string
+}) {
+  const { data, error } = await db()
+    .from('werkstatt_mitarbeiter')
+    .upsert({ ...m, updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteWerkstattMitarbeiter(id: string) {
+  const { error } = await db().from('werkstatt_mitarbeiter').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function getWerkstattZeitbuchungen() {
   const { data, error } = await db()
     .from('werkstatt_zeitbuchungen')
