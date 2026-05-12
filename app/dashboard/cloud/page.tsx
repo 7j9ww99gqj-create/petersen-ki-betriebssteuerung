@@ -1,43 +1,375 @@
 'use client'
-import { useState, useEffect } from 'react'
 
-export default function CloudPage() {
-  const [syncing, setSyncing] = useState(false)
-  const [syncProgress, setSyncProgress] = useState(100)
-  const [lastSync, setLastSync] = useState('Vor 2 Minuten')
-  const [syncLog, setSyncLog] = useState([
-    { time: '14:22', action: 'LagerPilot Bestände synchronisiert', status: 'ok' },
-    { time: '14:20', action: 'Neuer Wareneingang gespeichert', status: 'ok' },
-    { time: '13:58', action: 'KI-Assistent Ergebnis archiviert', status: 'ok' },
-    { time: '13:40', action: 'BüroPilot Rechnungen synchronisiert', status: 'ok' },
-    { time: '12:15', action: 'Verbindung kurz unterbrochen', status: 'warn' },
-    { time: '12:16', action: 'Automatisch wiederverbunden', status: 'ok' },
+import { useEffect, useMemo, useState } from 'react'
+import { hasDemoCookie } from '@/lib/auth'
+import {
+  getBueroAngebote,
+  getBueroAuftraege,
+  getBueroDokumente,
+  getBueroEingangsrechnungen,
+  getBueroKunden,
+  getBueroRechnungen,
+  getEinkaufBestellungen,
+  getEinkaufLieferanten,
+  getEinkaufWareneingaenge,
+  getLagerArtikel,
+  getLagerBewegungen,
+  getWerkstattKarten,
+} from '@/lib/db'
+import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
+
+type CloudLogEntry = {
+  time: string
+  action: string
+  status: 'ok' | 'warn'
+  sortKey: number
+}
+
+type CloudModule = {
+  name: string
+  value: string
+  detail: string
+  status: 'live' | 'warn'
+  icon: string
+}
+
+type CloudSnapshot = {
+  cloudStatus: string
+  cloudStatusColor: string
+  lastSyncLabel: string
+  storageLabel: string
+  deviceLabel: string
+  totalDocs: number
+  linkedDocs: number
+  orphanDocs: number
+  syncLog: CloudLogEntry[]
+  modules: CloudModule[]
+}
+
+type CloudDocument = {
+  id: string
+  name?: string
+  groesse?: string
+  eingangsrechnung_id?: string
+  rechnung_id?: string
+  angebot_id?: string
+  auftrag_id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+type DateCarrier = {
+  created_at?: string
+  updated_at?: string
+  datum?: string
+  erstellt?: string
+  rechnungsdatum?: string
+  gemeldet_am?: string
+  name?: string
+  id?: string
+}
+
+const demoSnapshot: CloudSnapshot = {
+  cloudStatus: 'Demo-Modus',
+  cloudStatusColor: '#f59e0b',
+  lastSyncLabel: 'Nur Demo-Daten',
+  storageLabel: 'Nicht verbunden',
+  deviceLabel: '1 Sitzung',
+  totalDocs: 2,
+  linkedDocs: 1,
+  orphanDocs: 1,
+  syncLog: [
+    { time: '14:22', action: 'Demo-Archiv geladen', status: 'ok', sortKey: Date.now() - 60_000 },
+    { time: '14:20', action: 'Keine Live-Cloud verbunden', status: 'warn', sortKey: Date.now() - 120_000 },
+  ],
+  modules: [
+    { name: 'LagerPilot', value: 'Demo', detail: 'Lokale Beispieldaten', status: 'warn', icon: '📦' },
+    { name: 'BüroPilot', value: 'Demo', detail: 'Belege nicht live synchronisiert', status: 'warn', icon: '🧾' },
+    { name: 'Archiv', value: '2 Dokumente', detail: 'Nur Demo-Dateien', status: 'warn', icon: '🗂️' },
+    { name: 'WerkstattPilot', value: 'Demo', detail: 'Keine Live-Aktivität', status: 'warn', icon: '🛠️' },
+  ],
+}
+
+function parseGroesse(value?: string | null) {
+  if (!value) return 0
+  const normalized = value.replace(',', '.')
+  const amount = Number.parseFloat(normalized.replace(/[^\d.]/g, ''))
+  if (!Number.isFinite(amount)) return 0
+  if (/gb/i.test(value)) return amount * 1024 * 1024 * 1024
+  if (/mb/i.test(value)) return amount * 1024 * 1024
+  return amount * 1024
+}
+
+function formatBytes(bytes: number) {
+  if (!bytes) return '0 KB'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  return `${value.toLocaleString('de-DE', { maximumFractionDigits: unit === 0 ? 0 : 1 })} ${units[unit]}`
+}
+
+function parseDate(value?: string | null) {
+  if (!value) return null
+  const direct = new Date(value)
+  if (!Number.isNaN(direct.getTime())) return direct
+  const deMatch = value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/)
+  if (!deMatch) return null
+  return new Date(`${deMatch[3]}-${deMatch[2]}-${deMatch[1]}T12:00:00`)
+}
+
+function formatRelative(value?: Date | null) {
+  if (!value) return 'Keine Aktivität'
+  const diffMs = Date.now() - value.getTime()
+  const diffMinutes = Math.max(0, Math.round(diffMs / 60000))
+  if (diffMinutes < 1) return 'Gerade eben'
+  if (diffMinutes < 60) return `Vor ${diffMinutes} Min.`
+  const diffHours = Math.round(diffMinutes / 60)
+  if (diffHours < 24) return `Vor ${diffHours} Std.`
+  const diffDays = Math.round(diffHours / 24)
+  return `Vor ${diffDays} Tag${diffDays === 1 ? '' : 'en'}`
+}
+
+function formatClock(value?: Date | null) {
+  if (!value) return '—'
+  return value.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+}
+
+function getLatest(records: DateCarrier[], fields: Array<keyof DateCarrier>) {
+  return records.reduce<Date | null>((latest, record) => {
+    for (const field of fields) {
+      const parsed = parseDate(record[field] as string | undefined)
+      if (parsed && (!latest || parsed > latest)) return parsed
+    }
+    return latest
+  }, null)
+}
+
+async function listStorageUsage() {
+  if (!isSupabaseConfigured()) return null
+
+  const supabase = createSupabaseClient()
+  const { data: auth } = await supabase.auth.getUser()
+  const userId = auth.user?.id
+  if (!userId) return null
+
+  const visited = new Set<string>()
+  const prefixes = [userId, `steuer/${userId}`]
+
+  async function walk(prefix: string): Promise<number> {
+    if (!prefix || visited.has(prefix)) return 0
+    visited.add(prefix)
+    const { data, error } = await supabase.storage.from('dokumente').list(prefix, { limit: 1000, sortBy: { column: 'name', order: 'asc' } })
+    if (error || !data) return 0
+
+    let bytes = 0
+    for (const item of data) {
+      const size = typeof item.metadata?.size === 'number' ? item.metadata.size : 0
+      if (size > 0) {
+        bytes += size
+        continue
+      }
+      bytes += await walk(`${prefix}/${item.name}`)
+    }
+    return bytes
+  }
+
+  const results = await Promise.all(prefixes.map(prefix => walk(prefix)))
+  return results.reduce((sum, value) => sum + value, 0)
+}
+
+async function loadCloudSnapshot(): Promise<CloudSnapshot> {
+  const [
+    dokumente,
+    angebote,
+    auftraege,
+    rechnungen,
+    eingangsrechnungen,
+    kunden,
+    lieferanten,
+    bestellungen,
+    wareneingaenge,
+    artikel,
+    bewegungen,
+    werkstattKarten,
+    storageBytes,
+  ] = await Promise.all([
+    getBueroDokumente() as Promise<CloudDocument[]>,
+    getBueroAngebote() as Promise<DateCarrier[]>,
+    getBueroAuftraege() as Promise<DateCarrier[]>,
+    getBueroRechnungen() as Promise<DateCarrier[]>,
+    getBueroEingangsrechnungen() as Promise<DateCarrier[]>,
+    getBueroKunden() as Promise<DateCarrier[]>,
+    getEinkaufLieferanten() as Promise<DateCarrier[]>,
+    getEinkaufBestellungen() as Promise<DateCarrier[]>,
+    getEinkaufWareneingaenge() as Promise<DateCarrier[]>,
+    getLagerArtikel() as Promise<DateCarrier[]>,
+    getLagerBewegungen() as Promise<DateCarrier[]>,
+    getWerkstattKarten() as Promise<DateCarrier[]>,
+    listStorageUsage(),
   ])
 
-  const triggerSync = () => {
-    setSyncing(true)
-    setSyncProgress(0)
-    const interval = setInterval(() => {
-      setSyncProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setSyncing(false)
-          setLastSync('Gerade eben')
-          setSyncLog(prev => [
-            { time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }), action: 'Manueller Sync abgeschlossen', status: 'ok' },
-            ...prev,
-          ])
-          return 100
-        }
-        return prev + 8
-      })
-    }, 120)
+  const linkedDocs = dokumente.filter(doc => doc.eingangsrechnung_id || doc.rechnung_id || doc.angebot_id || doc.auftrag_id).length
+  const orphanDocs = dokumente.length - linkedDocs
+
+  const lastActivity = [
+    getLatest(dokumente, ['updated_at', 'created_at']),
+    getLatest(rechnungen, ['updated_at', 'created_at', 'erstellt']),
+    getLatest(eingangsrechnungen, ['updated_at', 'created_at', 'rechnungsdatum']),
+    getLatest(bestellungen, ['updated_at', 'created_at']),
+    getLatest(bewegungen, ['created_at', 'datum']),
+    getLatest(werkstattKarten, ['updated_at', 'created_at', 'erstellt']),
+  ].reduce<Date | null>((latest, current) => {
+    if (!current) return latest
+    if (!latest || current > latest) return current
+    return latest
+  }, null)
+
+  const fallbackBytes = dokumente.reduce((sum, doc) => sum + parseGroesse(doc.groesse), 0)
+  const effectiveBytes = storageBytes && storageBytes > 0 ? storageBytes : fallbackBytes
+
+  const syncLog: CloudLogEntry[] = [
+    {
+      time: formatClock(getLatest(dokumente, ['updated_at', 'created_at'])),
+      action: `${dokumente.length} Archivdokumente im Live-System erkannt`,
+      status: dokumente.length ? 'ok' as const : 'warn' as const,
+      sortKey: getLatest(dokumente, ['updated_at', 'created_at'])?.getTime() ?? 0,
+    },
+    {
+      time: formatClock(getLatest(eingangsrechnungen, ['updated_at', 'created_at', 'rechnungsdatum'])),
+      action: `${eingangsrechnungen.length} Eingangsrechnungen mit Büro-/Einkaufsbezug geladen`,
+      status: eingangsrechnungen.length ? 'ok' as const : 'warn' as const,
+      sortKey: getLatest(eingangsrechnungen, ['updated_at', 'created_at', 'rechnungsdatum'])?.getTime() ?? 0,
+    },
+    {
+      time: formatClock(getLatest(bewegungen, ['created_at', 'datum'])),
+      action: `${bewegungen.length} letzte Lagerbewegungen für Cloud-Status ausgewertet`,
+      status: bewegungen.length ? 'ok' as const : 'warn' as const,
+      sortKey: getLatest(bewegungen, ['created_at', 'datum'])?.getTime() ?? 0,
+    },
+    {
+      time: formatClock(getLatest(bestellungen, ['updated_at', 'created_at'])),
+      action: `${bestellungen.length} Einkaufsbestellungen und ${wareneingaenge.length} Wareneingänge verbunden`,
+      status: bestellungen.length || wareneingaenge.length ? 'ok' as const : 'warn' as const,
+      sortKey: getLatest(bestellungen, ['updated_at', 'created_at'])?.getTime() ?? 0,
+    },
+    {
+      time: formatClock(getLatest(werkstattKarten, ['updated_at', 'created_at', 'erstellt'])),
+      action: `${werkstattKarten.length} Werkstattkarten im Live-Bestand verfügbar`,
+      status: werkstattKarten.length ? 'ok' as const : 'warn' as const,
+      sortKey: getLatest(werkstattKarten, ['updated_at', 'created_at', 'erstellt'])?.getTime() ?? 0,
+    },
+  ]
+    .filter(entry => entry.sortKey > 0)
+    .sort((a, b) => b.sortKey - a.sortKey)
+    .slice(0, 6)
+
+  const modules: CloudModule[] = [
+    {
+      name: 'LagerPilot',
+      value: `${artikel.length} Artikel`,
+      detail: `${bewegungen.length} letzte Bewegungen`,
+      status: artikel.length ? 'live' : 'warn',
+      icon: '📦',
+    },
+    {
+      name: 'BüroPilot',
+      value: `${kunden.length + angebote.length + auftraege.length + rechnungen.length} Objekte`,
+      detail: `${kunden.length} Kunden · ${rechnungen.length} Rechnungen`,
+      status: kunden.length || rechnungen.length ? 'live' : 'warn',
+      icon: '🧾',
+    },
+    {
+      name: 'Einkauf',
+      value: `${lieferanten.length} Lieferanten`,
+      detail: `${bestellungen.length} Bestellungen · ${wareneingaenge.length} Wareneingänge`,
+      status: lieferanten.length || bestellungen.length ? 'live' : 'warn',
+      icon: '🛒',
+    },
+    {
+      name: 'Archiv',
+      value: `${dokumente.length} Dokumente`,
+      detail: `${linkedDocs} verknüpft · ${orphanDocs} ohne Bezug`,
+      status: dokumente.length ? 'live' : 'warn',
+      icon: '🗂️',
+    },
+    {
+      name: 'WerkstattPilot',
+      value: `${werkstattKarten.length} Karten`,
+      detail: 'Live aus Werkstattdaten',
+      status: werkstattKarten.length ? 'live' : 'warn',
+      icon: '🛠️',
+    },
+  ]
+
+  return {
+    cloudStatus: isSupabaseConfigured() ? 'Live verbunden' : 'Nicht konfiguriert',
+    cloudStatusColor: isSupabaseConfigured() ? '#10b981' : '#f59e0b',
+    lastSyncLabel: formatRelative(lastActivity),
+    storageLabel: effectiveBytes > 0 ? formatBytes(effectiveBytes) : 'Keine Daten erkannt',
+    deviceLabel: `${modules.filter(module => module.status === 'live').length} Live-Module`,
+    totalDocs: dokumente.length,
+    linkedDocs,
+    orphanDocs,
+    syncLog: syncLog.length ? syncLog : [{ time: '—', action: 'Noch keine Live-Aktivität erkannt', status: 'warn', sortKey: 0 }],
+    modules,
+  }
+}
+
+export default function CloudPage() {
+  const isDemo = hasDemoCookie()
+  const [loading, setLoading] = useState(!isDemo)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState('')
+  const [snapshot, setSnapshot] = useState<CloudSnapshot>(demoSnapshot)
+
+  const cards = useMemo(() => ([
+    { label: 'Cloud-Status', value: snapshot.cloudStatus, icon: '☁️', color: snapshot.cloudStatusColor },
+    { label: 'Letzte Aktivität', value: snapshot.lastSyncLabel, icon: '🔄', color: '#1684ff' },
+    { label: 'Gespeicherte Daten', value: snapshot.storageLabel, icon: '💾', color: '#a78bfa' },
+    { label: 'Modulabdeckung', value: snapshot.deviceLabel, icon: '📡', color: '#f59e0b' },
+  ]), [snapshot])
+
+  useEffect(() => {
+    if (isDemo) {
+      setSnapshot(demoSnapshot)
+      setLoading(false)
+      return
+    }
+
+    const run = async () => {
+      setError('')
+      try {
+        setSnapshot(await loadCloudSnapshot())
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Cloud-Daten konnten nicht geladen werden.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void run()
+  }, [isDemo])
+
+  const triggerRefresh = async () => {
+    if (isDemo) return
+    setRefreshing(true)
+    setError('')
+    try {
+      setSnapshot(await loadCloudSnapshot())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Cloud-Daten konnten nicht aktualisiert werden.')
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   return (
     <div className="fade-in">
-      {/* Header */}
-      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <div style={{
           width: 52, height: 52, borderRadius: 14,
           background: 'rgba(32,200,255,.15)', border: '1px solid rgba(32,200,255,.3)',
@@ -45,113 +377,117 @@ export default function CloudPage() {
         }}>☁️</div>
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>Cloud & Sync</h1>
-          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Datensicherung · Echtzeit-Synchronisation · Zugriff überall</p>
+          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>
+            {isDemo ? 'Demo-Ansicht ohne Live-Cloud' : 'Live-Status aus Supabase, Archiv und Modulaktivität'}
+          </p>
         </div>
-        <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● ONLINE</span>
+        <span
+          className={snapshot.cloudStatus === 'Live verbunden' ? 'badge badge-green' : 'badge badge-gray'}
+          style={{ marginLeft: 'auto' }}
+        >
+          {snapshot.cloudStatus === 'Live verbunden' ? '● LIVE' : '● DEMO'}
+        </span>
       </div>
 
-      {/* Status cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
-        {[
-          { label: 'Cloud-Status', value: 'Verbunden', icon: '🟢', color: '#10b981' },
-          { label: 'Letzter Sync', value: lastSync, icon: '🔄', color: '#1684ff' },
-          { label: 'Gespeicherte Daten', value: '2,4 GB', icon: '💾', color: '#a78bfa' },
-          { label: 'Verbundene Geräte', value: '3', icon: '📱', color: '#f59e0b' },
-        ].map(s => (
-          <div key={s.label} className="pk-card" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span style={{ fontSize: 24 }}>{s.icon}</span>
+        {cards.map(card => (
+          <div key={card.label} className="pk-card" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span style={{ fontSize: 24 }}>{card.icon}</span>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 12, color: '#aeb9c8' }}>{s.label}</div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: card.color }}>{card.value}</div>
+              <div style={{ fontSize: 12, color: '#aeb9c8' }}>{card.label}</div>
             </div>
           </div>
         ))}
       </div>
 
+      {error && (
+        <div className="pk-card" style={{ marginBottom: 16, color: '#ff8080', border: '1px solid rgba(255,80,80,.25)' }}>
+          {error}
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        {/* Sync control */}
         <div>
           <div className="pk-card" style={{ marginBottom: 16 }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800 }}>🔄 Synchronisation</h3>
+            <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800 }}>🔄 Datenstatus</h3>
 
-            {syncing ? (
-              <div>
-                <div style={{ marginBottom: 10, fontSize: 14, color: '#aeb9c8' }}>
-                  Synchronisierung läuft… {syncProgress}%
-                </div>
-                <div style={{
-                  height: 8, borderRadius: 999, background: 'rgba(255,255,255,.08)',
-                  overflow: 'hidden', marginBottom: 16,
-                }}>
-                  <div style={{
-                    height: '100%', borderRadius: 999,
-                    background: 'linear-gradient(90deg, #1684ff, #20c8ff)',
-                    width: `${syncProgress}%`,
-                    transition: 'width .15s',
-                    boxShadow: '0 0 10px rgba(22,132,255,.5)',
-                  }} />
-                </div>
-                <div style={{ fontSize: 13, color: '#aeb9c8' }}>
-                  {syncProgress < 30 && '📦 LagerPilot wird synchronisiert…'}
-                  {syncProgress >= 30 && syncProgress < 60 && '🧾 BüroPilot wird synchronisiert…'}
-                  {syncProgress >= 60 && syncProgress < 85 && '🧠 KI-Assistenten-Auswertungen werden gesichert…'}
-                  {syncProgress >= 85 && '✅ Abschließende Prüfung…'}
-                </div>
-              </div>
+            {loading ? (
+              <div style={{ color: '#aeb9c8' }}>Cloud-Modul lädt Live-Daten…</div>
             ) : (
               <div>
                 <div style={{
                   padding: '14px 16px', borderRadius: 12, marginBottom: 16,
-                  background: 'rgba(37,211,102,.08)', border: '1px solid rgba(37,211,102,.2)',
+                  background: isDemo ? 'rgba(245,158,11,.08)' : 'rgba(37,211,102,.08)',
+                  border: isDemo ? '1px solid rgba(245,158,11,.2)' : '1px solid rgba(37,211,102,.2)',
                   display: 'flex', alignItems: 'center', gap: 10,
                 }}>
-                  <span style={{ fontSize: 18 }}>✅</span>
+                  <span style={{ fontSize: 18 }}>{isDemo ? 'ℹ️' : '✅'}</span>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: '#4ddb7e' }}>Alles synchronisiert</div>
-                    <div style={{ fontSize: 12, color: '#aeb9c8' }}>Letzter Sync: {lastSync}</div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: isDemo ? '#ffb347' : '#4ddb7e' }}>
+                      {isDemo ? 'Nur Demo-Cloud aktiv' : 'Live-Daten erfolgreich geladen'}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#aeb9c8' }}>Letzte Aktivität: {snapshot.lastSyncLabel}</div>
                   </div>
                 </div>
-                <button className="pk-btn" onClick={triggerSync} style={{ width: '100%', fontWeight: 700 }}>
-                  ☁️ Jetzt synchronisieren
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
+                  {[
+                    { label: 'Archivdokumente', value: snapshot.totalDocs, color: '#20c8ff' },
+                    { label: 'Verknüpft', value: snapshot.linkedDocs, color: '#4ddb7e' },
+                    { label: 'Ohne Bezug', value: snapshot.orphanDocs, color: '#f59e0b' },
+                  ].map(item => (
+                    <div key={item.label} style={{ padding: 12, borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: item.color }}>{item.value}</div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8' }}>{item.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <button className="pk-btn" onClick={() => void triggerRefresh()} disabled={refreshing || isDemo} style={{ width: '100%', fontWeight: 700, opacity: isDemo ? 0.65 : 1 }}>
+                  {refreshing ? 'Cloud-Daten werden aktualisiert…' : '☁️ Live-Daten neu laden'}
                 </button>
               </div>
             )}
           </div>
 
-          {/* Modules */}
           <div className="pk-card">
             <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 800 }}>Pilot-Module</h3>
-            {[
-              { name: 'LagerPilot', size: '820 MB', status: 'sync', icon: '📦' },
-              { name: 'BüroPilot', size: '340 MB', status: 'sync', icon: '🧾' },
-              { name: 'KI-Assistenten-Auswertungen', size: '1,1 GB', status: 'sync', icon: '🧠' },
-              { name: 'WerkstattPilot', size: '95 MB', status: 'sync', icon: '🛠️' },
-              { name: 'Archiv', size: '65 MB', status: 'sync', icon: '🗂️' },
-            ].map(m => (
-              <div key={m.name} style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0',
-                borderBottom: '1px solid rgba(255,255,255,.04)',
-              }}>
-                <span style={{ fontSize: 18 }}>{m.icon}</span>
+            {snapshot.modules.map(module => (
+              <div
+                key={module.name}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0',
+                  borderBottom: '1px solid rgba(255,255,255,.04)',
+                }}
+              >
+                <span style={{ fontSize: 18 }}>{module.icon}</span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{m.name}</div>
-                  <div style={{ fontSize: 11, color: '#aeb9c8' }}>{m.size}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{module.name}</div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8' }}>{module.detail}</div>
                 </div>
-                <span className="badge badge-green">✓ Sync</span>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>{module.value}</div>
+                  <span className={module.status === 'live' ? 'badge badge-green' : 'badge badge-gray'}>
+                    {module.status === 'live' ? 'Live' : 'Leicht'}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Sync log */}
         <div className="pk-card">
-          <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800 }}>📋 Sync-Protokoll</h3>
+          <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800 }}>📋 Aktivitätsprotokoll</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {syncLog.map((log, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px',
-                borderRadius: 10, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)',
-              }}>
+            {snapshot.syncLog.map((log, index) => (
+              <div
+                key={`${log.time}-${index}`}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px',
+                  borderRadius: 10, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)',
+                }}
+              >
                 <span style={{ fontSize: 14, marginTop: 1 }}>{log.status === 'ok' ? '✅' : '⚠️'}</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, color: log.status === 'warn' ? '#f59e0b' : '#f8fbff' }}>
@@ -165,18 +501,33 @@ export default function CloudPage() {
         </div>
       </div>
 
-      {/* Info cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginTop: 20 }}>
         {[
-          { icon: '🔒', title: 'Verschlüsselt', desc: 'Alle Daten sind AES-256 verschlüsselt und sicher übertragen.' },
-          { icon: '🌍', title: 'Überall verfügbar', desc: 'Zugriff von Smartphone, Tablet, Laptop und PC.' },
-          { icon: '⚡', title: 'Echtzeit-Sync', desc: 'Änderungen werden sofort auf alle Geräte übertragen.' },
-          { icon: '🔁', title: 'Automatisches Backup', desc: 'Tägliche Datensicherung, 30 Tage Verlauf.' },
-        ].map(c => (
-          <div key={c.title} className="pk-card">
-            <div style={{ fontSize: 28, marginBottom: 8 }}>{c.icon}</div>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{c.title}</div>
-            <div style={{ fontSize: 13, color: '#aeb9c8', lineHeight: 1.5 }}>{c.desc}</div>
+          {
+            icon: '🔒',
+            title: 'Supabase als Basis',
+            desc: isDemo ? 'Im Demo-Modus wird keine echte Storage- oder Auth-Verbindung aufgebaut.' : 'Cloud-Status und Archivwerte kommen aus dem aktuellen Supabase-Stand.',
+          },
+          {
+            icon: '🗂️',
+            title: 'Archiv wirklich live',
+            desc: `${snapshot.totalDocs} Dokumente sind im aktuellen Datenbestand erfasst; ${snapshot.linkedDocs} davon mit Büro-Bezug.`,
+          },
+          {
+            icon: '📡',
+            title: 'Kein Fake-Sync mehr',
+            desc: 'Der Button lädt reale Kennzahlen und Aktivität aus den bestehenden Modulen neu.',
+          },
+          {
+            icon: '⚠️',
+            title: 'Noch kein Vollsync-System',
+            desc: 'Geräteverwaltung, Hintergrund-Jobs und echte Backup-Historie sind weiterhin noch nicht als Backend-Prozess vorhanden.',
+          },
+        ].map(card => (
+          <div key={card.title} className="pk-card">
+            <div style={{ fontSize: 28, marginBottom: 8 }}>{card.icon}</div>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{card.title}</div>
+            <div style={{ fontSize: 13, color: '#aeb9c8', lineHeight: 1.5 }}>{card.desc}</div>
           </div>
         ))}
       </div>
