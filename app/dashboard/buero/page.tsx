@@ -77,6 +77,7 @@ type Eingangsrechnung = {
 }
 
 type DocumentRelationField = 'eingangsrechnung_id' | 'rechnung_id' | 'angebot_id' | 'auftrag_id'
+const documentRelationFields: DocumentRelationField[] = ['eingangsrechnung_id', 'rechnung_id', 'angebot_id', 'auftrag_id']
 
 // ── Demo-Daten ──────────────────────────────────────────────────────────────
 
@@ -212,6 +213,32 @@ function getDocumentRelationLabel(doc: Dokument) {
 function getLinkedDokument(dokumente: Dokument[], field: DocumentRelationField, value?: string | null) {
   if (!value) return undefined
   return dokumente.find(doc => doc[field] === value)
+}
+
+function isDokumentAvailableForRelation(dokument: Dokument, field: DocumentRelationField, currentId?: string | null) {
+  if (!dokument.storage_path) return false
+  return documentRelationFields.every(relationField => {
+    const relationValue = dokument[relationField]
+    if (!relationValue) return true
+    return relationField === field && relationValue === currentId
+  })
+}
+
+function applyDokumentRelationToState(
+  dokument: Dokument,
+  field: DocumentRelationField,
+  value?: string,
+  meta?: Pick<Dokument, 'kategorie' | 'bezug'>,
+): Dokument {
+  const nextDokument = { ...dokument }
+  documentRelationFields.forEach(relationField => {
+    nextDokument[relationField] = relationField === field ? value : undefined
+  })
+  if (meta) {
+    nextDokument.kategorie = meta.kategorie
+    nextDokument.bezug = meta.bezug
+  }
+  return nextDokument
 }
 
 // ── Hilfs-Komponenten ───────────────────────────────────────────────────────
@@ -630,7 +657,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
   }
 
   const filtered = angebote.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
-  const dokumentOptionen = dokumente.filter(doc => Boolean(doc.storage_path) && (!doc.angebot_id || doc.angebot_id === editAngebot?.id))
+  const dokumentOptionen = dokumente.filter(doc => isDokumentAvailableForRelation(doc, 'angebot_id', editAngebot?.id))
 
   const syncDokumentVerknuepfung = async (angebot: Angebot, dokumentId: string, previousDokumentId?: string) => {
     if (isDemo) return
@@ -641,14 +668,17 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
     if (!nextDokumentId) return
     await updateBueroDokument(nextDokumentId, {
       angebot_id: angebot.id,
+      eingangsrechnung_id: null,
+      rechnung_id: null,
+      auftrag_id: null,
       kategorie: 'Angebot',
       bezug: angebot.kunde,
     })
     setDokumente(prev => prev.map(doc => (
       doc.id === nextDokumentId
-        ? { ...doc, angebot_id: angebot.id, kategorie: 'Angebot', bezug: angebot.kunde }
+        ? applyDokumentRelationToState(doc, 'angebot_id', angebot.id, { kategorie: 'Angebot', bezug: angebot.kunde })
         : previousDokumentId && doc.id === previousDokumentId
-          ? { ...doc, angebot_id: undefined }
+          ? applyDokumentRelationToState(doc, 'angebot_id')
           : doc
     )))
   }
@@ -981,7 +1011,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
   }, [isDemo])
 
   const filtered = auftraege.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
-  const dokumentOptionen = dokumente.filter(doc => Boolean(doc.storage_path) && (!doc.auftrag_id || doc.auftrag_id === editAuftrag?.id))
+  const dokumentOptionen = dokumente.filter(doc => isDokumentAvailableForRelation(doc, 'auftrag_id', editAuftrag?.id))
 
   const statusColor: Record<string, string> = {
     'In Bearbeitung': '#1684ff',
@@ -998,15 +1028,18 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
     }
     if (!nextDokumentId) return
     await updateBueroDokument(nextDokumentId, {
+      eingangsrechnung_id: null,
+      rechnung_id: null,
+      angebot_id: null,
       auftrag_id: auftrag.id,
       kategorie: 'Vertrag',
       bezug: auftrag.kunde,
     })
     setDokumente(prev => prev.map(doc => (
       doc.id === nextDokumentId
-        ? { ...doc, auftrag_id: auftrag.id, kategorie: 'Vertrag', bezug: auftrag.kunde }
+        ? applyDokumentRelationToState(doc, 'auftrag_id', auftrag.id, { kategorie: 'Vertrag', bezug: auftrag.kunde })
         : previousDokumentId && doc.id === previousDokumentId
-          ? { ...doc, auftrag_id: undefined }
+          ? applyDokumentRelationToState(doc, 'auftrag_id')
           : doc
     )))
   }
@@ -1300,7 +1333,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
   }
 
   const filtered = rechnungen.filter(r => filterStatus === 'Alle' || r.status === filterStatus)
-  const dokumentOptionen = dokumente.filter(doc => Boolean(doc.storage_path) && (!doc.rechnung_id || doc.rechnung_id === editRechnung?.id))
+  const dokumentOptionen = dokumente.filter(doc => isDokumentAvailableForRelation(doc, 'rechnung_id', editRechnung?.id))
   const counts: Record<string, number> = { Alle: rechnungen.length }
   rechnungen.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1 })
 
@@ -1318,15 +1351,18 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
     }
     if (!nextDokumentId) return
     await updateBueroDokument(nextDokumentId, {
+      eingangsrechnung_id: null,
       rechnung_id: rechnung.id,
+      angebot_id: null,
+      auftrag_id: null,
       kategorie: 'Rechnung',
       bezug: rechnung.kunde,
     })
     setDokumente(prev => prev.map(doc => (
       doc.id === nextDokumentId
-        ? { ...doc, rechnung_id: rechnung.id, kategorie: 'Rechnung', bezug: rechnung.kunde }
+        ? applyDokumentRelationToState(doc, 'rechnung_id', rechnung.id, { kategorie: 'Rechnung', bezug: rechnung.kunde })
         : previousDokumentId && doc.id === previousDokumentId
-          ? { ...doc, rechnung_id: undefined }
+          ? applyDokumentRelationToState(doc, 'rechnung_id')
           : doc
     )))
   }
@@ -1716,7 +1752,7 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
   const ueberfaellig = visibleRows.filter(r => r.status === 'überfällig').length
   const bezahlt = visibleRows.filter(r => r.status === 'bezahlt').length
   const sumOffen = visibleRows.filter(r => r.status !== 'bezahlt' && r.status !== 'abgelehnt').reduce((s, r) => s + Number(r.betrag_brutto ?? 0), 0)
-  const dokumentOptionen = dokumente.filter(d => Boolean(d.storage_path))
+  const dokumentOptionen = dokumente.filter(d => isDokumentAvailableForRelation(d, 'eingangsrechnung_id', editRechnung?.id))
 
   const syncDokumentVerknuepfung = async (rechnung: Eingangsrechnung, previousDokumentId?: string) => {
     if (isDemo) return
@@ -1727,14 +1763,17 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
     if (!nextDokumentId) return
     await updateBueroDokument(nextDokumentId, {
       eingangsrechnung_id: rechnung.id,
+      rechnung_id: null,
+      angebot_id: null,
+      auftrag_id: null,
       kategorie: 'Rechnung',
       bezug: rechnung.lieferant,
     })
     setDokumente(prev => prev.map(doc => (
       doc.id === nextDokumentId
-        ? { ...doc, eingangsrechnung_id: rechnung.id, kategorie: 'Rechnung', bezug: rechnung.lieferant }
+        ? applyDokumentRelationToState(doc, 'eingangsrechnung_id', rechnung.id, { kategorie: 'Rechnung', bezug: rechnung.lieferant })
         : previousDokumentId && doc.id === previousDokumentId
-          ? { ...doc, eingangsrechnung_id: undefined }
+          ? applyDokumentRelationToState(doc, 'eingangsrechnung_id')
           : doc
     )))
   }
