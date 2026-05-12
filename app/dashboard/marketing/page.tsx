@@ -1,34 +1,66 @@
 'use client'
-import { useState, useEffect } from 'react'
+
+import { useEffect, useState } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
 import {
-  getMarketingKampagnen, upsertMarketingKampagne,
-  getMarketingLeads, upsertMarketingLead,
-  getMarketingNewsletter, upsertMarketingNewsletter,
+  getMarketingKampagnen,
+  getMarketingLeads,
+  getMarketingNewsletter,
+  upsertMarketingKampagne,
+  upsertMarketingLead,
+  upsertMarketingNewsletter,
 } from '@/lib/db'
-
-// ── Typen ─────────────────────────────────────────────────────────────────────
 
 type KampagneStatus = 'Entwurf' | 'Aktiv' | 'Pausiert' | 'Abgeschlossen'
 type LeadStatus = 'Neu' | 'Kontaktiert' | 'Qualifiziert' | 'Angebot' | 'Gewonnen' | 'Verloren'
 type LeadQuelle = 'Website' | 'Empfehlung' | 'Messe' | 'Social Media' | 'Kaltakquise' | 'Sonstiges'
+type NewsletterStatus = 'Entwurf' | 'Geplant' | 'Versendet'
+type SeoIntent = 'Informativ' | 'Transaktional' | 'Lokal' | 'Brand'
+type SeoStatus = 'Neu' | 'In Arbeit' | 'Optimiert'
+type ContentStatus = 'Idee' | 'In Arbeit' | 'Freigabe' | 'Fertig'
+type PostingStatus = 'Entwurf' | 'Geplant' | 'Veroeffentlicht'
+type PostingChannel = 'LinkedIn' | 'Instagram' | 'Facebook' | 'Newsletter' | 'Blog' | 'WhatsApp'
+type AutomationStatus = 'Aktiv' | 'Entwurf' | 'Pausiert'
+type IntegrationStatus = 'Nicht gestartet' | 'Vorbereitet' | 'In Umsetzung' | 'Live'
+type Tab = 'demo-lab' | 'seo' | 'content' | 'posting' | 'automationen' | 'integrationen' | 'kampagnen' | 'leads' | 'newsletter' | 'auswertungen'
 
 type Kampagne = {
-  id: string; name: string; typ: 'E-Mail' | 'Social Media' | 'Newsletter' | 'Anzeige'
-  status: KampagneStatus; zielgruppe: string; start: string; ende: string
-  empfaenger: number; geoeffnet: number; geklickt: number; konversionen: number
+  id: string
+  name: string
+  typ: 'E-Mail' | 'Social Media' | 'Newsletter' | 'Anzeige'
+  status: KampagneStatus
+  zielgruppe: string
+  start: string
+  ende: string
+  empfaenger: number
+  geoeffnet: number
+  geklickt: number
+  konversionen: number
   budget: string
 }
 
 type Lead = {
-  id: string; name: string; firma: string; email: string; telefon: string
-  quelle: LeadQuelle; status: LeadStatus; wert: string; erstellt: string; betreuer: string
+  id: string
+  name: string
+  firma: string
+  email: string
+  telefon: string
+  quelle: LeadQuelle
+  status: LeadStatus
+  wert: string
+  erstellt: string
+  betreuer: string
 }
 
 type Newsletter = {
-  id: string; betreff: string; vorschau: string; empfaenger: number
-  datum: string; status: 'Entwurf' | 'Geplant' | 'Versendet'
-  oeffnungsrate: number; klickrate: number
+  id: string
+  betreff: string
+  vorschau: string
+  empfaenger: number
+  datum: string
+  status: NewsletterStatus
+  oeffnungsrate: number
+  klickrate: number
 }
 
 type DemoMarketingFeature = {
@@ -40,13 +72,78 @@ type DemoMarketingFeature = {
   level: 'Gamechanger' | 'Stark' | 'Ausbau'
 }
 
-// ── Demo-Daten ────────────────────────────────────────────────────────────────
+type FeatureSignal = {
+  label: string
+  value: string
+  tone: string
+}
+
+type FeatureAction = {
+  tab: Tab
+  title: string
+  detail: string
+}
+
+type SeoKeyword = {
+  id: string
+  keyword: string
+  zielseite: string
+  intent: SeoIntent
+  suchvolumen: number
+  schwierigkeit: number
+  ranking: number
+  klicks: number
+  status: SeoStatus
+}
+
+type ContentIdea = {
+  id: string
+  titel: string
+  kanal: PostingChannel
+  ziel: string
+  keyword: string
+  hook: string
+  cta: string
+  status: ContentStatus
+}
+
+type PostingPlan = {
+  id: string
+  titel: string
+  kanal: PostingChannel
+  datum: string
+  status: PostingStatus
+  owner: string
+  quelle: string
+}
+
+type AutomationRule = {
+  id: string
+  name: string
+  trigger: string
+  aktion: string
+  kanal: PostingChannel | 'CRM' | 'E-Mail'
+  owner: string
+  status: AutomationStatus
+}
+
+type IntegrationItem = {
+  id: string
+  name: string
+  status: IntegrationStatus
+  datenbasis: string
+  letzterSync: string
+  naechsterSchritt: string
+}
+
+const COLOR = '#f59e0b'
+const leadPipeline: LeadStatus[] = ['Neu', 'Kontaktiert', 'Qualifiziert', 'Angebot', 'Gewonnen', 'Verloren']
 
 const demoKampagnen: Kampagne[] = [
   { id: 'KMP-001', name: 'Frühjahrs-Aktion 2025', typ: 'E-Mail', status: 'Aktiv', zielgruppe: 'Bestandskunden', start: '01.04.2025', ende: '31.05.2025', empfaenger: 234, geoeffnet: 89, geklickt: 41, konversionen: 12, budget: '800 €' },
   { id: 'KMP-002', name: 'LinkedIn Reichweite Mai', typ: 'Social Media', status: 'Aktiv', zielgruppe: 'B2B-Neukunden', start: '01.05.2025', ende: '31.05.2025', empfaenger: 1840, geoeffnet: 612, geklickt: 188, konversionen: 7, budget: '350 €' },
   { id: 'KMP-003', name: 'Monatlicher Newsletter', typ: 'Newsletter', status: 'Abgeschlossen', zielgruppe: 'Alle Kunden', start: '01.04.2025', ende: '01.04.2025', empfaenger: 312, geoeffnet: 141, geklickt: 58, konversionen: 9, budget: '0 €' },
-  { id: 'KMP-004', name: 'Google Ads – Sommer', typ: 'Anzeige', status: 'Entwurf', zielgruppe: 'Neukunden Region', start: '01.06.2025', ende: '31.07.2025', empfaenger: 0, geoeffnet: 0, geklickt: 0, konversionen: 0, budget: '1.200 €' },
+  { id: 'KMP-004', name: 'Google Ads - Sommer', typ: 'Anzeige', status: 'Entwurf', zielgruppe: 'Neukunden Region', start: '01.06.2025', ende: '31.07.2025', empfaenger: 0, geoeffnet: 0, geklickt: 0, konversionen: 0, budget: '1.200 €' },
   { id: 'KMP-005', name: 'Messe-Nachfass-Mail', typ: 'E-Mail', status: 'Pausiert', zielgruppe: 'Messekontakte', start: '15.03.2025', ende: '15.04.2025', empfaenger: 67, geoeffnet: 18, geklickt: 6, konversionen: 1, budget: '0 €' },
 ]
 
@@ -60,27 +157,25 @@ const demoLeads: Lead[] = [
 ]
 
 const demoNewsletter: Newsletter[] = [
-  { id: 'NL-006', betreff: 'Mai-News: Neue KI-Funktionen & Sommer-Angebote', vorschau: 'Entdecken Sie unsere neuesten Entwicklungen…', empfaenger: 312, datum: '01.05.2025', status: 'Entwurf', oeffnungsrate: 0, klickrate: 0 },
-  { id: 'NL-005', betreff: 'April: Frühjahrs-Aktion startet jetzt!', vorschau: 'Nur bis Ende April: 10% Rabatt auf alle Wartungsverträge…', empfaenger: 312, datum: '01.04.2025', status: 'Versendet', oeffnungsrate: 45.2, klickrate: 18.6 },
-  { id: 'NL-004', betreff: 'März: Messennachbericht & neue Referenzen', vorschau: 'Wir berichten von der Hannover Messe und stellen neue Kunden vor…', empfaenger: 298, datum: '01.03.2025', status: 'Versendet', oeffnungsrate: 38.7, klickrate: 12.4 },
-  { id: 'NL-003', betreff: 'Februar: Produktneuheiten 2025', vorschau: 'Alle neuen Leistungen und Pakete für das neue Jahr…', empfaenger: 287, datum: '01.02.2025', status: 'Versendet', oeffnungsrate: 41.1, klickrate: 15.8 },
+  { id: 'NL-006', betreff: 'Mai-News: Neue KI-Funktionen & Sommer-Angebote', vorschau: 'Entdecken Sie unsere neuesten Entwicklungen...', empfaenger: 312, datum: '01.05.2025', status: 'Entwurf', oeffnungsrate: 0, klickrate: 0 },
+  { id: 'NL-005', betreff: 'April: Fruehjahrs-Aktion startet jetzt!', vorschau: 'Nur bis Ende April: 10% Rabatt auf alle Wartungsvertraege...', empfaenger: 312, datum: '01.04.2025', status: 'Versendet', oeffnungsrate: 45.2, klickrate: 18.6 },
+  { id: 'NL-004', betreff: 'Maerz: Messennachbericht & neue Referenzen', vorschau: 'Wir berichten von der Hannover Messe und stellen neue Kunden vor...', empfaenger: 298, datum: '01.03.2025', status: 'Versendet', oeffnungsrate: 38.7, klickrate: 12.4 },
+  { id: 'NL-003', betreff: 'Februar: Produktneuheiten 2025', vorschau: 'Alle neuen Leistungen und Pakete fuer das neue Jahr...', empfaenger: 287, datum: '01.02.2025', status: 'Versendet', oeffnungsrate: 41.1, klickrate: 15.8 },
 ]
 
 const demoMarketingFeatures: DemoMarketingFeature[] = [
-  { id: 'autopilot', title: 'Autopilot-Marketing', short: 'Vom Ziel zum Funnel', detail: 'Der Nutzer sagt nur, wofür er mehr Kunden will. Danach zeigt der Flow grob Zielgruppe, Kampagne, Ads, Landingpage und Funnel als nächsten KI-Prozess.', icon: '🚀', level: 'Gamechanger' },
-  { id: 'seo', title: 'SEO-/Keywords-Analyse', short: 'Keywords, Klicks, Sichtbarkeit', detail: 'Prüft wichtige Suchbegriffe, geschätzte Klickstärke, organische Sichtbarkeit und welche Themen für die eigene Seite Potenzial haben.', icon: '🔎', level: 'Stark' },
-  { id: 'lead-intelligence', title: 'Lead Intelligence Engine', short: 'Heiße Leads erkennen', detail: 'Markiert, welche Leads heiß wirken, wann Kontakt sinnvoll ist und welche nächste Nachricht oder welcher Anruf empfohlen würde.', icon: '🔥', level: 'Stark' },
-  { id: 'ab-testing', title: 'Automatisches A/B Testing', short: 'Varianten testen lassen', detail: 'Die KI erzeugt mehrere Varianten, stoppt Verlierer und skaliert Gewinner im Kampagnenfluss.', icon: '🧪', level: 'Ausbau' },
-  { id: 'content-ai', title: 'KI-Content & Reels', short: 'Hooks, Clips, Thumbnails', detail: 'Idee für automatische Content-Erstellung mit Hooks, Reels, Anzeigenvideos und Thumbnails für Social-Kampagnen.', icon: '🎥', level: 'Stark' },
-  { id: 'funnel-brain', title: 'Funnel-Builder mit Gehirn', short: 'Struktur + Conversion-Ideen', detail: 'Ein Funnel-Builder, der Seitenstruktur, Absprünge und Conversion-Verbesserungen automatisch einschätzt.', icon: '🧩', level: 'Ausbau' },
-  { id: 'sales-assistant', title: 'KI-Vertriebsassistent', short: 'Antwortet wie ein Verkäufer', detail: 'Für E-Mail, WhatsApp und Chat mit Angebotswissen, Preisen und Einwandbehandlung als sichtbarer Vertriebs-Flow.', icon: '🗣️', level: 'Stark' },
-  { id: 'sales-clone', title: 'Besten Verkäufer klonen', short: 'Calls zu Skripten machen', detail: 'Zielt auf die Analyse starker Sales Calls und die Ableitung von Skripten, E-Mails und Funnels.', icon: '🧬', level: 'Ausbau' },
-  { id: 'content-daily', title: 'Was soll ich morgen posten?', short: 'Tägliche Content-Ideen', detail: 'Tägliche Content-Vorschläge inklusive Hook, Struktur und Startpunkt für den nächsten Post.', icon: '📊', level: 'Stark' },
-  { id: 'predictive', title: 'Predictive Marketing', short: 'Flops und Gewinner vorhersagen', detail: 'Die KI bewertet Kampagnenrisiken und Trendchancen, bevor Budget verbrannt wird.', icon: '🔮', level: 'Ausbau' },
-  { id: 'templates', title: 'Branchen-Templates', short: 'Flows für Coaches, Makler, Agenturen', detail: 'Branchenspezifische Templates liefern eigene Flows und Kampagnenlogik je Markt.', icon: '🧑‍🤝‍🧑', level: 'Stark' },
-  { id: 'integrations', title: 'Integrationen', short: 'CRM, Ads, WhatsApp, Kalender', detail: 'Zentrale Anbindung an externe Tools, damit kein Copy-Paste mehr nötig ist.', icon: '⚙️', level: 'Ausbau' },
-  { id: 'gamification', title: 'Gamification', short: 'Score, Fortschritt, Achievements', detail: 'Motivationsebene mit Funnel-Score, Performance-Zielen und sichtbaren Erfolgsmarkern.', icon: '🎮', level: 'Ausbau' },
-  { id: 'explainability', title: 'Warum funktioniert das?', short: 'KI erklärt die Wirkung', detail: 'Ergebnisse werden nicht nur angezeigt, sondern samt Begründung und Wirkung transparent gemacht.', icon: '🧠', level: 'Stark' },
+  { id: 'autopilot', title: 'Autopilot-Marketing', short: 'Vom Ziel zum Funnel', detail: 'Der Nutzer sagt nur, wofuer er mehr Kunden will. Danach zeigt der Flow Zielgruppe, Kampagne, Funnel und den naechsten operativen Schritt.', icon: '🚀', level: 'Gamechanger' },
+  { id: 'seo', title: 'SEO-/Keywords-Analyse', short: 'Keywords, Klicks, Sichtbarkeit', detail: 'Prueft Suchbegriffe, grobe Nachfrage, Sichtbarkeit und zeigt Themen, die direkt in Kampagnen und Content einfliessen koennen.', icon: '🔎', level: 'Stark' },
+  { id: 'lead-intelligence', title: 'Lead Intelligence Engine', short: 'Heisse Leads erkennen', detail: 'Bewertet Leads nach Reife, Potenzial und Quelle und priorisiert die naechste Aktion im Vertrieb.', icon: '🔥', level: 'Stark' },
+  { id: 'ab-testing', title: 'Automatisches A/B Testing', short: 'Varianten testen lassen', detail: 'Hilft dabei, Kampagnen kreativ zu variieren, Performance zu vergleichen und die naechste Testhypothese sichtbar zu machen.', icon: '🧪', level: 'Ausbau' },
+  { id: 'content-ai', title: 'KI-Content & Reels', short: 'Hooks, Clips, Thumbnails', detail: 'Leitet aus aktiven Themen konkrete Hooks, Formate und Content-Serien fuer Social und Newsletter ab.', icon: '🎥', level: 'Stark' },
+  { id: 'funnel-brain', title: 'Funnel-Builder mit Gehirn', short: 'Struktur + Conversion-Ideen', detail: 'Ordnet den aktuellen Prozess von Reichweite ueber Lead bis Abschluss und zeigt Bruchstellen im Funnel.', icon: '🧩', level: 'Ausbau' },
+  { id: 'sales-assistant', title: 'KI-Vertriebsassistent', short: 'Antwortet wie ein Verkaeufer', detail: 'Leitet Follow-ups, Nachrichten und Prioritaeten direkt aus Leadstatus, Quelle und Potenzial ab.', icon: '🗣️', level: 'Stark' },
+  { id: 'sales-clone', title: 'Besten Verkaeufer klonen', short: 'Calls zu Skripten machen', detail: 'Verdichtet erfolgreiche Muster in wiederholbare Vertriebsbausteine fuer E-Mail, Telefon und Kampagnen.', icon: '🧬', level: 'Ausbau' },
+  { id: 'content-daily', title: 'Was soll ich morgen posten?', short: 'Taegliche Content-Ideen', detail: 'Macht aus Kampagnenzielen und Themen sofort den naechsten konkreten Content-Vorschlag.', icon: '📊', level: 'Stark' },
+  { id: 'predictive', title: 'Predictive Marketing', short: 'Flops und Gewinner vorhersagen', detail: 'Nutzen wir fuer eine einfache Risiko- und Chancenanzeige anhand der bisher sichtbaren Performance.', icon: '🔮', level: 'Ausbau' },
+  { id: 'templates', title: 'Branchen-Templates', short: 'Flows je Markt', detail: 'Strukturiert Kampagnen und Inhalte nach Zielgruppenlogik, damit wiederkehrende Setups schneller bereitstehen.', icon: '🧩', level: 'Stark' },
+  { id: 'integrations', title: 'Integrationen', short: 'CRM, Ads, WhatsApp, Kalender', detail: 'Zeigt, welche Marketingbereiche bereits im System angekommen sind und welche Daten fuer weitere Integrationen bereitstehen.', icon: '⚙️', level: 'Ausbau' },
 ]
 
 const demoKeywordStats = [
@@ -90,9 +185,36 @@ const demoKeywordStats = [
   { keyword: 'dokumenten ki rechnung', klicks: 39, sichtbarkeit: 48, trend: '+9%' },
 ]
 
-// ── Helper ────────────────────────────────────────────────────────────────────
+const defaultSeoKeywords: SeoKeyword[] = [
+  { id: 'SEO-001', keyword: 'ki warenwirtschaft', zielseite: '/lagerpilot', intent: 'Transaktional', suchvolumen: 148, schwierigkeit: 42, ranking: 11, klicks: 31, status: 'In Arbeit' },
+  { id: 'SEO-002', keyword: 'erp handwerk', zielseite: '/werkstattpilot', intent: 'Informativ', suchvolumen: 94, schwierigkeit: 55, ranking: 18, klicks: 18, status: 'Neu' },
+  { id: 'SEO-003', keyword: 'marketing automation mittelstand', zielseite: '/marketingpilot', intent: 'Transaktional', suchvolumen: 72, schwierigkeit: 38, ranking: 7, klicks: 27, status: 'Optimiert' },
+]
 
-const COLOR = '#f59e0b'
+const defaultContentIdeas: ContentIdea[] = [
+  { id: 'CNT-001', titel: '3 Gruende warum Mittelstand an Nachfrage verliert', kanal: 'LinkedIn', ziel: 'Leadaufbau', keyword: 'marketing automation mittelstand', hook: 'Viele Teams machen Marketing ohne System.', cta: 'Demo fuer MarketingPilot anfragen', status: 'In Arbeit' },
+  { id: 'CNT-002', titel: 'SEO-Check fuer KI-Piloten Landingpages', kanal: 'Blog', ziel: 'Sichtbarkeit', keyword: 'ki warenwirtschaft', hook: 'So findest du Keywords mit echter Kaufabsicht.', cta: 'Keyword-Liste im Pilot pruefen', status: 'Idee' },
+  { id: 'CNT-003', titel: 'Newsletter-Aufhaenger fuer Fruehjahrsaktion', kanal: 'Newsletter', ziel: 'Reaktivierung', keyword: 'erp handwerk', hook: 'Was Kunden gerade wirklich automatisieren wollen.', cta: 'Angebot und Beratung sichern', status: 'Freigabe' },
+]
+
+const defaultPostingPlans: PostingPlan[] = [
+  { id: 'PST-001', titel: 'Case-Post zur Fruehjahrsaktion', kanal: 'LinkedIn', datum: '15.05.2026', status: 'Geplant', owner: 'K. Petersen', quelle: 'CNT-001' },
+  { id: 'PST-002', titel: 'SEO-Blogartikel veroeffentlichen', kanal: 'Blog', datum: '17.05.2026', status: 'Entwurf', owner: 'Marketing', quelle: 'CNT-002' },
+  { id: 'PST-003', titel: 'Newsletter Mai versenden', kanal: 'Newsletter', datum: '20.05.2026', status: 'Geplant', owner: 'Marketing', quelle: 'NL-006' },
+]
+
+const defaultAutomationRules: AutomationRule[] = [
+  { id: 'AUT-001', name: 'Lead Follow-up nach Qualifizierung', trigger: 'Lead wechselt auf Qualifiziert', aktion: 'Aufgabe fuer persoenlichen Rueckruf und Demo vorbereiten', kanal: 'CRM', owner: 'Vertrieb', status: 'Aktiv' },
+  { id: 'AUT-002', name: 'Newsletter aus Entwurf in Planung', trigger: '2 aktive Kampagnen ohne Newsletter-Begleitung', aktion: 'Newsletter-Briefing an Content senden', kanal: 'E-Mail', owner: 'Marketing', status: 'Entwurf' },
+  { id: 'AUT-003', name: 'Posting-Follow-up fuer heisse Leads', trigger: 'Lead Score ueber 80', aktion: 'WhatsApp oder LinkedIn Follow-up vorbereiten', kanal: 'WhatsApp', owner: 'K. Petersen', status: 'Pausiert' },
+]
+
+const defaultIntegrationItems: IntegrationItem[] = [
+  { id: 'INT-001', name: 'CRM Hub', status: 'Vorbereitet', datenbasis: 'Leads, Pipeline, Follow-ups', letzterSync: 'Heute', naechsterSchritt: 'Lead-Felder und Deal-Stufen bidirektional mappen' },
+  { id: 'INT-002', name: 'Meta / Facebook Ads', status: 'In Umsetzung', datenbasis: 'Kampagnenbudget, Klicks, Zielgruppen', letzterSync: 'Gestern', naechsterSchritt: 'Adsets und CPL je Kampagne anbinden' },
+  { id: 'INT-003', name: 'WhatsApp Vertrieb', status: 'Vorbereitet', datenbasis: 'Heisse Leads, Follow-up Aufgaben', letzterSync: 'Kein Sync', naechsterSchritt: 'Nachrichtenvorlagen und Lead-Zuordnung definieren' },
+  { id: 'INT-004', name: 'Google Search / SEO', status: 'Nicht gestartet', datenbasis: 'Keywords, Rankings, Landingpages', letzterSync: 'Kein Sync', naechsterSchritt: 'Keyword-Import und Ranking-Verlauf einbauen' },
+]
 
 function Toast({ msg }: { msg: string }) {
   if (!msg) return null
@@ -102,15 +224,28 @@ function Toast({ msg }: { msg: string }) {
 }
 
 const kampagneStatusBadge: Record<KampagneStatus, string> = {
-  Entwurf: 'badge-gray', Aktiv: 'badge-green', Pausiert: 'badge-orange', Abgeschlossen: 'badge-blue',
+  Entwurf: 'badge-gray',
+  Aktiv: 'badge-green',
+  Pausiert: 'badge-orange',
+  Abgeschlossen: 'badge-blue',
 }
+
 const leadStatusBadge: Record<LeadStatus, string> = {
-  Neu: 'badge-gray', Kontaktiert: 'badge-blue', Qualifiziert: 'badge-orange',
-  Angebot: 'badge-purple', Gewonnen: 'badge-green', Verloren: 'badge-gray',
+  Neu: 'badge-gray',
+  Kontaktiert: 'badge-blue',
+  Qualifiziert: 'badge-orange',
+  Angebot: 'badge-purple',
+  Gewonnen: 'badge-green',
+  Verloren: 'badge-gray',
 }
+
 const leadStatusColor: Record<LeadStatus, string> = {
-  Neu: '#aeb9c8', Kontaktiert: '#1684ff', Qualifiziert: '#f59e0b',
-  Angebot: '#a78bfa', Gewonnen: '#25d366', Verloren: '#4a5568',
+  Neu: '#aeb9c8',
+  Kontaktiert: '#1684ff',
+  Qualifiziert: '#f59e0b',
+  Angebot: '#a78bfa',
+  Gewonnen: '#25d366',
+  Verloren: '#4a5568',
 }
 
 function PctBar({ value, color }: { value: number; color: string }) {
@@ -122,6 +257,156 @@ function PctBar({ value, color }: { value: number; color: string }) {
       <span style={{ fontSize: 11, color: '#aeb9c8', minWidth: 34 }}>{value.toFixed(1)}%</span>
     </div>
   )
+}
+
+function parseCurrency(value: string) {
+  const normalized = value.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, '')
+  const parsed = Number.parseFloat(normalized)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function formatCurrency(value: number) {
+  return `${value.toLocaleString('de-DE')} €`
+}
+
+function useLocalStorageState<T>(key: string, initialValue: T) {
+  const [state, setState] = useState<T>(initialValue)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const saved = window.localStorage.getItem(key)
+      if (saved) setState(JSON.parse(saved) as T)
+    } catch {
+      // local fallback keeps the page usable even if storage is blocked
+    }
+  }, [key])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(key, JSON.stringify(state))
+    } catch {
+      // ignore storage failures and keep runtime state only
+    }
+  }, [key, state])
+
+  return [state, setState] as const
+}
+
+function nextId(prefix: string, ids: string[]) {
+  const next = ids.reduce((max, id) => {
+    const match = id.match(/(\d+)$/)
+    const numeric = match ? Number.parseInt(match[1], 10) : 0
+    return Math.max(max, numeric)
+  }, 0) + 1
+
+  return `${prefix}-${String(next).padStart(3, '0')}`
+}
+
+function getLeadScore(lead: Lead) {
+  const statusScore: Record<LeadStatus, number> = {
+    Neu: 35,
+    Kontaktiert: 50,
+    Qualifiziert: 72,
+    Angebot: 88,
+    Gewonnen: 100,
+    Verloren: 5,
+  }
+
+  const sourceBonus: Partial<Record<LeadQuelle, number>> = {
+    Website: 8,
+    Empfehlung: 10,
+    Messe: 6,
+    'Social Media': 5,
+  }
+
+  const valueBonus = Math.min(20, Math.floor(parseCurrency(lead.wert) / 2500))
+  return Math.min(100, statusScore[lead.status] + (sourceBonus[lead.quelle] ?? 0) + valueBonus)
+}
+
+function getLeadAction(lead: Lead) {
+  if (lead.status === 'Neu') return 'Innerhalb von 24h persoenlich anrufen'
+  if (lead.status === 'Kontaktiert') return 'Konkreten Bedarf und Termin bestaetigen'
+  if (lead.status === 'Qualifiziert') return 'Use-Case und ROI mit Demo unterlegen'
+  if (lead.status === 'Angebot') return 'Follow-up mit Einwandbehandlung senden'
+  if (lead.status === 'Gewonnen') return 'Onboarding und Referenzchance sichern'
+  return 'Lead fuer spaetere Reaktivierung markieren'
+}
+
+function getNewsletterAverages(newsletter: Newsletter[]) {
+  const sent = newsletter.filter(item => item.status === 'Versendet')
+  if (sent.length === 0) return { openRate: 0, clickRate: 0 }
+  return {
+    openRate: sent.reduce((sum, item) => sum + item.oeffnungsrate, 0) / sent.length,
+    clickRate: sent.reduce((sum, item) => sum + item.klickrate, 0) / sent.length,
+  }
+}
+
+function createNewsletterMetrics(newsletter: Newsletter, kampagnen: Kampagne[]) {
+  const activeCampaigns = kampagnen.filter(k => k.status === 'Aktiv').length
+  const baseOpenRate = newsletter.empfaenger > 300 ? 39 : 34
+  const openRate = Math.min(58, baseOpenRate + activeCampaigns * 1.7 + newsletter.betreff.length * 0.12)
+  const clickRate = Math.min(24, Math.max(8, openRate * 0.42))
+  return {
+    oeffnungsrate: Number(openRate.toFixed(1)),
+    klickrate: Number(clickRate.toFixed(1)),
+  }
+}
+
+function getFeatureSignals(featureId: string, kampagnen: Kampagne[], leads: Lead[], newsletter: Newsletter[]) {
+  const hotLeads = leads.filter(lead => getLeadScore(lead) >= 75 && !['Gewonnen', 'Verloren'].includes(lead.status))
+  const activeCampaigns = kampagnen.filter(k => k.status === 'Aktiv')
+  const draftAssets = kampagnen.filter(k => k.status === 'Entwurf').length + newsletter.filter(n => n.status !== 'Versendet').length
+  const averages = getNewsletterAverages(newsletter)
+
+  const sharedActions: FeatureAction[] = [
+    { tab: 'kampagnen', title: 'Aktive Kampagnen nachschaerfen', detail: `${activeCampaigns.length} Kampagnen laufen gerade mit direkten Hebeln fuer Performance.` },
+    { tab: 'leads', title: 'Heisse Leads zuerst bearbeiten', detail: `${hotLeads.length} Leads liegen aktuell im schnellen Abschlussfenster.` },
+    { tab: 'newsletter', title: 'Offene Newsletter operationalisieren', detail: `${newsletter.filter(n => n.status !== 'Versendet').length} Newsletter warten auf Planung oder Versand.` },
+  ]
+
+  if (featureId === 'lead-intelligence' || featureId === 'sales-assistant') {
+    return {
+      signals: [
+        { label: 'Heisse Leads', value: String(hotLeads.length), tone: '#25d366' },
+        { label: 'Pipeline-Wert', value: formatCurrency(leads.filter(l => !['Gewonnen', 'Verloren'].includes(l.status)).reduce((sum, lead) => sum + parseCurrency(lead.wert), 0)), tone: '#a78bfa' },
+        { label: 'Naechste Aufgabe', value: hotLeads[0] ? `${hotLeads[0].name}: ${getLeadAction(hotLeads[0])}` : 'Neue Leads sammeln', tone: COLOR },
+      ],
+      actions: sharedActions,
+    }
+  }
+
+  if (featureId === 'seo' || featureId === 'content-ai' || featureId === 'content-daily') {
+    return {
+      signals: [
+        { label: 'Aktive Themen', value: String(activeCampaigns.length || kampagnen.length), tone: '#1684ff' },
+        { label: 'Newsletter-Resonanz', value: `${averages.openRate.toFixed(1)}% Oeffnungsrate`, tone: '#10b981' },
+        { label: 'Content-Luecke', value: `${draftAssets} offene Assets warten auf Inhalt`, tone: COLOR },
+      ],
+      actions: sharedActions,
+    }
+  }
+
+  if (featureId === 'integrations') {
+    return {
+      signals: [
+        { label: 'Systemobjekte live', value: `${kampagnen.length + leads.length + newsletter.length}`, tone: '#6cb6ff' },
+        { label: 'Bereiche angebunden', value: 'Kampagnen, Leads, Newsletter', tone: '#25d366' },
+        { label: 'Naechster Schritt', value: 'Automationen und externe Kanaele andocken', tone: COLOR },
+      ],
+      actions: sharedActions,
+    }
+  }
+
+  return {
+    signals: [
+      { label: 'Aktive Kampagnen', value: String(activeCampaigns.length), tone: COLOR },
+      { label: 'Entwuerfe im System', value: String(draftAssets), tone: '#a78bfa' },
+      { label: 'Newsletter-Mittelwert', value: `${averages.clickRate.toFixed(1)}% Klickrate`, tone: '#1684ff' },
+    ],
+    actions: sharedActions,
+  }
 }
 
 function DemoFeatureCard({ feature, active, onClick }: { feature: DemoMarketingFeature; active: boolean; onClick: () => void }) {
@@ -151,8 +436,23 @@ function DemoFeatureCard({ feature, active, onClick }: { feature: DemoMarketingF
   )
 }
 
-function DemoLabTab() {
+function DemoLabTab({
+  kampagnen,
+  leads,
+  newsletter,
+  onJump,
+}: {
+  kampagnen: Kampagne[]
+  leads: Lead[]
+  newsletter: Newsletter[]
+  onJump: (tab: Tab) => void
+}) {
   const [selected, setSelected] = useState<DemoMarketingFeature>(demoMarketingFeatures[0])
+  const hotLead = [...leads]
+    .filter(lead => !['Gewonnen', 'Verloren'].includes(lead.status))
+    .sort((a, b) => getLeadScore(b) - getLeadScore(a))[0]
+  const featureView = getFeatureSignals(selected.id, kampagnen, leads, newsletter)
+  const draftAssets = kampagnen.filter(k => k.status === 'Entwurf').length + newsletter.filter(n => n.status !== 'Versendet').length
 
   return (
     <div>
@@ -160,25 +460,35 @@ function DemoLabTab() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
           <div>
             <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em' }}>KI-Suite</div>
-            <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>MarketingPilot mit klickbaren KI-Modulen</div>
+            <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>MarketingPilot mit operativen KI-Bausteinen</div>
           </div>
-          <span className="badge badge-orange">Autopilot · SEO · Content · Vertrieb</span>
+          <span className="badge badge-orange">Live mit Kampagnen, Leads und Newsletter-Daten</span>
         </div>
         <div style={{ fontSize: 13, color: '#aeb9c8', lineHeight: 1.6 }}>
-          Alle Bereiche sind direkt sichtbar und anklickbar, damit der gesamte Marketing-Stack vom ersten Blick an erfassbar ist.
+          Die neuen Module sind jetzt nicht mehr nur Vorschau. Sie lesen den aktuellen Marketing-Bestand, zeigen Prioritaeten und springen direkt in den passenden Arbeitsbereich.
         </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
+        {[
+          { label: 'Aktive Kampagnen', value: String(kampagnen.filter(k => k.status === 'Aktiv').length), icon: '📣', color: COLOR },
+          { label: 'Heisse Leads', value: String(leads.filter(lead => getLeadScore(lead) >= 75 && !['Gewonnen', 'Verloren'].includes(lead.status)).length), icon: '🔥', color: '#25d366' },
+          { label: 'Offene Assets', value: String(draftAssets), icon: '🧩', color: '#a78bfa' },
+          { label: 'Newsletter geplant', value: String(newsletter.filter(item => item.status === 'Geplant').length), icon: '📰', color: '#1684ff' },
+        ].map(item => (
+          <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: item.color }}>{item.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
+          </div>
+        ))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18, marginBottom: 18 }}>
         <div className="pk-card">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
             {demoMarketingFeatures.map(feature => (
-              <DemoFeatureCard
-                key={feature.id}
-                feature={feature}
-                active={selected.id === feature.id}
-                onClick={() => setSelected(feature)}
-              />
+              <DemoFeatureCard key={feature.id} feature={feature} active={selected.id === feature.id} onClick={() => setSelected(feature)} />
             ))}
           </div>
         </div>
@@ -194,22 +504,61 @@ function DemoLabTab() {
             </div>
           </div>
           <div style={{ fontSize: 13, color: '#d0d9e8', lineHeight: 1.6, marginBottom: 14 }}>{selected.detail}</div>
-          <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
-            <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 6 }}>Modulbild</div>
-            <div style={{ fontSize: 13, color: '#f8fbff' }}>
-              Sichtbar im MarketingPilot als klickbarer Modulbereich mit klarer Einordnung, Fokus und Ausbaurichtung.
-            </div>
+
+          <div style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
+            {featureView.signals.map(signal => (
+              <div key={signal.label} style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+                <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 5 }}>{signal.label}</div>
+                <div style={{ color: signal.tone, fontWeight: 800, fontSize: 14 }}>{signal.value}</div>
+              </div>
+            ))}
           </div>
+
+          {hotLead && (
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)' }}>
+              <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 5 }}>Sofort sinnvoll</div>
+              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>{hotLead.name} · Score {getLeadScore(hotLead)}</div>
+              <div style={{ fontSize: 12, color: '#d0d9e8' }}>{getLeadAction(hotLead)}</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="pk-card" style={{ marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 16 }}>Naechste sinnvolle Systemschritte</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>Direkt aus den eingebundenen Marketing-Daten abgeleitet</div>
+          </div>
+          <span className="badge badge-blue">Ins System eingepflegt</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+          {featureView.actions.map(action => (
+            <button
+              key={action.title}
+              onClick={() => onJump(action.tab)}
+              style={{
+                textAlign: 'left',
+                padding: '14px 16px',
+                borderRadius: 14,
+                border: '1px solid rgba(255,255,255,.08)',
+                background: 'rgba(255,255,255,.03)',
+                color: '#f8fbff',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>{action.title}</div>
+              <div style={{ fontSize: 12, color: '#aeb9c8', lineHeight: 1.5 }}>{action.detail}</div>
+            </button>
+          ))}
         </div>
       </div>
 
       <div className="pk-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
           <div>
-            <div style={{ fontWeight: 900, fontSize: 16 }}>🔎 SEO-/Keywords-Analyse</div>
-            <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>
-              Wichtige Keywords prüfen, grobe Klickstärke sehen und Potenzial der eigenen Seite erkennen
-            </div>
+            <div style={{ fontWeight: 900, fontSize: 16 }}>SEO-/Keywords-Analyse</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>Keyword-Ideen bleiben als sichtbarer Ausbaupfad im MarketingPilot erhalten</div>
           </div>
           <span className="badge badge-blue">Keywords · Klicks · Sichtbarkeit</span>
         </div>
@@ -217,15 +566,15 @@ function DemoLabTab() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
           {[
             { label: 'Keywords im Fokus', value: '24', icon: '🏷️', color: COLOR },
-            { label: 'Geschätzte Klicks', value: '348', icon: '🖱️', color: '#1684ff' },
-            { label: 'Eigene Seitenklicks', value: '127', icon: '🌐', color: '#10b981' },
-            { label: 'Top-Chancen', value: '6', icon: '🚀', color: '#a78bfa' },
+            { label: 'Geschaetzte Klicks', value: '348', icon: '🖱️', color: '#1684ff' },
+            { label: 'Seitenklicks', value: String(kampagnen.reduce((sum, item) => sum + item.geklickt, 0)), icon: '🌐', color: '#10b981' },
+            { label: 'Top-Chancen', value: String(Math.max(3, kampagnen.filter(item => item.status !== 'Abgeschlossen').length)), icon: '🚀', color: '#a78bfa' },
           ].map(item => (
-            <button key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px', cursor: 'pointer', color: 'inherit' }}>
+            <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
               <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
               <div style={{ fontSize: 20, fontWeight: 900, color: item.color }}>{item.value}</div>
               <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
-            </button>
+            </div>
           ))}
         </div>
 
@@ -234,44 +583,28 @@ function DemoLabTab() {
             <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Keyword-Vorschau</div>
             <div style={{ display: 'grid', gap: 10 }}>
               {demoKeywordStats.map(row => (
-                <button
-                  key={row.keyword}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1.4fr .6fr .6fr .5fr',
-                    gap: 10,
-                    alignItems: 'center',
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                    borderRadius: 12,
-                    cursor: 'pointer',
-                    background: 'rgba(255,255,255,.03)',
-                    border: '1px solid rgba(255,255,255,.06)',
-                    color: '#f8fbff',
-                  }}
-                >
+                <div key={row.keyword} style={{ display: 'grid', gridTemplateColumns: '1.4fr .6fr .6fr .5fr', gap: 10, alignItems: 'center', padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
                   <span style={{ fontWeight: 700, fontSize: 13 }}>{row.keyword}</span>
                   <span style={{ fontSize: 12, color: '#aeb9c8' }}>{row.klicks} Klicks</span>
                   <span style={{ fontSize: 12, color: '#aeb9c8' }}>{row.sichtbarkeit}% Sichtbarkeit</span>
                   <span style={{ fontSize: 12, color: '#4ddb7e', fontWeight: 700 }}>{row.trend}</span>
-                </button>
+                </div>
               ))}
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Nächste Ausbaustufe</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Direkt weiter nutzbar</div>
             <div style={{ display: 'grid', gap: 10 }}>
               {[
-                'Keyword-Liste eingeben und Chancen live berechnen',
-                'Klicks der eigenen Seite pro Landingpage anzeigen',
-                'Wettbewerb und Ranking-Veränderungen verfolgen',
-                'Keywords direkt in Kampagnen und Content-Ideen übernehmen',
+                'Keyword-Liste in Kampagnenbriefings uebernehmen',
+                'Top-Themen fuer Newsletter und Social Posts ableiten',
+                'Lead-Quellen gegen Content-Performance spiegeln',
+                'Neue Rankings spaeter an echte Quellen koppeln',
               ].map(item => (
-                <button key={item} style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', color: '#d0d9e8', fontSize: 13 }}>
+                <div key={item} style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', color: '#d0d9e8', fontSize: 13 }}>
                   {item}
-                </button>
+                </div>
               ))}
             </div>
           </div>
@@ -281,109 +614,156 @@ function DemoLabTab() {
   )
 }
 
-// ── Kampagnen-Tab ─────────────────────────────────────────────────────────────
-
-function KampagnenTab({ isDemo }: { isDemo: boolean }) {
-  const [kampagnen, setKampagnen] = useState<Kampagne[]>(isDemo ? demoKampagnen : [])
+function KampagnenTab({
+  isDemo,
+  kampagnen,
+  onChange,
+}: {
+  isDemo: boolean
+  kampagnen: Kampagne[]
+  onChange: (next: Kampagne[]) => void
+}) {
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState('Alle')
   const [toast, setToast] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
-  const [loading, setLoading] = useState(!isDemo)
   const [form, setForm] = useState({ name: '', typ: 'E-Mail', zielgruppe: '', start: '', ende: '', budget: '' })
 
-  useEffect(() => {
-    if (isDemo) return
-    getMarketingKampagnen()
-      .then(data => setKampagnen(data as Kampagne[]))
-      .catch(() => setErrorMsg('Fehler beim Laden der Kampagnen'))
-      .finally(() => setLoading(false))
-  }, [isDemo])
-
   const showToast = (msg: string, error = false) => {
-    if (error) setErrorMsg(msg); else setToast(msg)
-    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+    if (error) setErrorMsg(msg)
+    else setToast(msg)
+    setTimeout(() => {
+      setToast('')
+      setErrorMsg('')
+    }, 4000)
   }
 
-  const filtered = kampagnen.filter(k => filterStatus === 'Alle' || k.status === filterStatus)
+  const filtered = kampagnen.filter(item => filterStatus === 'Alle' || item.status === filterStatus)
   const counts: Record<string, number> = { Alle: kampagnen.length }
-  kampagnen.forEach(k => { counts[k.status] = (counts[k.status] || 0) + 1 })
+  kampagnen.forEach(item => {
+    counts[item.status] = (counts[item.status] || 0) + 1
+  })
+
+  const avgOpenRate = kampagnen.filter(item => item.empfaenger > 0).reduce((sum, item, _, arr) => {
+    const rate = item.empfaenger > 0 ? (item.geoeffnet / item.empfaenger) * 100 : 0
+    return sum + rate / arr.length
+  }, 0)
 
   const handleSave = async () => {
     if (!form.name || !form.zielgruppe) return
-    const newK: Kampagne = {
-      id: `KMP-00${kampagnen.length + 1}`, name: form.name,
-      typ: form.typ as Kampagne['typ'], status: 'Entwurf',
-      zielgruppe: form.zielgruppe, start: form.start || '—', ende: form.ende || '—',
-      empfaenger: 0, geoeffnet: 0, geklickt: 0, konversionen: 0,
+    const newCampaign: Kampagne = {
+      id: nextId('KMP', kampagnen.map(item => item.id)),
+      name: form.name,
+      typ: form.typ as Kampagne['typ'],
+      status: 'Entwurf',
+      zielgruppe: form.zielgruppe,
+      start: form.start || '—',
+      ende: form.ende || '—',
+      empfaenger: 0,
+      geoeffnet: 0,
+      geklickt: 0,
+      konversionen: 0,
       budget: form.budget ? `${form.budget} €` : '0 €',
     }
+
     if (!isDemo) {
-      try { await upsertMarketingKampagne(newK) } catch { showToast('Fehler beim Speichern', true); return }
+      try {
+        await upsertMarketingKampagne(newCampaign)
+      } catch {
+        showToast('Fehler beim Speichern', true)
+        return
+      }
     }
-    setKampagnen(prev => [newK, ...prev])
+
+    onChange([newCampaign, ...kampagnen])
     setForm({ name: '', typ: 'E-Mail', zielgruppe: '', start: '', ende: '', budget: '' })
     setShowForm(false)
-    showToast(`✅ Kampagne "${newK.name}" als Entwurf angelegt`)
+    showToast(`✅ Kampagne "${newCampaign.name}" als Entwurf angelegt`)
   }
 
   const handleStatus = async (id: string, status: KampagneStatus) => {
-    const k = kampagnen.find(k => k.id === id)
-    if (!isDemo && k) {
-      try { await upsertMarketingKampagne({ ...k, status }) } catch { showToast('Fehler beim Speichern', true); return }
+    const updated = kampagnen.map(item => item.id === id ? { ...item, status } : item)
+    const current = updated.find(item => item.id === id)
+
+    if (!isDemo && current) {
+      try {
+        await upsertMarketingKampagne(current)
+      } catch {
+        showToast('Fehler beim Speichern', true)
+        return
+      }
     }
-    setKampagnen(prev => prev.map(k => k.id === id ? { ...k, status } : k))
+
+    onChange(updated)
     showToast(`✅ Kampagne auf "${status}" gesetzt`)
   }
-
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 28, height: 28, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
-        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Kampagnen…</div>
-      </div>
-    </div>
-  )
 
   return (
     <div>
       {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
+        {[
+          { label: 'Aktiv', value: String(kampagnen.filter(item => item.status === 'Aktiv').length), icon: '▶', color: '#25d366' },
+          { label: 'Entwuerfe', value: String(kampagnen.filter(item => item.status === 'Entwurf').length), icon: '📝', color: COLOR },
+          { label: 'Pausiert', value: String(kampagnen.filter(item => item.status === 'Pausiert').length), icon: '⏸', color: '#ffb347' },
+          { label: 'Ø Oeffnungsrate', value: `${avgOpenRate.toFixed(1)}%`, icon: '📈', color: '#1684ff' },
+        ].map(item => (
+          <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: item.color }}>{item.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
+          </div>
+        ))}
+      </div>
+
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {(['Alle', 'Aktiv', 'Entwurf', 'Pausiert', 'Abgeschlossen'] as const).map(s => (
-            <button key={s} onClick={() => setFilterStatus(s)} style={{
-              padding: '6px 13px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)',
-              background: filterStatus === s ? 'rgba(245,158,11,.15)' : 'transparent',
-              color: filterStatus === s ? '#fbbf24' : '#aeb9c8', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-            }}>{s} <span style={{ opacity: .6 }}>({counts[s] ?? 0})</span></button>
+          {(['Alle', 'Aktiv', 'Entwurf', 'Pausiert', 'Abgeschlossen'] as const).map(status => (
+            <button
+              key={status}
+              onClick={() => setFilterStatus(status)}
+              style={{
+                padding: '6px 13px',
+                borderRadius: 999,
+                border: '1px solid rgba(255,255,255,.1)',
+                background: filterStatus === status ? 'rgba(245,158,11,.15)' : 'transparent',
+                color: filterStatus === status ? '#fbbf24' : '#aeb9c8',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {status} <span style={{ opacity: 0.6 }}>({counts[status] ?? 0})</span>
+            </button>
           ))}
         </div>
-        <button className="pk-btn" style={{ marginLeft: 'auto', fontSize: 13, background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={() => setShowForm(f => !f)}>
+        <button className="pk-btn" style={{ marginLeft: 'auto', fontSize: 13, background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={() => setShowForm(open => !open)}>
           {showForm ? '✕ Abbrechen' : '+ Neue Kampagne'}
         </button>
       </div>
 
       {showForm && (
         <div className="pk-card fade-in" style={{ marginBottom: 20, border: '1px solid rgba(245,158,11,.2)' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>📣 Neue Kampagne erstellen</h3>
+          <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>Neue Kampagne erstellen</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             {[
-              { label: 'Kampagnenname *', key: 'name', placeholder: 'z.B. Sommer-Aktion 2025' },
+              { label: 'Kampagnenname *', key: 'name', placeholder: 'z.B. Sommer-Aktion' },
               { label: 'Zielgruppe *', key: 'zielgruppe', placeholder: 'z.B. Bestandskunden' },
-              { label: 'Budget (€)', key: 'budget', placeholder: 'z.B. 500' },
               { label: 'Start', key: 'start', placeholder: 'TT.MM.JJJJ' },
               { label: 'Ende', key: 'ende', placeholder: 'TT.MM.JJJJ' },
-            ].map(f => (
-              <div key={f.key}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{f.label}</label>
-                <input className="pk-input" placeholder={f.placeholder} value={(form as Record<string, string>)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
+              { label: 'Budget (€)', key: 'budget', placeholder: 'z.B. 1200' },
+            ].map(field => (
+              <div key={field.key}>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{field.label}</label>
+                <input className="pk-input" placeholder={field.placeholder} value={(form as Record<string, string>)[field.key]} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
               </div>
             ))}
             <div>
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
-              <select className="pk-input" value={form.typ} onChange={e => setForm(p => ({ ...p, typ: e.target.value }))} style={{ cursor: 'pointer' }}>
-                {['E-Mail', 'Social Media', 'Newsletter', 'Anzeige'].map(t => <option key={t}>{t}</option>)}
+              <select className="pk-input" value={form.typ} onChange={event => setForm(prev => ({ ...prev, typ: event.target.value }))}>
+                {['E-Mail', 'Social Media', 'Newsletter', 'Anzeige'].map(type => <option key={type}>{type}</option>)}
               </select>
             </div>
           </div>
@@ -392,59 +772,62 @@ function KampagnenTab({ isDemo }: { isDemo: boolean }) {
       )}
 
       <div style={{ display: 'grid', gap: 12 }}>
-        {filtered.map(k => {
-          const oeffRate = k.empfaenger > 0 ? (k.geoeffnet / k.empfaenger) * 100 : 0
-          const klickRate = k.geoeffnet > 0 ? (k.geklickt / k.geoeffnet) * 100 : 0
+        {filtered.map(item => {
+          const openRate = item.empfaenger > 0 ? (item.geoeffnet / item.empfaenger) * 100 : 0
+          const clickRate = item.geoeffnet > 0 ? (item.geklickt / item.geoeffnet) * 100 : 0
+          const conversionRate = item.geklickt > 0 ? (item.konversionen / item.geklickt) * 100 : 0
           return (
-            <div key={k.id} className="pk-card" style={{ border: `1px solid ${COLOR}18` }}>
+            <div key={item.id} className="pk-card" style={{ border: `1px solid ${COLOR}18` }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 14 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: COLOR + '18', border: `1px solid ${COLOR}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
-                  {k.typ === 'E-Mail' ? '✉️' : k.typ === 'Social Media' ? '📱' : k.typ === 'Newsletter' ? '📰' : '📢'}
+                <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: `${COLOR}18`, border: `1px solid ${COLOR}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                  {item.typ === 'E-Mail' ? '✉️' : item.typ === 'Social Media' ? '📱' : item.typ === 'Newsletter' ? '📰' : '📢'}
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
-                    <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#aeb9c8' }}>{k.id}</span>
-                    <span className="badge badge-gray">{k.typ}</span>
-                    <span className={`badge ${kampagneStatusBadge[k.status]}`}>{k.status}</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#aeb9c8' }}>{item.id}</span>
+                    <span className="badge badge-gray">{item.typ}</span>
+                    <span className={`badge ${kampagneStatusBadge[item.status]}`}>{item.status}</span>
                   </div>
-                  <div style={{ fontWeight: 800, fontSize: 15 }}>{k.name}</div>
-                  <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>👥 {k.zielgruppe} · 📅 {k.start} – {k.ende} · 💶 {k.budget}</div>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{item.name}</div>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>👥 {item.zielgruppe} · 📅 {item.start} - {item.ende} · 💶 {item.budget}</div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  {k.status === 'Entwurf' && <button onClick={() => handleStatus(k.id, 'Aktiv')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>▶ Starten</button>}
-                  {k.status === 'Aktiv' && <button onClick={() => handleStatus(k.id, 'Pausiert')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(245,158,11,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>⏸ Pausieren</button>}
-                  {k.status === 'Aktiv' && <button onClick={() => handleStatus(k.id, 'Abgeschlossen')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(22,132,255,.3)', background: 'transparent', color: '#6cb6ff', cursor: 'pointer' }}>✅ Abschließen</button>}
-                  {k.status === 'Pausiert' && <button onClick={() => handleStatus(k.id, 'Aktiv')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>▶ Fortsetzen</button>}
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {item.status === 'Entwurf' && <button onClick={() => handleStatus(item.id, 'Aktiv')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>▶ Starten</button>}
+                  {item.status === 'Aktiv' && <button onClick={() => handleStatus(item.id, 'Pausiert')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(245,158,11,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>⏸ Pausieren</button>}
+                  {item.status === 'Aktiv' && <button onClick={() => handleStatus(item.id, 'Abgeschlossen')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(22,132,255,.3)', background: 'transparent', color: '#6cb6ff', cursor: 'pointer' }}>✅ Abschliessen</button>}
+                  {item.status === 'Pausiert' && <button onClick={() => handleStatus(item.id, 'Aktiv')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>▶ Fortsetzen</button>}
                 </div>
               </div>
-              {k.empfaenger > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 12 }}>
-                  {[
-                    { label: 'Empfänger', value: k.empfaenger.toLocaleString('de-DE'), icon: '👥' },
-                    { label: 'Geöffnet', value: k.geoeffnet.toLocaleString('de-DE'), icon: '👁️' },
-                    { label: 'Geklickt', value: k.geklickt.toLocaleString('de-DE'), icon: '🖱️' },
-                    { label: 'Konversionen', value: k.konversionen.toLocaleString('de-DE'), icon: '🎯' },
-                  ].map(s => (
-                    <div key={s.label} style={{ textAlign: 'center', padding: '10px 8px', borderRadius: 10, background: 'rgba(255,255,255,.04)' }}>
-                      <div style={{ fontSize: 16, marginBottom: 2 }}>{s.icon}</div>
-                      <div style={{ fontWeight: 800, fontSize: 16, color: COLOR }}>{s.value}</div>
-                      <div style={{ fontSize: 10, color: '#aeb9c8', marginTop: 1 }}>{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {k.empfaenger > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Öffnungsrate</div>
-                    <PctBar value={oeffRate} color={COLOR} />
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 12 }}>
+                {[
+                  { label: 'Empfaenger', value: item.empfaenger.toLocaleString('de-DE'), icon: '👥' },
+                  { label: 'Geoeffnet', value: item.geoeffnet.toLocaleString('de-DE'), icon: '👁️' },
+                  { label: 'Geklickt', value: item.geklickt.toLocaleString('de-DE'), icon: '🖱️' },
+                  { label: 'Konversionen', value: item.konversionen.toLocaleString('de-DE'), icon: '🎯' },
+                ].map(stat => (
+                  <div key={stat.label} style={{ textAlign: 'center', padding: '10px 8px', borderRadius: 10, background: 'rgba(255,255,255,.04)' }}>
+                    <div style={{ fontSize: 16, marginBottom: 2 }}>{stat.icon}</div>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: COLOR }}>{stat.value}</div>
+                    <div style={{ fontSize: 10, color: '#aeb9c8', marginTop: 1 }}>{stat.label}</div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Klickrate (von Geöffnet)</div>
-                    <PctBar value={klickRate} color="#1684ff" />
-                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Oeffnungsrate</div>
+                  <PctBar value={openRate} color={COLOR} />
                 </div>
-              )}
+                <div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Klickrate</div>
+                  <PctBar value={clickRate} color="#1684ff" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Conversion aus Klicks</div>
+                  <PctBar value={conversionRate} color="#10b981" />
+                </div>
+              </div>
             </div>
           )
         })}
@@ -453,99 +836,131 @@ function KampagnenTab({ isDemo }: { isDemo: boolean }) {
   )
 }
 
-// ── Leads-Tab ─────────────────────────────────────────────────────────────────
-
-function LeadsTab({ isDemo }: { isDemo: boolean }) {
-  const [leads, setLeads] = useState<Lead[]>(isDemo ? demoLeads : [])
+function LeadsTab({
+  isDemo,
+  leads,
+  onChange,
+}: {
+  isDemo: boolean
+  leads: Lead[]
+  onChange: (next: Lead[]) => void
+}) {
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState('Alle')
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
-  const [loading, setLoading] = useState(!isDemo)
   const [form, setForm] = useState({ name: '', firma: '', email: '', telefon: '', quelle: 'Website', wert: '', betreuer: '' })
 
-  useEffect(() => {
-    if (isDemo) return
-    getMarketingLeads()
-      .then(data => setLeads(data as Lead[]))
-      .catch(() => setErrorMsg('Fehler beim Laden der Leads'))
-      .finally(() => setLoading(false))
-  }, [isDemo])
-
   const showToast = (msg: string, error = false) => {
-    if (error) setErrorMsg(msg); else setToast(msg)
-    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+    if (error) setErrorMsg(msg)
+    else setToast(msg)
+    setTimeout(() => {
+      setToast('')
+      setErrorMsg('')
+    }, 4000)
   }
 
-  const filtered = leads.filter(l =>
-    (filterStatus === 'Alle' || l.status === filterStatus) &&
-    (l.name.toLowerCase().includes(search.toLowerCase()) || l.firma.toLowerCase().includes(search.toLowerCase()))
+  const filtered = leads.filter(lead =>
+    (filterStatus === 'Alle' || lead.status === filterStatus) &&
+    (lead.name.toLowerCase().includes(search.toLowerCase()) || lead.firma.toLowerCase().includes(search.toLowerCase()))
   )
+
   const counts: Record<string, number> = { Alle: leads.length }
-  leads.forEach(l => { counts[l.status] = (counts[l.status] || 0) + 1 })
+  leads.forEach(lead => {
+    counts[lead.status] = (counts[lead.status] || 0) + 1
+  })
+
+  const topLeads = [...leads]
+    .filter(lead => !['Gewonnen', 'Verloren'].includes(lead.status))
+    .sort((a, b) => getLeadScore(b) - getLeadScore(a))
+    .slice(0, 3)
 
   const handleSave = async () => {
     if (!form.name || !form.email) return
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    const newL: Lead = {
-      id: `LD-00${leads.length + 1}`, ...form,
-      quelle: form.quelle as LeadQuelle, status: 'Neu',
-      wert: form.wert ? `${form.wert} €` : '—', erstellt: today,
+    const newLead: Lead = {
+      id: nextId('LD', leads.map(item => item.id)),
+      name: form.name,
+      firma: form.firma,
+      email: form.email,
+      telefon: form.telefon,
+      quelle: form.quelle as LeadQuelle,
+      status: 'Neu',
+      wert: form.wert ? `${form.wert} €` : '—',
+      erstellt: today,
+      betreuer: form.betreuer,
     }
+
     if (!isDemo) {
-      try { await upsertMarketingLead(newL) } catch { showToast('Fehler beim Speichern', true); return }
+      try {
+        await upsertMarketingLead(newLead)
+      } catch {
+        showToast('Fehler beim Speichern', true)
+        return
+      }
     }
-    setLeads(prev => [newL, ...prev])
+
+    onChange([newLead, ...leads])
     setForm({ name: '', firma: '', email: '', telefon: '', quelle: 'Website', wert: '', betreuer: '' })
     setShowForm(false)
-    showToast(`✅ Lead "${newL.name}" wurde angelegt`)
+    showToast(`✅ Lead "${newLead.name}" wurde angelegt`)
   }
 
   const handleStatusChange = async (id: string, status: LeadStatus) => {
-    const lead = leads.find(l => l.id === id)
-    if (!isDemo && lead) {
-      try { await upsertMarketingLead({ ...lead, status }) } catch { showToast('Fehler beim Speichern', true); return }
+    const updated = leads.map(lead => lead.id === id ? { ...lead, status } : lead)
+    const current = updated.find(lead => lead.id === id)
+
+    if (!isDemo && current) {
+      try {
+        await upsertMarketingLead(current)
+      } catch {
+        showToast('Fehler beim Speichern', true)
+        return
+      }
     }
-    setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
+
+    onChange(updated)
     showToast(`✅ Lead-Status auf "${status}" gesetzt`)
   }
-
-  const pipeline: LeadStatus[] = ['Neu', 'Kontaktiert', 'Qualifiziert', 'Angebot', 'Gewonnen', 'Verloren']
-
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 28, height: 28, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
-        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Leads…</div>
-      </div>
-    </div>
-  )
 
   return (
     <div>
       {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
 
-      {/* Pipeline Visual */}
-      <div className="pk-card" style={{ marginBottom: 16, padding: '16px 20px' }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: '#aeb9c8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>Pipeline-Übersicht</div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', overflowX: 'auto' }}>
-          {pipeline.slice(0, 5).map((s, i) => {
-            const n = leads.filter(l => l.status === s).length
-            const wert = leads.filter(l => l.status === s).reduce((sum, l) => sum + parseFloat(l.wert.replace(/[^0-9.]/g, '') || '0'), 0)
-            return (
-              <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{
-                  minWidth: 110, padding: '10px 14px', borderRadius: 12, textAlign: 'center',
-                  background: n > 0 ? leadStatusColor[s] + '15' : 'rgba(255,255,255,.04)',
-                  border: `1px solid ${n > 0 ? leadStatusColor[s] + '30' : 'rgba(255,255,255,.06)'}`,
-                }}>
-                  <div style={{ fontWeight: 900, fontSize: 20, color: n > 0 ? leadStatusColor[s] : '#4a5568' }}>{n}</div>
-                  <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 1 }}>{s}</div>
-                  {n > 0 && <div style={{ fontSize: 10, color: leadStatusColor[s], marginTop: 2, fontWeight: 700 }}>{wert.toLocaleString('de-DE')} €</div>}
+      {topLeads.length > 0 && (
+        <div className="pk-card" style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#aeb9c8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>Lead Intelligence</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            {topLeads.map(lead => (
+              <div key={lead.id} style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                  <div style={{ fontWeight: 800 }}>{lead.name}</div>
+                  <span className={`badge ${leadStatusBadge[lead.status]}`}>Score {getLeadScore(lead)}</span>
                 </div>
-                {i < 4 && <span style={{ color: '#4a5568', fontSize: 18 }}>›</span>}
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 8 }}>{lead.firma || 'Ohne Firma'} · {lead.quelle}</div>
+                <div style={{ fontSize: 12, color: '#d0d9e8', lineHeight: 1.5 }}>{getLeadAction(lead)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="pk-card" style={{ marginBottom: 16, padding: '16px 20px' }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#aeb9c8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12 }}>Pipeline-Uebersicht</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', overflowX: 'auto' }}>
+          {leadPipeline.slice(0, 5).map((status, index) => {
+            const count = leads.filter(lead => lead.status === status).length
+            const amount = leads.filter(lead => lead.status === status).reduce((sum, lead) => sum + parseCurrency(lead.wert), 0)
+            return (
+              <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ minWidth: 110, padding: '10px 14px', borderRadius: 12, textAlign: 'center', background: count > 0 ? `${leadStatusColor[status]}15` : 'rgba(255,255,255,.04)', border: `1px solid ${count > 0 ? `${leadStatusColor[status]}30` : 'rgba(255,255,255,.06)'}` }}>
+                  <div style={{ fontWeight: 900, fontSize: 20, color: count > 0 ? leadStatusColor[status] : '#4a5568' }}>{count}</div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 1 }}>{status}</div>
+                  {count > 0 && <div style={{ fontSize: 10, color: leadStatusColor[status], marginTop: 2, fontWeight: 700 }}>{formatCurrency(amount)}</div>}
+                </div>
+                {index < 4 && <span style={{ color: '#4a5568', fontSize: 18 }}>›</span>}
               </div>
             )
           })}
@@ -553,24 +968,35 @@ function LeadsTab({ isDemo }: { isDemo: boolean }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input className="pk-input" placeholder="🔍 Leads suchen…" value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 260 }} />
+        <input className="pk-input" placeholder="🔍 Leads suchen..." value={search} onChange={event => setSearch(event.target.value)} style={{ maxWidth: 260 }} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {(['Alle', 'Neu', 'Kontaktiert', 'Qualifiziert', 'Angebot', 'Gewonnen'] as const).map(s => (
-            <button key={s} onClick={() => setFilterStatus(s)} style={{
-              padding: '6px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)',
-              background: filterStatus === s ? 'rgba(245,158,11,.15)' : 'transparent',
-              color: filterStatus === s ? '#fbbf24' : '#aeb9c8', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-            }}>{s} <span style={{ opacity: .6 }}>({counts[s] ?? 0})</span></button>
+          {(['Alle', 'Neu', 'Kontaktiert', 'Qualifiziert', 'Angebot', 'Gewonnen'] as const).map(status => (
+            <button
+              key={status}
+              onClick={() => setFilterStatus(status)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 999,
+                border: '1px solid rgba(255,255,255,.1)',
+                background: filterStatus === status ? 'rgba(245,158,11,.15)' : 'transparent',
+                color: filterStatus === status ? '#fbbf24' : '#aeb9c8',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {status} <span style={{ opacity: 0.6 }}>({counts[status] ?? 0})</span>
+            </button>
           ))}
         </div>
-        <button className="pk-btn" style={{ marginLeft: 'auto', fontSize: 13, background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={() => setShowForm(f => !f)}>
+        <button className="pk-btn" style={{ marginLeft: 'auto', fontSize: 13, background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={() => setShowForm(open => !open)}>
           {showForm ? '✕ Abbrechen' : '+ Neuer Lead'}
         </button>
       </div>
 
       {showForm && (
         <div className="pk-card fade-in" style={{ marginBottom: 20, border: '1px solid rgba(245,158,11,.2)' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>🎯 Neuen Lead anlegen</h3>
+          <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>Neuen Lead anlegen</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>
             {[
               { label: 'Name *', key: 'name', placeholder: 'Vor- und Nachname' },
@@ -579,16 +1005,16 @@ function LeadsTab({ isDemo }: { isDemo: boolean }) {
               { label: 'Telefon', key: 'telefon', placeholder: '040 12345' },
               { label: 'Potenzieller Wert (€)', key: 'wert', placeholder: 'z.B. 5000' },
               { label: 'Betreuer', key: 'betreuer', placeholder: 'Mitarbeitername' },
-            ].map(f => (
-              <div key={f.key}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{f.label}</label>
-                <input className="pk-input" placeholder={f.placeholder} value={(form as Record<string, string>)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
+            ].map(field => (
+              <div key={field.key}>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{field.label}</label>
+                <input className="pk-input" placeholder={field.placeholder} value={(form as Record<string, string>)[field.key]} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
               </div>
             ))}
             <div>
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Quelle</label>
-              <select className="pk-input" value={form.quelle} onChange={e => setForm(p => ({ ...p, quelle: e.target.value }))} style={{ cursor: 'pointer' }}>
-                {['Website', 'Empfehlung', 'Messe', 'Social Media', 'Kaltakquise', 'Sonstiges'].map(q => <option key={q}>{q}</option>)}
+              <select className="pk-input" value={form.quelle} onChange={event => setForm(prev => ({ ...prev, quelle: event.target.value }))}>
+                {['Website', 'Empfehlung', 'Messe', 'Social Media', 'Kaltakquise', 'Sonstiges'].map(source => <option key={source}>{source}</option>)}
               </select>
             </div>
           </div>
@@ -600,30 +1026,33 @@ function LeadsTab({ isDemo }: { isDemo: boolean }) {
         <table className="pk-table">
           <thead>
             <tr>
-              <th>Lead</th><th>Quelle</th><th>Status</th><th>Wert</th><th>Betreuer</th><th>Erstellt</th><th>Aktion</th>
+              <th>Lead</th>
+              <th>Quelle</th>
+              <th>Status</th>
+              <th>Wert</th>
+              <th>Score</th>
+              <th>Betreuer</th>
+              <th>Erstellt</th>
+              <th>Aktion</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map(l => (
-              <tr key={l.id}>
+            {filtered.map(lead => (
+              <tr key={lead.id}>
                 <td>
-                  <div style={{ fontWeight: 700 }}>{l.name}</div>
-                  <div style={{ fontSize: 11, color: '#aeb9c8' }}>{l.firma} · {l.email}</div>
+                  <div style={{ fontWeight: 700 }}>{lead.name}</div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8' }}>{lead.firma || 'Ohne Firma'} · {lead.email}</div>
                 </td>
-                <td><span className="badge badge-gray">{l.quelle}</span></td>
-                <td><span className={`badge ${leadStatusBadge[l.status]}`}>{l.status}</span></td>
-                <td style={{ fontWeight: 700, color: l.status === 'Gewonnen' ? '#4ddb7e' : COLOR }}>{l.wert}</td>
-                <td style={{ color: '#aeb9c8', fontSize: 13 }}>{l.betreuer}</td>
-                <td style={{ color: '#aeb9c8', fontSize: 13 }}>{l.erstellt}</td>
+                <td><span className="badge badge-gray">{lead.quelle}</span></td>
+                <td><span className={`badge ${leadStatusBadge[lead.status]}`}>{lead.status}</span></td>
+                <td style={{ fontWeight: 700, color: lead.status === 'Gewonnen' ? '#4ddb7e' : COLOR }}>{lead.wert}</td>
+                <td style={{ color: '#f8fbff', fontWeight: 700 }}>{getLeadScore(lead)}</td>
+                <td style={{ color: '#aeb9c8', fontSize: 13 }}>{lead.betreuer || '—'}</td>
+                <td style={{ color: '#aeb9c8', fontSize: 13 }}>{lead.erstellt}</td>
                 <td>
-                  {l.status !== 'Gewonnen' && l.status !== 'Verloren' && (
-                    <select
-                      className="pk-input"
-                      style={{ fontSize: 11, padding: '3px 8px', width: 'auto', cursor: 'pointer' }}
-                      value={l.status}
-                      onChange={e => handleStatusChange(l.id, e.target.value as LeadStatus)}
-                    >
-                      {pipeline.map(s => <option key={s}>{s}</option>)}
+                  {lead.status !== 'Gewonnen' && lead.status !== 'Verloren' && (
+                    <select className="pk-input" style={{ fontSize: 11, padding: '3px 8px', width: 'auto', cursor: 'pointer' }} value={lead.status} onChange={event => handleStatusChange(lead.id, event.target.value as LeadStatus)}>
+                      {leadPipeline.map(status => <option key={status}>{status}</option>)}
                     </select>
                   )}
                 </td>
@@ -637,110 +1066,142 @@ function LeadsTab({ isDemo }: { isDemo: boolean }) {
   )
 }
 
-// ── Newsletter-Tab ────────────────────────────────────────────────────────────
-
-function NewsletterTab({ isDemo }: { isDemo: boolean }) {
-  const [newsletter, setNewsletter] = useState<Newsletter[]>(isDemo ? demoNewsletter : [])
+function NewsletterTab({
+  isDemo,
+  kampagnen,
+  newsletter,
+  onChange,
+}: {
+  isDemo: boolean
+  kampagnen: Kampagne[]
+  newsletter: Newsletter[]
+  onChange: (next: Newsletter[]) => void
+}) {
   const [showForm, setShowForm] = useState(false)
   const [toast, setToast] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
-  const [loading, setLoading] = useState(!isDemo)
+  const [statusFilter, setStatusFilter] = useState<'Alle' | NewsletterStatus>('Alle')
   const [form, setForm] = useState({ betreff: '', vorschau: '', datum: '' })
 
-  useEffect(() => {
-    if (isDemo) return
-    getMarketingNewsletter()
-      .then(data => setNewsletter(data as Newsletter[]))
-      .catch(() => setErrorMsg('Fehler beim Laden der Newsletter'))
-      .finally(() => setLoading(false))
-  }, [isDemo])
-
   const showToast = (msg: string, error = false) => {
-    if (error) setErrorMsg(msg); else setToast(msg)
-    setTimeout(() => { setToast(''); setErrorMsg('') }, 4000)
+    if (error) setErrorMsg(msg)
+    else setToast(msg)
+    setTimeout(() => {
+      setToast('')
+      setErrorMsg('')
+    }, 4000)
   }
+
+  const averages = getNewsletterAverages(newsletter)
+  const filtered = newsletter.filter(item => statusFilter === 'Alle' || item.status === statusFilter)
 
   const handleSave = async () => {
     if (!form.betreff) return
-    const newNL: Newsletter = {
-      id: `NL-00${newsletter.length + 1}`, betreff: form.betreff,
-      vorschau: form.vorschau || 'Klicken Sie hier, um mehr zu erfahren…',
-      empfaenger: 312, datum: form.datum || new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-      status: 'Entwurf', oeffnungsrate: 0, klickrate: 0,
+    const newItem: Newsletter = {
+      id: nextId('NL', newsletter.map(item => item.id)),
+      betreff: form.betreff,
+      vorschau: form.vorschau || 'Klicken Sie hier, um mehr zu erfahren...',
+      empfaenger: 312,
+      datum: form.datum || new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      status: 'Entwurf',
+      oeffnungsrate: 0,
+      klickrate: 0,
     }
+
     if (!isDemo) {
-      try { await upsertMarketingNewsletter(newNL) } catch { showToast('Fehler beim Speichern', true); return }
+      try {
+        await upsertMarketingNewsletter(newItem)
+      } catch {
+        showToast('Fehler beim Speichern', true)
+        return
+      }
     }
-    setNewsletter(prev => [newNL, ...prev])
+
+    onChange([newItem, ...newsletter])
     setForm({ betreff: '', vorschau: '', datum: '' })
     setShowForm(false)
-    showToast(`✅ Newsletter "${newNL.betreff.substring(0, 40)}…" als Entwurf gespeichert`)
+    showToast(`✅ Newsletter "${newItem.betreff.substring(0, 40)}" als Entwurf gespeichert`)
   }
 
-  const handleVersenden = async (id: string) => {
-    const nl = newsletter.find(n => n.id === id)
-    const updated = nl ? { ...nl, status: 'Versendet' as const, oeffnungsrate: 34 + Math.random() * 15, klickrate: 10 + Math.random() * 8 } : null
-    if (!isDemo && updated) {
-      try { await upsertMarketingNewsletter(updated) } catch { showToast('Fehler beim Versenden', true); return }
+  const updateNewsletter = async (id: string, updater: (current: Newsletter) => Newsletter, successMessage: string) => {
+    const current = newsletter.find(item => item.id === id)
+    if (!current) return
+    const updatedItem = updater(current)
+
+    if (!isDemo) {
+      try {
+        await upsertMarketingNewsletter(updatedItem)
+      } catch {
+        showToast('Fehler beim Speichern', true)
+        return
+      }
     }
-    setNewsletter(prev => prev.map(n => n.id === id
-      ? { ...n, status: 'Versendet', oeffnungsrate: 34 + Math.random() * 15, klickrate: 10 + Math.random() * 8 }
-      : n
-    ))
-    showToast('✅ Newsletter wurde versendet' + (isDemo ? ' (Demo-Simulation)' : ''))
-  }
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 28, height: 28, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
-        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Newsletter…</div>
-      </div>
-    </div>
-  )
+    onChange(newsletter.map(item => item.id === id ? updatedItem : item))
+    showToast(successMessage)
+  }
 
   return (
     <div>
       {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
 
-      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
           { label: 'Abonnenten', value: '312', icon: '👥', color: COLOR },
-          { label: 'Ø Öffnungsrate', value: '41.7%', icon: '👁️', color: '#10b981' },
-          { label: 'Ø Klickrate', value: '15.6%', icon: '🖱️', color: '#1684ff' },
-          { label: 'Versendet (gesamt)', value: String(newsletter.filter(n => n.status === 'Versendet').length), icon: '📰', color: '#a78bfa' },
-        ].map(s => (
-          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
-            <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
-            <div style={{ fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+          { label: 'Ø Oeffnungsrate', value: `${averages.openRate.toFixed(1)}%`, icon: '👁️', color: '#10b981' },
+          { label: 'Ø Klickrate', value: `${averages.clickRate.toFixed(1)}%`, icon: '🖱️', color: '#1684ff' },
+          { label: 'Geplant + Entwurf', value: String(newsletter.filter(item => item.status !== 'Versendet').length), icon: '🗂️', color: '#a78bfa' },
+        ].map(item => (
+          <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: item.color }}>{item.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
-        <button className="pk-btn" style={{ fontSize: 13, background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={() => setShowForm(f => !f)}>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {(['Alle', 'Entwurf', 'Geplant', 'Versendet'] as const).map(status => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 999,
+                border: '1px solid rgba(255,255,255,.1)',
+                background: statusFilter === status ? 'rgba(245,158,11,.15)' : 'transparent',
+                color: statusFilter === status ? '#fbbf24' : '#aeb9c8',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+        <button className="pk-btn" style={{ fontSize: 13, background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={() => setShowForm(open => !open)}>
           {showForm ? '✕ Abbrechen' : '+ Neuer Newsletter'}
         </button>
       </div>
 
       {showForm && (
         <div className="pk-card fade-in" style={{ marginBottom: 20, border: '1px solid rgba(245,158,11,.2)' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>📰 Neuen Newsletter erstellen</h3>
+          <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>Neuen Newsletter erstellen</h3>
           <div style={{ display: 'grid', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Betreff *</label>
-              <input className="pk-input" placeholder="E-Mail-Betreff eingeben…" value={form.betreff} onChange={e => setForm(p => ({ ...p, betreff: e.target.value }))} />
+              <input className="pk-input" placeholder="E-Mail-Betreff eingeben..." value={form.betreff} onChange={event => setForm(prev => ({ ...prev, betreff: event.target.value }))} />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Vorschautext</label>
-              <input className="pk-input" placeholder="Kurze Vorschau für den Posteingang…" value={form.vorschau} onChange={e => setForm(p => ({ ...p, vorschau: e.target.value }))} />
+              <input className="pk-input" placeholder="Kurze Vorschau fuer den Posteingang..." value={form.vorschau} onChange={event => setForm(prev => ({ ...prev, vorschau: event.target.value }))} />
             </div>
             <div style={{ maxWidth: 260 }}>
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Versanddatum</label>
-              <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.datum} onChange={e => setForm(p => ({ ...p, datum: e.target.value }))} />
+              <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.datum} onChange={event => setForm(prev => ({ ...prev, datum: event.target.value }))} />
             </div>
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
@@ -750,37 +1211,52 @@ function NewsletterTab({ isDemo }: { isDemo: boolean }) {
       )}
 
       <div style={{ display: 'grid', gap: 12 }}>
-        {newsletter.map(n => (
-          <div key={n.id} className="pk-card" style={{ border: `1px solid ${COLOR}15` }}>
+        {filtered.map(item => (
+          <div key={item.id} className="pk-card" style={{ border: `1px solid ${COLOR}15` }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: COLOR + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📰</div>
+              <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: `${COLOR}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📰</div>
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span className={`badge ${n.status === 'Versendet' ? 'badge-green' : n.status === 'Geplant' ? 'badge-blue' : 'badge-gray'}`}>{n.status}</span>
-                  <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#aeb9c8' }}>{n.id}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                  <span className={`badge ${item.status === 'Versendet' ? 'badge-green' : item.status === 'Geplant' ? 'badge-blue' : 'badge-gray'}`}>{item.status}</span>
+                  <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#aeb9c8' }}>{item.id}</span>
                 </div>
-                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{n.betreff}</div>
-                <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: n.status === 'Versendet' ? 10 : 0 }}>
-                  {n.vorschau.substring(0, 80)}… · 📅 {n.datum} · 👥 {n.empfaenger} Empfänger
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{item.betreff}</div>
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: item.status === 'Versendet' ? 10 : 8 }}>
+                  {item.vorschau.substring(0, 80)}... · 📅 {item.datum} · 👥 {item.empfaenger} Empfaenger
                 </div>
-                {n.status === 'Versendet' && (
+                {item.status === 'Versendet' && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <div>
-                      <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 3 }}>Öffnungsrate</div>
-                      <PctBar value={n.oeffnungsrate} color={COLOR} />
+                      <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 3 }}>Oeffnungsrate</div>
+                      <PctBar value={item.oeffnungsrate} color={COLOR} />
                     </div>
                     <div>
                       <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 3 }}>Klickrate</div>
-                      <PctBar value={n.klickrate} color="#1684ff" />
+                      <PctBar value={item.klickrate} color="#1684ff" />
                     </div>
                   </div>
                 )}
               </div>
-              {n.status === 'Entwurf' && (
-                <button onClick={() => handleVersenden(n.id)} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  📤 Jetzt versenden
-                </button>
-              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+                {item.status === 'Entwurf' && (
+                  <button onClick={() => updateNewsletter(item.id, current => ({ ...current, status: 'Geplant' }), '✅ Newsletter wurde eingeplant')} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(22,132,255,.3)', background: 'transparent', color: '#6cb6ff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    📅 Planen
+                  </button>
+                )}
+                {item.status !== 'Versendet' && (
+                  <button
+                    onClick={() => updateNewsletter(item.id, current => ({ ...current, status: 'Versendet', ...createNewsletterMetrics(current, kampagnen) }), `✅ Newsletter wurde versendet${isDemo ? ' (Demo-Simulation)' : ''}`)}
+                    style={{ fontSize: 12, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    📤 Jetzt versenden
+                  </button>
+                )}
+                {item.status === 'Geplant' && (
+                  <button onClick={() => updateNewsletter(item.id, current => ({ ...current, status: 'Entwurf' }), '✅ Newsletter zurueck in Entwurf gesetzt')} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.18)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    ↺ Entwurf
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -789,107 +1265,699 @@ function NewsletterTab({ isDemo }: { isDemo: boolean }) {
   )
 }
 
-// ── Auswertungen-Tab ──────────────────────────────────────────────────────────
+function SeoTab({
+  seoKeywords,
+  onChange,
+}: {
+  seoKeywords: SeoKeyword[]
+  onChange: (next: SeoKeyword[]) => void
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ keyword: '', zielseite: '/marketingpilot', intent: 'Transaktional', suchvolumen: '', schwierigkeit: '', ranking: '', klicks: '' })
+  const [toast, setToast] = useState('')
 
-function AuswertungenTab({ leads, kampagnen }: { leads: Lead[]; kampagnen: Kampagne[] }) {
-  const gesamtLeads = leads.length
-  const gewonneneLeads = leads.filter(l => l.status === 'Gewonnen').length
-  const konvRate = gesamtLeads > 0 ? ((gewonneneLeads / gesamtLeads) * 100).toFixed(1) : '0.0'
-  const pipelineWert = leads.filter(l => !['Gewonnen', 'Verloren'].includes(l.status))
-    .reduce((s, l) => s + parseFloat(l.wert.replace(/[^0-9.]/g, '') || '0'), 0)
+  const avgRanking = seoKeywords.length > 0 ? seoKeywords.reduce((sum, item) => sum + item.ranking, 0) / seoKeywords.length : 0
+  const totalClicks = seoKeywords.reduce((sum, item) => sum + item.klicks, 0)
+  const topChance = [...seoKeywords].sort((a, b) => a.ranking - b.ranking)[0]
 
-  const quellenStats = ['Website', 'Empfehlung', 'Messe', 'Social Media', 'Kaltakquise'].map(q => ({
-    quelle: q,
-    count: leads.filter(l => l.quelle === q).length,
-    gewonnen: leads.filter(l => l.quelle === q && l.status === 'Gewonnen').length,
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3500)
+  }
+
+  const handleSave = () => {
+    if (!form.keyword) return
+    const nextItem: SeoKeyword = {
+      id: nextId('SEO', seoKeywords.map(item => item.id)),
+      keyword: form.keyword,
+      zielseite: form.zielseite,
+      intent: form.intent as SeoIntent,
+      suchvolumen: Number(form.suchvolumen || 0),
+      schwierigkeit: Number(form.schwierigkeit || 0),
+      ranking: Number(form.ranking || 0),
+      klicks: Number(form.klicks || 0),
+      status: 'Neu',
+    }
+    onChange([nextItem, ...seoKeywords])
+    setForm({ keyword: '', zielseite: '/marketingpilot', intent: 'Transaktional', suchvolumen: '', schwierigkeit: '', ranking: '', klicks: '' })
+    setShowForm(false)
+    showToast(`✅ Keyword "${nextItem.keyword}" aufgenommen`)
+  }
+
+  const updateStatus = (id: string, status: SeoStatus) => {
+    onChange(seoKeywords.map(item => item.id === id ? { ...item, status } : item))
+    showToast(`✅ SEO-Status auf "${status}" gesetzt`)
+  }
+
+  return (
+    <div>
+      <Toast msg={toast} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: 'Keywords aktiv', value: String(seoKeywords.length), icon: '🏷️', color: COLOR },
+          { label: 'Gesamt-Klicks', value: String(totalClicks), icon: '🖱️', color: '#1684ff' },
+          { label: 'Ø Ranking', value: avgRanking > 0 ? avgRanking.toFixed(1) : '—', icon: '📈', color: '#10b981' },
+          { label: 'Top-Chance', value: topChance ? topChance.keyword : '—', icon: '🚀', color: '#a78bfa' },
+        ].map(item => (
+          <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
+            <div style={{ fontSize: item.label === 'Top-Chance' ? 14 : 20, fontWeight: 900, color: item.color }}>{item.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="pk-card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 16 }}>SEO-Workspace</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>Keywords, Landingpages, Rankings und naechste Optimierungsschritte direkt im Pilot</div>
+          </div>
+          <button className="pk-btn" style={{ fontSize: 13, background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={() => setShowForm(open => !open)}>
+            {showForm ? '✕ Abbrechen' : '+ Keyword'}
+          </button>
+        </div>
+
+        {showForm && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
+            {[
+              { label: 'Keyword *', key: 'keyword', placeholder: 'z.B. seo marketing pilot' },
+              { label: 'Zielseite', key: 'zielseite', placeholder: '/marketingpilot' },
+              { label: 'Suchvolumen', key: 'suchvolumen', placeholder: '80' },
+              { label: 'Schwierigkeit', key: 'schwierigkeit', placeholder: '45' },
+              { label: 'Ranking', key: 'ranking', placeholder: '12' },
+              { label: 'Klicks', key: 'klicks', placeholder: '18' },
+            ].map(field => (
+              <div key={field.key}>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>{field.label}</label>
+                <input className="pk-input" value={(form as Record<string, string>)[field.key]} placeholder={field.placeholder} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
+              </div>
+            ))}
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Intent</label>
+              <select className="pk-input" value={form.intent} onChange={event => setForm(prev => ({ ...prev, intent: event.target.value }))}>
+                {['Informativ', 'Transaktional', 'Lokal', 'Brand'].map(intent => <option key={intent}>{intent}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button className="pk-btn" style={{ width: '100%', background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={handleSave}>Speichern</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          {seoKeywords.map(item => (
+            <div key={item.id} style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 800 }}>{item.keyword}</div>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>{item.zielseite} · {item.intent} · Ranking {item.ranking}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span className={`badge ${item.status === 'Optimiert' ? 'badge-green' : item.status === 'In Arbeit' ? 'badge-blue' : 'badge-gray'}`}>{item.status}</span>
+                  <select className="pk-input" style={{ width: 'auto', padding: '5px 10px' }} value={item.status} onChange={event => updateStatus(item.id, event.target.value as SeoStatus)}>
+                    {['Neu', 'In Arbeit', 'Optimiert'].map(status => <option key={status}>{status}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
+                {[
+                  { label: 'Volumen', value: item.suchvolumen },
+                  { label: 'Schwierigkeit', value: item.schwierigkeit },
+                  { label: 'Klicks', value: item.klicks },
+                  { label: 'Chance', value: Math.max(0, 100 - item.schwierigkeit + (20 - item.ranking)) },
+                ].map(stat => (
+                  <div key={stat.label} style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.04)' }}>
+                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>{stat.label}</div>
+                    <div style={{ fontWeight: 800, marginTop: 3 }}>{stat.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ContentTab({
+  seoKeywords,
+  contentIdeas,
+  onChange,
+}: {
+  seoKeywords: SeoKeyword[]
+  contentIdeas: ContentIdea[]
+  onChange: (next: ContentIdea[]) => void
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [toast, setToast] = useState('')
+  const [form, setForm] = useState({ titel: '', kanal: 'LinkedIn', ziel: '', keyword: seoKeywords[0]?.keyword ?? '', hook: '', cta: '' })
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3500)
+  }
+
+  const handleSave = () => {
+    if (!form.titel) return
+    const nextItem: ContentIdea = {
+      id: nextId('CNT', contentIdeas.map(item => item.id)),
+      titel: form.titel,
+      kanal: form.kanal as PostingChannel,
+      ziel: form.ziel || 'Sichtbarkeit',
+      keyword: form.keyword,
+      hook: form.hook,
+      cta: form.cta,
+      status: 'Idee',
+    }
+    onChange([nextItem, ...contentIdeas])
+    setForm({ titel: '', kanal: 'LinkedIn', ziel: '', keyword: seoKeywords[0]?.keyword ?? '', hook: '', cta: '' })
+    setShowForm(false)
+    showToast(`✅ Content-Idee "${nextItem.titel}" angelegt`)
+  }
+
+  const updateStatus = (id: string, status: ContentStatus) => {
+    onChange(contentIdeas.map(item => item.id === id ? { ...item, status } : item))
+  }
+
+  return (
+    <div>
+      <Toast msg={toast} />
+      <div className="pk-card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 16 }}>Content-Studio</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>Hooks, Ziele, Keywords und CTA sauber pro Asset ausarbeiten</div>
+          </div>
+          <button className="pk-btn" style={{ fontSize: 13, background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={() => setShowForm(open => !open)}>
+            {showForm ? '✕ Abbrechen' : '+ Content-Idee'}
+          </button>
+        </div>
+
+        {showForm && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 14 }}>
+            {[
+              { label: 'Titel *', key: 'titel', placeholder: 'z.B. LinkedIn Story ueber Prozesschaos' },
+              { label: 'Ziel', key: 'ziel', placeholder: 'Leadaufbau' },
+              { label: 'Hook', key: 'hook', placeholder: 'Viele Teams verlieren Geld durch...' },
+              { label: 'CTA', key: 'cta', placeholder: 'Demo buchen' },
+            ].map(field => (
+              <div key={field.key}>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>{field.label}</label>
+                <input className="pk-input" value={(form as Record<string, string>)[field.key]} placeholder={field.placeholder} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
+              </div>
+            ))}
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Kanal</label>
+              <select className="pk-input" value={form.kanal} onChange={event => setForm(prev => ({ ...prev, kanal: event.target.value }))}>
+                {['LinkedIn', 'Instagram', 'Facebook', 'Newsletter', 'Blog', 'WhatsApp'].map(channel => <option key={channel}>{channel}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Keyword</label>
+              <select className="pk-input" value={form.keyword} onChange={event => setForm(prev => ({ ...prev, keyword: event.target.value }))}>
+                {seoKeywords.map(item => <option key={item.id} value={item.keyword}>{item.keyword}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button className="pk-btn" style={{ width: '100%', background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={handleSave}>Speichern</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          {contentIdeas.map(item => (
+            <div key={item.id} style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 800 }}>{item.titel}</div>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>{item.kanal} · Ziel: {item.ziel} · Keyword: {item.keyword}</div>
+                </div>
+                <select className="pk-input" style={{ width: 'auto', padding: '5px 10px' }} value={item.status} onChange={event => updateStatus(item.id, event.target.value as ContentStatus)}>
+                  {['Idee', 'In Arbeit', 'Freigabe', 'Fertig'].map(status => <option key={status}>{status}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.04)' }}>
+                  <div style={{ fontSize: 11, color: '#aeb9c8' }}>Hook</div>
+                  <div style={{ marginTop: 4, fontSize: 13 }}>{item.hook || 'Noch kein Hook hinterlegt'}</div>
+                </div>
+                <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.04)' }}>
+                  <div style={{ fontSize: 11, color: '#aeb9c8' }}>CTA</div>
+                  <div style={{ marginTop: 4, fontSize: 13 }}>{item.cta || 'Noch kein CTA hinterlegt'}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PostingTab({
+  postingPlans,
+  contentIdeas,
+  onChange,
+}: {
+  postingPlans: PostingPlan[]
+  contentIdeas: ContentIdea[]
+  onChange: (next: PostingPlan[]) => void
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [toast, setToast] = useState('')
+  const [form, setForm] = useState({ titel: '', kanal: 'LinkedIn', datum: '', owner: 'Marketing', quelle: contentIdeas[0]?.id ?? '' })
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3500)
+  }
+
+  const handleSave = () => {
+    if (!form.titel || !form.datum) return
+    const nextItem: PostingPlan = {
+      id: nextId('PST', postingPlans.map(item => item.id)),
+      titel: form.titel,
+      kanal: form.kanal as PostingChannel,
+      datum: form.datum,
+      status: 'Entwurf',
+      owner: form.owner,
+      quelle: form.quelle || 'Manuell',
+    }
+    onChange([nextItem, ...postingPlans])
+    setForm({ titel: '', kanal: 'LinkedIn', datum: '', owner: 'Marketing', quelle: contentIdeas[0]?.id ?? '' })
+    setShowForm(false)
+    showToast(`✅ Posting "${nextItem.titel}" angelegt`)
+  }
+
+  const updateStatus = (id: string, status: PostingStatus) => {
+    onChange(postingPlans.map(item => item.id === id ? { ...item, status } : item))
+  }
+
+  return (
+    <div>
+      <Toast msg={toast} />
+      <div className="pk-card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 16 }}>Posting-Planung</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>Kalender, Status und Verantwortliche fuer alle Kanaele in einer Liste</div>
+          </div>
+          <button className="pk-btn" style={{ fontSize: 13, background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={() => setShowForm(open => !open)}>
+            {showForm ? '✕ Abbrechen' : '+ Posting'}
+          </button>
+        </div>
+
+        {showForm && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 14 }}>
+            {[
+              { label: 'Titel *', key: 'titel', placeholder: 'z.B. LinkedIn Case Study' },
+              { label: 'Datum *', key: 'datum', placeholder: '18.05.2026' },
+              { label: 'Owner', key: 'owner', placeholder: 'Marketing' },
+            ].map(field => (
+              <div key={field.key}>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>{field.label}</label>
+                <input className="pk-input" value={(form as Record<string, string>)[field.key]} placeholder={field.placeholder} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
+              </div>
+            ))}
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Kanal</label>
+              <select className="pk-input" value={form.kanal} onChange={event => setForm(prev => ({ ...prev, kanal: event.target.value }))}>
+                {['LinkedIn', 'Instagram', 'Facebook', 'Newsletter', 'Blog', 'WhatsApp'].map(channel => <option key={channel}>{channel}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Quelle</label>
+              <select className="pk-input" value={form.quelle} onChange={event => setForm(prev => ({ ...prev, quelle: event.target.value }))}>
+                <option value="Manuell">Manuell</option>
+                {contentIdeas.map(item => <option key={item.id} value={item.id}>{item.titel}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button className="pk-btn" style={{ width: '100%', background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={handleSave}>Speichern</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          {postingPlans.map(item => (
+            <div key={item.id} style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 800 }}>{item.titel}</div>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>{item.kanal} · {item.datum} · Owner: {item.owner}</div>
+                </div>
+                <select className="pk-input" style={{ width: 'auto', padding: '5px 10px' }} value={item.status} onChange={event => updateStatus(item.id, event.target.value as PostingStatus)}>
+                  {['Entwurf', 'Geplant', 'Veroeffentlicht'].map(status => <option key={status}>{status}</option>)}
+                </select>
+              </div>
+              <div style={{ fontSize: 12, color: '#d0d9e8' }}>Quelle: {contentIdeas.find(content => content.id === item.quelle)?.titel ?? item.quelle}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AutomationenTab({
+  automationRules,
+  leads,
+  onChange,
+}: {
+  automationRules: AutomationRule[]
+  leads: Lead[]
+  onChange: (next: AutomationRule[]) => void
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [toast, setToast] = useState('')
+  const [form, setForm] = useState({ name: '', trigger: '', aktion: '', kanal: 'CRM', owner: 'Marketing' })
+
+  const hotLeads = leads.filter(lead => getLeadScore(lead) >= 75 && !['Gewonnen', 'Verloren'].includes(lead.status))
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3500)
+  }
+
+  const handleSave = () => {
+    if (!form.name || !form.trigger) return
+    const nextItem: AutomationRule = {
+      id: nextId('AUT', automationRules.map(item => item.id)),
+      name: form.name,
+      trigger: form.trigger,
+      aktion: form.aktion,
+      kanal: form.kanal as AutomationRule['kanal'],
+      owner: form.owner,
+      status: 'Entwurf',
+    }
+    onChange([nextItem, ...automationRules])
+    setForm({ name: '', trigger: '', aktion: '', kanal: 'CRM', owner: 'Marketing' })
+    setShowForm(false)
+    showToast(`✅ Automation "${nextItem.name}" angelegt`)
+  }
+
+  return (
+    <div>
+      <Toast msg={toast} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: 'Aktive Regeln', value: String(automationRules.filter(item => item.status === 'Aktiv').length), icon: '⚙️', color: COLOR },
+          { label: 'Heisse Leads', value: String(hotLeads.length), icon: '🔥', color: '#25d366' },
+          { label: 'Entwuerfe', value: String(automationRules.filter(item => item.status === 'Entwurf').length), icon: '📝', color: '#a78bfa' },
+        ].map(item => (
+          <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: item.color }}>{item.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {hotLeads.length > 0 && (
+        <div className="pk-card" style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 12 }}>Follow-up Queue</div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {hotLeads.slice(0, 5).map(lead => (
+              <div key={lead.id} style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontWeight: 800 }}>{lead.name} · Score {getLeadScore(lead)}</div>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>{lead.firma || 'Ohne Firma'} · {lead.status} · {lead.quelle}</div>
+                </div>
+                <div style={{ fontSize: 12, color: '#d0d9e8', maxWidth: 320 }}>{getLeadAction(lead)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="pk-card" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 16 }}>Automationen & Follow-up</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>Fuer Leads, Newsletter und Vertriebsaktionen vorbereitete Regeln im Pilot</div>
+          </div>
+          <button className="pk-btn" style={{ fontSize: 13, background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={() => setShowForm(open => !open)}>
+            {showForm ? '✕ Abbrechen' : '+ Automation'}
+          </button>
+        </div>
+
+        {showForm && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 14 }}>
+            {[
+              { label: 'Name *', key: 'name', placeholder: 'Lead-Follow-up' },
+              { label: 'Trigger *', key: 'trigger', placeholder: 'Lead wechselt auf Angebot' },
+              { label: 'Aktion', key: 'aktion', placeholder: 'WhatsApp + Aufgabe erstellen' },
+              { label: 'Owner', key: 'owner', placeholder: 'Vertrieb' },
+            ].map(field => (
+              <div key={field.key}>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>{field.label}</label>
+                <input className="pk-input" value={(form as Record<string, string>)[field.key]} placeholder={field.placeholder} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
+              </div>
+            ))}
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Kanal</label>
+              <select className="pk-input" value={form.kanal} onChange={event => setForm(prev => ({ ...prev, kanal: event.target.value }))}>
+                {['CRM', 'E-Mail', 'WhatsApp', 'LinkedIn'].map(channel => <option key={channel}>{channel}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button className="pk-btn" style={{ width: '100%', background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={handleSave}>Speichern</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          {automationRules.map(item => (
+            <div key={item.id} style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 800 }}>{item.name}</div>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>Trigger: {item.trigger}</div>
+                </div>
+                <select className="pk-input" style={{ width: 'auto', padding: '5px 10px' }} value={item.status} onChange={event => onChange(automationRules.map(rule => rule.id === item.id ? { ...rule, status: event.target.value as AutomationStatus } : rule))}>
+                  {['Aktiv', 'Entwurf', 'Pausiert'].map(status => <option key={status}>{status}</option>)}
+                </select>
+              </div>
+              <div style={{ fontSize: 13, color: '#d0d9e8', marginBottom: 4 }}>{item.aktion || 'Aktion noch offen'}</div>
+              <div style={{ fontSize: 12, color: '#aeb9c8' }}>{item.kanal} · Owner: {item.owner}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function IntegrationenTab({
+  integrationItems,
+  onChange,
+}: {
+  integrationItems: IntegrationItem[]
+  onChange: (next: IntegrationItem[]) => void
+}) {
+  return (
+    <div>
+      <div className="pk-card">
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontWeight: 900, fontSize: 16 }}>Integrationen vorbereiten</div>
+          <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>CRM, Ads, WhatsApp und SEO-Schnittstellen als echter Arbeitsbereich fuer den weiteren Ausbau</div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+          {integrationItems.map(item => (
+            <div key={item.id} style={{ padding: '16px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8, alignItems: 'center' }}>
+                <div style={{ fontWeight: 800 }}>{item.name}</div>
+                <select className="pk-input" style={{ width: 'auto', padding: '5px 10px' }} value={item.status} onChange={event => onChange(integrationItems.map(current => current.id === item.id ? { ...current, status: event.target.value as IntegrationStatus } : current))}>
+                  {['Nicht gestartet', 'Vorbereitet', 'In Umsetzung', 'Live'].map(status => <option key={status}>{status}</option>)}
+                </select>
+              </div>
+              <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 8 }}>Datenbasis: {item.datenbasis}</div>
+              <div style={{ fontSize: 13, color: '#d0d9e8', marginBottom: 6 }}>{item.naechsterSchritt}</div>
+              <div style={{ fontSize: 12, color: '#aeb9c8' }}>Letzter Sync: {item.letzterSync}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AuswertungenTab({
+  leads,
+  kampagnen,
+  newsletter,
+  seoKeywords,
+  contentIdeas,
+  postingPlans,
+}: {
+  leads: Lead[]
+  kampagnen: Kampagne[]
+  newsletter: Newsletter[]
+  seoKeywords: SeoKeyword[]
+  contentIdeas: ContentIdea[]
+  postingPlans: PostingPlan[]
+}) {
+  const totalLeads = leads.length
+  const wonLeads = leads.filter(lead => lead.status === 'Gewonnen').length
+  const conversionRate = totalLeads > 0 ? ((wonLeads / totalLeads) * 100).toFixed(1) : '0.0'
+  const pipelineValue = leads.filter(lead => !['Gewonnen', 'Verloren'].includes(lead.status)).reduce((sum, lead) => sum + parseCurrency(lead.wert), 0)
+  const averages = getNewsletterAverages(newsletter)
+  const avgSeoRanking = seoKeywords.length > 0 ? seoKeywords.reduce((sum, item) => sum + item.ranking, 0) / seoKeywords.length : 0
+  const publishedPosts = postingPlans.filter(item => item.status === 'Veroeffentlicht').length
+  const readyContent = contentIdeas.filter(item => item.status === 'Fertig').length
+
+  const sourceStats = ['Website', 'Empfehlung', 'Messe', 'Social Media', 'Kaltakquise'].map(source => ({
+    quelle: source,
+    count: leads.filter(lead => lead.quelle === source).length,
+    gewonnen: leads.filter(lead => lead.quelle === source && lead.status === 'Gewonnen').length,
   }))
+
+  const campaignPerformance = kampagnen
+    .filter(item => item.empfaenger > 0)
+    .map(item => ({
+      id: item.id,
+      name: item.name,
+      openRate: item.empfaenger > 0 ? (item.geoeffnet / item.empfaenger) * 100 : 0,
+      clickRate: item.geoeffnet > 0 ? (item.geklickt / item.geoeffnet) * 100 : 0,
+      conversionRate: item.geklickt > 0 ? (item.konversionen / item.geklickt) * 100 : 0,
+    }))
 
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Leads gesamt', value: String(gesamtLeads), icon: '🎯', color: COLOR },
-          { label: 'Gewonnen', value: String(gewonneneLeads), icon: '🏆', color: '#10b981' },
-          { label: 'Konversionsrate', value: `${konvRate}%`, icon: '📈', color: '#1684ff' },
-          { label: 'Pipeline-Wert', value: `${pipelineWert.toLocaleString('de-DE')} €`, icon: '💶', color: '#a78bfa' },
-          { label: 'Aktive Kampagnen', value: String(kampagnen.filter(k => k.status === 'Aktiv').length), icon: '📣', color: COLOR },
-          { label: 'Ø Öffnungsrate', value: '41.7%', icon: '👁️', color: '#10b981' },
-        ].map(s => (
-          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
-            <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
-            <div style={{ fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+          { label: 'Leads gesamt', value: String(totalLeads), icon: '🎯', color: COLOR },
+          { label: 'Gewonnen', value: String(wonLeads), icon: '🏆', color: '#10b981' },
+          { label: 'Konversionsrate', value: `${conversionRate}%`, icon: '📈', color: '#1684ff' },
+          { label: 'Pipeline-Wert', value: formatCurrency(pipelineValue), icon: '💶', color: '#a78bfa' },
+          { label: 'Aktive Kampagnen', value: String(kampagnen.filter(item => item.status === 'Aktiv').length), icon: '📣', color: COLOR },
+          { label: 'Ø Oeffnungsrate', value: `${averages.openRate.toFixed(1)}%`, icon: '👁️', color: '#10b981' },
+          { label: 'Ø SEO-Ranking', value: avgSeoRanking > 0 ? avgSeoRanking.toFixed(1) : '—', icon: '🔎', color: '#6cb6ff' },
+          { label: 'Content fertig', value: String(readyContent), icon: '✍️', color: '#f472b6' },
+          { label: 'Posts live', value: String(publishedPosts), icon: '📅', color: '#f97316' },
+        ].map(item => (
+          <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: item.color }}>{item.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
         <div className="pk-card">
-          <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📊 Leads nach Quelle</h3>
-          {quellenStats.filter(q => q.count > 0).map(q => (
-            <div key={q.quelle} style={{ marginBottom: 14 }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>Leads nach Quelle</h3>
+          {sourceStats.filter(item => item.count > 0).map(item => (
+            <div key={item.quelle} style={{ marginBottom: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 13 }}>
-                <span style={{ fontWeight: 600 }}>{q.quelle}</span>
-                <span style={{ color: '#aeb9c8' }}>{q.count} Leads · {q.gewonnen} gewonnen</span>
+                <span style={{ fontWeight: 600 }}>{item.quelle}</span>
+                <span style={{ color: '#aeb9c8' }}>{item.count} Leads · {item.gewonnen} gewonnen</span>
               </div>
-              <PctBar value={gesamtLeads > 0 ? (q.count / gesamtLeads) * 100 : 0} color={COLOR} />
+              <PctBar value={totalLeads > 0 ? (item.count / totalLeads) * 100 : 0} color={COLOR} />
             </div>
           ))}
         </div>
 
         <div className="pk-card">
-          <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📣 Kampagnen-Performance</h3>
-          {kampagnen.filter(k => k.empfaenger > 0).map(k => {
-            const rate = ((k.geoeffnet / k.empfaenger) * 100).toFixed(1)
-            return (
-              <div key={k.id} style={{ marginBottom: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 13 }}>
-                  <span style={{ fontWeight: 600 }}>{k.name}</span>
-                  <span style={{ color: '#aeb9c8' }}>{rate}% Öffnungsrate</span>
-                </div>
-                <PctBar value={parseFloat(rate)} color={COLOR} />
+          <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>Kampagnen-Performance</h3>
+          {campaignPerformance.map(item => (
+            <div key={item.id} style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
+                <span style={{ fontWeight: 600 }}>{item.name}</span>
+                <span style={{ color: '#aeb9c8' }}>{item.openRate.toFixed(1)}% Oeffnungsrate</span>
               </div>
-            )
-          })}
+              <PctBar value={item.openRate} color={COLOR} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6, fontSize: 12, color: '#aeb9c8' }}>
+                <span>Klickrate: {item.clickRate.toFixed(1)}%</span>
+                <span>Conversion: {item.conversionRate.toFixed(1)}%</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="pk-card">
+          <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>Newsletter-Funnel</h3>
+          {[
+            { label: 'Entwurf', value: newsletter.filter(item => item.status === 'Entwurf').length, color: '#aeb9c8' },
+            { label: 'Geplant', value: newsletter.filter(item => item.status === 'Geplant').length, color: '#1684ff' },
+            { label: 'Versendet', value: newsletter.filter(item => item.status === 'Versendet').length, color: '#25d366' },
+          ].map(item => (
+            <div key={item.label} style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 13 }}>
+                <span style={{ fontWeight: 600 }}>{item.label}</span>
+                <span style={{ color: item.color, fontWeight: 700 }}>{item.value}</span>
+              </div>
+              <PctBar value={newsletter.length > 0 ? (item.value / newsletter.length) * 100 : 0} color={item.color} />
+            </div>
+          ))}
+        </div>
+
+        <div className="pk-card">
+          <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>SEO & Content-Fortschritt</h3>
+          <div style={{ display: 'grid', gap: 12 }}>
+            {seoKeywords.slice(0, 4).map(item => (
+              <div key={item.id}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 13 }}>
+                  <span style={{ fontWeight: 600 }}>{item.keyword}</span>
+                  <span style={{ color: '#aeb9c8' }}>Ranking {item.ranking}</span>
+                </div>
+                <PctBar value={Math.max(0, 100 - item.ranking * 4)} color="#6cb6ff" />
+              </div>
+            ))}
+            <div style={{ marginTop: 4, fontSize: 12, color: '#aeb9c8' }}>
+              {contentIdeas.filter(item => item.status === 'In Arbeit' || item.status === 'Freigabe').length} Content-Stuecke sind gerade in Arbeit oder Freigabe.
+            </div>
+          </div>
         </div>
       </div>
     </div>
   )
 }
-
-// ── Haupt-Seite ───────────────────────────────────────────────────────────────
-
-type Tab = 'demo-lab' | 'kampagnen' | 'leads' | 'newsletter' | 'auswertungen'
 
 export default function MarketingPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
   const [tab, setTab] = useState<Tab>('demo-lab')
   const [kampagnen, setKampagnen] = useState<Kampagne[]>(isDemo ? demoKampagnen : [])
   const [leads, setLeads] = useState<Lead[]>(isDemo ? demoLeads : [])
+  const [newsletter, setNewsletter] = useState<Newsletter[]>(isDemo ? demoNewsletter : [])
+  const [seoKeywords, setSeoKeywords] = useLocalStorageState<SeoKeyword[]>('marketingpilot-seo-keywords', defaultSeoKeywords)
+  const [contentIdeas, setContentIdeas] = useLocalStorageState<ContentIdea[]>('marketingpilot-content-ideas', defaultContentIdeas)
+  const [postingPlans, setPostingPlans] = useLocalStorageState<PostingPlan[]>('marketingpilot-posting-plans', defaultPostingPlans)
+  const [automationRules, setAutomationRules] = useLocalStorageState<AutomationRule[]>('marketingpilot-automation-rules', defaultAutomationRules)
+  const [integrationItems, setIntegrationItems] = useLocalStorageState<IntegrationItem[]>('marketingpilot-integration-items', defaultIntegrationItems)
   const [loading, setLoading] = useState(!isDemo)
   const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
     if (isDemo) return
-    Promise.all([getMarketingKampagnen(), getMarketingLeads()])
-      .then(([k, l]) => { setKampagnen(k as Kampagne[]); setLeads(l as Lead[]) })
+    Promise.all([getMarketingKampagnen(), getMarketingLeads(), getMarketingNewsletter()])
+      .then(([campaignRows, leadRows, newsletterRows]) => {
+        setKampagnen(campaignRows as Kampagne[])
+        setLeads(leadRows as Lead[])
+        setNewsletter(newsletterRows as Newsletter[])
+      })
       .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
   }, [isDemo])
 
-  const aktiveKampagnen = kampagnen.filter(k => k.status === 'Aktiv').length
-  const neueLeads = leads.filter(l => l.status === 'Neu').length
-  const gesamtLeads = leads.length
-  const gesamtEmpfaenger = 1240
+  const activeCampaigns = kampagnen.filter(item => item.status === 'Aktiv').length
+  const newLeads = leads.filter(item => item.status === 'Neu').length
+  const totalLeads = leads.length
+  const sentEmails = newsletter.filter(item => item.status === 'Versendet').reduce((sum, item) => sum + item.empfaenger, 0)
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 32, height: 32, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
-        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade MarketingPilot…</div>
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 32, height: 32, border: `3px solid ${COLOR}40`, borderTopColor: COLOR, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
+          <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade MarketingPilot...</div>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   return (
     <div className="fade-in">
@@ -906,15 +1974,15 @@ export default function MarketingPilotPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 22 }}>
         {[
-          { label: 'Aktive Kampagnen', value: String(aktiveKampagnen), icon: '📣', color: COLOR },
-          { label: 'Neue Leads', value: String(neueLeads), icon: '🎯', color: '#f43f5e' },
-          { label: 'Leads gesamt', value: String(gesamtLeads), icon: '👥', color: '#1684ff' },
-          { label: 'E-Mails versendet', value: gesamtEmpfaenger.toLocaleString('de-DE'), icon: '✉️', color: '#10b981' },
-        ].map(s => (
-          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
-            <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+          { label: 'Aktive Kampagnen', value: String(activeCampaigns), icon: '📣', color: COLOR },
+          { label: 'Neue Leads', value: String(newLeads), icon: '🎯', color: '#f43f5e' },
+          { label: 'Leads gesamt', value: String(totalLeads), icon: '👥', color: '#1684ff' },
+          { label: 'E-Mails versendet', value: sentEmails.toLocaleString('de-DE'), icon: '✉️', color: '#10b981' },
+        ].map(item => (
+          <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
+            <div style={{ fontSize: 22, marginBottom: 4 }}>{item.icon}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: item.color }}>{item.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
           </div>
         ))}
       </div>
@@ -922,24 +1990,47 @@ export default function MarketingPilotPage() {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
         {([
           { id: 'demo-lab', label: '🚀 KI-Suite' },
+          { id: 'seo', label: '🔎 SEO' },
+          { id: 'content', label: '✍️ Content' },
+          { id: 'posting', label: '📅 Posting' },
+          { id: 'automationen', label: '⚙️ Automationen' },
+          { id: 'integrationen', label: '🔌 Integrationen' },
           { id: 'kampagnen', label: '📣 Kampagnen' },
           { id: 'leads', label: '🎯 Leads' },
           { id: 'newsletter', label: '📰 Newsletter' },
           { id: 'auswertungen', label: '📊 Auswertungen' },
-        ] as const).map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: '10px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-            background: 'transparent', borderBottom: tab === t.id ? `2px solid ${COLOR}` : '2px solid transparent',
-            color: tab === t.id ? '#fbbf24' : '#aeb9c8', marginBottom: -1, transition: 'color .15s',
-          }}>{t.label}</button>
+        ] as const).map(item => (
+          <button
+            key={item.id}
+            onClick={() => setTab(item.id)}
+            style={{
+              padding: '10px 16px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 600,
+              background: 'transparent',
+              borderBottom: tab === item.id ? `2px solid ${COLOR}` : '2px solid transparent',
+              color: tab === item.id ? '#fbbf24' : '#aeb9c8',
+              marginBottom: -1,
+              transition: 'color .15s',
+            }}
+          >
+            {item.label}
+          </button>
         ))}
       </div>
 
-      {tab === 'demo-lab' && <DemoLabTab />}
-      {tab === 'kampagnen' && <KampagnenTab isDemo={isDemo} />}
-      {tab === 'leads' && <LeadsTab isDemo={isDemo} />}
-      {tab === 'newsletter' && <NewsletterTab isDemo={isDemo} />}
-      {tab === 'auswertungen' && <AuswertungenTab leads={leads} kampagnen={kampagnen} />}
+      {tab === 'demo-lab' && <DemoLabTab kampagnen={kampagnen} leads={leads} newsletter={newsletter} onJump={setTab} />}
+      {tab === 'seo' && <SeoTab seoKeywords={seoKeywords} onChange={setSeoKeywords} />}
+      {tab === 'content' && <ContentTab seoKeywords={seoKeywords} contentIdeas={contentIdeas} onChange={setContentIdeas} />}
+      {tab === 'posting' && <PostingTab postingPlans={postingPlans} contentIdeas={contentIdeas} onChange={setPostingPlans} />}
+      {tab === 'automationen' && <AutomationenTab automationRules={automationRules} leads={leads} onChange={setAutomationRules} />}
+      {tab === 'integrationen' && <IntegrationenTab integrationItems={integrationItems} onChange={setIntegrationItems} />}
+      {tab === 'kampagnen' && <KampagnenTab isDemo={isDemo} kampagnen={kampagnen} onChange={setKampagnen} />}
+      {tab === 'leads' && <LeadsTab isDemo={isDemo} leads={leads} onChange={setLeads} />}
+      {tab === 'newsletter' && <NewsletterTab isDemo={isDemo} kampagnen={kampagnen} newsletter={newsletter} onChange={setNewsletter} />}
+      {tab === 'auswertungen' && <AuswertungenTab leads={leads} kampagnen={kampagnen} newsletter={newsletter} seoKeywords={seoKeywords} contentIdeas={contentIdeas} postingPlans={postingPlans} />}
     </div>
   )
 }
