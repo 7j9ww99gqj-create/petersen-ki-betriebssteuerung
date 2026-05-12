@@ -3,13 +3,21 @@
 import { useEffect, useState } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
 import {
+  getMarketingAutomationRules,
   getMarketingKampagnen,
+  getMarketingContentIdeas,
+  getMarketingIntegrationItems,
   getMarketingLeads,
   getMarketingNewsletter,
+  getMarketingPostingPlans,
   getMarketingSeoKeywords,
+  upsertMarketingAutomationRule,
   upsertMarketingKampagne,
+  upsertMarketingContentIdea,
+  upsertMarketingIntegrationItem,
   upsertMarketingLead,
   upsertMarketingNewsletter,
+  upsertMarketingPostingPlan,
   upsertMarketingSeoKeyword,
 } from '@/lib/db'
 
@@ -275,25 +283,30 @@ function useLocalStorageState<T>(key: string, initialValue: T) {
   const [state, setState] = useState<T>(initialValue)
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
     try {
       const saved = window.localStorage.getItem(key)
       if (saved) setState(JSON.parse(saved) as T)
     } catch {
-      // local fallback keeps the page usable even if storage is blocked
+      // Lokaler Fallback bleibt beim Initialwert.
     }
   }, [key])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
     try {
       window.localStorage.setItem(key, JSON.stringify(state))
     } catch {
-      // ignore storage failures and keep runtime state only
+      // Schreibfehler im Browser still ignorieren.
     }
   }, [key, state])
 
   return [state, setState] as const
+}
+
+function findChangedItem<T extends { id: string }>(next: T[], current: T[]) {
+  return next.find(item => {
+    const existing = current.find(currentItem => currentItem.id === item.id)
+    return !existing || JSON.stringify(existing) !== JSON.stringify(item)
+  })
 }
 
 function nextId(prefix: string, ids: string[]) {
