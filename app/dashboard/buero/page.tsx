@@ -27,18 +27,18 @@ type Kunde = {
 }
 
 type Angebot = {
-  id: string; kunde: string; titel: string; betrag: string; datum: string
+  id: string; kunde_id?: string; kunde: string; titel: string; betrag: string; datum: string
   gueltig: string; status: 'Entwurf' | 'Versendet' | 'Akzeptiert' | 'Abgelehnt'
 }
 
 type Auftrag = {
-  id: string; kunde: string; beschreibung: string; wert: string
+  id: string; kunde_id?: string; kunde: string; beschreibung: string; wert: string
   start: string; ende: string; status: 'In Bearbeitung' | 'Abgeschlossen' | 'Geplant' | 'Pausiert'
   fortschritt: number
 }
 
 type Rechnung = {
-  id: string; kunde: string; betrag: string; faellig: string
+  id: string; kunde_id?: string; kunde: string; betrag: string; faellig: string
   erstellt: string; status: 'Offen' | 'Bezahlt' | 'Überfällig' | 'Mahnung'
   bezahltAm?: string
 }
@@ -57,6 +57,7 @@ type EingangsrechnungStatus = 'offen' | 'geprüft' | 'freigegeben' | 'bezahlt' |
 
 type Eingangsrechnung = {
   id: string
+  lieferant_id?: string
   lieferant: string
   rechnungsnummer?: string
   rechnungsdatum?: string
@@ -687,9 +688,11 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
     if (!form.kunde || !form.titel || !form.betrag) return
     const today = new Date()
     const firmaDefaults = getLocalFirmaDefaults()
+    const kunde = kunden.find(entry => entry.name === form.kunde)
     const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const newAng: Angebot = {
       id: `ANG-2025-0${43 + angebote.length - demoAngebote.length}`,
+      kunde_id: kunde?.id,
       kunde: form.kunde, titel: form.titel,
       betrag: form.betrag.includes('€') ? form.betrag : `${form.betrag} €`,
       datum: fmt(today),
@@ -960,6 +963,9 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                       <button onClick={e => { e.stopPropagation(); generateAngebotPDF(a, a.kunde) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
                         📄 PDF
                       </button>
+                      <button onClick={e => { e.stopPropagation(); window.location.href = `/dashboard/buero/angebote/${encodeURIComponent(a.id)}` }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>
+                        ↗ Details
+                      </button>
                       <button onClick={e => { e.stopPropagation(); openEdit(a) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
                         ✏️
                       </button>
@@ -1057,8 +1063,10 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
     if (!form.kunde || !form.beschreibung || !form.wert) return
     const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const today = new Date()
+    const kunde = kunden.find(entry => entry.name === form.kunde)
     const newA: Auftrag = {
       id: `A-2025-0${35 + auftraege.length}`,
+      kunde_id: kunde?.id,
       kunde: form.kunde, beschreibung: form.beschreibung,
       wert: form.wert.includes('€') ? form.wert : `${form.wert} €`,
       start: form.start || fmt(today),
@@ -1273,6 +1281,9 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
               <button onClick={e => { e.stopPropagation(); openEdit(a) }} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
                 ✏️ Bearbeiten
               </button>
+              <button onClick={e => { e.stopPropagation(); window.location.href = `/dashboard/buero/auftraege/${encodeURIComponent(a.id)}` }} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>
+                ↗ Details
+              </button>
               {deleteId === a.id ? (
                 <DeleteConfirm label={a.id} onConfirm={() => handleDelete(a.id)} onCancel={() => setDeleteId(null)} />
               ) : (
@@ -1390,9 +1401,11 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
     if (!form.kunde || !form.betrag) return
     const today = new Date()
     const firmaDefaults = getLocalFirmaDefaults()
+    const kunde = kunden.find(entry => entry.name === form.kunde)
     const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const newRe: Rechnung = {
       id: `RE-2025-0${79 + rechnungen.length - demoRechnungen.length}`,
+      kunde_id: kunde?.id,
       kunde: form.kunde,
       betrag: form.betrag.includes('€') ? form.betrag : `${form.betrag} €`,
       faellig: form.faellig || fmt(new Date(today.getTime() + firmaDefaults.zahlungsziel_tage * 86400000)),
@@ -1637,6 +1650,9 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
                       <button onClick={e => { e.stopPropagation(); generateRechnungPDF(r, r.kunde) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
                         📄 PDF
                       </button>
+                      <button onClick={e => { e.stopPropagation(); window.location.href = `/dashboard/buero/rechnungen/${encodeURIComponent(r.id)}` }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>
+                        ↗ Details
+                      </button>
                       <button onClick={e => { e.stopPropagation(); openEdit(r) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
                         ✏️
                       </button>
@@ -1668,6 +1684,7 @@ const emptyEingangsForm = {
 
 function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean; initialFilterStatus?: string }) {
   const [rechnungen, setRechnungen] = useState<Eingangsrechnung[]>(isDemo ? demoEingangsrechnungen : [])
+  const [lieferantenStamm, setLieferantenStamm] = useState<Lieferant[]>(isDemo ? demoLieferanten : [])
   const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [loading, setLoading] = useState(!isDemo)
   const [toast, setToast] = useState('')
@@ -1691,10 +1708,11 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
 
   useEffect(() => {
     if (isDemo) return
-    Promise.all([getBueroEingangsrechnungen(), getBueroDokumente()])
-      .then(([rechnungenData, dokumenteData]) => {
+    Promise.all([getBueroEingangsrechnungen(), getBueroDokumente(), getEinkaufLieferanten()])
+      .then(([rechnungenData, dokumenteData, lieferantenData]) => {
         setRechnungen(rechnungenData as Eingangsrechnung[])
         setDokumente(dokumenteData as Dokument[])
+        setLieferantenStamm(lieferantenData as Lieferant[])
       })
       .catch(() => showToast('Fehler beim Laden der Eingangsrechnungen', true))
       .finally(() => setLoading(false))
@@ -1793,8 +1811,10 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
   const save = async () => {
     if (!form.lieferant.trim()) { showToast('Lieferant ist Pflicht', true); return }
     const previousDokumentId = editRechnung?.dokument_id
+    const lieferant = lieferantenStamm.find(entry => entry.name === form.lieferant.trim())
     const payload: Eingangsrechnung = {
       id: editRechnung?.id ?? `ER-${Date.now().toString(36).toUpperCase()}`,
+      lieferant_id: lieferant?.id ?? editRechnung?.lieferant_id,
       lieferant: form.lieferant.trim(),
       rechnungsnummer: form.rechnungsnummer.trim(),
       rechnungsdatum: form.rechnungsdatum || undefined,
@@ -2013,6 +2033,9 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
                             Dokument
                           </button>
                         )}
+                        <button className="pk-btn-ghost" onClick={e => { e.stopPropagation(); window.location.href = `/dashboard/buero/eingangsrechnungen/${encodeURIComponent(r.id)}` }} style={{ fontSize: 11, padding: '4px 9px' }}>
+                          Details
+                        </button>
                         <button className="pk-btn-ghost" onClick={e => { e.stopPropagation(); openEdit(r) }} style={{ fontSize: 11, padding: '4px 9px' }}>Bearbeiten</button>
                         {r.status !== 'bezahlt' && (
                           confirmPayId === r.id ? (

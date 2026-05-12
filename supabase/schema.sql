@@ -99,6 +99,7 @@ create table if not exists buero_kunden (
 create table if not exists buero_angebote (
   id         text primary key,
   user_id    uuid references auth.users not null default auth.uid(),
+  kunde_id   text references buero_kunden(id),
   kunde      text,
   titel      text,
   betrag     text,
@@ -112,6 +113,7 @@ create table if not exists buero_angebote (
 create table if not exists buero_auftraege (
   id          text primary key,
   user_id     uuid references auth.users not null default auth.uid(),
+  kunde_id    text references buero_kunden(id),
   kunde       text,
   beschreibung text,
   wert        text,
@@ -126,6 +128,7 @@ create table if not exists buero_auftraege (
 create table if not exists buero_rechnungen (
   id          text primary key,
   user_id     uuid references auth.users not null default auth.uid(),
+  kunde_id    text references buero_kunden(id),
   kunde       text,
   nummer      text,
   betrag      text,
@@ -146,6 +149,7 @@ create table if not exists buero_rechnungen (
 create table if not exists buero_eingangsrechnungen (
   id                text primary key,
   user_id           uuid references auth.users not null default auth.uid(),
+  lieferant_id      text references einkauf_lieferanten(id),
   lieferant         text not null,
   rechnungsnummer   text,
   rechnungsdatum    date,
@@ -222,11 +226,15 @@ create policy "buero_dokumente_user" on buero_dokumente for all using (auth.uid(
 create index if not exists idx_buero_eingangsrechnungen_user_status on buero_eingangsrechnungen(user_id, status);
 create index if not exists idx_buero_eingangsrechnungen_user_faelligkeit on buero_eingangsrechnungen(user_id, faelligkeit);
 create index if not exists idx_buero_eingangsrechnungen_lieferant on buero_eingangsrechnungen(user_id, lieferant);
+create index if not exists idx_buero_eingangsrechnungen_lieferant_id on buero_eingangsrechnungen(lieferant_id);
 create index if not exists idx_buero_eingangsrechnungen_dokument_id on buero_eingangsrechnungen(dokument_id);
 create index if not exists idx_buero_dokumente_eingangsrechnung_id on buero_dokumente(eingangsrechnung_id);
 create index if not exists idx_buero_dokumente_rechnung_id on buero_dokumente(rechnung_id);
 create index if not exists idx_buero_dokumente_angebot_id on buero_dokumente(angebot_id);
 create index if not exists idx_buero_dokumente_auftrag_id on buero_dokumente(auftrag_id);
+create index if not exists idx_buero_angebote_kunde_id on buero_angebote(kunde_id);
+create index if not exists idx_buero_auftraege_kunde_id on buero_auftraege(kunde_id);
+create index if not exists idx_buero_rechnungen_kunde_id on buero_rechnungen(kunde_id);
 
 -- ── Einkauf / Lieferanten ───────────────────────────────────
 
