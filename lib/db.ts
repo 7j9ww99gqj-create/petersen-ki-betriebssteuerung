@@ -1080,6 +1080,75 @@ export async function upsertMarketingSeoKeyword(k: {
   return data
 }
 
+export async function getMarketingContentIdeas() {
+  const { data, error } = await db().from('marketing_content_ideas').select('*').order('id', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertMarketingContentIdea(c: {
+  id: string; titel: string; kanal?: string; ziel?: string; keyword?: string
+  hook?: string; cta?: string; status?: string
+}) {
+  const { data, error } = await db()
+    .from('marketing_content_ideas')
+    .upsert({ ...c, updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function getMarketingPostingPlans() {
+  const { data, error } = await db().from('marketing_posting_plans').select('*').order('id', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertMarketingPostingPlan(p: {
+  id: string; titel: string; kanal?: string; datum?: string; status?: string; owner?: string; quelle?: string
+}) {
+  const { data, error } = await db()
+    .from('marketing_posting_plans')
+    .upsert({ ...p, updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function getMarketingAutomationRules() {
+  const { data, error } = await db().from('marketing_automation_rules').select('*').order('id', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertMarketingAutomationRule(a: {
+  id: string; name: string; trigger?: string; aktion?: string; kanal?: string; owner?: string; status?: string
+}) {
+  const { data, error } = await db()
+    .from('marketing_automation_rules')
+    .upsert({ ...a, updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function getMarketingIntegrationItems() {
+  const { data, error } = await db().from('marketing_integration_items').select('*').order('id', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertMarketingIntegrationItem(i: {
+  id: string; name: string; status?: string; datenbasis?: string; letzterSync?: string; naechsterSchritt?: string
+}) {
+  const { data, error } = await db()
+    .from('marketing_integration_items')
+    .upsert({ ...i, updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
 // ── PLANUNG ──────────────────────────────────────────────────────────────────
 
 export async function getPlanungProjekte() {

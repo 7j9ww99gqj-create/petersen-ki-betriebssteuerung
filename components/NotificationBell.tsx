@@ -99,12 +99,14 @@ export default function NotificationBell() {
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          width: 38, height: 38, borderRadius: 10,
+          width: 42, height: 42, borderRadius: 12,
           border: '1px solid rgba(255,255,255,.1)',
           background: open ? 'rgba(22,132,255,.15)' : 'rgba(255,255,255,.05)',
           cursor: 'pointer', display: 'flex', alignItems: 'center',
           justifyContent: 'center', position: 'relative',
           transition: 'background .15s', fontSize: 18,
+          flexShrink: 0,
+          touchAction: 'manipulation',
         }}
         title="Benachrichtigungen"
       >

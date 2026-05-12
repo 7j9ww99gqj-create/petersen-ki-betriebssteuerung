@@ -7,7 +7,7 @@ import GlobalSearch from '@/components/GlobalSearch'
 import SupportButton from '@/components/SupportButton'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { hasDemoCookie } from '@/lib/auth'
-import { ROLE_LABELS, type AppRole } from '@/lib/roles'
+import { ROLE_LABELS, loadRole, type AppRole } from '@/lib/roles'
 import { getFirmaEinstellungen, upsertFirmaEinstellungen, uploadFirmenLogo, type FirmaEinstellungen } from '@/lib/db'
 
 // Bottom-Nav Einträge (Mobile)
@@ -70,12 +70,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Close sidebar on route change (mobile nav)
   useEffect(() => { setSidebarOpen(false) }, [pathname])
 
-  // Read role from localStorage (Demo always Admin)
   useEffect(() => {
-    const stored = hasDemoCookie()
-      ? 'Admin'
-      : ((localStorage.getItem('pk_role') as AppRole) || 'Admin')
-    setRoleState(stored)
+    loadRole().then(setRoleState).catch(() => setRoleState('Admin'))
   }, [pathname])
 
   // Auth check
@@ -193,8 +189,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             backdropFilter: 'blur(14px)',
             WebkitBackdropFilter: 'blur(14px)',
             borderBottom: '1px solid rgba(255,255,255,.07)',
-            padding: '10px 16px',
+            paddingTop: 'calc(10px + env(safe-area-inset-top))',
+            paddingRight: 16,
+            paddingBottom: 10,
+            paddingLeft: 16,
             display: 'flex', alignItems: 'center', gap: 10,
+            overflow: 'visible',
           }}
         >
           {/* Hamburger – only visible on desktop (mobile uses bottom-nav "Menü") */}
