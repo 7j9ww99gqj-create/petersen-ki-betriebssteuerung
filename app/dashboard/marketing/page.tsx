@@ -34,14 +34,10 @@ type Newsletter = {
 type DemoMarketingFeature = {
   id: string
   title: string
-  navLabel: string
   short: string
   detail: string
   icon: string
-  accent: string
-  stats: { label: string; value: string; trend: string }[]
-  board: { title: string; value: string; note: string }[]
-  insights: string[]
+  level: 'Gamechanger' | 'Stark' | 'Ausbau'
 }
 
 // ── Demo-Daten ────────────────────────────────────────────────────────────────
@@ -71,20 +67,20 @@ const demoNewsletter: Newsletter[] = [
 ]
 
 const demoMarketingFeatures: DemoMarketingFeature[] = [
-  { id: 'autopilot', title: 'Autopilot-Marketing', navLabel: '🚀 Autopilot', short: 'Vom Ziel zum Funnel', detail: 'Von der Zielsetzung bis zur ersten Kampagnenstruktur mit Zielgruppe, Angebot, Funnel und Startpunkten für den Rollout.', icon: '🚀', accent: '#f59e0b', stats: [{ label: 'Funnels bereit', value: '4', trend: '+1 heute' }, { label: 'Kampagnenpfade', value: '12', trend: '+18%' }, { label: 'Launch-Fokus', value: 'B2B', trend: 'hoch' }], board: [{ title: 'Zielgruppe', value: 'KMU Dienstleister', note: 'primärer Markt' }, { title: 'Hook-Cluster', value: '6 aktiv', note: 'Angebot + Problem' }, { title: 'Landingpages', value: '3 Entwürfe', note: 'Hero bis CTA' }], insights: ['Top-Funnel: Beratung → Case Study → Termin', 'Kaltstart-Kampagne priorisiert bezahlte Reichweite', 'Upsell-Pfad wird nach Erstkontakt eingeplant'] },
-  { id: 'seo', title: 'SEO-/Keywords-Analyse', navLabel: '🔎 SEO', short: 'Keywords, Klicks, Sichtbarkeit', detail: 'Keyword-Lage, geschätzte Klickstärke, Ranking-Chancen und sichtbare Themencluster rund um die eigene Seite.', icon: '🔎', accent: '#1684ff', stats: [{ label: 'Keywords im Fokus', value: '24', trend: '+4' }, { label: 'Geschätzte Klicks', value: '348', trend: '+12%' }, { label: 'Eigene Seitenklicks', value: '127', trend: '+9%' }], board: [{ title: 'Top-Chance', value: 'ERP Handwerk', note: 'niedriger Wettbewerb' }, { title: 'Sichtbarkeit', value: '61%', note: 'auf Kernbegriffen' }, { title: 'Content-Lücke', value: '5 Themen', note: 'noch offen' }], insights: ['Keyword-Cluster „Automatisierung“ steigt am stärksten', 'Landingpage-Traffic konzentriert sich auf zwei Kernseiten', 'Neue Begriffe können direkt in Anzeigen und Content überführt werden'] },
-  { id: 'lead-intelligence', title: 'Lead Intelligence Engine', navLabel: '🔥 Leads', short: 'Heiße Leads erkennen', detail: 'Lead-Qualität, Abschlusswahrscheinlichkeit, nächster Kontaktzeitpunkt und empfohlene Vertriebsaktion auf einen Blick.', icon: '🔥', accent: '#ef4444', stats: [{ label: 'Heiße Leads', value: '9', trend: '+2' }, { label: 'Kaufwahrscheinlichkeit', value: '74%', trend: '+6%' }, { label: 'Heute anrufen', value: '3', trend: 'sofort' }], board: [{ title: 'Hot Queue', value: 'LD-002', note: 'Angebot offen' }, { title: 'Timing-Fenster', value: 'Morgen 09:00', note: 'beste Antwortquote' }, { title: 'Empfohlene Aktion', value: 'Follow-up Mail', note: 'mit Referenz' }], insights: ['Website-Leads reagieren aktuell schneller als Messekontakte', 'Hoher Warenkorb korreliert mit Terminbuchung binnen 48h', 'Empfehlungsleads zeigen die beste Abschlussquote'] },
-  { id: 'ab-testing', title: 'Automatisches A/B Testing', navLabel: '🧪 A/B Tests', short: 'Varianten testen lassen', detail: 'Mehrere Anzeigen-, Hook- und Landingpage-Varianten im direkten Vergleich mit Gewinner- und Verliererbild.', icon: '🧪', accent: '#a855f7', stats: [{ label: 'Varianten aktiv', value: '5', trend: '+2' }, { label: 'Gewinnerquote', value: '38%', trend: '+8%' }, { label: 'Budget gespart', value: '420 €', trend: 'laufend' }], board: [{ title: 'Beste Anzeige', value: 'Variante B', note: 'CTR am stärksten' }, { title: 'Schwächste Hook', value: 'Variante D', note: 'früh gestoppt' }, { title: 'Skalierung', value: '2 Gewinner', note: 'bereit' }], insights: ['Kurze Headline schlägt lange Erklärtexte', 'Video-Ads ziehen aktuell bessere CTR als statische Banner', 'Gewinneranzeigen performen besonders im Retargeting'] },
-  { id: 'content-ai', title: 'KI-Content & Reels', navLabel: '🎥 Content', short: 'Hooks, Clips, Thumbnails', detail: 'Reels, Anzeigenvideos, Hooks und Thumbnail-Richtungen als schneller Content-Überblick für Social und Ads.', icon: '🎥', accent: '#10b981', stats: [{ label: 'Content-Ideen', value: '15', trend: '+5' }, { label: 'Reel-Konzepte', value: '6', trend: '+2' }, { label: 'Hook-Stacks', value: '12', trend: 'bereit' }], board: [{ title: 'Nächster Reel', value: 'Kundenproblem', note: '15 Sekunden' }, { title: 'Thumbnail-Stil', value: 'Bold Contrast', note: 'hohe Aufmerksamkeit' }, { title: 'Ad-Angles', value: '4 live', note: 'Preis, Zeit, KI, Ordnung' }], insights: ['Problem-Hooks schneiden besser als Feature-Hooks', 'Carousel-Ideen eignen sich als Blog- und Reel-Basis', 'Kurzclips können direkt für Ads recycelt werden'] },
-  { id: 'funnel-brain', title: 'Funnel-Builder mit Gehirn', navLabel: '🧩 Funnel', short: 'Struktur + Conversion-Ideen', detail: 'Funnel-Struktur, kritische Ausstiegspunkte und Conversion-Hebel als übersichtliches Read-only Dashboard.', icon: '🧩', accent: '#14b8a6', stats: [{ label: 'Funnel-Stufen', value: '7', trend: 'komplett' }, { label: 'Absprung-Risiken', value: '3', trend: '-1' }, { label: 'Conversion-Hebel', value: '8', trend: '+2' }], board: [{ title: 'Schwächste Stufe', value: 'Formular', note: 'zu lang' }, { title: 'CTA-Qualität', value: '82/100', note: 'stark' }, { title: 'Mobile Flow', value: 'gut', note: 'stapelbar' }], insights: ['Die Angebotsseite braucht stärkere Beweiselemente', 'Formularverkürzung hebt voraussichtlich die Quote', 'FAQ-Block wirkt besonders in warmem Traffic'] },
-  { id: 'sales-assistant', title: 'KI-Vertriebsassistent', navLabel: '🗣️ Vertrieb', short: 'Antwortet wie ein Verkäufer', detail: 'Antwortvorschläge für Chat, Mail und Messenger mit Preislogik, Einwandbehandlung und Angebotsfokus.', icon: '🗣️', accent: '#f97316', stats: [{ label: 'Offene Dialoge', value: '11', trend: '+3' }, { label: 'Antwortvorschläge', value: '27', trend: 'bereit' }, { label: 'Einwände erkannt', value: '8', trend: 'heute' }], board: [{ title: 'Top-Einwand', value: 'Preis zu hoch', note: 'am häufigsten' }, { title: 'Bester Kanal', value: 'WhatsApp', note: 'schnellste Reaktion' }, { title: 'Nächster Schritt', value: 'Demo-Termin', note: 'empfohlen' }], insights: ['Preisfragen brauchen zuerst ROI-Argumente', 'Messenger-Nachrichten funktionieren aktuell schneller als Mail', 'Kurzantwort + Termin-CTA führt am häufigsten weiter'] },
-  { id: 'sales-clone', title: 'Besten Verkäufer klonen', navLabel: '🧬 Sales Clone', short: 'Calls zu Skripten machen', detail: 'Starke Verkaufsmuster, Einwandroutinen und Gesprächslogik aus Best-Performer-Calls als skalierbare Vorlage.', icon: '🧬', accent: '#8b5cf6', stats: [{ label: 'Calls analysiert', value: '18', trend: '+4' }, { label: 'Muster erkannt', value: '9', trend: 'stabil' }, { label: 'Skripte extrahiert', value: '5', trend: '+1' }], board: [{ title: 'Top-Pattern', value: 'Problem vor Produkt', note: 'höchste Wirkung' }, { title: 'Closing-Stil', value: 'sanft direkt', note: 'beste Quote' }, { title: 'Mail-Transfer', value: '4 Vorlagen', note: 'abgeleitet' }], insights: ['Die besten Calls starten mit Diagnose statt Pitch', 'Story + Zahlen wirkt stärker als reine Feature-Listen', 'Closing klappt am besten nach kurzer Zusammenfassung'] },
-  { id: 'content-daily', title: 'Was soll ich morgen posten?', navLabel: '📅 Posting', short: 'Tägliche Content-Ideen', detail: 'Tägliche Themenvorschläge mit Hook, Struktur und Kanalidee für Creator, Vertrieb und Sichtbarkeit.', icon: '📅', accent: '#0ea5e9', stats: [{ label: 'Posts vorbereitet', value: '3', trend: 'morgen' }, { label: 'Hook-Ideen', value: '12', trend: '+3' }, { label: 'Kanäle bedient', value: '4', trend: 'aktiv' }], board: [{ title: 'Morgen-Post', value: 'KI spart Zeit', note: 'Hook priorisiert' }, { title: 'Format', value: 'Short Reel', note: '45 Sek.' }, { title: 'CTA', value: 'Kommentarfrage', note: 'Interaktion' }], insights: ['Praxisnahe Vorher/Nachher-Posts passen zum Funnel', 'Ein Hook pro Kanal kann mehrfach recycelt werden', 'Kurze Expertenmeinungen stärken die Markenwahrnehmung'] },
-  { id: 'predictive', title: 'Predictive Marketing', navLabel: '🔮 Predictive', short: 'Flops und Gewinner vorhersagen', detail: 'Risiko- und Trendeinschätzung für Kampagnen, Themen und Kanäle, bevor Zeit oder Budget investiert wird.', icon: '🔮', accent: '#6366f1', stats: [{ label: 'Trend-Themen', value: '7', trend: '+2' }, { label: 'Flop-Risiken', value: '2', trend: '-1' }, { label: 'Gewinner-Signale', value: '5', trend: '+11%' }], board: [{ title: 'Trend-Thema', value: 'Automatisierung', note: 'steigend' }, { title: 'Risikokanal', value: 'Display Ads', note: 'schwächer' }, { title: 'Budget-Tipp', value: 'Video zuerst', note: 'beste Prognose' }], insights: ['Trend-Signale verdichten sich rund um Produktivität', 'Display verliert gegen Social bei kalter Zielgruppe', 'Schnelle Tests vor vollem Rollout bleiben sinnvoll'] },
-  { id: 'templates', title: 'Branchen-Templates', navLabel: '🧑‍🤝‍🧑 Templates', short: 'Flows für Coaches, Makler, Agenturen', detail: 'Vorgefertigte Branchen-Setups mit passender Tonalität, Funnel-Struktur und Kampagnenlogik.', icon: '🧑‍🤝‍🧑', accent: '#22c55e', stats: [{ label: 'Templates bereit', value: '9', trend: '+2' }, { label: 'Branchen aktiv', value: '5', trend: 'wachsend' }, { label: 'Setup-Zeit', value: '12 Min', trend: '-4 Min' }], board: [{ title: 'Top-Branche', value: 'Agenturen', note: 'meiste Assets' }, { title: 'Coach-Flow', value: 'Leadmagnet', note: 'bewährt' }, { title: 'Makler-Set', value: 'Objektanfrage', note: 'stark' }], insights: ['Branchenspezifische Hooks vereinfachen den Start massiv', 'Template-Wechsel spart vor allem beim Funnel-Aufbau Zeit', 'Ein eigener Stil pro Branche wirkt klarer im Vertrieb'] },
-  { id: 'integrations', title: 'Integrationen', navLabel: '⚙️ Integrationen', short: 'CRM, Ads, WhatsApp, Kalender', detail: 'Verknüpfungen zu den wichtigsten Systemen mit Datenfluss-Übersicht für Leads, Kampagnen und Termine.', icon: '⚙️', accent: '#64748b', stats: [{ label: 'Schnittstellen', value: '8', trend: '+1' }, { label: 'Datenflüsse', value: '21', trend: 'aktiv' }, { label: 'Sync-Ziele', value: '5', trend: 'bereit' }], board: [{ title: 'CRM Sync', value: 'stabil', note: 'zentral' }, { title: 'Ads-Kanäle', value: 'Meta + Google', note: 'priorisiert' }, { title: 'Kalenderfluss', value: 'Terminbuchung', note: 'wichtig' }], insights: ['CRM und Messenger sind die wertvollsten ersten Integrationen', 'Direkter Ads-Rückfluss spart manuelle Nachpflege', 'Kalenderkopplung stärkt den Vertriebsassistenten'] },
-  { id: 'gamification', title: 'Gamification', navLabel: '🎮 Gamification', short: 'Score, Fortschritt, Achievements', detail: 'Fortschrittsanzeigen, Funnel-Scores und Leistungsmarker als sichtbare Motivationsebene im MarketingPilot.', icon: '🎮', accent: '#eab308', stats: [{ label: 'Funnel-Score', value: '72%', trend: '+5%' }, { label: 'Achievements', value: '6', trend: '+1' }, { label: 'Wochenziel', value: '84%', trend: 'nah dran' }], board: [{ title: 'Top-Achievement', value: '3 Tage aktiv', note: 'laufend' }, { title: 'Performance-Woche', value: '+15%', note: 'sichtbar' }, { title: 'Nächster Meilenstein', value: '80 Score', note: 'kurz davor' }], insights: ['Sichtbarer Fortschritt hält Nutzer länger im System', 'Wochentrends helfen bei Prioritäten im Team', 'Funnel-Score kann später mit echten Daten gekoppelt werden'] },
-  { id: 'explainability', title: 'Warum funktioniert das?', navLabel: '🧠 Warum?', short: 'KI erklärt die Wirkung', detail: 'Begründungen, Wirkannahmen und Lernhinweise dazu, warum Kampagnen, Hooks oder Funnels stärker laufen als andere.', icon: '🧠', accent: '#06b6d4', stats: [{ label: 'Erklärungen', value: '14', trend: '+4' }, { label: 'Learnings', value: '9', trend: 'neu' }, { label: 'Hebel erkannt', value: '5', trend: 'klar' }], board: [{ title: 'Beste Headline', value: 'klarer Nutzen', note: 'stärkste Wirkung' }, { title: 'Grund', value: 'sofort verständlich', note: 'weniger Reibung' }, { title: 'Lernformat', value: 'Kurzbrief', note: 'kompakt' }], insights: ['Klare Nutzenkommunikation schlägt abstrakte Vision', 'Soziale Beweise stabilisieren kalten Traffic', 'Kurze Erklärblöcke machen die KI nachvollziehbarer'] },
+  { id: 'autopilot', title: 'Autopilot-Marketing', short: 'Vom Ziel zum Funnel', detail: 'Der Nutzer sagt nur, wofür er mehr Kunden will. Danach zeigt der Flow grob Zielgruppe, Kampagne, Ads, Landingpage und Funnel als nächsten KI-Prozess.', icon: '🚀', level: 'Gamechanger' },
+  { id: 'seo', title: 'SEO-/Keywords-Analyse', short: 'Keywords, Klicks, Sichtbarkeit', detail: 'Prüft wichtige Suchbegriffe, geschätzte Klickstärke, organische Sichtbarkeit und welche Themen für die eigene Seite Potenzial haben.', icon: '🔎', level: 'Stark' },
+  { id: 'lead-intelligence', title: 'Lead Intelligence Engine', short: 'Heiße Leads erkennen', detail: 'Markiert, welche Leads heiß wirken, wann Kontakt sinnvoll ist und welche nächste Nachricht oder welcher Anruf empfohlen würde.', icon: '🔥', level: 'Stark' },
+  { id: 'ab-testing', title: 'Automatisches A/B Testing', short: 'Varianten testen lassen', detail: 'Die KI erzeugt mehrere Varianten, stoppt Verlierer und skaliert Gewinner im Kampagnenfluss.', icon: '🧪', level: 'Ausbau' },
+  { id: 'content-ai', title: 'KI-Content & Reels', short: 'Hooks, Clips, Thumbnails', detail: 'Idee für automatische Content-Erstellung mit Hooks, Reels, Anzeigenvideos und Thumbnails für Social-Kampagnen.', icon: '🎥', level: 'Stark' },
+  { id: 'funnel-brain', title: 'Funnel-Builder mit Gehirn', short: 'Struktur + Conversion-Ideen', detail: 'Ein Funnel-Builder, der Seitenstruktur, Absprünge und Conversion-Verbesserungen automatisch einschätzt.', icon: '🧩', level: 'Ausbau' },
+  { id: 'sales-assistant', title: 'KI-Vertriebsassistent', short: 'Antwortet wie ein Verkäufer', detail: 'Für E-Mail, WhatsApp und Chat mit Angebotswissen, Preisen und Einwandbehandlung als sichtbarer Vertriebs-Flow.', icon: '🗣️', level: 'Stark' },
+  { id: 'sales-clone', title: 'Besten Verkäufer klonen', short: 'Calls zu Skripten machen', detail: 'Zielt auf die Analyse starker Sales Calls und die Ableitung von Skripten, E-Mails und Funnels.', icon: '🧬', level: 'Ausbau' },
+  { id: 'content-daily', title: 'Was soll ich morgen posten?', short: 'Tägliche Content-Ideen', detail: 'Tägliche Content-Vorschläge inklusive Hook, Struktur und Startpunkt für den nächsten Post.', icon: '📊', level: 'Stark' },
+  { id: 'predictive', title: 'Predictive Marketing', short: 'Flops und Gewinner vorhersagen', detail: 'Die KI bewertet Kampagnenrisiken und Trendchancen, bevor Budget verbrannt wird.', icon: '🔮', level: 'Ausbau' },
+  { id: 'templates', title: 'Branchen-Templates', short: 'Flows für Coaches, Makler, Agenturen', detail: 'Branchenspezifische Templates liefern eigene Flows und Kampagnenlogik je Markt.', icon: '🧑‍🤝‍🧑', level: 'Stark' },
+  { id: 'integrations', title: 'Integrationen', short: 'CRM, Ads, WhatsApp, Kalender', detail: 'Zentrale Anbindung an externe Tools, damit kein Copy-Paste mehr nötig ist.', icon: '⚙️', level: 'Ausbau' },
+  { id: 'gamification', title: 'Gamification', short: 'Score, Fortschritt, Achievements', detail: 'Motivationsebene mit Funnel-Score, Performance-Zielen und sichtbaren Erfolgsmarkern.', icon: '🎮', level: 'Ausbau' },
+  { id: 'explainability', title: 'Warum funktioniert das?', short: 'KI erklärt die Wirkung', detail: 'Ergebnisse werden nicht nur angezeigt, sondern samt Begründung und Wirkung transparent gemacht.', icon: '🧠', level: 'Stark' },
 ]
 
 const demoKeywordStats = [
@@ -128,137 +124,163 @@ function PctBar({ value, color }: { value: number; color: string }) {
   )
 }
 
-function AiModuleTab({ feature }: { feature: DemoMarketingFeature }) {
-  const keywordRows = feature.id === 'seo' ? demoKeywordStats : []
+function DemoFeatureCard({ feature, active, onClick }: { feature: DemoMarketingFeature; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        textAlign: 'left',
+        width: '100%',
+        padding: 16,
+        borderRadius: 14,
+        cursor: 'pointer',
+        background: active ? 'rgba(245,158,11,.14)' : 'rgba(255,255,255,.03)',
+        border: active ? '1px solid rgba(245,158,11,.38)' : '1px solid rgba(255,255,255,.08)',
+        color: '#f8fbff',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 20 }}>{feature.icon}</span>
+        <span className={feature.level === 'Gamechanger' ? 'badge badge-orange' : feature.level === 'Stark' ? 'badge badge-blue' : 'badge badge-gray'}>
+          {feature.level}
+        </span>
+      </div>
+      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>{feature.title}</div>
+      <div style={{ fontSize: 12, color: '#aeb9c8', lineHeight: 1.45 }}>{feature.short}</div>
+    </button>
+  )
+}
+
+function DemoLabTab() {
+  const [selected, setSelected] = useState<DemoMarketingFeature>(demoMarketingFeatures[0])
 
   return (
     <div>
-      <div className="pk-card" style={{ marginBottom: 18, border: `1px solid ${feature.accent}30` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ width: 46, height: 46, borderRadius: 14, background: `${feature.accent}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
-            {feature.icon}
-          </div>
+      <div className="pk-card" style={{ marginBottom: 18, border: '1px solid rgba(245,158,11,.18)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
           <div>
-            <div style={{ fontWeight: 900, fontSize: 18 }}>{feature.title}</div>
-            <div style={{ fontSize: 13, color: '#aeb9c8', marginTop: 4 }}>{feature.detail}</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em' }}>KI-Suite</div>
+            <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>MarketingPilot mit klickbaren KI-Modulen</div>
           </div>
+          <span className="badge badge-orange">Autopilot · SEO · Content · Vertrieb</span>
+        </div>
+        <div style={{ fontSize: 13, color: '#aeb9c8', lineHeight: 1.6 }}>
+          Alle Bereiche sind direkt sichtbar und anklickbar, damit der gesamte Marketing-Stack vom ersten Blick an erfassbar ist.
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, marginBottom: 18 }}>
-        {feature.stats.map(item => (
-          <div key={item.label} className="pk-card" style={{ padding: '16px 14px' }}>
-            <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 8 }}>{item.label}</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: feature.accent }}>{item.value}</div>
-            <div style={{ fontSize: 12, color: '#d0d9e8', marginTop: 6 }}>{item.trend}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18, marginBottom: 18 }}>
         <div className="pk-card">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+            {demoMarketingFeatures.map(feature => (
+              <DemoFeatureCard
+                key={feature.id}
+                feature={feature}
+                active={selected.id === feature.id}
+                onClick={() => setSelected(feature)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="pk-card" style={{ border: '1px solid rgba(245,158,11,.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: `${feature.accent}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-              {feature.icon}
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(245,158,11,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+              {selected.icon}
             </div>
-            <div style={{ fontWeight: 900, fontSize: 16 }}>Dashboard-Überblick</div>
+            <div>
+              <div style={{ fontWeight: 900, fontSize: 16 }}>{selected.title}</div>
+              <div style={{ fontSize: 12, color: '#aeb9c8' }}>{selected.short}</div>
+            </div>
           </div>
-          <div style={{ display: 'grid', gap: 10 }}>
-            {feature.board.map(item => (
-              <div key={item.title} style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
-                <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 4 }}>{item.title}</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#f8fbff' }}>{item.value}</div>
-                <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 4 }}>{item.note}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="pk-card">
-          <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 12 }}>Signale & Hinweise</div>
-          <div style={{ display: 'grid', gap: 10 }}>
-            {feature.insights.map(item => (
-              <div key={item} style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', color: '#d0d9e8', fontSize: 13 }}>
-                {item}
-              </div>
-            ))}
+          <div style={{ fontSize: 13, color: '#d0d9e8', lineHeight: 1.6, marginBottom: 14 }}>{selected.detail}</div>
+          <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+            <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 6 }}>Modulbild</div>
+            <div style={{ fontSize: 13, color: '#f8fbff' }}>
+              Sichtbar im MarketingPilot als klickbarer Modulbereich mit klarer Einordnung, Fokus und Ausbaurichtung.
+            </div>
           </div>
         </div>
       </div>
 
-      {keywordRows.length > 0 && (
-        <div className="pk-card">
-          <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 14 }}>Keyword-Vorschau</div>
-          <div style={{ display: 'grid', gap: 10 }}>
-            {keywordRows.map(row => (
-              <div
-                key={row.keyword}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                  gap: 10,
-                  alignItems: 'center',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '10px 12px',
-                  borderRadius: 12,
-                  background: 'rgba(255,255,255,.03)',
-                  border: '1px solid rgba(255,255,255,.06)',
-                  color: '#f8fbff',
-                }}
-              >
-                <span style={{ fontWeight: 700, fontSize: 13 }}>{row.keyword}</span>
-                <span style={{ fontSize: 12, color: '#aeb9c8' }}>{row.klicks} Klicks</span>
-                <span style={{ fontSize: 12, color: '#aeb9c8' }}>{row.sichtbarkeit}% Sichtbarkeit</span>
-                <span style={{ fontSize: 12, color: '#4ddb7e', fontWeight: 700 }}>{row.trend}</span>
-              </div>
-            ))}
+      <div className="pk-card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 16 }}>🔎 SEO-/Keywords-Analyse</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>
+              Wichtige Keywords prüfen, grobe Klickstärke sehen und Potenzial der eigenen Seite erkennen
+            </div>
+          </div>
+          <span className="badge badge-blue">Keywords · Klicks · Sichtbarkeit</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+          {[
+            { label: 'Keywords im Fokus', value: '24', icon: '🏷️', color: COLOR },
+            { label: 'Geschätzte Klicks', value: '348', icon: '🖱️', color: '#1684ff' },
+            { label: 'Eigene Seitenklicks', value: '127', icon: '🌐', color: '#10b981' },
+            { label: 'Top-Chancen', value: '6', icon: '🚀', color: '#a78bfa' },
+          ].map(item => (
+            <button key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px', cursor: 'pointer', color: 'inherit' }}>
+              <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: item.color }}>{item.value}</div>
+              <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Keyword-Vorschau</div>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {demoKeywordStats.map(row => (
+                <button
+                  key={row.keyword}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.4fr .6fr .6fr .5fr',
+                    gap: 10,
+                    alignItems: 'center',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '10px 12px',
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                    background: 'rgba(255,255,255,.03)',
+                    border: '1px solid rgba(255,255,255,.06)',
+                    color: '#f8fbff',
+                  }}
+                >
+                  <span style={{ fontWeight: 700, fontSize: 13 }}>{row.keyword}</span>
+                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>{row.klicks} Klicks</span>
+                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>{row.sichtbarkeit}% Sichtbarkeit</span>
+                  <span style={{ fontSize: 12, color: '#4ddb7e', fontWeight: 700 }}>{row.trend}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Nächste Ausbaustufe</div>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {[
+                'Keyword-Liste eingeben und Chancen live berechnen',
+                'Klicks der eigenen Seite pro Landingpage anzeigen',
+                'Wettbewerb und Ranking-Veränderungen verfolgen',
+                'Keywords direkt in Kampagnen und Content-Ideen übernehmen',
+              ].map(item => (
+                <button key={item} style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', color: '#d0d9e8', fontSize: 13 }}>
+                  {item}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
-const aiTabs = demoMarketingFeatures.map(feature => ({
-  id: feature.id,
-  label: feature.navLabel,
-}))
-
-type Tab =
-  | 'kampagnen'
-  | 'leads'
-  | 'newsletter'
-  | 'auswertungen'
-  | 'autopilot'
-  | 'seo'
-  | 'lead-intelligence'
-  | 'ab-testing'
-  | 'content-ai'
-  | 'funnel-brain'
-  | 'sales-assistant'
-  | 'sales-clone'
-  | 'content-daily'
-  | 'predictive'
-  | 'templates'
-  | 'integrations'
-  | 'gamification'
-  | 'explainability'
-
-function isAiTab(tab: Tab) {
-  return demoMarketingFeatures.some(feature => feature.id === tab)
-}
-
-function getAiFeature(tab: Tab) {
-  return demoMarketingFeatures.find(feature => feature.id === tab) || demoMarketingFeatures[0]
-}
-
-const marketingTabs: { id: Tab; label: string }[] = [
-  { id: 'kampagnen', label: '📣 Kampagnen' },
-  { id: 'leads', label: '🎯 Leads' },
-  { id: 'newsletter', label: '📰 Newsletter' },
-  { id: 'auswertungen', label: '📊 Auswertungen' },
-  ...aiTabs as { id: Tab; label: string }[],
-]
 // ── Kampagnen-Tab ─────────────────────────────────────────────────────────────
 
 function KampagnenTab({ isDemo }: { isDemo: boolean }) {
@@ -837,9 +859,11 @@ function AuswertungenTab({ leads, kampagnen }: { leads: Lead[]; kampagnen: Kampa
 
 // ── Haupt-Seite ───────────────────────────────────────────────────────────────
 
+type Tab = 'demo-lab' | 'kampagnen' | 'leads' | 'newsletter' | 'auswertungen'
+
 export default function MarketingPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
-  const [tab, setTab] = useState<Tab>('kampagnen')
+  const [tab, setTab] = useState<Tab>('demo-lab')
   const [kampagnen, setKampagnen] = useState<Kampagne[]>(isDemo ? demoKampagnen : [])
   const [leads, setLeads] = useState<Lead[]>(isDemo ? demoLeads : [])
   const [loading, setLoading] = useState(!isDemo)
@@ -873,7 +897,7 @@ export default function MarketingPilotPage() {
         <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0 }}>📣</div>
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>MarketingPilot</h1>
-          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Kampagnen · Leads · Newsletter · Auswertungen · KI-Automation</p>
+          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Kampagnen · Leads · Newsletter · Auswertungen · KI-Suite</p>
         </div>
         <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>
       </div>
@@ -896,7 +920,13 @@ export default function MarketingPilotPage() {
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
-        {marketingTabs.map(t => (
+        {([
+          { id: 'demo-lab', label: '🚀 KI-Suite' },
+          { id: 'kampagnen', label: '📣 Kampagnen' },
+          { id: 'leads', label: '🎯 Leads' },
+          { id: 'newsletter', label: '📰 Newsletter' },
+          { id: 'auswertungen', label: '📊 Auswertungen' },
+        ] as const).map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding: '10px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
             background: 'transparent', borderBottom: tab === t.id ? `2px solid ${COLOR}` : '2px solid transparent',
@@ -905,11 +935,11 @@ export default function MarketingPilotPage() {
         ))}
       </div>
 
+      {tab === 'demo-lab' && <DemoLabTab />}
       {tab === 'kampagnen' && <KampagnenTab isDemo={isDemo} />}
       {tab === 'leads' && <LeadsTab isDemo={isDemo} />}
       {tab === 'newsletter' && <NewsletterTab isDemo={isDemo} />}
       {tab === 'auswertungen' && <AuswertungenTab leads={leads} kampagnen={kampagnen} />}
-      {isAiTab(tab) && <AiModuleTab feature={getAiFeature(tab)} />}
     </div>
   )
 }

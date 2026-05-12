@@ -52,7 +52,7 @@
 /dashboard/lager           → app/dashboard/lager/page.tsx       ← LagerPilot (12 Tabs)
 /dashboard/buero           → app/dashboard/buero/page.tsx       ← BüroPilot (6 Tabs)
 /dashboard/werkstatt       → app/dashboard/werkstatt/page.tsx
-/dashboard/marketing       → app/dashboard/marketing/page.tsx          ← CRUD + KI-Menü mit Vorschau-Dashboards
+/dashboard/marketing       → app/dashboard/marketing/page.tsx          ← CRUD + klickbare KI-Suite
 /dashboard/analyse         → app/dashboard/analyse/page.tsx
 /dashboard/planung         → app/dashboard/planung/page.tsx
 /dashboard/ki-erkennung    → app/dashboard/ki-erkennung/page.tsx ← KI-Assistent (3 Tabs)
@@ -284,9 +284,9 @@ Archiv-/Cloud-Stand:
 
 Aktueller Stand:
 - Bestehende Live-Bereiche: Kampagnen, Leads, Newsletter, Auswertungen
-- Neue KI-Menüpunkte direkt im MarketingPilot
+- Neuer KI-Bereich: `🚀 KI-Suite`
 
-KI-Menüpunkte im UI:
+KI-Module im UI:
 - Autopilot-Marketing
 - SEO-/Keywords-Analyse
 - Lead Intelligence Engine
@@ -303,10 +303,10 @@ KI-Menüpunkte im UI:
 - Explainability
 
 Wichtig:
-- jedes Modul hat einen eigenen Menüpunkt
-- neue KI-Bereiche sind read-only aufgebaut
+- Alle Module sind sichtbar und anklickbar
 - noch keine echte Datenlogik
-- SEO-/Keywords-Analyse zeigt aktuell grobe Kennzahlen
+- noch keine Auswahl- oder Ausführungsflüsse
+- SEO-/Keywords-Analyse zeigt aktuell grobe Kennzahlen und die nächste Ausbaustufe
 ```
 
 ---
