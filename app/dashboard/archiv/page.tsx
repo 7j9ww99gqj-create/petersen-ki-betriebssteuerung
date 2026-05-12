@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
-import { getBueroDokumente, getDokumentUrl } from '@/lib/db'
+import { getBueroDokumente, getDokumentUrl, getSteuerBelege } from '@/lib/db'
 import { normalizeDocumentStoragePath } from '@/lib/documents'
 
 type ArchivDokument = {
@@ -20,11 +20,15 @@ type ArchivDokument = {
   angebot_id?: string
   auftrag_id?: string
   dokument_url?: string
+  quelle?: 'buero' | 'steuer'
+  datei_url?: string
+  status?: string
 }
 
 const demoArchivData: ArchivDokument[] = [
   { id: 'DOC-001', name: 'Lieferschein LS-2025-08847', typ: 'Lieferschein', datum: '06.05.2025', groesse: '124 KB', kategorie: 'Wareneingang', bezug: 'Metallbau GmbH' },
   { id: 'DOC-002', name: 'Rechnung RE-2025-1123', typ: 'Rechnung', datum: '05.05.2025', groesse: '89 KB', kategorie: 'Rechnung', bezug: 'Kunde' },
+  { id: 'STB-001', name: 'Steuerbeleg April', typ: 'Steuerbeleg', datum: '03.05.2025', groesse: '—', kategorie: 'Steuer', bezug: 'Büromaterial GmbH', quelle: 'steuer' },
 ]
 
 function getRelationLabel(doc: ArchivDokument) {
@@ -51,8 +55,36 @@ export default function ArchivPage() {
       setLoading(false)
       return
     }
-    getBueroDokumente()
-      .then(data => setDocs((data ?? []) as ArchivDokument[]))
+    Promise.all([getBueroDokumente(), getSteuerBelege()])
+      .then(([bueroDocs, steuerBelege]) => {
+        const mappedSteuer = (steuerBelege ?? []).map(row => {
+          const entry = row as {
+            id: string
+            lieferant?: string
+            datum?: string
+            datei_url?: string
+            status?: string
+            notiz?: string
+            belegnummer?: string
+          }
+          return {
+            id: entry.id,
+            name: entry.notiz?.trim() || entry.belegnummer?.trim() || `Steuerbeleg ${entry.id}`,
+            typ: 'Steuerbeleg',
+            datum: entry.datum,
+            groesse: '—',
+            kategorie: 'Steuer',
+            bezug: entry.lieferant || 'SteuerPilot',
+            dokument_url: entry.datei_url,
+            datei_url: entry.datei_url,
+            status: entry.status,
+            quelle: 'steuer' as const,
+          } satisfies ArchivDokument
+        })
+
+        const mappedBuero = ((bueroDocs ?? []) as ArchivDokument[]).map(doc => ({ ...doc, quelle: 'buero' as const }))
+        setDocs([...mappedBuero, ...mappedSteuer].sort((a, b) => String(b.datum ?? '').localeCompare(String(a.datum ?? ''))))
+      })
       .catch(err => setError(err instanceof Error ? err.message : 'Archiv konnte nicht geladen werden.'))
       .finally(() => setLoading(false))
   }, [isDemo])
@@ -65,7 +97,7 @@ export default function ArchivPage() {
   const filtered = docs.filter(doc => {
     const q = search.toLowerCase()
     const relation = getRelationLabel(doc)
-    const matchSearch = !q || [doc.name, doc.bezug, doc.id, doc.kategorie, doc.typ, relation?.label].some(value => (value ?? '').toLowerCase().includes(q))
+    const matchSearch = !q || [doc.name, doc.bezug, doc.id, doc.kategorie, doc.typ, relation?.label, doc.quelle, doc.status].some(value => (value ?? '').toLowerCase().includes(q))
     const typeValue = doc.kategorie || doc.typ || 'Sonstiges'
     const matchFilter = filter === 'Alle' || typeValue === filter
     const hasRelation = Boolean(relation)
@@ -79,18 +111,20 @@ export default function ArchivPage() {
     const linked = docs.filter(doc => getRelationLabel(doc)).length
     const incoming = docs.filter(doc => doc.eingangsrechnung_id).length
     const outgoing = docs.filter(doc => doc.rechnung_id || doc.angebot_id || doc.auftrag_id).length
+    const steuer = docs.filter(doc => doc.quelle === 'steuer').length
     return {
       total: docs.length,
       linked,
       unlinked: docs.length - linked,
       incoming,
       outgoing,
+      steuer,
     }
   }, [docs])
 
   const openDocument = async (doc: ArchivDokument) => {
     if (isDemo) return
-    const path = normalizeDocumentStoragePath(doc.storage_path || doc.dokument_url)
+    const path = normalizeDocumentStoragePath(doc.storage_path || doc.dokument_url || doc.datei_url)
     if (!path) {
       setError(`Für ${doc.name} ist kein gültiger Speicherpfad vorhanden.`)
       return
@@ -168,6 +202,7 @@ export default function ArchivPage() {
           { label: 'Ohne Bezug', value: stats.unlinked, color: '#f59e0b' },
           { label: 'Eingangsbelege', value: stats.incoming, color: '#ffb347' },
           { label: 'Ausgang/Verträge', value: stats.outgoing, color: '#aeb9c8' },
+          { label: 'Steuerbelege', value: stats.steuer, color: '#f59e0b' },
         ].map(item => (
           <div key={item.label} className="pk-card" style={{ padding: 14 }}>
             <div style={{ fontSize: 22, fontWeight: 900, color: item.color }}>{item.value}</div>
@@ -189,6 +224,7 @@ export default function ArchivPage() {
               <th>Dokument</th>
               <th>Typ</th>
               <th>Bezug</th>
+              <th>Quelle</th>
               <th>Datum</th>
               <th>Größe</th>
               <th>Detail</th>
@@ -206,13 +242,20 @@ export default function ArchivPage() {
                   </td>
                   <td><span className="badge badge-gray">{doc.kategorie || doc.typ || 'Sonstiges'}</span></td>
                   <td style={{ color: '#aeb9c8', fontSize: 13 }}>{doc.bezug || '—'}</td>
+                  <td style={{ color: '#aeb9c8', fontSize: 13 }}>{doc.quelle === 'steuer' ? 'SteuerPilot' : 'BüroPilot'}</td>
                   <td style={{ color: '#aeb9c8', fontSize: 13 }}>{doc.datum || '—'}</td>
                   <td style={{ color: '#aeb9c8', fontSize: 13 }}>{doc.groesse || '—'}</td>
                   <td style={{ fontSize: 13 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <Link href={`/dashboard/buero/dokumente/${encodeURIComponent(doc.id)}`} style={{ color: '#6cb6ff', textDecoration: 'none' }}>
-                        Dokumentdetails
-                      </Link>
+                      {doc.quelle === 'steuer' ? (
+                        <Link href="/dashboard/steuer?tab=belege" style={{ color: '#6cb6ff', textDecoration: 'none' }}>
+                          Steuerbelege öffnen
+                        </Link>
+                      ) : (
+                        <Link href={`/dashboard/buero/dokumente/${encodeURIComponent(doc.id)}`} style={{ color: '#6cb6ff', textDecoration: 'none' }}>
+                          Dokumentdetails
+                        </Link>
+                      )}
                       {relation && (
                         <Link href={relation.href} style={{ color: '#aeb9c8', textDecoration: 'none' }}>
                           {relation.label}
@@ -224,8 +267,8 @@ export default function ArchivPage() {
                     <button
                       className="pk-btn-ghost"
                       onClick={() => void openDocument(doc)}
-                      disabled={isDemo || openingId === doc.id || !(doc.storage_path || doc.dokument_url)}
-                      style={{ padding: '5px 12px', fontSize: 12, opacity: isDemo || !(doc.storage_path || doc.dokument_url) ? 0.55 : 1 }}
+                      disabled={isDemo || openingId === doc.id || !(doc.storage_path || doc.dokument_url || doc.datei_url)}
+                      style={{ padding: '5px 12px', fontSize: 12, opacity: isDemo || !(doc.storage_path || doc.dokument_url || doc.datei_url) ? 0.55 : 1 }}
                     >
                       {openingId === doc.id ? 'Lädt…' : 'Öffnen'}
                     </button>

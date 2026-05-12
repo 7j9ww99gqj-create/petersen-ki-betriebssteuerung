@@ -44,6 +44,8 @@ type CloudSnapshot = {
   orphanDocs: number
   syncLog: CloudLogEntry[]
   modules: CloudModule[]
+  backupHistory: Array<{ label: string; detail: string; status: 'ok' | 'warn' }>
+  devices: Array<{ name: string; detail: string; status: 'active' | 'passive' }>
 }
 
 type CloudDocument = {
@@ -87,6 +89,12 @@ const demoSnapshot: CloudSnapshot = {
     { name: 'BüroPilot', value: 'Demo', detail: 'Belege nicht live synchronisiert', status: 'warn', icon: '🧾' },
     { name: 'Archiv', value: '2 Dokumente', detail: 'Nur Demo-Dateien', status: 'warn', icon: '🗂️' },
     { name: 'WerkstattPilot', value: 'Demo', detail: 'Keine Live-Aktivität', status: 'warn', icon: '🛠️' },
+  ],
+  backupHistory: [
+    { label: 'Demo-Snapshot', detail: 'Keine echte Backup-Historie im Demo-Modus', status: 'warn' },
+  ],
+  devices: [
+    { name: 'Aktueller Browser', detail: 'Demo-Sitzung auf diesem Gerät', status: 'active' },
   ],
 }
 
@@ -136,6 +144,30 @@ function formatRelative(value?: Date | null) {
 function formatClock(value?: Date | null) {
   if (!value) return '—'
   return value.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatDateTime(value?: Date | null) {
+  if (!value) return '—'
+  return value.toLocaleString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function inferDeviceName() {
+  if (typeof navigator === 'undefined') return 'Aktuelles Gerät'
+  const ua = navigator.userAgent
+  if (/iphone/i.test(ua)) return 'iPhone'
+  if (/ipad/i.test(ua)) return 'iPad'
+  if (/android/i.test(ua) && /mobile/i.test(ua)) return 'Android Smartphone'
+  if (/android/i.test(ua)) return 'Android Tablet'
+  if (/mac os x|macintosh/i.test(ua)) return 'Mac'
+  if (/windows/i.test(ua)) return 'Windows PC'
+  if (/linux/i.test(ua)) return 'Linux Gerät'
+  return 'Aktuelles Gerät'
 }
 
 function getLatest(records: DateCarrier[], fields: Array<keyof DateCarrier>) {
@@ -305,6 +337,42 @@ async function loadCloudSnapshot(): Promise<CloudSnapshot> {
     },
   ]
 
+  const backupHistory = [
+    {
+      label: 'Archiv-Snapshot',
+      detail: `${dokumente.length} Dokumente · letzte Aktivität ${formatDateTime(getLatest(dokumente, ['updated_at', 'created_at']))}`,
+      status: dokumente.length ? 'ok' as const : 'warn' as const,
+    },
+    {
+      label: 'Büro-/Einkaufsstand',
+      detail: `${rechnungen.length + eingangsrechnungen.length + bestellungen.length} Belegobjekte · ${formatDateTime(getLatest([...rechnungen, ...eingangsrechnungen, ...bestellungen], ['updated_at', 'created_at', 'rechnungsdatum']))}`,
+      status: rechnungen.length || eingangsrechnungen.length || bestellungen.length ? 'ok' as const : 'warn' as const,
+    },
+    {
+      label: 'Lager-/Werkstattstand',
+      detail: `${bewegungen.length + werkstattKarten.length} Aktivitätsobjekte · ${formatDateTime(getLatest([...bewegungen, ...werkstattKarten], ['created_at', 'updated_at', 'datum', 'erstellt']))}`,
+      status: bewegungen.length || werkstattKarten.length ? 'ok' as const : 'warn' as const,
+    },
+  ]
+
+  const devices = [
+    {
+      name: inferDeviceName(),
+      detail: `Aktive Browser-Sitzung · letzte Prüfung ${formatDateTime(new Date())}`,
+      status: 'active' as const,
+    },
+    {
+      name: 'Supabase Session',
+      detail: isSupabaseConfigured() ? 'Authentifizierung und Storage erreichbar' : 'Supabase nicht vollständig konfiguriert',
+      status: isSupabaseConfigured() ? 'passive' as const : 'active' as const,
+    },
+    {
+      name: 'Weitere Geräte',
+      detail: 'Noch keine echte Multi-Device-Verwaltung im Backend vorhanden',
+      status: 'passive' as const,
+    },
+  ]
+
   return {
     cloudStatus: isSupabaseConfigured() ? 'Live verbunden' : 'Nicht konfiguriert',
     cloudStatusColor: isSupabaseConfigured() ? '#10b981' : '#f59e0b',
@@ -316,6 +384,8 @@ async function loadCloudSnapshot(): Promise<CloudSnapshot> {
     orphanDocs,
     syncLog: syncLog.length ? syncLog : [{ time: '—', action: 'Noch keine Live-Aktivität erkannt', status: 'warn', sortKey: 0 }],
     modules,
+    backupHistory,
+    devices,
   }
 }
 
@@ -501,6 +571,42 @@ export default function CloudPage() {
         </div>
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
+        <div className="pk-card">
+          <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800 }}>🧷 Backup-Historie</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {snapshot.backupHistory.map(entry => (
+              <div key={entry.label} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{entry.label}</div>
+                  <span className={entry.status === 'ok' ? 'badge badge-green' : 'badge badge-orange'}>
+                    {entry.status === 'ok' ? 'Aktuell' : 'Begrenzt'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 4 }}>{entry.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="pk-card">
+          <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800 }}>💻 Geräte & Sitzungen</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {snapshot.devices.map(device => (
+              <div key={device.name} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{device.name}</div>
+                  <span className={device.status === 'active' ? 'badge badge-green' : 'badge badge-gray'}>
+                    {device.status === 'active' ? 'Aktiv' : 'Info'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 4 }}>{device.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginTop: 20 }}>
         {[
           {
@@ -521,7 +627,7 @@ export default function CloudPage() {
           {
             icon: '⚠️',
             title: 'Noch kein Vollsync-System',
-            desc: 'Geräteverwaltung, Hintergrund-Jobs und echte Backup-Historie sind weiterhin noch nicht als Backend-Prozess vorhanden.',
+            desc: 'Die neue Übersicht zeigt echte Aktivität, ersetzt aber noch keine zentrale Geräteverwaltung oder versionierte Backup-Infrastruktur.',
           },
         ].map(card => (
           <div key={card.title} className="pk-card">
