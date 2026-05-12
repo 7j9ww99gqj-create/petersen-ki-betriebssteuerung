@@ -919,11 +919,19 @@ export async function upsertEinkaufBestellung(b: {
 
 export async function getEinkaufWareneingaenge() {
   const [result, bestellungen] = await Promise.all([
-    db()
-      .from('einkauf_wareneingaenge')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(200),
+    (async () => {
+      const preferred = await db()
+        .from('einkauf_wareneingaenge')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200)
+      if (!preferred.error || !isSchemaMismatch(preferred.error)) return preferred
+      return db()
+        .from('einkauf_wareneingaenge')
+        .select('*')
+        .order('id', { ascending: false })
+        .limit(200)
+    })(),
     getEinkaufBestellungen(),
   ])
   if (result.error) throw result.error
