@@ -22,6 +22,19 @@
 
 ## 2. Aktueller Arbeitsstand
 - Aktuell in Arbeit am `2026-05-12`:
+  - Der MarketingPilot wurde funktional deutlich ausgebaut und auf `main` gepusht (Commit `5a1816f`): [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx) enthält jetzt neben Kampagnen, Leads, Newsletter und Auswertungen auch echte Arbeitsbereiche für `SEO`, `Content`, `Posting`, `Automationen` und `Integrationen`.
+  - `SEO` ist jetzt als eigener Workspace nutzbar: Keywords, Zielseiten, Intent, Suchvolumen, Schwierigkeit, Ranking, Klicks und Status können gepflegt werden.
+  - `Content` ist jetzt als kleines Studio eingebaut: Ideen, Hook, CTA, Keyword-Zuordnung, Kanal und Status lassen sich direkt im MarketingPilot verwalten.
+  - `Posting` hat jetzt eine eigene Planungsansicht mit Kanal, Termin, Owner, Quelle und Veröffentlichungsstatus.
+  - `Automationen` enthält jetzt nicht nur Regelkarten, sondern auch eine sichtbare Follow-up-Queue aus heißen Leads als operative Arbeitsliste.
+  - `Integrationen` ist als vorbereiteter Systembereich vorhanden und bildet CRM-, Ads-, WhatsApp- und SEO-Anbindungen mit Status, Datenbasis und nächstem Schritt ab.
+  - `Auswertungen` wurden erweitert und zeigen jetzt zusätzlich SEO-, Content- und Posting-Fortschritt neben Lead-, Kampagnen- und Newsletter-Zahlen.
+  - `SEO` speichert jetzt auch ausserhalb des Demo-Modus echt in Supabase: neue Tabelle `marketing_seo_keywords`, Loader/Upsert in [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts) und Live-Laden/Speichern im [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx).
+  - `Content`, `Posting`, `Automationen` und `Integrationen` bleiben vorerst lokal im Browser (`localStorage`); nur `SEO` hat jetzt echte Backend-Persistenz.
+  - Betroffene Dateien: [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql), [`supabase/migrations/20260512190000_add_marketing_seo_keywords.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512190000_add_marketing_seo_keywords.sql), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md).
+  - Offene Punkte: MarketingPilot-CRUD für `Content`, `Posting`, `Automationen` und `Integrationen` ist weiter lokal; ausserdem fehlt noch das Remote-Anwenden der neuen SEO-Migration auf Supabase sowie danach echte externe SEO-/API-Integrationen.
+  - Tests: `npm run lint` erfolgreich; `npm run build` erfolgreich. Weiterhin nur bestehende Warnungen zu `<img>` in [`app/dashboard/einstellungen/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/einstellungen/page.tsx), [`app/dashboard/lager/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/lager/page.tsx), [`components/DocumentPreviewModal.tsx`](/Users/kevinpetersen/Documents/petersen-ki/components/DocumentPreviewModal.tsx) sowie ein bestehender `useEffect`-Dependency-Hinweis in [`app/dashboard/planung/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/planung/page.tsx).
+  - Aktueller Branch: `feature/marketing-seo-persist`
   - [`app/dashboard/buero/[entity]/[id]/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/[entity]/[id]/page.tsx) zeigt Kunden-, Lieferanten- und Eingangsrechnungsdetails jetzt fachlich statt generisch: Stammdaten, Kennzahlen, verknüpfte Vorgänge, Dokumente und Belegkontext sind direkt sichtbar.
   - [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts) hat dafür drei kleine Kontext-Loader erhalten, die bestehende Listen/Relationen bündeln, ohne neues größeres Datenmodell einzuführen.
   - Die drei Phase-1-Migrationen sind jetzt live auf Supabase: Einkaufsschema, Büro-Dokumentrelationen und neue Kernrelationen (`kunde_id`, `lieferant_id`) wurden remote angewendet.
@@ -60,7 +73,8 @@
 - Teilweise implementiert:
   - KI-Erkennung: Upload, Klassifikation, Übernahmeflüsse vorhanden; Qualität abhängig von API-Key/Mapping.
   - SteuerPilot: funktional, aber noch nicht sauber mit Eingangsrechnungen verzahnt.
-  - Planung/Marketing: Live-CRUD vorhanden, aber fachlich noch leichtgewichtig; Marketing hat jetzt zusätzlich eine klickbare KI-Suite ohne echte Backend-Logik.
+  - Planung: Live-CRUD vorhanden, aber fachlich noch leichtgewichtig.
+  - Marketing: Kampagnen, Leads, Newsletter und Auswertungen haben Live-/Pseudo-Live-Flows; `SEO` ist jetzt auch serverseitig gespeichert, `Content`, `Posting`, `Automationen` und `Integrationen` sind als UI-Arbeitsbereiche vorhanden, aber noch lokal.
 - Fehlt oder ist schwach:
   - Durchgängige relationale Verknüpfungen zwischen Modulen.
   - Zentrale Detailseiten/Objektansichten.
@@ -145,6 +159,7 @@
 ## 8. Änderungsverlauf
 | Datum | Agent | Änderungen | Betroffene Dateien | Nächste Schritte |
 | --- | --- | --- | --- | --- |
+| 2026-05-12 | Codex | MarketingPilot-SEO auf echte Supabase-Persistenz gehoben: neue Tabelle `marketing_seo_keywords`, Datenlayer erweitert und SEO-Workspace von rein lokalem State auf Live-Laden/Speichern umgestellt | [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql), [`supabase/migrations/20260512190000_add_marketing_seo_keywords.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512190000_add_marketing_seo_keywords.sql), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Migration remote anwenden, danach Content/Posting/Automationen/Integrationen schrittweise ebenfalls persistieren |
 | 2026-05-12 | Codex | Live-Migrationen vollständig ausgerollt, Kernrelationen (`kunde_id`/`lieferant_id`) ergänzt, Archiv auf Live-Dokumente umgestellt, Detailseiten eingeführt, Chat-/Dokument-API serverseitig mit Session/Rolle gehärtet, Dokumentlöschung um Storage-Cleanup erweitert | [`app/api/chat/route.ts`](/Users/kevinpetersen/Documents/petersen-ki/app/api/chat/route.ts), [`app/api/document-ai/route.ts`](/Users/kevinpetersen/Documents/petersen-ki/app/api/document-ai/route.ts), [`app/dashboard/archiv/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/archiv/page.tsx), [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx), [`app/dashboard/buero/[entity]/[id]/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/[entity]/[id]/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`lib/server-auth.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/server-auth.ts), [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql), [`supabase/migrations/20260512142000_add_buero_core_relations.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512142000_add_buero_core_relations.sql), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Live-Stammdaten für Kunden/Lieferanten ergänzen, Detailseiten weiter verlinken, Rollenmodell von Metadata-Guard auf echtes Domänenmodell heben |
 | 2026-05-12 | Codex | Dokumentauswahl im Büro gegen Doppelverknüpfungen abgesichert und Wareneingänge-Lesefallback für gemischte Live-Schemata ergänzt | [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Dokumentrelationen und Einkaufsmigration mit Echtdaten gegen die Live-Datenbank validieren |
 | 2026-05-12 | Codex | Dokumentverknüpfung im Büro-UI auf Rechnungen, Angebote und Aufträge erweitert; Formulare können archivierte Dokumente auswählen und Listen/Karten zeigen den Link sichtbar an | [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Beide Migrationen live anwenden und Relationslogik mit Echtdaten für Einkauf + alle vier Belegtypen prüfen |
@@ -157,7 +172,7 @@
 
 ## 9. Datenbank-Analyse
 - Bestehende Struktur:
-  - `35` Tabellen im Schema.
+  - `36` Tabellen im Schema.
   - Gute Breite für ERP-nahe Domänen: Firma, Lager, Büro, Einkauf, Werkstatt, Marketing, Planung, Steuer, Import, Dokumente.
   - RLS ist fast überall vorhanden.
 - Probleme / Risiken:

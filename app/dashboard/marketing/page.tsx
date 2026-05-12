@@ -6,9 +6,11 @@ import {
   getMarketingKampagnen,
   getMarketingLeads,
   getMarketingNewsletter,
+  getMarketingSeoKeywords,
   upsertMarketingKampagne,
   upsertMarketingLead,
   upsertMarketingNewsletter,
+  upsertMarketingSeoKeyword,
 } from '@/lib/db'
 
 type KampagneStatus = 'Entwurf' | 'Aktiv' | 'Pausiert' | 'Abgeschlossen'
@@ -1266,15 +1268,18 @@ function NewsletterTab({
 }
 
 function SeoTab({
+  isDemo,
   seoKeywords,
   onChange,
 }: {
+  isDemo: boolean
   seoKeywords: SeoKeyword[]
-  onChange: (next: SeoKeyword[]) => void
+  onChange: (next: SeoKeyword[]) => Promise<boolean>
 }) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ keyword: '', zielseite: '/marketingpilot', intent: 'Transaktional', suchvolumen: '', schwierigkeit: '', ranking: '', klicks: '' })
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const avgRanking = seoKeywords.length > 0 ? seoKeywords.reduce((sum, item) => sum + item.ranking, 0) / seoKeywords.length : 0
   const totalClicks = seoKeywords.reduce((sum, item) => sum + item.klicks, 0)
@@ -1285,7 +1290,12 @@ function SeoTab({
     setTimeout(() => setToast(''), 3500)
   }
 
-  const handleSave = () => {
+  const showError = (msg: string) => {
+    setErrorMsg(msg)
+    setTimeout(() => setErrorMsg(''), 4000)
+  }
+
+  const handleSave = async () => {
     if (!form.keyword) return
     const nextItem: SeoKeyword = {
       id: nextId('SEO', seoKeywords.map(item => item.id)),
@@ -1298,19 +1308,28 @@ function SeoTab({
       klicks: Number(form.klicks || 0),
       status: 'Neu',
     }
-    onChange([nextItem, ...seoKeywords])
+    const saved = await onChange([nextItem, ...seoKeywords])
+    if (!saved) {
+      showError('Fehler beim Speichern')
+      return
+    }
     setForm({ keyword: '', zielseite: '/marketingpilot', intent: 'Transaktional', suchvolumen: '', schwierigkeit: '', ranking: '', klicks: '' })
     setShowForm(false)
-    showToast(`✅ Keyword "${nextItem.keyword}" aufgenommen`)
+    showToast(`✅ Keyword "${nextItem.keyword}" aufgenommen${isDemo ? ' (lokal)' : ''}`)
   }
 
-  const updateStatus = (id: string, status: SeoStatus) => {
-    onChange(seoKeywords.map(item => item.id === id ? { ...item, status } : item))
-    showToast(`✅ SEO-Status auf "${status}" gesetzt`)
+  const updateStatus = async (id: string, status: SeoStatus) => {
+    const saved = await onChange(seoKeywords.map(item => item.id === id ? { ...item, status } : item))
+    if (!saved) {
+      showError('Fehler beim Speichern')
+      return
+    }
+    showToast(`✅ SEO-Status auf "${status}" gesetzt${isDemo ? ' (lokal)' : ''}`)
   }
 
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
@@ -1923,7 +1942,7 @@ export default function MarketingPilotPage() {
   const [kampagnen, setKampagnen] = useState<Kampagne[]>(isDemo ? demoKampagnen : [])
   const [leads, setLeads] = useState<Lead[]>(isDemo ? demoLeads : [])
   const [newsletter, setNewsletter] = useState<Newsletter[]>(isDemo ? demoNewsletter : [])
-  const [seoKeywords, setSeoKeywords] = useLocalStorageState<SeoKeyword[]>('marketingpilot-seo-keywords', defaultSeoKeywords)
+  const [seoKeywords, setSeoKeywords] = useState<SeoKeyword[]>(isDemo ? defaultSeoKeywords : [])
   const [contentIdeas, setContentIdeas] = useLocalStorageState<ContentIdea[]>('marketingpilot-content-ideas', defaultContentIdeas)
   const [postingPlans, setPostingPlans] = useLocalStorageState<PostingPlan[]>('marketingpilot-posting-plans', defaultPostingPlans)
   const [automationRules, setAutomationRules] = useLocalStorageState<AutomationRule[]>('marketingpilot-automation-rules', defaultAutomationRules)
@@ -1933,15 +1952,39 @@ export default function MarketingPilotPage() {
 
   useEffect(() => {
     if (isDemo) return
-    Promise.all([getMarketingKampagnen(), getMarketingLeads(), getMarketingNewsletter()])
-      .then(([campaignRows, leadRows, newsletterRows]) => {
+    Promise.all([getMarketingKampagnen(), getMarketingLeads(), getMarketingNewsletter(), getMarketingSeoKeywords()])
+      .then(([campaignRows, leadRows, newsletterRows, seoRows]) => {
         setKampagnen(campaignRows as Kampagne[])
         setLeads(leadRows as Lead[])
         setNewsletter(newsletterRows as Newsletter[])
+        setSeoKeywords(seoRows as SeoKeyword[])
       })
       .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
   }, [isDemo])
+
+  const saveSeoKeywords = async (next: SeoKeyword[]) => {
+    const changedItem = next.find(item => {
+      const current = seoKeywords.find(existing => existing.id === item.id)
+      return !current || JSON.stringify(current) !== JSON.stringify(item)
+    })
+
+    if (!changedItem) {
+      setSeoKeywords(next)
+      return true
+    }
+
+    if (!isDemo) {
+      try {
+        await upsertMarketingSeoKeyword(changedItem)
+      } catch {
+        return false
+      }
+    }
+
+    setSeoKeywords(next)
+    return true
+  }
 
   const activeCampaigns = kampagnen.filter(item => item.status === 'Aktiv').length
   const newLeads = leads.filter(item => item.status === 'Neu').length
@@ -2022,7 +2065,7 @@ export default function MarketingPilotPage() {
       </div>
 
       {tab === 'demo-lab' && <DemoLabTab kampagnen={kampagnen} leads={leads} newsletter={newsletter} onJump={setTab} />}
-      {tab === 'seo' && <SeoTab seoKeywords={seoKeywords} onChange={setSeoKeywords} />}
+      {tab === 'seo' && <SeoTab isDemo={isDemo} seoKeywords={seoKeywords} onChange={saveSeoKeywords} />}
       {tab === 'content' && <ContentTab seoKeywords={seoKeywords} contentIdeas={contentIdeas} onChange={setContentIdeas} />}
       {tab === 'posting' && <PostingTab postingPlans={postingPlans} contentIdeas={contentIdeas} onChange={setPostingPlans} />}
       {tab === 'automationen' && <AutomationenTab automationRules={automationRules} leads={leads} onChange={setAutomationRules} />}

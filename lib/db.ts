@@ -1062,6 +1062,24 @@ export async function upsertMarketingNewsletter(n: {
   return data
 }
 
+export async function getMarketingSeoKeywords() {
+  const { data, error } = await db().from('marketing_seo_keywords').select('*').order('id', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertMarketingSeoKeyword(k: {
+  id: string; keyword: string; zielseite?: string; intent?: string; suchvolumen?: number
+  schwierigkeit?: number; ranking?: number; klicks?: number; status?: string
+}) {
+  const { data, error } = await db()
+    .from('marketing_seo_keywords')
+    .upsert({ ...k, updated_at: new Date().toISOString() })
+    .select()
+  if (error) throw error
+  return data
+}
+
 // ── PLANUNG ──────────────────────────────────────────────────────────────────
 
 export async function getPlanungProjekte() {
