@@ -1,7 +1,8 @@
 node_modules/
 .next/
 .env.local
-node_modules/
-.next/
-.env.local
+.env.vercel
+.env.vercel.prod
 .vercel
+.DS_Store
+supabase/.temp/
