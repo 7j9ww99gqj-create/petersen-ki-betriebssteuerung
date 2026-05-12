@@ -189,7 +189,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             backdropFilter: 'blur(14px)',
             WebkitBackdropFilter: 'blur(14px)',
             borderBottom: '1px solid rgba(255,255,255,.07)',
-            paddingTop: 'max(10px, env(safe-area-inset-top))',
+            paddingTop: 'calc(10px + env(safe-area-inset-top))',
             paddingRight: 16,
             paddingBottom: 10,
             paddingLeft: 16,

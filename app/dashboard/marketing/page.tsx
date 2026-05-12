@@ -279,29 +279,6 @@ function formatCurrency(value: number) {
   return `${value.toLocaleString('de-DE')} €`
 }
 
-function useLocalStorageState<T>(key: string, initialValue: T) {
-  const [state, setState] = useState<T>(initialValue)
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(key)
-      if (saved) setState(JSON.parse(saved) as T)
-    } catch {
-      // Lokaler Fallback bleibt beim Initialwert.
-    }
-  }, [key])
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(state))
-    } catch {
-      // Schreibfehler im Browser still ignorieren.
-    }
-  }, [key, state])
-
-  return [state, setState] as const
-}
-
 function findChangedItem<T extends { id: string }>(next: T[], current: T[]) {
   return next.find(item => {
     const existing = current.find(currentItem => currentItem.id === item.id)
@@ -1434,16 +1411,19 @@ function SeoTab({
 }
 
 function ContentTab({
+  isDemo,
   seoKeywords,
   contentIdeas,
   onChange,
 }: {
+  isDemo: boolean
   seoKeywords: SeoKeyword[]
   contentIdeas: ContentIdea[]
-  onChange: (next: ContentIdea[]) => void
+  onChange: (next: ContentIdea[]) => Promise<boolean>
 }) {
   const [showForm, setShowForm] = useState(false)
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
   const [form, setForm] = useState({ titel: '', kanal: 'LinkedIn', ziel: '', keyword: seoKeywords[0]?.keyword ?? '', hook: '', cta: '' })
 
   const showToast = (msg: string) => {
@@ -1451,7 +1431,7 @@ function ContentTab({
     setTimeout(() => setToast(''), 3500)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.titel) return
     const nextItem: ContentIdea = {
       id: nextId('CNT', contentIdeas.map(item => item.id)),
@@ -1463,18 +1443,26 @@ function ContentTab({
       cta: form.cta,
       status: 'Idee',
     }
-    onChange([nextItem, ...contentIdeas])
+    const saved = await onChange([nextItem, ...contentIdeas])
+    if (!saved) {
+      setErrorMsg('Fehler beim Speichern')
+      return
+    }
     setForm({ titel: '', kanal: 'LinkedIn', ziel: '', keyword: seoKeywords[0]?.keyword ?? '', hook: '', cta: '' })
     setShowForm(false)
-    showToast(`✅ Content-Idee "${nextItem.titel}" angelegt`)
+    showToast(`✅ Content-Idee "${nextItem.titel}" angelegt${isDemo ? ' (lokal)' : ''}`)
   }
 
-  const updateStatus = (id: string, status: ContentStatus) => {
-    onChange(contentIdeas.map(item => item.id === id ? { ...item, status } : item))
+  const updateStatus = async (id: string, status: ContentStatus) => {
+    const saved = await onChange(contentIdeas.map(item => item.id === id ? { ...item, status } : item))
+    if (!saved) {
+      setErrorMsg('Fehler beim Speichern')
+    }
   }
 
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div className="pk-card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -1549,16 +1537,19 @@ function ContentTab({
 }
 
 function PostingTab({
+  isDemo,
   postingPlans,
   contentIdeas,
   onChange,
 }: {
+  isDemo: boolean
   postingPlans: PostingPlan[]
   contentIdeas: ContentIdea[]
-  onChange: (next: PostingPlan[]) => void
+  onChange: (next: PostingPlan[]) => Promise<boolean>
 }) {
   const [showForm, setShowForm] = useState(false)
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
   const [form, setForm] = useState({ titel: '', kanal: 'LinkedIn', datum: '', owner: 'Marketing', quelle: contentIdeas[0]?.id ?? '' })
 
   const showToast = (msg: string) => {
@@ -1566,7 +1557,7 @@ function PostingTab({
     setTimeout(() => setToast(''), 3500)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.titel || !form.datum) return
     const nextItem: PostingPlan = {
       id: nextId('PST', postingPlans.map(item => item.id)),
@@ -1577,18 +1568,26 @@ function PostingTab({
       owner: form.owner,
       quelle: form.quelle || 'Manuell',
     }
-    onChange([nextItem, ...postingPlans])
+    const saved = await onChange([nextItem, ...postingPlans])
+    if (!saved) {
+      setErrorMsg('Fehler beim Speichern')
+      return
+    }
     setForm({ titel: '', kanal: 'LinkedIn', datum: '', owner: 'Marketing', quelle: contentIdeas[0]?.id ?? '' })
     setShowForm(false)
-    showToast(`✅ Posting "${nextItem.titel}" angelegt`)
+    showToast(`✅ Posting "${nextItem.titel}" angelegt${isDemo ? ' (lokal)' : ''}`)
   }
 
-  const updateStatus = (id: string, status: PostingStatus) => {
-    onChange(postingPlans.map(item => item.id === id ? { ...item, status } : item))
+  const updateStatus = async (id: string, status: PostingStatus) => {
+    const saved = await onChange(postingPlans.map(item => item.id === id ? { ...item, status } : item))
+    if (!saved) {
+      setErrorMsg('Fehler beim Speichern')
+    }
   }
 
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div className="pk-card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -1654,16 +1653,19 @@ function PostingTab({
 }
 
 function AutomationenTab({
+  isDemo,
   automationRules,
   leads,
   onChange,
 }: {
+  isDemo: boolean
   automationRules: AutomationRule[]
   leads: Lead[]
-  onChange: (next: AutomationRule[]) => void
+  onChange: (next: AutomationRule[]) => Promise<boolean>
 }) {
   const [showForm, setShowForm] = useState(false)
   const [toast, setToast] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
   const [form, setForm] = useState({ name: '', trigger: '', aktion: '', kanal: 'CRM', owner: 'Marketing' })
 
   const hotLeads = leads.filter(lead => getLeadScore(lead) >= 75 && !['Gewonnen', 'Verloren'].includes(lead.status))
@@ -1673,7 +1675,7 @@ function AutomationenTab({
     setTimeout(() => setToast(''), 3500)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name || !form.trigger) return
     const nextItem: AutomationRule = {
       id: nextId('AUT', automationRules.map(item => item.id)),
@@ -1684,14 +1686,19 @@ function AutomationenTab({
       owner: form.owner,
       status: 'Entwurf',
     }
-    onChange([nextItem, ...automationRules])
+    const saved = await onChange([nextItem, ...automationRules])
+    if (!saved) {
+      setErrorMsg('Fehler beim Speichern')
+      return
+    }
     setForm({ name: '', trigger: '', aktion: '', kanal: 'CRM', owner: 'Marketing' })
     setShowForm(false)
-    showToast(`✅ Automation "${nextItem.name}" angelegt`)
+    showToast(`✅ Automation "${nextItem.name}" angelegt${isDemo ? ' (lokal)' : ''}`)
   }
 
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
@@ -1768,7 +1775,10 @@ function AutomationenTab({
                   <div style={{ fontWeight: 800 }}>{item.name}</div>
                   <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>Trigger: {item.trigger}</div>
                 </div>
-                <select className="pk-input" style={{ width: 'auto', padding: '5px 10px' }} value={item.status} onChange={event => onChange(automationRules.map(rule => rule.id === item.id ? { ...rule, status: event.target.value as AutomationStatus } : rule))}>
+                <select className="pk-input" style={{ width: 'auto', padding: '5px 10px' }} value={item.status} onChange={async event => {
+                  const saved = await onChange(automationRules.map(rule => rule.id === item.id ? { ...rule, status: event.target.value as AutomationStatus } : rule))
+                  if (!saved) setErrorMsg('Fehler beim Speichern')
+                }}>
                   {['Aktiv', 'Entwurf', 'Pausiert'].map(status => <option key={status}>{status}</option>)}
                 </select>
               </div>
@@ -1783,14 +1793,18 @@ function AutomationenTab({
 }
 
 function IntegrationenTab({
+  isDemo,
   integrationItems,
   onChange,
 }: {
+  isDemo: boolean
   integrationItems: IntegrationItem[]
-  onChange: (next: IntegrationItem[]) => void
+  onChange: (next: IntegrationItem[]) => Promise<boolean>
 }) {
+  const [errorMsg, setErrorMsg] = useState('')
   return (
     <div>
+      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <div className="pk-card">
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontWeight: 900, fontSize: 16 }}>Integrationen vorbereiten</div>
@@ -1802,7 +1816,10 @@ function IntegrationenTab({
             <div key={item.id} style={{ padding: '16px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8, alignItems: 'center' }}>
                 <div style={{ fontWeight: 800 }}>{item.name}</div>
-                <select className="pk-input" style={{ width: 'auto', padding: '5px 10px' }} value={item.status} onChange={event => onChange(integrationItems.map(current => current.id === item.id ? { ...current, status: event.target.value as IntegrationStatus } : current))}>
+                <select className="pk-input" style={{ width: 'auto', padding: '5px 10px' }} value={item.status} onChange={async event => {
+                  const saved = await onChange(integrationItems.map(current => current.id === item.id ? { ...current, status: event.target.value as IntegrationStatus } : current))
+                  if (!saved) setErrorMsg(`Fehler beim Speichern${isDemo ? ' (lokal)' : ''}`)
+                }}>
                   {['Nicht gestartet', 'Vorbereitet', 'In Umsetzung', 'Live'].map(status => <option key={status}>{status}</option>)}
                 </select>
               </div>
@@ -1956,31 +1973,41 @@ export default function MarketingPilotPage() {
   const [leads, setLeads] = useState<Lead[]>(isDemo ? demoLeads : [])
   const [newsletter, setNewsletter] = useState<Newsletter[]>(isDemo ? demoNewsletter : [])
   const [seoKeywords, setSeoKeywords] = useState<SeoKeyword[]>(isDemo ? defaultSeoKeywords : [])
-  const [contentIdeas, setContentIdeas] = useLocalStorageState<ContentIdea[]>('marketingpilot-content-ideas', defaultContentIdeas)
-  const [postingPlans, setPostingPlans] = useLocalStorageState<PostingPlan[]>('marketingpilot-posting-plans', defaultPostingPlans)
-  const [automationRules, setAutomationRules] = useLocalStorageState<AutomationRule[]>('marketingpilot-automation-rules', defaultAutomationRules)
-  const [integrationItems, setIntegrationItems] = useLocalStorageState<IntegrationItem[]>('marketingpilot-integration-items', defaultIntegrationItems)
+  const [contentIdeas, setContentIdeas] = useState<ContentIdea[]>(isDemo ? defaultContentIdeas : [])
+  const [postingPlans, setPostingPlans] = useState<PostingPlan[]>(isDemo ? defaultPostingPlans : [])
+  const [automationRules, setAutomationRules] = useState<AutomationRule[]>(isDemo ? defaultAutomationRules : [])
+  const [integrationItems, setIntegrationItems] = useState<IntegrationItem[]>(isDemo ? defaultIntegrationItems : [])
   const [loading, setLoading] = useState(!isDemo)
   const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
     if (isDemo) return
-    Promise.all([getMarketingKampagnen(), getMarketingLeads(), getMarketingNewsletter(), getMarketingSeoKeywords()])
-      .then(([campaignRows, leadRows, newsletterRows, seoRows]) => {
+    Promise.all([
+      getMarketingKampagnen(),
+      getMarketingLeads(),
+      getMarketingNewsletter(),
+      getMarketingSeoKeywords(),
+      getMarketingContentIdeas(),
+      getMarketingPostingPlans(),
+      getMarketingAutomationRules(),
+      getMarketingIntegrationItems(),
+    ])
+      .then(([campaignRows, leadRows, newsletterRows, seoRows, contentRows, postingRows, automationRows, integrationRows]) => {
         setKampagnen(campaignRows as Kampagne[])
         setLeads(leadRows as Lead[])
         setNewsletter(newsletterRows as Newsletter[])
         setSeoKeywords(seoRows as SeoKeyword[])
+        setContentIdeas((contentRows as ContentIdea[]).length > 0 ? contentRows as ContentIdea[] : defaultContentIdeas)
+        setPostingPlans((postingRows as PostingPlan[]).length > 0 ? postingRows as PostingPlan[] : defaultPostingPlans)
+        setAutomationRules((automationRows as AutomationRule[]).length > 0 ? automationRows as AutomationRule[] : defaultAutomationRules)
+        setIntegrationItems((integrationRows as IntegrationItem[]).length > 0 ? integrationRows as IntegrationItem[] : defaultIntegrationItems)
       })
       .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
   }, [isDemo])
 
   const saveSeoKeywords = async (next: SeoKeyword[]) => {
-    const changedItem = next.find(item => {
-      const current = seoKeywords.find(existing => existing.id === item.id)
-      return !current || JSON.stringify(current) !== JSON.stringify(item)
-    })
+    const changedItem = findChangedItem(next, seoKeywords)
 
     if (!changedItem) {
       setSeoKeywords(next)
@@ -1996,6 +2023,74 @@ export default function MarketingPilotPage() {
     }
 
     setSeoKeywords(next)
+    return true
+  }
+
+  const saveContentIdeas = async (next: ContentIdea[]) => {
+    const changedItem = findChangedItem(next, contentIdeas)
+    if (!changedItem) {
+      setContentIdeas(next)
+      return true
+    }
+    if (!isDemo) {
+      try {
+        await upsertMarketingContentIdea(changedItem)
+      } catch {
+        return false
+      }
+    }
+    setContentIdeas(next)
+    return true
+  }
+
+  const savePostingPlans = async (next: PostingPlan[]) => {
+    const changedItem = findChangedItem(next, postingPlans)
+    if (!changedItem) {
+      setPostingPlans(next)
+      return true
+    }
+    if (!isDemo) {
+      try {
+        await upsertMarketingPostingPlan(changedItem)
+      } catch {
+        return false
+      }
+    }
+    setPostingPlans(next)
+    return true
+  }
+
+  const saveAutomationRules = async (next: AutomationRule[]) => {
+    const changedItem = findChangedItem(next, automationRules)
+    if (!changedItem) {
+      setAutomationRules(next)
+      return true
+    }
+    if (!isDemo) {
+      try {
+        await upsertMarketingAutomationRule(changedItem)
+      } catch {
+        return false
+      }
+    }
+    setAutomationRules(next)
+    return true
+  }
+
+  const saveIntegrationItems = async (next: IntegrationItem[]) => {
+    const changedItem = findChangedItem(next, integrationItems)
+    if (!changedItem) {
+      setIntegrationItems(next)
+      return true
+    }
+    if (!isDemo) {
+      try {
+        await upsertMarketingIntegrationItem(changedItem)
+      } catch {
+        return false
+      }
+    }
+    setIntegrationItems(next)
     return true
   }
 
@@ -2079,10 +2174,10 @@ export default function MarketingPilotPage() {
 
       {tab === 'demo-lab' && <DemoLabTab kampagnen={kampagnen} leads={leads} newsletter={newsletter} onJump={setTab} />}
       {tab === 'seo' && <SeoTab isDemo={isDemo} seoKeywords={seoKeywords} onChange={saveSeoKeywords} />}
-      {tab === 'content' && <ContentTab seoKeywords={seoKeywords} contentIdeas={contentIdeas} onChange={setContentIdeas} />}
-      {tab === 'posting' && <PostingTab postingPlans={postingPlans} contentIdeas={contentIdeas} onChange={setPostingPlans} />}
-      {tab === 'automationen' && <AutomationenTab automationRules={automationRules} leads={leads} onChange={setAutomationRules} />}
-      {tab === 'integrationen' && <IntegrationenTab integrationItems={integrationItems} onChange={setIntegrationItems} />}
+      {tab === 'content' && <ContentTab isDemo={isDemo} seoKeywords={seoKeywords} contentIdeas={contentIdeas} onChange={saveContentIdeas} />}
+      {tab === 'posting' && <PostingTab isDemo={isDemo} postingPlans={postingPlans} contentIdeas={contentIdeas} onChange={savePostingPlans} />}
+      {tab === 'automationen' && <AutomationenTab isDemo={isDemo} automationRules={automationRules} leads={leads} onChange={saveAutomationRules} />}
+      {tab === 'integrationen' && <IntegrationenTab isDemo={isDemo} integrationItems={integrationItems} onChange={saveIntegrationItems} />}
       {tab === 'kampagnen' && <KampagnenTab isDemo={isDemo} kampagnen={kampagnen} onChange={setKampagnen} />}
       {tab === 'leads' && <LeadsTab isDemo={isDemo} leads={leads} onChange={setLeads} />}
       {tab === 'newsletter' && <NewsletterTab isDemo={isDemo} kampagnen={kampagnen} newsletter={newsletter} onChange={setNewsletter} />}
