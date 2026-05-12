@@ -31,6 +31,15 @@ type Newsletter = {
   oeffnungsrate: number; klickrate: number
 }
 
+type DemoMarketingFeature = {
+  id: string
+  title: string
+  short: string
+  detail: string
+  icon: string
+  level: 'Gamechanger' | 'Stark' | 'Ausbau'
+}
+
 // ── Demo-Daten ────────────────────────────────────────────────────────────────
 
 const demoKampagnen: Kampagne[] = [
@@ -55,6 +64,30 @@ const demoNewsletter: Newsletter[] = [
   { id: 'NL-005', betreff: 'April: Frühjahrs-Aktion startet jetzt!', vorschau: 'Nur bis Ende April: 10% Rabatt auf alle Wartungsverträge…', empfaenger: 312, datum: '01.04.2025', status: 'Versendet', oeffnungsrate: 45.2, klickrate: 18.6 },
   { id: 'NL-004', betreff: 'März: Messennachbericht & neue Referenzen', vorschau: 'Wir berichten von der Hannover Messe und stellen neue Kunden vor…', empfaenger: 298, datum: '01.03.2025', status: 'Versendet', oeffnungsrate: 38.7, klickrate: 12.4 },
   { id: 'NL-003', betreff: 'Februar: Produktneuheiten 2025', vorschau: 'Alle neuen Leistungen und Pakete für das neue Jahr…', empfaenger: 287, datum: '01.02.2025', status: 'Versendet', oeffnungsrate: 41.1, klickrate: 15.8 },
+]
+
+const demoMarketingFeatures: DemoMarketingFeature[] = [
+  { id: 'autopilot', title: 'Autopilot-Marketing', short: 'Vom Ziel zum Funnel', detail: 'Der Nutzer sagt nur, wofür er mehr Kunden will. Die Demo zeigt danach grob Zielgruppe, Kampagne, Ads, Landingpage und Funnel als nächsten KI-Flow.', icon: '🚀', level: 'Gamechanger' },
+  { id: 'seo', title: 'SEO-/Keywords-Analyse', short: 'Keywords, Klicks, Sichtbarkeit', detail: 'Prüft wichtige Suchbegriffe, geschätzte Klickstärke, organische Sichtbarkeit und welche Themen für die eigene Seite Potenzial haben.', icon: '🔎', level: 'Stark' },
+  { id: 'lead-intelligence', title: 'Lead Intelligence Engine', short: 'Heiße Leads erkennen', detail: 'Die Demo markiert, welche Leads heiß wirken, wann Kontakt sinnvoll ist und welche nächste Nachricht oder welcher Anruf empfohlen würde.', icon: '🔥', level: 'Stark' },
+  { id: 'ab-testing', title: 'Automatisches A/B Testing', short: 'Varianten testen lassen', detail: 'Später soll die KI Varianten erzeugen, Verlierer stoppen und Gewinner skalieren. Aktuell nur als klickbare Vorschau.', icon: '🧪', level: 'Ausbau' },
+  { id: 'content-ai', title: 'KI-Content & Reels', short: 'Hooks, Clips, Thumbnails', detail: 'Idee für automatische Content-Erstellung mit Hooks, Reels, Anzeigenvideos und Thumbnails für Social-Kampagnen.', icon: '🎥', level: 'Stark' },
+  { id: 'funnel-brain', title: 'Funnel-Builder mit Gehirn', short: 'Struktur + Conversion-Ideen', detail: 'Die Demo beschreibt einen späteren Funnel-Builder, der Seitenstruktur, Absprünge und Conversion-Verbesserungen automatisch einschätzt.', icon: '🧩', level: 'Ausbau' },
+  { id: 'sales-assistant', title: 'KI-Vertriebsassistent', short: 'Antwortet wie ein Verkäufer', detail: 'Später für E-Mail, WhatsApp und Chat mit Angebotswissen, Preisen und Einwandbehandlung. Aktuell als Feature-Vorschau.', icon: '🗣️', level: 'Stark' },
+  { id: 'sales-clone', title: 'Besten Verkäufer klonen', short: 'Calls zu Skripten machen', detail: 'Zielt auf die Analyse starker Sales Calls und die Ableitung von Skripten, E-Mails und Funnels.', icon: '🧬', level: 'Ausbau' },
+  { id: 'content-daily', title: 'Was soll ich morgen posten?', short: 'Tägliche Content-Ideen', detail: 'Zeigt eine spätere Funktion für tägliche Content-Vorschläge inklusive Hook und Struktur.', icon: '📊', level: 'Stark' },
+  { id: 'predictive', title: 'Predictive Marketing', short: 'Flops und Gewinner vorhersagen', detail: 'Später soll die KI Kampagnenrisiken und Trendchancen bewerten, bevor Budget verbrannt wird.', icon: '🔮', level: 'Ausbau' },
+  { id: 'templates', title: 'Branchen-Templates', short: 'Flows für Coaches, Makler, Agenturen', detail: 'Branchenspezifische Templates sollen eigene Flows und Kampagnenlogik je Markt liefern.', icon: '🧑‍🤝‍🧑', level: 'Stark' },
+  { id: 'integrations', title: 'Integrationen', short: 'CRM, Ads, WhatsApp, Kalender', detail: 'Zentrale Anbindung an externe Tools, damit kein Copy-Paste mehr nötig ist.', icon: '⚙️', level: 'Ausbau' },
+  { id: 'gamification', title: 'Gamification', short: 'Score, Fortschritt, Achievements', detail: 'Später als Motivationsebene mit Funnel-Score, Performance-Zielen und kleinen Erfolgsmarkern.', icon: '🎮', level: 'Ausbau' },
+  { id: 'explainability', title: 'Warum funktioniert das?', short: 'KI erklärt die Wirkung', detail: 'Die Demo zeigt die Idee, Ergebnisse nicht nur auszugeben, sondern die Begründung dahinter sichtbar zu machen.', icon: '🧠', level: 'Stark' },
+]
+
+const demoKeywordStats = [
+  { keyword: 'ki warenwirtschaft', klicks: 148, sichtbarkeit: 82, trend: '+12%' },
+  { keyword: 'erp handwerk', klicks: 94, sichtbarkeit: 61, trend: '+7%' },
+  { keyword: 'lager software mittelstand', klicks: 67, sichtbarkeit: 54, trend: '+18%' },
+  { keyword: 'dokumenten ki rechnung', klicks: 39, sichtbarkeit: 48, trend: '+9%' },
 ]
 
 // ── Helper ────────────────────────────────────────────────────────────────────
@@ -87,6 +120,163 @@ function PctBar({ value, color }: { value: number; color: string }) {
         <div style={{ width: `${Math.min(value, 100)}%`, height: '100%', borderRadius: 999, background: color }} />
       </div>
       <span style={{ fontSize: 11, color: '#aeb9c8', minWidth: 34 }}>{value.toFixed(1)}%</span>
+    </div>
+  )
+}
+
+function DemoFeatureCard({ feature, active, onClick }: { feature: DemoMarketingFeature; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        textAlign: 'left',
+        width: '100%',
+        padding: 16,
+        borderRadius: 14,
+        cursor: 'pointer',
+        background: active ? 'rgba(245,158,11,.14)' : 'rgba(255,255,255,.03)',
+        border: active ? '1px solid rgba(245,158,11,.38)' : '1px solid rgba(255,255,255,.08)',
+        color: '#f8fbff',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 20 }}>{feature.icon}</span>
+        <span className={feature.level === 'Gamechanger' ? 'badge badge-orange' : feature.level === 'Stark' ? 'badge badge-blue' : 'badge badge-gray'}>
+          {feature.level}
+        </span>
+      </div>
+      <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 4 }}>{feature.title}</div>
+      <div style={{ fontSize: 12, color: '#aeb9c8', lineHeight: 1.45 }}>{feature.short}</div>
+    </button>
+  )
+}
+
+function DemoLabTab() {
+  const [selected, setSelected] = useState<DemoMarketingFeature>(demoMarketingFeatures[0])
+
+  return (
+    <div>
+      <div className="pk-card" style={{ marginBottom: 18, border: '1px solid rgba(245,158,11,.18)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em' }}>Demo-Labor</div>
+            <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>MarketingPilot Roadmap zum Anklicken</div>
+          </div>
+          <span className="badge badge-orange">Nur Demo · keine Live-Logik</span>
+        </div>
+        <div style={{ fontSize: 13, color: '#aeb9c8', lineHeight: 1.6 }}>
+          Die folgenden Bereiche sind bewusst nur grob sichtbar. Man kann sie anklicken, aber noch nichts produktiv ausführen.
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr .8fr', gap: 18, marginBottom: 18 }}>
+        <div className="pk-card">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+            {demoMarketingFeatures.map(feature => (
+              <DemoFeatureCard
+                key={feature.id}
+                feature={feature}
+                active={selected.id === feature.id}
+                onClick={() => setSelected(feature)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="pk-card" style={{ border: '1px solid rgba(245,158,11,.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(245,158,11,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+              {selected.icon}
+            </div>
+            <div>
+              <div style={{ fontWeight: 900, fontSize: 16 }}>{selected.title}</div>
+              <div style={{ fontSize: 12, color: '#aeb9c8' }}>{selected.short}</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 13, color: '#d0d9e8', lineHeight: 1.6, marginBottom: 14 }}>{selected.detail}</div>
+          <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+            <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 6 }}>Aktueller Status</div>
+            <div style={{ fontSize: 13, color: '#f8fbff' }}>
+              Sichtbar im MarketingPilot als klickbare Demo-Vorschau. Noch keine Auswahl, keine Speicherung, keine Integrationen.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="pk-card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 16 }}>🔎 SEO-/Keywords-Analyse</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>
+              Demo-Idee: wichtige Keywords prüfen, grobe Klickstärke sehen und Potenzial der eigenen Seite erkennen
+            </div>
+          </div>
+          <span className="badge badge-blue">Klickbar · noch ohne Datenanbindung</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+          {[
+            { label: 'Keywords im Fokus', value: '24', icon: '🏷️', color: COLOR },
+            { label: 'Geschätzte Klicks', value: '348', icon: '🖱️', color: '#1684ff' },
+            { label: 'Eigene Seitenklicks', value: '127', icon: '🌐', color: '#10b981' },
+            { label: 'Top-Chancen', value: '6', icon: '🚀', color: '#a78bfa' },
+          ].map(item => (
+            <button key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px', cursor: 'pointer', color: 'inherit' }}>
+              <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: item.color }}>{item.value}</div>
+              <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr .9fr', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Keyword-Vorschau</div>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {demoKeywordStats.map(row => (
+                <button
+                  key={row.keyword}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.4fr .6fr .6fr .5fr',
+                    gap: 10,
+                    alignItems: 'center',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '10px 12px',
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                    background: 'rgba(255,255,255,.03)',
+                    border: '1px solid rgba(255,255,255,.06)',
+                    color: '#f8fbff',
+                  }}
+                >
+                  <span style={{ fontWeight: 700, fontSize: 13 }}>{row.keyword}</span>
+                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>{row.klicks} Klicks</span>
+                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>{row.sichtbarkeit}% Sichtbarkeit</span>
+                  <span style={{ fontSize: 12, color: '#4ddb7e', fontWeight: 700 }}>{row.trend}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Geplante nächste Ausbaustufe</div>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {[
+                'Keyword-Liste eingeben und Chancen live berechnen',
+                'Klicks der eigenen Seite pro Landingpage anzeigen',
+                'Wettbewerb und Ranking-Veränderungen verfolgen',
+                'Keywords direkt in Kampagnen und Content-Ideen übernehmen',
+              ].map(item => (
+                <button key={item} style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', color: '#d0d9e8', fontSize: 13 }}>
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -669,11 +859,11 @@ function AuswertungenTab({ leads, kampagnen }: { leads: Lead[]; kampagnen: Kampa
 
 // ── Haupt-Seite ───────────────────────────────────────────────────────────────
 
-type Tab = 'kampagnen' | 'leads' | 'newsletter' | 'auswertungen'
+type Tab = 'demo-lab' | 'kampagnen' | 'leads' | 'newsletter' | 'auswertungen'
 
 export default function MarketingPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
-  const [tab, setTab] = useState<Tab>('kampagnen')
+  const [tab, setTab] = useState<Tab>('demo-lab')
   const [kampagnen, setKampagnen] = useState<Kampagne[]>(isDemo ? demoKampagnen : [])
   const [leads, setLeads] = useState<Lead[]>(isDemo ? demoLeads : [])
   const [loading, setLoading] = useState(!isDemo)
@@ -707,7 +897,7 @@ export default function MarketingPilotPage() {
         <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0 }}>📣</div>
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>MarketingPilot</h1>
-          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Kampagnen · Leads · Newsletter · Auswertungen</p>
+          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Kampagnen · Leads · Newsletter · Auswertungen · KI-Demos</p>
         </div>
         <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>
       </div>
@@ -731,6 +921,7 @@ export default function MarketingPilotPage() {
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
         {([
+          { id: 'demo-lab', label: '🚀 KI-Demos' },
           { id: 'kampagnen', label: '📣 Kampagnen' },
           { id: 'leads', label: '🎯 Leads' },
           { id: 'newsletter', label: '📰 Newsletter' },
@@ -744,6 +935,7 @@ export default function MarketingPilotPage() {
         ))}
       </div>
 
+      {tab === 'demo-lab' && <DemoLabTab />}
       {tab === 'kampagnen' && <KampagnenTab isDemo={isDemo} />}
       {tab === 'leads' && <LeadsTab isDemo={isDemo} />}
       {tab === 'newsletter' && <NewsletterTab isDemo={isDemo} />}

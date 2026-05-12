@@ -7,6 +7,15 @@ KI-gestütztes Warenwirtschaftssystem als produktive SaaS-WebApp.
 **Live:** https://petersen-ki-betriebssteuerung.vercel.app  
 **Repo:** https://github.com/7j9ww99gqj-create/petersen-ki-betriebssteuerung
 
+### Aktueller Zwischenstand (2026-05-12)
+- Büro-/Einkaufsrelationen wurden weiter abgesichert: `kunde_id` und `lieferant_id` laufen jetzt in `lib/db.ts`, Schema und Büro-UI konsistenter mit.
+- Büro-Detailseiten existieren jetzt unter `app/dashboard/buero/[entity]/[id]/page.tsx` für Kunden, Angebote, Aufträge, Rechnungen, Eingangsrechnungen, Dokumente, Lieferanten und Bestellungen.
+- `app/api/chat/route.ts` und `app/api/document-ai/route.ts` sind serverseitig über `lib/server-auth.ts` gehärtet; Dokument-KI erlaubt jetzt auch die im UI sichtbaren Rollen `Werkstatt` und `Lager`.
+- Archiv ist live angebunden und durchsucht jetzt `buero_dokumente` plus `steuer_belege`; Legacy-Dokumentpfade werden beim Öffnen berücksichtigt.
+- Cloud & Sync zeigt keine Fantasiewerte mehr, sondern echte Live-Kennzahlen, eine ehrliche Backup-Historie aus Modulaktivität und eine einfache Sitzungs-/Geräteübersicht.
+- Letzte relevante Commits auf `main`: `8e8183d` (Cloud-Modul an Live-Daten), `ecc1f62` (Cloud + globale Archivsuche).
+- MarketingPilot hat jetzt zusätzlich einen reinen Demo-Bereich `KI-Demos` mit klickbaren Roadmap-Karten und einer groben SEO-/Keywords-Analyse-Vorschau, bewusst noch ohne echte Ausführung.
+
 ---
 
 ## Schnellstart
@@ -92,12 +101,12 @@ insertEinkaufWareneingang(w: { bestellung_id, eingangsdatum, menge_bestellt, men
 | LagerPilot | `/dashboard/lager` | ✅ Vollständig | 12 Tabs (siehe unten) |
 | BüroPilot | `/dashboard/buero` | ✅ Vollständig | kunden/angebote/auftraege/rechnungen/dokumente/einkauf |
 | WerkstattPilot | `/dashboard/werkstatt` | ✅ Vollständig | Karten/Zeit/Material/Prüfprotokoll |
-| MarketingPilot | `/dashboard/marketing` | ⚠️ Teilweise | Create OK, Edit/Delete fehlt |
+| MarketingPilot | `/dashboard/marketing` | ⚠️ Teilweise | Create OK, Edit/Delete fehlt; KI-Demos/SEO nur als klickbare Vorschau |
 | AnalysePilot | `/dashboard/analyse` | ⚠️ Demo-Daten | Charts laufen, kein Supabase |
 | PlanungPilot | `/dashboard/planung` | ✅ Vollständig | Projekte/Aufgaben/Kalender/Ressourcen |
 | KI-Assistent | `/dashboard/ki-erkennung` | ✅ Vollständig | Tagesbrief/Erkennung/Chat + Aktions-Ausführung |
-| Cloud & Sync | `/dashboard/cloud` | ✅ Basis | Sync-Status, Storage |
-| Archiv | `/dashboard/archiv` | ✅ Basis | Dokumentenarchiv |
+| Cloud & Sync | `/dashboard/cloud` | ✅ Live-Basis | echte Kennzahlen, Aktivität, Storage, ehrliche Geräte-/Backup-Übersicht |
+| Archiv | `/dashboard/archiv` | ✅ Live-Basis | globales Archiv für Büro-Dokumente + Steuerbelege |
 | Einstellungen | `/dashboard/einstellungen` | ✅ Vollständig | Profil/Benachrichtigungen/Rollen |
 
 ### LagerPilot — Alle Tabs
@@ -203,8 +212,8 @@ POST /api/chat
 
 ### Daten-Loading in route.ts
 - `pk_demo` Cookie aus Request → Demo: statische `DEMO_CONTEXT`-Daten
-- Live: `Promise.allSettled([getLagerArtikel(), getLagerStellplaetze(), getLagerStellplatzBestand(), getLagerUmlagerungen()])`
-- **Bekannte Einschränkung:** `createBrowserClient` hat keine User-Session in API-Routes → RLS gibt leere Arrays zurück. Fix: auf `createServerClient` mit Cookie-Forwarding umstellen (noch offen)
+- Live: serverseitiger Supabase-Zugriff über `lib/server-auth.ts` + Session-Cookies
+- Lagerdaten werden in der Route direkt über den Server-Client geladen; die frühere Browser-Client-/RLS-Leerfall-Einschränkung ist für `/api/chat` damit behoben
 
 ### buildContextBlock — Was im Prompt steht
 ```

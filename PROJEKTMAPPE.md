@@ -1,6 +1,6 @@
 # Petersen KI – Vollständige Projektmappe
 
-> Letzte Aktualisierung: 2026-05-10
+> Letzte Aktualisierung: 2026-05-12
 
 ---
 
@@ -26,7 +26,7 @@
 │                                                                      │
 │  app/api/chat/route.ts  ──────→  Anthropic API (Claude Sonnet)      │
 │    ├── Demo: DEMO_CONTEXT (statisch)                                 │
-│    ├── Live: getLagerArtikel/Stellplaetze/Bestand/Umlagerungen()    │
+│    ├── Live: Server-Supabase via lib/server-auth.ts                  │
 │    ├── buildContextBlock() → Lagerdaten + Problem-Analyse im Prompt │
 │    └── structuredOutput → JSON { message, probleme[], actions[] }   │
 │                                                                      │
@@ -52,12 +52,13 @@
 /dashboard/lager           → app/dashboard/lager/page.tsx       ← LagerPilot (12 Tabs)
 /dashboard/buero           → app/dashboard/buero/page.tsx       ← BüroPilot (6 Tabs)
 /dashboard/werkstatt       → app/dashboard/werkstatt/page.tsx
-/dashboard/marketing       → app/dashboard/marketing/page.tsx
+/dashboard/marketing       → app/dashboard/marketing/page.tsx          ← CRUD + KI-Demo-Vorschau
 /dashboard/analyse         → app/dashboard/analyse/page.tsx
 /dashboard/planung         → app/dashboard/planung/page.tsx
 /dashboard/ki-erkennung    → app/dashboard/ki-erkennung/page.tsx ← KI-Assistent (3 Tabs)
-/dashboard/cloud           → app/dashboard/cloud/page.tsx
-/dashboard/archiv          → app/dashboard/archiv/page.tsx
+/dashboard/cloud           → app/dashboard/cloud/page.tsx              ← Live-Kennzahlen + Backup-/Geräteübersicht
+/dashboard/archiv          → app/dashboard/archiv/page.tsx             ← Büro-Dokumente + Steuerbelege
+/dashboard/buero/[entity]/[id] → app/dashboard/buero/[entity]/[id]/page.tsx
 /dashboard/einstellungen   → app/dashboard/einstellungen/page.tsx
 
 POST /api/chat             → app/api/chat/route.ts               ← KI-Chat + Lagerdaten
@@ -224,7 +225,7 @@ type KiAktion = { type: 'umlagerung'|'bestellung'|'hinweis', artikel?,
 
 ---
 
-### 🧾 BüroPilot (`/dashboard/buero`) — 6 Tabs
+### 🧾 BüroPilot (`/dashboard/buero`) — 6 Tabs + Detailseiten
 
 ```
 app/dashboard/buero/page.tsx
@@ -254,7 +255,58 @@ app/dashboard/buero/page.tsx
       │     └── auto: Bestellstatus → Geliefert / Teillieferung
       │
       └── 4 KPI-Karten
-      ⚠️ EinkaufTab läuft noch auf Demo-State (db.ts-Funktionen fertig, nicht verdrahtet)
+      ⚠️ Teile des Einkaufs sind fachlich noch leichter als Lager, aber Relationen Kunde/Lieferant/Dokument wurden bereits nachgezogen
+
+Zusätzlich:
+- `app/dashboard/buero/[entity]/[id]/page.tsx`
+- generische Detailroute für:
+  - Kunden
+  - Angebote
+  - Aufträge
+  - Rechnungen
+  - Eingangsrechnungen
+  - Dokumente
+  - Lieferanten
+  - Bestellungen
+
+Relationen-Stand:
+- `buero_angebote.kunde_id`
+- `buero_auftraege.kunde_id`
+- `buero_rechnungen.kunde_id`
+- `buero_eingangsrechnungen.lieferant_id`
+- `buero_dokumente` mit Relationsfeldern für Eingangsrechnung/Rechnung/Angebot/Auftrag
+
+Archiv-/Cloud-Stand:
+- Archiv ist nicht mehr nur Demo-UI, sondern zieht echte Büro-Dokumente und Steuerbelege
+- Cloud zeigt echte Live-Kennzahlen statt fester Demo-Sync-Werte
+
+### 📣 MarketingPilot (`/dashboard/marketing`)
+
+Aktueller Stand:
+- Bestehende Live-Bereiche: Kampagnen, Leads, Newsletter, Auswertungen
+- Neuer Demo-Bereich: `🚀 KI-Demos`
+
+Demo-Features im UI:
+- Autopilot-Marketing
+- SEO-/Keywords-Analyse
+- Lead Intelligence Engine
+- Automatisches A/B Testing
+- KI-Content & Reels
+- Funnel-Builder
+- KI-Vertriebsassistent
+- Verkäufer-Klon
+- Daily Content Ideas
+- Predictive Marketing
+- Branchen-Templates
+- Integrationen
+- Gamification
+- Explainability
+
+Wichtig:
+- Alles aktuell nur als klickbare Vorschau
+- keine echte Datenlogik
+- keine Auswahl- oder Ausführungsflüsse
+- SEO-/Keywords-Analyse zeigt aktuell nur grobe Demo-Kennzahlen und geplante nächste Ausbaustufen
 ```
 
 ---
