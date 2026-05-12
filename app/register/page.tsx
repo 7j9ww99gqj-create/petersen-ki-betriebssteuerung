@@ -29,7 +29,15 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const supabase = createSupabaseClient()
-      const { data, error: authError } = await supabase.auth.signUp({ email, password })
+      const { data, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            role: 'Mitarbeiter',
+          },
+        },
+      })
 
       if (authError) {
         setError(authError.message)

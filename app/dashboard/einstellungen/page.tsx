@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
 import { isDemoUser, hasDemoCookie, performLogout } from '@/lib/auth'
-import { type AppRole, ROLE_LABELS, ROLE_PILOTS, PERMISSIONS, useRole, setRole as saveRole } from '@/lib/roles'
+import { type AppRole, APP_ROLES, ROLE_LABELS, ROLE_PILOTS, PERMISSIONS, normalizeRole, useRole } from '@/lib/roles'
 import {
   parseCsvFile, validateImportRows, autoMapColumns, buildImportRows,
   normalizeNumber, normalizeDate,
@@ -51,11 +51,12 @@ export default function EinstellungenPage() {
       if (!user) return
       const email = user.email ?? ''
       const demo = isDemoUser(email)
+      const resolvedRole = normalizeRole(user.app_metadata?.role ?? user.user_metadata?.role)
       setIsDemo(demo)
       setProfil({
         name: (user.user_metadata?.full_name as string) || email.split('@')[0] || '',
         email,
-        role: demo ? 'Demo Admin' : 'Administrator',
+        role: demo ? 'Demo Admin' : ROLE_LABELS[resolvedRole],
         firma: (user.user_metadata?.firma as string) || '',
       })
     })
@@ -270,7 +271,7 @@ export default function EinstellungenPage() {
               Werkstatt: 'Werkstatt, Lager, Planung und KI-Assistent',
               Lager: 'Nur Lagerverwaltung und KI-Assistent',
             }
-            const allRoles = Object.keys(ROLE_LABELS) as AppRole[]
+            const allRoles = APP_ROLES
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* Aktuelle Rolle */}
@@ -337,7 +338,7 @@ export default function EinstellungenPage() {
 
                   {/* Rolle wechseln */}
                   <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', paddingTop: 20 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>Rolle wechseln (Demo)</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>{isDemo ? 'Rolle wechseln (Demo)' : 'Eigene Rolle im System speichern'}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                       <select
                         value={selectedRole}
@@ -352,17 +353,23 @@ export default function EinstellungenPage() {
                       <button
                         className="pk-btn"
                         style={{ fontWeight: 700 }}
-                        onClick={() => {
-                          applyRole(selectedRole)
-                          saveRole(selectedRole)
-                          showToast(`✅ Rolle gesetzt: ${ROLE_LABELS[selectedRole]}`)
+                        onClick={async () => {
+                          try {
+                            const nextRole = await applyRole(selectedRole)
+                            setProfil(prev => ({ ...prev, role: isDemo ? 'Demo Admin' : ROLE_LABELS[nextRole] }))
+                            showToast(`✅ Rolle gesetzt: ${ROLE_LABELS[nextRole]}`)
+                          } catch (error) {
+                            showToast(error instanceof Error ? error.message : 'Rolle konnte nicht gespeichert werden.', 'error')
+                          }
                         }}
                       >
                         Speichern
                       </button>
                     </div>
                     <p style={{ margin: '12px 0 0', fontSize: 12, color: '#4a5568', lineHeight: 1.6 }}>
-                      Im Produktivbetrieb werden Rollen vom Admin über die Benutzerverwaltung vergeben.
+                      {isDemo
+                        ? 'Im Produktivbetrieb werden Rollen serverseitig an den Benutzer gebunden.'
+                        : 'Die Rolle wird jetzt in den Benutzer-Metadaten gespeichert und bei API-Zugriffen mitverwendet.'}
                     </p>
                   </div>
                 </div>
