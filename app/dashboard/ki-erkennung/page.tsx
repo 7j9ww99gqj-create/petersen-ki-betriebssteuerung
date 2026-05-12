@@ -1147,7 +1147,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
         <div className="pk-card" style={{ display: 'flex', flexDirection: 'column', minHeight: 560 }}>
           <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>💬 Demo-Chat</h3>
           <p style={{ margin: '0 0 14px', color: '#aeb9c8', fontSize: 13 }}>
-            Simulierter Assistent ohne echte KI-Antworten. Echte KI wird nur im Tab „Dokumente" verwendet.
+            Simulierter Assistent ohne echte KI-Antworten. Echte KI wird nur im Tab „Dokumente&quot; verwendet.
           </p>
 
           {/* Chat-Verlauf */}

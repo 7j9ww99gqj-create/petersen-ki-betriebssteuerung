@@ -104,7 +104,7 @@ export default function RegisterPage() {
                 fontSize: 12, color: '#93b8ff', textAlign: 'left', lineHeight: 1.5,
               }}>
                 💡 <strong>Tipp für Entwickler:</strong> E-Mail-Bestätigung in Supabase unter
-                Authentication → Settings → „Confirm email" deaktivieren, dann ist der Login sofort möglich.
+                Authentication → Settings → „Confirm email&quot; deaktivieren, dann ist der Login sofort möglich.
               </div>
               <button onClick={() => router.push('/login')} className="pk-btn"
                 style={{ width: '100%', marginTop: 20, fontWeight: 700 }}>
