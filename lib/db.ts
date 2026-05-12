@@ -4,6 +4,7 @@
  * Demo-Nutzer (hasDemoCookie) verwenden statische Daten in den Pilots.
  */
 import { createSupabaseClient } from './supabase'
+import { normalizeDocumentStoragePath } from './documents'
 
 function db() { return createSupabaseClient() }
 
@@ -330,15 +331,26 @@ export async function deleteBueroDokument(id: string) {
 
 // Datei in Storage hochladen
 export async function uploadDokument(file: File, userId: string): Promise<string> {
-  const path = `${userId}/${Date.now()}_${file.name}`
-  const { error } = await db().storage.from('dokumente').upload(path, file)
+  const sanitizedName = file.name.replace(/[^\w.\-]+/g, '_')
+  const path = `${userId}/${Date.now()}_${sanitizedName}`
+  const { error } = await db().storage.from('dokumente').upload(path, file, { upsert: true })
   if (error) throw error
   return path
 }
 
-export async function getDokumentUrl(path: string): Promise<string> {
-  const { data } = await db().storage.from('dokumente').createSignedUrl(path, 3600)
+export async function getDokumentUrl(pathOrUrl: string): Promise<string> {
+  const normalized = normalizeDocumentStoragePath(pathOrUrl)
+  if (!normalized) return ''
+  if (/^https?:\/\//i.test(normalized)) return normalized
+  const { data, error } = await db().storage.from('dokumente').createSignedUrl(normalized, 3600)
+  if (error) throw error
   return data?.signedUrl ?? ''
+}
+
+export async function getBueroDokumentById(id: string) {
+  const { data, error } = await db().from('buero_dokumente').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  return data
 }
 
 // ── WERKSTATT ────────────────────────────────────────────────────────────────

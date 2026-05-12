@@ -3,12 +3,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   umlagerArtikel, getLagerStellplaetze, getLagerStellplatzBestand,
-  getBueroDokumente, insertBueroDokument, updateBueroDokument, uploadDokument,
+  getBueroDokumentById, getBueroDokumente, getDokumentUrl, insertBueroDokument, updateBueroDokument, uploadDokument,
   upsertBueroEingangsrechnung, upsertBueroRechnung, upsertBueroAngebot,
   insertEinkaufWareneingang,
 } from '@/lib/db'
 import { hasDemoCookie } from '@/lib/auth'
 import { createSupabaseClient } from '@/lib/supabase'
+import { normalizeDocumentStoragePath, type StoredDocumentLink } from '@/lib/documents'
+import DocumentPreviewModal from '@/components/DocumentPreviewModal'
 
 // ─── Demo-Daten ───────────────────────────────────────────────────────────────
 
@@ -188,6 +190,25 @@ function toDocRecord(params: {
   }
 }
 
+async function resolveWorkflowDocumentUrl(doc: StoredDocumentLink): Promise<string> {
+  const directPath = normalizeDocumentStoragePath(doc.storage_path)
+  if (directPath) {
+    const signedUrl = await getDokumentUrl(directPath)
+    if (signedUrl) return signedUrl
+  }
+
+  if (doc.dokument_id) {
+    const linked = await getBueroDokumentById(doc.dokument_id)
+    const linkedPath = normalizeDocumentStoragePath((linked as { storage_path?: string | null } | null)?.storage_path)
+    if (linkedPath) {
+      const signedUrl = await getDokumentUrl(linkedPath)
+      if (signedUrl) return signedUrl
+    }
+  }
+
+  throw new Error('Für dieses Dokument wurde keine gespeicherte Datei gefunden. Bitte Upload und Storage-Verknüpfung prüfen.')
+}
+
 // ─── Hauptkomponente ──────────────────────────────────────────────────────────
 
 export default function KiErkennungPage() {
@@ -211,6 +232,10 @@ export default function KiErkennungPage() {
   const [activeDocId, setActiveDocId] = useState<string | null>(null)
   const [docSearch, setDocSearch] = useState('')
   const [handoverConfirm, setHandoverConfirm] = useState<HandoverTarget | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<DocumentWorkflowRecord | null>(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
 
   // Tab: Chat
   const [chatMsg, setChatMsg] = useState('')
@@ -390,6 +415,33 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     setSavedDocs(prev => prev.map(d => d.id === id ? { ...d, status } : d))
     if (!hasDemoCookie()) {
       await updateBueroDokument(id, { status })
+    }
+  }
+
+  async function openSavedDocument(doc: DocumentWorkflowRecord) {
+    if (isDemo) {
+      setPreviewDoc(doc)
+      setPreviewUrl('')
+      setPreviewError('Im Demo-Modus ist keine echte Datei hinterlegt. In Live-Accounts wird hier die Vorschau oder Dateiansicht geöffnet.')
+      setPreviewLoading(false)
+      return
+    }
+
+    setPreviewDoc(doc)
+    setPreviewLoading(true)
+    setPreviewError(null)
+    setPreviewUrl('')
+
+    try {
+      setPreviewUrl(await resolveWorkflowDocumentUrl({
+        ...doc,
+        storage_path: doc.storagePath,
+        dokument_id: doc.id,
+      }))
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : 'Dokument konnte nicht geöffnet werden.')
+    } finally {
+      setPreviewLoading(false)
     }
   }
 
@@ -646,6 +698,21 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
 
   return (
     <div className="fade-in">
+      {previewDoc && (
+        <DocumentPreviewModal
+          document={previewDoc}
+          url={previewUrl}
+          loading={previewLoading}
+          error={previewError}
+          onClose={() => {
+            setPreviewDoc(null)
+            setPreviewUrl('')
+            setPreviewError(null)
+          }}
+          onRetry={() => openSavedDocument(previewDoc)}
+          onOpenExternal={previewUrl ? () => window.open(previewUrl, '_blank', 'noopener,noreferrer') : undefined}
+        />
+      )}
       {/* Header */}
       <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{
@@ -1027,13 +1094,13 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
                 toDocRecord({ id: 'DEMO-DOK-1', name: 'Demo Lieferschein.pdf', result: { documentType: 'lieferschein', summary: 'Demo: Lieferschein LS-2025-08844', confidence: .99, extracted: {}, suggestedActions: [] }, fields: {}, status: 'archiviert' }),
                 toDocRecord({ id: 'DEMO-DOK-2', name: 'Demo Rechnung.pdf', result: { documentType: 'rechnung', summary: 'Demo: Rechnung RE-2025-1123', confidence: .95, extracted: {}, suggestedActions: [] }, fields: {}, status: 'übernommen' }),
               ]).map(r => (
-                <div key={r.id} style={{
+                <div key={r.id} onClick={() => openSavedDocument(r)} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0',
-                  borderBottom: '1px solid rgba(255,255,255,.05)',
+                  borderBottom: '1px solid rgba(255,255,255,.05)', width: '100%', color: 'inherit', textAlign: 'left', cursor: 'pointer',
                 }}>
                   <span style={{ fontSize: 20 }}>{r.documentType === 'rechnung' ? '🧾' : '📄'}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{r.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, textDecoration: 'underline' }}>{r.name}</div>
                     <div style={{ fontSize: 11, color: '#aeb9c8' }}>{labelForDocumentType(r.documentType)} · {r.summary}</div>
                     <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
                       <span className={r.status === 'übernommen' ? 'badge badge-green' : r.status === 'archiviert' ? 'badge badge-gray' : r.status === 'geprüft' ? 'badge badge-blue' : 'badge badge-orange'}>{r.status}</span>
@@ -1041,7 +1108,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
                     </div>
                   </div>
                   {r.status !== 'archiviert' && savedDocs.some(d => d.id === r.id) && (
-                    <button className="pk-btn-ghost" onClick={() => setDocumentStatus(r.id, 'archiviert').catch(() => {})} style={{ fontSize: 11 }}>
+                    <button className="pk-btn-ghost" onClick={e => { e.stopPropagation(); setDocumentStatus(r.id, 'archiviert').catch(() => {}) }} style={{ fontSize: 11 }}>
                       Archivieren
                     </button>
                   )}

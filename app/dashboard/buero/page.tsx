@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
 import {
   getBueroKunden, upsertBueroKunde, deleteBueroKunde,
@@ -8,12 +9,15 @@ import {
   getBueroRechnungen, upsertBueroRechnung,
   getBueroEingangsrechnungen, upsertBueroEingangsrechnung, deleteBueroEingangsrechnung,
   markEingangsrechnungBezahlt, updateEingangsrechnungStatus,
-  getBueroDokumente, insertBueroDokument, deleteBueroDokument,
+  getBueroDokumente, getBueroDokumentById, getDokumentUrl, insertBueroDokument, deleteBueroDokument, uploadDokument,
   getEinkaufLieferanten, upsertEinkaufLieferant, deleteEinkaufLieferant,
   getEinkaufBestellungen, upsertEinkaufBestellung,
   getEinkaufWareneingaenge, insertEinkaufWareneingang,
 } from '@/lib/db'
 import { generateRechnungPDF, generateAngebotPDF } from '@/lib/pdf'
+import { createSupabaseClient } from '@/lib/supabase'
+import { normalizeDocumentStoragePath, type StoredDocumentLink } from '@/lib/documents'
+import DocumentPreviewModal from '@/components/DocumentPreviewModal'
 
 // ── Typen ───────────────────────────────────────────────────────────────────
 
@@ -42,6 +46,7 @@ type Rechnung = {
 type Dokument = {
   id: string; name: string; typ: string; groesse: string; datum: string
   kategorie: 'Angebot' | 'Rechnung' | 'Vertrag' | 'Sonstiges'; bezug: string
+  storage_path?: string
 }
 
 type EingangsrechnungStatus = 'offen' | 'geprüft' | 'freigegeben' | 'bezahlt' | 'überfällig' | 'abgelehnt'
@@ -149,6 +154,31 @@ const demoDokumente: Dokument[] = [
 function parseBetrag(s: string): number {
   const cleaned = s.replace(/[^\d,\.]/g, '').replace(',', '.')
   return parseFloat(cleaned) || 0
+}
+
+async function resolveDocumentViewUrl(doc: StoredDocumentLink): Promise<string> {
+  const directPath = normalizeDocumentStoragePath(doc.storage_path)
+  if (directPath) {
+    const signedUrl = await getDokumentUrl(directPath)
+    if (signedUrl) return signedUrl
+  }
+
+  const legacyPath = normalizeDocumentStoragePath(doc.dokument_url)
+  if (legacyPath) {
+    const signedUrl = await getDokumentUrl(legacyPath)
+    if (signedUrl) return signedUrl
+  }
+
+  if (doc.dokument_id) {
+    const linked = await getBueroDokumentById(doc.dokument_id)
+    const linkedPath = normalizeDocumentStoragePath((linked as { storage_path?: string | null } | null)?.storage_path)
+    if (linkedPath) {
+      const signedUrl = await getDokumentUrl(linkedPath)
+      if (signedUrl) return signedUrl
+    }
+  }
+
+  throw new Error('Für diesen Eintrag wurde keine gültige Datei gefunden. Bitte Speicherpfad, Dokumenten-ID oder Upload prüfen.')
 }
 
 function getLocalFirmaDefaults() {
@@ -540,7 +570,7 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
 
 // ── Angebote-Tab ────────────────────────────────────────────────────────────
 
-function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege }: { isDemo: boolean; kunden: Kunde[]; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>> }) {
+function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterStatus }: { isDemo: boolean; kunden: Kunde[]; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; initialFilterStatus?: string }) {
   const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
   const [showForm, setShowForm] = useState(false)
   const [toast, setToast] = useState('')
@@ -563,6 +593,13 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege }: { isDemo: bool
       .catch(() => showToast('Fehler beim Laden der Angebote', true))
       .finally(() => setLoading(false))
   }, [isDemo])
+
+  useEffect(() => {
+    if (!initialFilterStatus) return
+    if (['Alle', 'Entwurf', 'Versendet', 'Akzeptiert', 'Abgelehnt'].includes(initialFilterStatus)) {
+      setFilterStatus(initialFilterStatus)
+    }
+  }, [initialFilterStatus])
 
   const showToast = (msg: string, error = false) => {
     setToast(msg); setToastError(error)
@@ -777,7 +814,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege }: { isDemo: bool
           </thead>
           <tbody>
             {filtered.map(a => (
-              <tr key={a.id}>
+              <tr key={a.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(a)}>
                 <td style={{ color: '#aeb9c8', fontFamily: 'monospace', fontSize: 12 }}>{a.id}</td>
                 <td style={{ fontWeight: 600 }}>{a.kunde}</td>
                 <td style={{ color: '#d0d9e8' }}>{a.titel}</td>
@@ -791,28 +828,28 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege }: { isDemo: bool
                   ) : (
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {a.status === 'Entwurf' && (
-                        <button onClick={() => handleStatusChange(a.id, 'Versendet')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(22,132,255,.3)', background: 'transparent', color: '#6cb6ff', cursor: 'pointer' }}>
+                        <button onClick={e => { e.stopPropagation(); handleStatusChange(a.id, 'Versendet') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(22,132,255,.3)', background: 'transparent', color: '#6cb6ff', cursor: 'pointer' }}>
                           📤 Senden
                         </button>
                       )}
                       {a.status === 'Versendet' && (
                         <>
-                          <button onClick={() => handleStatusChange(a.id, 'Akzeptiert')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>✅</button>
-                          <button onClick={() => handleStatusChange(a.id, 'Abgelehnt')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,165,0,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>✕</button>
+                          <button onClick={e => { e.stopPropagation(); handleStatusChange(a.id, 'Akzeptiert') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>✅</button>
+                          <button onClick={e => { e.stopPropagation(); handleStatusChange(a.id, 'Abgelehnt') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,165,0,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>✕</button>
                         </>
                       )}
                       {a.status === 'Akzeptiert' && (
-                        <button onClick={() => handleKonvertieren(a)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'rgba(37,211,102,.08)', color: '#4ddb7e', cursor: 'pointer', fontWeight: 700 }}>
+                        <button onClick={e => { e.stopPropagation(); handleKonvertieren(a) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'rgba(37,211,102,.08)', color: '#4ddb7e', cursor: 'pointer', fontWeight: 700 }}>
                           → Auftrag erstellen
                         </button>
                       )}
-                      <button onClick={() => generateAngebotPDF(a, a.kunde)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
+                      <button onClick={e => { e.stopPropagation(); generateAngebotPDF(a, a.kunde) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
                         📄 PDF
                       </button>
-                      <button onClick={() => openEdit(a)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
+                      <button onClick={e => { e.stopPropagation(); openEdit(a) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
                         ✏️
                       </button>
-                      <button onClick={() => setDeleteId(a.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.3)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>
+                      <button onClick={e => { e.stopPropagation(); setDeleteId(a.id) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.3)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>
                         🗑️
                       </button>
                     </div>
@@ -1023,7 +1060,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
 
       <div style={{ display: 'grid', gap: 12 }}>
         {filtered.map(a => (
-          <div key={a.id} className="pk-card" style={{ border: `1px solid ${statusColor[a.status]}20` }}>
+          <div key={a.id} className="pk-card" style={{ border: `1px solid ${statusColor[a.status]}20`, cursor: 'pointer' }} onClick={() => openEdit(a)}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -1041,17 +1078,17 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
             <ProgressBar value={a.fortschritt} color={statusColor[a.status]} />
             <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               {a.status === 'In Bearbeitung' && (
-                <button onClick={() => handleAbschliessen(a.id)} style={{ fontSize: 12, padding: '6px 16px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
+                <button onClick={e => { e.stopPropagation(); handleAbschliessen(a.id) }} style={{ fontSize: 12, padding: '6px 16px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
                   ✅ Als abgeschlossen markieren
                 </button>
               )}
-              <button onClick={() => openEdit(a)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
+              <button onClick={e => { e.stopPropagation(); openEdit(a) }} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
                 ✏️ Bearbeiten
               </button>
               {deleteId === a.id ? (
                 <DeleteConfirm label={a.id} onConfirm={() => handleDelete(a.id)} onCancel={() => setDeleteId(null)} />
               ) : (
-                <button onClick={() => setDeleteId(a.id)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(255,80,80,.3)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>
+                <button onClick={e => { e.stopPropagation(); setDeleteId(a.id) }} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(255,80,80,.3)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>
                   🗑️ Löschen
                 </button>
               )}
@@ -1065,7 +1102,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
 
 // ── Rechnungen-Tab ──────────────────────────────────────────────────────────
 
-function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] }) {
+function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolean; kunden: Kunde[]; initialFilterStatus?: string }) {
   const [rechnungen, setRechnungen] = useState<Rechnung[]>(isDemo ? demoRechnungen : [])
   const [toast, setToast] = useState('')
   const [toastError, setToastError] = useState(false)
@@ -1088,6 +1125,13 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
       .catch(() => showToast('Fehler beim Laden der Rechnungen', true))
       .finally(() => setLoading(false))
   }, [isDemo])
+
+  useEffect(() => {
+    if (!initialFilterStatus) return
+    if (['Alle', 'Offen', 'Überfällig', 'Mahnung', 'Bezahlt'].includes(initialFilterStatus)) {
+      setFilterStatus(initialFilterStatus)
+    }
+  }, [initialFilterStatus])
 
   const showToast = (msg: string, error = false) => {
     setToast(msg); setToastError(error)
@@ -1230,21 +1274,21 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
           { label: 'Bezahlt', value: fmtEur(sumBezahlt), icon: '✅', color: '#4ddb7e', bg: 'rgba(37,211,102,.08)', border: 'rgba(37,211,102,.2)' },
           { label: 'Überfällig / Mahnung', value: fmtEur(sumUeberfaellig), icon: '⚠️', color: '#ffb347', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.2)' },
         ].map(k => (
-          <div key={k.label} style={{ padding: '14px 16px', borderRadius: 12, background: k.bg, border: `1px solid ${k.border}` }}>
+          <button key={k.label} onClick={() => setFilterStatus(k.label === 'Überfällig / Mahnung' ? 'Überfällig' : k.label)} style={{ padding: '14px 16px', borderRadius: 12, background: k.bg, border: `1px solid ${k.border}`, textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
             <div style={{ fontSize: 20, marginBottom: 4 }}>{k.icon}</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em' }}>{k.label}</div>
-          </div>
+          </button>
         ))}
       </div>
 
       {offenCount > 0 && (
-        <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button onClick={() => setFilterStatus('Offen')} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: 'inherit', textAlign: 'left' }}>
           <span style={{ fontSize: 18 }}>⚠️</span>
           <span style={{ fontSize: 13, fontWeight: 600, color: '#ffb347' }}>
             {offenCount} offene Rechnungen – bitte prüfen und ggf. mahnen
           </span>
-        </div>
+        </button>
       )}
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1305,7 +1349,7 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
           </thead>
           <tbody>
             {filtered.map(r => (
-              <tr key={r.id}>
+              <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(r)}>
                 <td style={{ color: '#aeb9c8', fontFamily: 'monospace', fontSize: 12 }}>{r.id}</td>
                 <td style={{ fontWeight: 600 }}>{r.kunde}</td>
                 <td style={{ fontWeight: 800, fontSize: 15, color: r.status === 'Bezahlt' ? '#4ddb7e' : '#f8fbff' }}>{r.betrag}</td>
@@ -1321,26 +1365,26 @@ function RechnungenTab({ isDemo, kunden }: { isDemo: boolean; kunden: Kunde[] })
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {(r.status === 'Offen' || r.status === 'Überfällig') && (
                         <>
-                          <button onClick={() => handleBezahlt(r.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
+                          <button onClick={e => { e.stopPropagation(); handleBezahlt(r.id) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
                             ✅ Bezahlt
                           </button>
-                          <button onClick={() => handleMahnung(r.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,165,0,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>
+                          <button onClick={e => { e.stopPropagation(); handleMahnung(r.id) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,165,0,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>
                             📮 Mahnen
                           </button>
                         </>
                       )}
                       {r.status === 'Mahnung' && (
-                        <button onClick={() => handleBezahlt(r.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
+                        <button onClick={e => { e.stopPropagation(); handleBezahlt(r.id) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
                           ✅ Bezahlt
                         </button>
                       )}
-                      <button onClick={() => generateRechnungPDF(r, r.kunde)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
+                      <button onClick={e => { e.stopPropagation(); generateRechnungPDF(r, r.kunde) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
                         📄 PDF
                       </button>
-                      <button onClick={() => openEdit(r)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
+                      <button onClick={e => { e.stopPropagation(); openEdit(r) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
                         ✏️
                       </button>
-                      <button onClick={() => setDeleteId(r.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.3)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>
+                      <button onClick={e => { e.stopPropagation(); setDeleteId(r.id) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.3)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>
                         🗑️
                       </button>
                     </div>
@@ -1364,7 +1408,7 @@ const emptyEingangsForm = {
   kategorie: '', iban: '', verwendungszweck: '', notiz: '', dokument_id: '', dokument_url: '',
 }
 
-function EingangRechnungenTab({ isDemo }: { isDemo: boolean }) {
+function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean; initialFilterStatus?: string }) {
   const [rechnungen, setRechnungen] = useState<Eingangsrechnung[]>(isDemo ? demoEingangsrechnungen : [])
   const [loading, setLoading] = useState(!isDemo)
   const [toast, setToast] = useState('')
@@ -1377,6 +1421,10 @@ function EingangRechnungenTab({ isDemo }: { isDemo: boolean }) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [confirmPayId, setConfirmPayId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyEingangsForm)
+  const [previewDoc, setPreviewDoc] = useState<StoredDocumentLink | null>(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
 
   const showToast = (msg: string, error = false) => {
     setToast(msg); setToastError(error); setTimeout(() => setToast(''), 3500)
@@ -1389,6 +1437,13 @@ function EingangRechnungenTab({ isDemo }: { isDemo: boolean }) {
       .catch(() => showToast('Fehler beim Laden der Eingangsrechnungen', true))
       .finally(() => setLoading(false))
   }, [isDemo])
+
+  useEffect(() => {
+    if (!initialFilterStatus) return
+    if (['Alle', 'offen', 'geprüft', 'freigegeben', 'bezahlt', 'überfällig', 'abgelehnt'].includes(initialFilterStatus)) {
+      setFilterStatus(initialFilterStatus as 'Alle' | EingangsrechnungStatus)
+    }
+  }, [initialFilterStatus])
 
   useEffect(() => {
     try {
@@ -1503,15 +1558,70 @@ function EingangRechnungenTab({ isDemo }: { isDemo: boolean }) {
     setRechnungen(prev => prev.map(r => r.id === id ? { ...r, status } : r))
   }
 
+  const openLinkedDocument = async (rechnung: Eingangsrechnung) => {
+    if (isDemo) {
+      showToast('Demo: Für verknüpfte Dokumente ist keine echte Datei hinterlegt.', true)
+      return
+    }
+
+    const docLink: StoredDocumentLink = {
+      id: rechnung.id,
+      name: rechnung.rechnungsnummer || rechnung.id,
+      typ: 'PDF',
+      dokument_id: rechnung.dokument_id,
+      dokument_url: rechnung.dokument_url,
+    }
+
+    setPreviewDoc(docLink)
+    setPreviewLoading(true)
+    setPreviewError(null)
+    setPreviewUrl('')
+
+    try {
+      setPreviewUrl(await resolveDocumentViewUrl(docLink))
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : 'Dokument konnte nicht geöffnet werden.')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
   if (loading) return <div className="pk-card" style={{ color: '#aeb9c8' }}>Lade Eingangsrechnungen…</div>
 
   return (
     <div>
       <Toast msg={toast} error={toastError} />
+      {previewDoc && (
+        <DocumentPreviewModal
+          document={previewDoc}
+          url={previewUrl}
+          loading={previewLoading}
+          error={previewError}
+          onClose={() => {
+            setPreviewDoc(null)
+            setPreviewUrl('')
+            setPreviewError(null)
+          }}
+          onRetry={async () => {
+            if (!previewDoc) return
+            setPreviewLoading(true)
+            setPreviewError(null)
+            setPreviewUrl('')
+            try {
+              setPreviewUrl(await resolveDocumentViewUrl(previewDoc))
+            } catch (err) {
+              setPreviewError(err instanceof Error ? err.message : 'Dokument konnte nicht geöffnet werden.')
+            } finally {
+              setPreviewLoading(false)
+            }
+          }}
+          onOpenExternal={previewUrl ? () => window.open(previewUrl, '_blank', 'noopener,noreferrer') : undefined}
+        />
+      )}
       {ueberfaellig > 0 && (
-        <div style={{ marginBottom: 14, padding: '12px 16px', borderRadius: 10, background: 'rgba(244,63,94,.1)', border: '1px solid rgba(244,63,94,.28)', color: '#fda4af', fontSize: 13, fontWeight: 700 }}>
+        <button onClick={() => setFilterStatus('überfällig')} style={{ width: '100%', marginBottom: 14, padding: '12px 16px', borderRadius: 10, background: 'rgba(244,63,94,.1)', border: '1px solid rgba(244,63,94,.28)', color: '#fda4af', fontSize: 13, fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}>
           ⚠️ {ueberfaellig} Eingangsrechnung{ueberfaellig !== 1 ? 'en sind' : ' ist'} überfällig und sollte geprüft werden.
-        </div>
+        </button>
       )}
 
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
@@ -1521,11 +1631,11 @@ function EingangRechnungenTab({ isDemo }: { isDemo: boolean }) {
           { label: 'Bezahlt', value: String(bezahlt), icon: '💚', color: '#10b981' },
           { label: 'Summe offen', value: sumOffen.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }), icon: '💶', color: '#20c8ff' },
         ].map(s => (
-          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+          <button key={s.label} className="pk-card" onClick={() => setFilterStatus(s.label === 'Offen' ? 'offen' : s.label === 'Überfällig' ? 'überfällig' : s.label === 'Bezahlt' ? 'bezahlt' : 'Alle')} style={{ textAlign: 'center', padding: '14px 10px', cursor: 'pointer', color: 'inherit' }}>
             <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
             <div style={{ fontSize: 19, fontWeight: 900, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: '#aeb9c8' }}>{s.label}</div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -1573,7 +1683,7 @@ function EingangRechnungenTab({ isDemo }: { isDemo: boolean }) {
               {filtered.length === 0 ? (
                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>Keine Eingangsrechnungen gefunden.</td></tr>
               ) : filtered.map(r => (
-                <tr key={r.id}>
+                <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(r)}>
                   <td><div style={{ fontFamily: 'monospace', color: '#6cb6ff', fontSize: 12 }}>{r.rechnungsnummer || r.id}</div><div style={{ color: '#aeb9c8', fontSize: 11 }}>{r.rechnungsdatum || '—'}</div></td>
                   <td style={{ fontWeight: 700 }}>{r.lieferant}</td>
                   <td style={{ color: isOverdue(r) ? '#f43f5e' : '#aeb9c8', fontWeight: isOverdue(r) ? 700 : 500 }}>{r.faelligkeit || '—'}</td>
@@ -1583,17 +1693,22 @@ function EingangRechnungenTab({ isDemo }: { isDemo: boolean }) {
                   <td>
                     {deleteId === r.id ? <DeleteConfirm label={r.rechnungsnummer || r.id} onConfirm={() => remove(r.id)} onCancel={() => setDeleteId(null)} /> : (
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <button className="pk-btn-ghost" onClick={() => openEdit(r)} style={{ fontSize: 11, padding: '4px 9px' }}>Bearbeiten</button>
+                        {(r.dokument_url || r.dokument_id) && (
+                          <button className="pk-btn-ghost" onClick={e => { e.stopPropagation(); openLinkedDocument(r) }} style={{ fontSize: 11, padding: '4px 9px' }}>
+                            Dokument
+                          </button>
+                        )}
+                        <button className="pk-btn-ghost" onClick={e => { e.stopPropagation(); openEdit(r) }} style={{ fontSize: 11, padding: '4px 9px' }}>Bearbeiten</button>
                         {r.status !== 'bezahlt' && (
                           confirmPayId === r.id ? (
                             <>
-                              <button onClick={() => markPaid(r.id)} style={{ fontSize: 11, padding: '4px 9px', borderRadius: 999, border: '1px solid rgba(37,211,102,.35)', background: 'rgba(37,211,102,.14)', color: '#4ddb7e', cursor: 'pointer', fontWeight: 700 }}>Ja, bezahlt</button>
-                              <button onClick={() => setConfirmPayId(null)} style={{ fontSize: 11, padding: '4px 9px', borderRadius: 999, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Abbrechen</button>
+                              <button onClick={e => { e.stopPropagation(); markPaid(r.id) }} style={{ fontSize: 11, padding: '4px 9px', borderRadius: 999, border: '1px solid rgba(37,211,102,.35)', background: 'rgba(37,211,102,.14)', color: '#4ddb7e', cursor: 'pointer', fontWeight: 700 }}>Ja, bezahlt</button>
+                              <button onClick={e => { e.stopPropagation(); setConfirmPayId(null) }} style={{ fontSize: 11, padding: '4px 9px', borderRadius: 999, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Abbrechen</button>
                             </>
-                          ) : <button className="pk-btn-ghost" onClick={() => markPaid(r.id)} style={{ fontSize: 11, padding: '4px 9px', color: '#4ddb7e' }}>Bezahlt</button>
+                          ) : <button className="pk-btn-ghost" onClick={e => { e.stopPropagation(); markPaid(r.id) }} style={{ fontSize: 11, padding: '4px 9px', color: '#4ddb7e' }}>Bezahlt</button>
                         )}
-                        {r.status === 'offen' && <button className="pk-btn-ghost" onClick={() => changeStatus(r.id, 'geprüft')} style={{ fontSize: 11, padding: '4px 9px' }}>Prüfen</button>}
-                        <button className="pk-btn-ghost" onClick={() => remove(r.id)} style={{ fontSize: 11, padding: '4px 9px', color: '#ff8080' }}>Löschen</button>
+                        {r.status === 'offen' && <button className="pk-btn-ghost" onClick={e => { e.stopPropagation(); changeStatus(r.id, 'geprüft') }} style={{ fontSize: 11, padding: '4px 9px' }}>Prüfen</button>}
+                        <button className="pk-btn-ghost" onClick={e => { e.stopPropagation(); remove(r.id) }} style={{ fontSize: 11, padding: '4px 9px', color: '#ff8080' }}>Löschen</button>
                       </div>
                     )}
                   </td>
@@ -1620,6 +1735,10 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
   const [uploading, setUploading] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [previewDoc, setPreviewDoc] = useState<Dokument | null>(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
 
   useEffect(() => {
     if (isDemo) return
@@ -1655,7 +1774,7 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
     const ext = file.name.split('.').pop()?.toUpperCase() ?? 'PDF'
 
     const newDoc: Dokument = {
-      id: `DOK-${String(dokumente.length + 1).padStart(3, '0')}`,
+      id: `DOK-${Date.now().toString(36).toUpperCase()}`,
       name: file.name,
       typ: ext,
       groesse: groesseKB,
@@ -1672,11 +1791,18 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
       }, 900)
     } else {
       try {
-        await insertBueroDokument(newDoc)
+        const { data: auth } = await createSupabaseClient().auth.getUser()
+        const userId = auth.user?.id
+        if (!userId) throw new Error('Kein Benutzer für den Dokumenten-Upload gefunden.')
+
+        const storagePath = await uploadDokument(file, userId)
+        await insertBueroDokument({ ...newDoc, storage_path: storagePath })
         const data = await getBueroDokumente()
         setDokumente(data as Dokument[])
         showToast(`✅ "${file.name}" erfolgreich hochgeladen und archiviert`)
-      } catch { showToast('Fehler beim Hochladen', true) }
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Fehler beim Hochladen', true)
+      }
       finally { setUploading(false) }
     }
 
@@ -1691,6 +1817,26 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
     }
     setDokumente(prev => prev.filter(d => d.id !== id))
     showToast(`🗑️ Dokument wurde gelöscht`)
+  }
+
+  const openDocument = async (doc: Dokument) => {
+    if (isDemo) {
+      showToast(`Demo: Für „${doc.name}" ist keine echte Datei hinterlegt.`, true)
+      return
+    }
+
+    setPreviewDoc(doc)
+    setPreviewLoading(true)
+    setPreviewError(null)
+    setPreviewUrl('')
+
+    try {
+      setPreviewUrl(await resolveDocumentViewUrl(doc))
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : 'Dokument konnte nicht geöffnet werden.')
+    } finally {
+      setPreviewLoading(false)
+    }
   }
 
   const kategorieIcon: Record<string, string> = { Angebot: '📋', Rechnung: '💶', Vertrag: '📝', Sonstiges: '📄' }
@@ -1708,6 +1854,21 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
   return (
     <div>
       <Toast msg={toast} error={toastError} />
+      {previewDoc && (
+        <DocumentPreviewModal
+          document={previewDoc}
+          url={previewUrl}
+          loading={previewLoading}
+          error={previewError}
+          onClose={() => {
+            setPreviewDoc(null)
+            setPreviewUrl('')
+            setPreviewError(null)
+          }}
+          onRetry={() => openDocument(previewDoc)}
+          onOpenExternal={previewUrl ? () => window.open(previewUrl, '_blank', 'noopener,noreferrer') : undefined}
+        />
+      )}
 
       {/* Upload-Bereich */}
       <div className="pk-card fade-in" style={{ marginBottom: 16, border: '1px dashed rgba(32,200,255,.25)', background: 'rgba(32,200,255,.04)', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px' }}>
@@ -1763,10 +1924,14 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
             {filtered.map(d => (
               <tr key={d.id}>
                 <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    onClick={() => openDocument(d)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', border: 'none', padding: 0, color: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+                    title="Dokument öffnen"
+                  >
                     <span style={{ fontSize: 18 }}>{kategorieIcon[d.kategorie]}</span>
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>{d.name}</span>
-                  </div>
+                    <span style={{ fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>{d.name}</span>
+                  </button>
                 </td>
                 <td><span className={`badge ${kategorieBadge[d.kategorie]}`}>{d.kategorie}</span></td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{d.bezug}</td>
@@ -1778,11 +1943,11 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
                   ) : (
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button
-                        onClick={() => isDemo ? showToast(`📄 Demo: "${d.name}" — kein echter Download verfügbar`) : showToast(`📄 "${d.name}" wird geöffnet…`)}
-                        style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: isDemo ? '#6b7e94' : '#aeb9c8', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.6 : 1 }}
-                        title={isDemo ? 'Download nur mit echtem Account verfügbar' : 'Dokument herunterladen'}
+                        onClick={() => openDocument(d)}
+                        style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}
+                        title="Dokument öffnen"
                       >
-                        🔗 Download
+                        👁 Öffnen
                       </button>
                       <button onClick={() => setDeleteId(d.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.3)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>
                         🗑️
@@ -1832,6 +1997,7 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
   const [showForm, setShowForm] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [editLieferant, setEditLieferant] = useState<Lieferant | null>(null)
+  const [selectedBestellung, setSelectedBestellung] = useState<EinkaufsBestellung | null>(null)
   const [loading, setLoading] = useState(!isDemo)
 
   // Lieferant-Formular
@@ -2073,7 +2239,7 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
                   {lieferanten.length === 0 ? (
                     <tr><td colSpan={10} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>🏭 Noch keine Lieferanten angelegt.</td></tr>
                   ) : lieferanten.map(l => (
-                    <tr key={l.id}>
+                    <tr key={l.id} style={{ cursor: 'pointer' }} onClick={() => openEditLieferant(l)}>
                       <td style={{ color: '#aeb9c8', fontFamily: 'monospace', fontSize: 12 }}>{l.id}</td>
                       <td style={{ fontWeight: 700 }}>{l.name}</td>
                       <td><span className="badge badge-gray">{l.kategorie}</span></td>
@@ -2088,9 +2254,9 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
                           <DeleteConfirm label={l.name} onConfirm={() => handleLieferantDelete(l.id)} onCancel={() => setDeleteId(null)} />
                         ) : (
                           <div style={{ display: 'flex', gap: 6 }}>
-                            <button onClick={() => openEditLieferant(l)} style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>
-                            <button onClick={() => { setBsForm(p => ({ ...p, lieferant: l.name })); setSubTab('bestellungen'); setShowForm(true) }} title="Bestellung anlegen" style={{ background: 'rgba(37,211,102,.08)', border: '1px solid rgba(37,211,102,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#4ddb7e', fontSize: 13 }}>🛒</button>
-                            <button onClick={() => setDeleteId(l.id)} style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}>🗑</button>
+                            <button onClick={e => { e.stopPropagation(); openEditLieferant(l) }} style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>
+                            <button onClick={e => { e.stopPropagation(); setBsForm(p => ({ ...p, lieferant: l.name })); setSubTab('bestellungen'); setShowForm(true) }} title="Bestellung anlegen" style={{ background: 'rgba(37,211,102,.08)', border: '1px solid rgba(37,211,102,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#4ddb7e', fontSize: 13 }}>🛒</button>
+                            <button onClick={e => { e.stopPropagation(); setDeleteId(l.id) }} style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}>🗑</button>
                           </div>
                         )}
                       </td>
@@ -2106,6 +2272,26 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
       {/* ── BESTELLUNGEN ── */}
       {subTab === 'bestellungen' && (
         <div>
+          {selectedBestellung && (
+            <Modal title={`🛒 Bestellung ${selectedBestellung.id}`} onClose={() => setSelectedBestellung(null)}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+                <div><label style={labelStyle}>Lieferant</label><div className="pk-input">{selectedBestellung.lieferant}</div></div>
+                <div><label style={labelStyle}>Artikel</label><div className="pk-input">{selectedBestellung.artikel}</div></div>
+                <div><label style={labelStyle}>Menge</label><div className="pk-input">{selectedBestellung.menge} {selectedBestellung.einheit}</div></div>
+                <div><label style={labelStyle}>Status</label><div className="pk-input">{selectedBestellung.status}</div></div>
+                <div><label style={labelStyle}>EK-Preis</label><div className="pk-input">{selectedBestellung.einkaufspreis}</div></div>
+                <div><label style={labelStyle}>Gesamt</label><div className="pk-input">{selectedBestellung.gesamt}</div></div>
+                <div><label style={labelStyle}>Bestellt am</label><div className="pk-input">{selectedBestellung.bestellt_am}</div></div>
+                <div><label style={labelStyle}>Erwartet</label><div className="pk-input">{selectedBestellung.erwartet_am || '—'}</div></div>
+                <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Notiz</label><div className="pk-input">{selectedBestellung.notiz || '—'}</div></div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+                {selectedBestellung.status === 'Entwurf' && <button className="pk-btn" onClick={() => { handleBestellungAusloesen(selectedBestellung.id); setSelectedBestellung(null) }}>Auslösen</button>}
+                {(selectedBestellung.status === 'Bestellt' || selectedBestellung.status === 'Teillieferung') && <button className="pk-btn" onClick={() => { setWeForm(p => ({ ...p, bestellung_id: selectedBestellung.id, lieferant: selectedBestellung.lieferant, artikel: selectedBestellung.artikel, menge: String(selectedBestellung.menge), einheit: selectedBestellung.einheit })); setSelectedBestellung(null); setSubTab('wareneingaenge'); setShowForm(true) }}>Wareneingang öffnen</button>}
+                {selectedBestellung.status === 'Bestellt' && <button className="pk-btn-ghost" onClick={() => { handleBestellungGeliefert(selectedBestellung.id); setSelectedBestellung(null) }}>Als geliefert markieren</button>}
+              </div>
+            </Modal>
+          )}
           <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
             <button className="pk-btn" onClick={() => setShowForm(f => !f)} style={{ fontSize: 13 }}>
               {showForm ? '✕ Abbrechen' : '+ Neue Bestellung'}
@@ -2150,7 +2336,7 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
                   {bestellungen.length === 0 ? (
                     <tr><td colSpan={10} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>🛒 Noch keine Bestellungen.</td></tr>
                   ) : bestellungen.map(b => (
-                    <tr key={b.id}>
+                    <tr key={b.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedBestellung(b)}>
                       <td style={{ color: '#aeb9c8', fontFamily: 'monospace', fontSize: 12 }}>{b.id}</td>
                       <td style={{ fontWeight: 600 }}>{b.lieferant}</td>
                       <td style={{ color: '#d0d9e8' }}>{b.artikel}</td>
@@ -2163,13 +2349,13 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
                       <td>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {b.status === 'Entwurf' && (
-                            <button onClick={() => handleBestellungAusloesen(b.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(22,132,255,.3)', background: 'rgba(22,132,255,.08)', color: '#6cb6ff', cursor: 'pointer', fontWeight: 700 }}>📤 Auslösen</button>
+                            <button onClick={e => { e.stopPropagation(); handleBestellungAusloesen(b.id) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(22,132,255,.3)', background: 'rgba(22,132,255,.08)', color: '#6cb6ff', cursor: 'pointer', fontWeight: 700 }}>📤 Auslösen</button>
                           )}
                           {(b.status === 'Bestellt' || b.status === 'Teillieferung') && (
-                            <button onClick={() => { setWeForm(p => ({ ...p, bestellung_id: b.id, lieferant: b.lieferant, artikel: b.artikel, menge: String(b.menge), einheit: b.einheit })); setSubTab('wareneingaenge'); setShowForm(true) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'rgba(37,211,102,.08)', color: '#4ddb7e', cursor: 'pointer', fontWeight: 700 }}>📥 WE buchen</button>
+                            <button onClick={e => { e.stopPropagation(); setWeForm(p => ({ ...p, bestellung_id: b.id, lieferant: b.lieferant, artikel: b.artikel, menge: String(b.menge), einheit: b.einheit })); setSubTab('wareneingaenge'); setShowForm(true) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'rgba(37,211,102,.08)', color: '#4ddb7e', cursor: 'pointer', fontWeight: 700 }}>📥 WE buchen</button>
                           )}
                           {b.status === 'Bestellt' && (
-                            <button onClick={() => handleBestellungGeliefert(b.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(16,185,129,.3)', background: 'transparent', color: '#34d399', cursor: 'pointer' }}>✅ Geliefert</button>
+                            <button onClick={e => { e.stopPropagation(); handleBestellungGeliefert(b.id) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(16,185,129,.3)', background: 'transparent', color: '#34d399', cursor: 'pointer' }}>✅ Geliefert</button>
                           )}
                         </div>
                       </td>
@@ -2261,6 +2447,8 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
 // ── Haupt-Seite ─────────────────────────────────────────────────────────────
 
 export default function BueroPilotPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [isDemo] = useState(() => hasDemoCookie())
   const [tab, setTab] = useState<Tab>('kunden')
   const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
@@ -2276,6 +2464,13 @@ export default function BueroPilotPage() {
       .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
   }, [isDemo])
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab')
+    if (requestedTab && ['kunden', 'angebote', 'auftraege', 'rechnungen', 'eingangsrechnungen', 'dokumente', 'einkauf'].includes(requestedTab)) {
+      setTab(requestedTab as Tab)
+    }
+  }, [searchParams])
 
   const offeneAngebote = isDemo ? demoAngebote.filter(a => a.status === 'Versendet' || a.status === 'Entwurf').length : 0
   const offeneRechnungen = isDemo ? demoRechnungen.filter(r => r.status !== 'Bezahlt').length : 0
@@ -2316,21 +2511,31 @@ export default function BueroPilotPage() {
           { label: 'Laufende Aufträge', value: String(laufendeAuftraege), icon: '✅', color: '#25d366' },
           { label: 'Offene Rechnungen', value: String(offeneRechnungen), icon: '💶', color: '#f59e0b' },
         ].map(s => (
-          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
+          <button
+            key={s.label}
+            className="pk-card"
+            onClick={() => {
+              if (s.label === 'Kunden gesamt') router.push('/dashboard/buero?tab=kunden')
+              if (s.label === 'Offene Angebote') router.push('/dashboard/buero?tab=angebote&filter=Versendet')
+              if (s.label === 'Laufende Aufträge') router.push('/dashboard/buero?tab=auftraege')
+              if (s.label === 'Offene Rechnungen') router.push('/dashboard/buero?tab=rechnungen&filter=Offen')
+            }}
+            style={{ textAlign: 'center', padding: '16px 12px', cursor: 'pointer', color: 'inherit' }}
+          >
             <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
-          </div>
+          </button>
         ))}
       </div>
 
       <TabBar tab={tab} setTab={setTab} />
 
       {tab === 'kunden' && <KundenTab isDemo={isDemo} auftraege={auftraege} rechnungen={isDemo ? demoRechnungen : []} />}
-      {tab === 'angebote' && <AngeboteTab isDemo={isDemo} kunden={kunden} auftraege={auftraege} setAuftraege={setAuftraege} />}
+      {tab === 'angebote' && <AngeboteTab isDemo={isDemo} kunden={kunden} auftraege={auftraege} setAuftraege={setAuftraege} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
       {tab === 'auftraege' && <AuftraegeTab isDemo={isDemo} auftraege={auftraege} setAuftraege={setAuftraege} kunden={kunden} />}
-      {tab === 'rechnungen' && <RechnungenTab isDemo={isDemo} kunden={kunden} />}
-      {tab === 'eingangsrechnungen' && <EingangRechnungenTab isDemo={isDemo} />}
+      {tab === 'rechnungen' && <RechnungenTab isDemo={isDemo} kunden={kunden} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
+      {tab === 'eingangsrechnungen' && <EingangRechnungenTab isDemo={isDemo} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
       {tab === 'dokumente' && <DokumenteTab isDemo={isDemo} />}
       {tab === 'einkauf' && <EinkaufTab isDemo={isDemo} />}
     </div>

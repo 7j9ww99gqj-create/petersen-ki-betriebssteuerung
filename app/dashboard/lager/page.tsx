@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
 import {
   getLagerArtikel, getLagerBewegungen,
@@ -781,10 +782,12 @@ function ScannerModal({ onClose, onScan }: {
 // ── Hauptkomponente ──────────────────────────────────────────────────────────
 
 export default function LagerPilotPage() {
+  const searchParams = useSearchParams()
   const [isDemo] = useState(() => hasDemoCookie())
   const [tab, setTab] = useState<LagerTab>('bestand')
   const [search, setSearch] = useState('')
   const [filterKat, setFilterKat] = useState('Alle')
+  const [bestandStatusFilter, setBestandStatusFilter] = useState<'Alle' | 'ok' | 'niedrig' | 'leer'>('Alle')
   const [artikel, setArtikel] = useState<Artikel[]>(isDemo ? demoArtikel : [])
   const [bewegungen, setBewegungen] = useState<Bewegung[]>(isDemo ? demoBewegungen : [])
   const [loading, setLoading] = useState(!isDemo)
@@ -849,6 +852,17 @@ export default function LagerPilotPage() {
       .catch(() => showToast('Fehler beim Laden', false))
       .finally(() => setLoading(false))
   }, [isDemo])
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab')
+    if (requestedTab && ['bestand', 'bewegungen', 'eingang', 'ausgang', 'inventur', 'bestellung', 'historie', 'stellplaetze', 'lagerbelegung', 'umlagerung', 'kommissionierung', 'tagesbericht'].includes(requestedTab)) {
+      setTab(requestedTab as LagerTab)
+    }
+    const requestedStatus = searchParams.get('status')
+    if (requestedStatus && ['Alle', 'ok', 'niedrig', 'leer'].includes(requestedStatus)) {
+      setBestandStatusFilter(requestedStatus as 'Alle' | 'ok' | 'niedrig' | 'leer')
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (isDemo) return
@@ -966,7 +980,8 @@ export default function LagerPilotPage() {
       a.id.toLowerCase().includes(search.toLowerCase()) ||
       (a.lagerplatz ?? '').toLowerCase().includes(search.toLowerCase())
     const matchKat = filterKat === 'Alle' || a.kategorie === filterKat
-    return matchSearch && matchKat
+    const matchStatus = bestandStatusFilter === 'Alle' || a.status === bestandStatusFilter
+    return matchSearch && matchKat && matchStatus
   })
 
   // ── Sortierung ───────────────────────────────────────────────────────────────
@@ -1703,11 +1718,23 @@ export default function LagerPilotPage() {
           { label: 'Buchungen', value: String(bewegungen.length), icon: '🔄', color: '#10b981' },
           { label: 'Bestellpflichtig', value: String(bestellArtikel.length), icon: '🛒', color: bestellArtikel.length > 0 ? '#f59e0b' : '#10b981' },
         ].map(s => (
-          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+          <button
+            key={s.label}
+            className="pk-card"
+            onClick={() => {
+              if (s.label === 'Artikel gesamt') { setTab('bestand'); setBestandStatusFilter('Alle') }
+              if (s.label === 'Gesamtbestand') { setTab('bestand'); setBestandStatusFilter('Alle') }
+              if (s.label === 'Niedrig Bestand') { setTab('bestand'); setBestandStatusFilter('niedrig') }
+              if (s.label === 'Leer / 0') { setTab('bestand'); setBestandStatusFilter('leer') }
+              if (s.label === 'Buchungen') setTab('bewegungen')
+              if (s.label === 'Bestellpflichtig') setTab('bestellung')
+            }}
+            style={{ textAlign: 'center', padding: '14px 10px', cursor: 'pointer', color: 'inherit' }}
+          >
             <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
             <div style={{ fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -1729,17 +1756,23 @@ export default function LagerPilotPage() {
           {warnListOpen && (
             <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(245,158,11,.15)', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {warnArtikel.map(a => (
-                <span
+                <button
                   key={a.id}
+                  onClick={() => {
+                    setTab('bestand')
+                    setBestandStatusFilter(a.status === 'leer' ? 'leer' : 'niedrig')
+                    setSearch(a.name)
+                  }}
                   style={{
                     fontSize: 12, padding: '3px 9px', borderRadius: 6, fontWeight: 600,
                     background: a.status === 'leer' ? 'rgba(244,63,94,.12)' : 'rgba(245,158,11,.12)',
                     border: `1px solid ${a.status === 'leer' ? 'rgba(244,63,94,.3)' : 'rgba(245,158,11,.3)'}`,
                     color: a.status === 'leer' ? '#f43f5e' : '#f59e0b',
+                    cursor: 'pointer',
                   }}
                 >
                   {a.status === 'leer' ? '🚨' : '⚠️'} {a.name} ({a.bestand} {a.einheit})
-                </span>
+                </button>
               ))}
             </div>
           )}
@@ -1811,6 +1844,21 @@ export default function LagerPilotPage() {
               <option>Alle</option>
               {KATEGORIEN.map(k => <option key={k}>{k}</option>)}
             </select>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {(['Alle', 'ok', 'niedrig', 'leer'] as const).map(status => (
+                <button
+                  key={status}
+                  onClick={() => setBestandStatusFilter(status)}
+                  style={{
+                    padding: '6px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)',
+                    background: bestandStatusFilter === status ? 'rgba(22,132,255,.15)' : 'transparent',
+                    color: bestandStatusFilter === status ? '#6cb6ff' : '#aeb9c8', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  {status === 'Alle' ? 'Alle' : status === 'ok' ? 'OK' : status === 'niedrig' ? 'Niedrig' : 'Leer'}
+                </button>
+              ))}
+            </div>
             <span style={{ fontSize: 12, color: '#aeb9c8' }}>{filtered.length} von {artikel.length} Artikel</span>
             <button
               className="pk-btn-ghost"
@@ -1861,7 +1909,7 @@ export default function LagerPilotPage() {
                       {artikel.length === 0 ? '📦 Noch keine Artikel. Lege deinen ersten Artikel an.' : 'Keine Artikel gefunden.'}
                     </td></tr>
                   ) : sorted.map(a => (
-                    <tr key={a.id}>
+                    <tr key={a.id} style={{ cursor: 'pointer' }} onClick={() => setModal(a)}>
                       <td style={{ color: '#aeb9c8', fontFamily: 'monospace', fontSize: 12 }}>{a.id}</td>
                       <td style={{ fontWeight: 600 }}>{a.name}</td>
                       <td><span className="badge badge-gray">{a.kategorie}</span></td>
@@ -1879,13 +1927,13 @@ export default function LagerPilotPage() {
                           {deleteConfirmId === a.id ? (
                             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                               <button
-                                onClick={() => handleDeleteArtikel(a.id)}
+                                onClick={e => { e.stopPropagation(); handleDeleteArtikel(a.id) }}
                                 style={{ background: 'rgba(244,63,94,.18)', border: '1px solid rgba(244,63,94,.4)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}
                               >
                                 Ja, löschen
                               </button>
                               <button
-                                onClick={() => setDeleteConfirmId(null)}
+                                onClick={e => { e.stopPropagation(); setDeleteConfirmId(null) }}
                                 style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#aeb9c8', fontSize: 11, whiteSpace: 'nowrap' }}
                               >
                                 Abbrechen
@@ -1893,11 +1941,11 @@ export default function LagerPilotPage() {
                             </div>
                           ) : (
                             <div style={{ display: 'flex', gap: 6 }}>
-                              <button onClick={() => setModal(a)} title="Bearbeiten" style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>
-                              <button onClick={() => openEinlagern(a.id)} title="Auf Stellplatz buchen" style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#34d399', fontSize: 13 }}>📥</button>
-                              <button onClick={() => setLabelModal({ type: 'artikel', artikel: a })} title="QR-/Etikett drucken" style={{ background: 'rgba(167,139,250,.1)', border: '1px solid rgba(167,139,250,.24)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#c4b5fd', fontSize: 13 }}>🏷️</button>
-                              <button onClick={() => { setHistArtikel(a.id); setTab('historie') }} title="Artikel-Historie" style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#34d399', fontSize: 13 }}>📈</button>
-                              <button onClick={() => setDeleteConfirmId(a.id)} title="Löschen" style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}>🗑</button>
+                              <button onClick={e => { e.stopPropagation(); setModal(a) }} title="Bearbeiten" style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>
+                              <button onClick={e => { e.stopPropagation(); openEinlagern(a.id) }} title="Auf Stellplatz buchen" style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#34d399', fontSize: 13 }}>📥</button>
+                              <button onClick={e => { e.stopPropagation(); setLabelModal({ type: 'artikel', artikel: a }) }} title="QR-/Etikett drucken" style={{ background: 'rgba(167,139,250,.1)', border: '1px solid rgba(167,139,250,.24)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#c4b5fd', fontSize: 13 }}>🏷️</button>
+                              <button onClick={e => { e.stopPropagation(); setHistArtikel(a.id); setTab('historie') }} title="Artikel-Historie" style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#34d399', fontSize: 13 }}>📈</button>
+                              <button onClick={e => { e.stopPropagation(); setDeleteConfirmId(a.id) }} title="Löschen" style={{ background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#f43f5e', fontSize: 13 }}>🗑</button>
                             </div>
                           )}
                       </td>
@@ -1926,7 +1974,13 @@ export default function LagerPilotPage() {
                   {bewegungen.length === 0 ? (
                     <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>🔄 Noch keine Buchungen vorhanden.</td></tr>
                   ) : bewegungen.map(b => (
-                    <tr key={b.id}>
+                    <tr key={b.id} style={{ cursor: 'pointer' }} onClick={() => {
+                      const linkedArtikel = artikel.find(a => a.name === b.artikel)
+                      if (linkedArtikel) {
+                        setHistArtikel(linkedArtikel.id)
+                        setTab('historie')
+                      }
+                    }}>
                       <td>
                         <span className={`badge ${b.typ === 'Eingang' ? 'badge-green' : b.typ === 'Inventur' ? 'badge-blue' : 'badge-orange'}`}>
                           {b.typ === 'Eingang' ? '📥' : b.typ === 'Inventur' ? '📋' : '📤'} {b.typ}
