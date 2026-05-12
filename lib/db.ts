@@ -14,6 +14,133 @@ function today() {
   return new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+function firstText(...values: Array<string | null | undefined>) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+function toNumber(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const normalized = value.replace(/[^\d,.-]/g, '').replace(',', '.')
+    const parsed = Number.parseFloat(normalized)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  return 0
+}
+
+function formatEuro(value: unknown) {
+  const amount = toNumber(value)
+  return `${amount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+}
+
+function isSchemaMismatch(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+  const schemaError = error as { code?: string; message?: string; details?: string }
+  return ['42703', '42804', 'PGRST204'].includes(schemaError.code ?? '')
+    || /column|schema cache|type/i.test(`${schemaError.message ?? ''} ${schemaError.details ?? ''}`)
+}
+
+type EinkaufLieferantRecord = {
+  id: string
+  name?: string | null
+}
+
+type EinkaufBestellungRecord = {
+  id: string
+  lieferant_id?: string | null
+  lieferant?: string | null
+  artikel?: string | null
+  menge?: number | string | null
+  einheit?: string | null
+  einkaufspreis?: string | null
+  gesamt?: string | null
+  status?: string | null
+  bestellt_am?: string | null
+  erwartet_am?: string | null
+  geliefert_am?: string | null
+  notiz?: string | null
+  einzelpreis?: number | string | null
+  gesamtpreis?: number | string | null
+  bestelldatum?: string | null
+  lieferdatum_soll?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+type EinkaufWareneingangRecord = {
+  id: string | number
+  bestellung_id?: string | null
+  lieferant?: string | null
+  artikel?: string | null
+  menge?: number | string | null
+  einheit?: string | null
+  datum?: string | null
+  qualitaet?: string | null
+  mitarbeiter?: string | null
+  notiz?: string | null
+  eingangsdatum?: string | null
+  menge_bestellt?: number | string | null
+  menge_erhalten?: number | string | null
+  created_at?: string | null
+}
+
+async function listEinkaufLieferantenIndex() {
+  const { data, error } = await db().from('einkauf_lieferanten').select('id, name')
+  if (error) throw error
+  const rows = (data ?? []) as EinkaufLieferantRecord[]
+  return {
+    byId: new Map(rows.map(row => [row.id, row])),
+    byName: new Map(rows.filter(row => row.name).map(row => [String(row.name).trim().toLowerCase(), row])),
+  }
+}
+
+function normalizeEinkaufBestellung(
+  row: EinkaufBestellungRecord,
+  lieferantenById: Map<string, EinkaufLieferantRecord>,
+) {
+  const lieferantName = firstText(row.lieferant, row.lieferant_id ? lieferantenById.get(row.lieferant_id)?.name ?? '' : '')
+  const einzelpreis = firstText(row.einkaufspreis, row.einzelpreis != null ? formatEuro(row.einzelpreis) : '')
+  const gesamt = firstText(row.gesamt, row.gesamtpreis != null ? formatEuro(row.gesamtpreis) : '')
+  return {
+    ...row,
+    lieferant_id: row.lieferant_id ?? undefined,
+    lieferant: lieferantName,
+    artikel: row.artikel ?? '',
+    menge: toNumber(row.menge),
+    einheit: firstText(row.einheit, 'Stk'),
+    einkaufspreis: einzelpreis,
+    gesamt,
+    status: firstText(row.status, 'Entwurf'),
+    bestellt_am: firstText(row.bestellt_am, row.bestelldatum),
+    erwartet_am: firstText(row.erwartet_am, row.lieferdatum_soll),
+    geliefert_am: firstText(row.geliefert_am),
+    notiz: firstText(row.notiz),
+  }
+}
+
+function normalizeEinkaufWareneingang(
+  row: EinkaufWareneingangRecord,
+  bestellungenById: Map<string, ReturnType<typeof normalizeEinkaufBestellung>>,
+) {
+  const bestellung = row.bestellung_id ? bestellungenById.get(row.bestellung_id) : undefined
+  return {
+    ...row,
+    id: String(row.id),
+    bestellung_id: firstText(row.bestellung_id),
+    lieferant: firstText(row.lieferant, bestellung?.lieferant),
+    artikel: firstText(row.artikel, bestellung?.artikel),
+    menge: toNumber(row.menge || row.menge_erhalten || row.menge_bestellt),
+    einheit: firstText(row.einheit, bestellung?.einheit, 'Stk'),
+    datum: firstText(row.datum, row.eingangsdatum),
+    qualitaet: firstText(row.qualitaet, 'OK'),
+    mitarbeiter: firstText(row.mitarbeiter, '—'),
+    notiz: firstText(row.notiz),
+  }
+}
+
 export type FirmaEinstellungen = {
   id?: string
   user_id?: string
@@ -303,6 +430,7 @@ export async function insertBueroDokument(d: {
   datum?: string; kategorie?: string; bezug?: string; storage_path?: string
   status?: string; document_type?: string; confidence?: number; summary?: string
   extracted?: Record<string, unknown>; suggested_actions?: unknown[]; search_text?: string
+  eingangsrechnung_id?: string; rechnung_id?: string; angebot_id?: string; auftrag_id?: string
 }) {
   const { data, error } = await db().from('buero_dokumente').insert(d).select()
   if (error) throw error
@@ -314,6 +442,7 @@ export async function updateBueroDokument(id: string, d: {
   bezug?: string; storage_path?: string; status?: string; document_type?: string
   confidence?: number; summary?: string; extracted?: Record<string, unknown>
   suggested_actions?: unknown[]; search_text?: string
+  eingangsrechnung_id?: string | null; rechnung_id?: string | null; angebot_id?: string | null; auftrag_id?: string | null
 }) {
   const { data, error } = await db()
     .from('buero_dokumente')
@@ -700,41 +829,164 @@ export async function deleteEinkaufLieferant(id: string) {
 }
 
 export async function getEinkaufBestellungen() {
-  const { data, error } = await db().from('einkauf_bestellungen').select('*').order('id', { ascending: false })
+  const [{ data, error }, lieferantenIndex] = await Promise.all([
+    db().from('einkauf_bestellungen').select('*').order('id', { ascending: false }),
+    listEinkaufLieferantenIndex(),
+  ])
   if (error) throw error
-  return data ?? []
+  return ((data ?? []) as EinkaufBestellungRecord[]).map(row => normalizeEinkaufBestellung(row, lieferantenIndex.byId))
 }
 
 export async function upsertEinkaufBestellung(b: {
-  id: string; lieferant?: string; artikel?: string; menge?: number; einheit?: string
+  id: string; lieferant_id?: string; lieferant?: string; artikel?: string; menge?: number; einheit?: string
   einkaufspreis?: string; gesamt?: string; status?: string; bestellt_am?: string
   erwartet_am?: string; geliefert_am?: string; notiz?: string
 }) {
-  const { data, error } = await db()
+  const lieferantenIndex = await listEinkaufLieferantenIndex()
+  const lieferantRecord = b.lieferant_id
+    ? lieferantenIndex.byId.get(b.lieferant_id)
+    : b.lieferant
+      ? lieferantenIndex.byName.get(b.lieferant.trim().toLowerCase())
+      : undefined
+  const menge = toNumber(b.menge)
+  const einzelpreis = b.einkaufspreis ? toNumber(b.einkaufspreis) : 0
+  const gesamtpreis = b.gesamt ? toNumber(b.gesamt) : menge * einzelpreis
+  const payload = {
+    id: b.id,
+    lieferant_id: b.lieferant_id ?? lieferantRecord?.id ?? null,
+    lieferant: firstText(b.lieferant, lieferantRecord?.name),
+    artikel: b.artikel ?? '',
+    menge,
+    einheit: firstText(b.einheit, 'Stk'),
+    einkaufspreis: b.einkaufspreis ? formatEuro(b.einkaufspreis) : formatEuro(einzelpreis),
+    gesamt: b.gesamt ? formatEuro(b.gesamt) : formatEuro(gesamtpreis),
+    status: firstText(b.status, 'Entwurf'),
+    bestellt_am: b.bestellt_am ?? '',
+    erwartet_am: b.erwartet_am ?? '',
+    geliefert_am: b.geliefert_am ?? null,
+    notiz: b.notiz ?? null,
+    einzelpreis,
+    gesamtpreis,
+    bestelldatum: b.bestellt_am ?? '',
+    lieferdatum_soll: b.erwartet_am ?? '',
+    updated_at: new Date().toISOString(),
+  }
+  const supabase = db()
+  const full = await supabase.from('einkauf_bestellungen').upsert(payload).select()
+  if (!full.error) return full.data
+  if (!isSchemaMismatch(full.error)) throw full.error
+
+  const legacy = await supabase
     .from('einkauf_bestellungen')
-    .upsert({ ...b, updated_at: new Date().toISOString() })
+    .upsert({
+      id: payload.id,
+      lieferant: payload.lieferant,
+      artikel: payload.artikel,
+      menge: payload.menge,
+      einheit: payload.einheit,
+      einkaufspreis: payload.einkaufspreis,
+      gesamt: payload.gesamt,
+      status: payload.status,
+      bestellt_am: payload.bestellt_am,
+      erwartet_am: payload.erwartet_am,
+      geliefert_am: payload.geliefert_am,
+      notiz: payload.notiz,
+      updated_at: payload.updated_at,
+    })
     .select()
-  if (error) throw error
-  return data
+  if (!legacy.error) return legacy.data
+  if (!isSchemaMismatch(legacy.error)) throw legacy.error
+
+  const live = await supabase
+    .from('einkauf_bestellungen')
+    .upsert({
+      id: payload.id,
+      lieferant_id: payload.lieferant_id,
+      status: payload.status,
+      artikel: payload.artikel,
+      menge: payload.menge,
+      einzelpreis: payload.einzelpreis,
+      gesamtpreis: payload.gesamtpreis,
+      bestelldatum: payload.bestelldatum,
+      lieferdatum_soll: payload.lieferdatum_soll,
+      notiz: payload.notiz,
+      updated_at: payload.updated_at,
+    })
+    .select()
+  if (live.error) throw live.error
+  return live.data
 }
 
 export async function getEinkaufWareneingaenge() {
-  const { data, error } = await db()
-    .from('einkauf_wareneingaenge')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(200)
-  if (error) throw error
-  return data ?? []
+  const [result, bestellungen] = await Promise.all([
+    db()
+      .from('einkauf_wareneingaenge')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200),
+    getEinkaufBestellungen(),
+  ])
+  if (result.error) throw result.error
+  const bestellungenById = new Map(
+    (bestellungen as Array<ReturnType<typeof normalizeEinkaufBestellung>>).map(bestellung => [bestellung.id, bestellung]),
+  )
+  return ((result.data ?? []) as EinkaufWareneingangRecord[]).map(row => normalizeEinkaufWareneingang(row, bestellungenById))
 }
 
 export async function insertEinkaufWareneingang(w: {
   id: string; bestellung_id?: string; lieferant?: string; artikel?: string
   menge?: number; einheit?: string; datum?: string; qualitaet?: string; mitarbeiter?: string
 }) {
-  const { data, error } = await db().from('einkauf_wareneingaenge').insert(w).select()
-  if (error) throw error
-  return data
+  const menge = toNumber(w.menge)
+  const payload = {
+    id: w.id,
+    bestellung_id: w.bestellung_id ?? null,
+    lieferant: w.lieferant ?? null,
+    artikel: w.artikel ?? null,
+    menge,
+    einheit: firstText(w.einheit, 'Stk'),
+    datum: w.datum ?? today(),
+    qualitaet: firstText(w.qualitaet, 'OK'),
+    mitarbeiter: firstText(w.mitarbeiter, '—'),
+    eingangsdatum: w.datum ?? today(),
+    menge_bestellt: menge,
+    menge_erhalten: menge,
+  }
+  const supabase = db()
+  const full = await supabase.from('einkauf_wareneingaenge').insert(payload).select()
+  if (!full.error) return full.data
+  if (!isSchemaMismatch(full.error)) throw full.error
+
+  const legacy = await supabase
+    .from('einkauf_wareneingaenge')
+    .insert({
+      id: payload.id,
+      bestellung_id: payload.bestellung_id,
+      lieferant: payload.lieferant,
+      artikel: payload.artikel,
+      menge: payload.menge,
+      einheit: payload.einheit,
+      datum: payload.datum,
+      qualitaet: payload.qualitaet,
+      mitarbeiter: payload.mitarbeiter,
+    })
+    .select()
+  if (!legacy.error) return legacy.data
+  if (!isSchemaMismatch(legacy.error)) throw legacy.error
+
+  const live = await supabase
+    .from('einkauf_wareneingaenge')
+    .insert({
+      bestellung_id: payload.bestellung_id,
+      eingangsdatum: payload.eingangsdatum,
+      menge_bestellt: payload.menge_bestellt,
+      menge_erhalten: payload.menge_erhalten,
+      qualitaet: payload.qualitaet,
+      notiz: [payload.lieferant, payload.artikel, payload.mitarbeiter].filter(Boolean).join(' | ') || null,
+    })
+    .select()
+  if (live.error) throw live.error
+  return live.data
 }
 
 export async function getPlanungRessourcen() {

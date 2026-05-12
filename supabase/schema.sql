@@ -159,7 +159,7 @@ create table if not exists buero_eingangsrechnungen (
   verwendungszweck  text,
   notiz             text,
   dokument_url      text,
-  dokument_id       text,
+  dokument_id       text references buero_dokumente(id),
   bezahlt_am        date,
   created_at        timestamptz default now(),
   updated_at        timestamptz default now()
@@ -182,6 +182,10 @@ create table if not exists buero_dokumente (
   extracted   jsonb default '{}',
   suggested_actions jsonb default '[]',
   search_text text,
+  eingangsrechnung_id text references buero_eingangsrechnungen(id),
+  rechnung_id text references buero_rechnungen(id),
+  angebot_id text references buero_angebote(id),
+  auftrag_id text references buero_auftraege(id),
   created_at  timestamptz default now(),
   updated_at  timestamptz default now()
 );
@@ -203,6 +207,11 @@ create policy "buero_dokumente_user" on buero_dokumente for all using (auth.uid(
 create index if not exists idx_buero_eingangsrechnungen_user_status on buero_eingangsrechnungen(user_id, status);
 create index if not exists idx_buero_eingangsrechnungen_user_faelligkeit on buero_eingangsrechnungen(user_id, faelligkeit);
 create index if not exists idx_buero_eingangsrechnungen_lieferant on buero_eingangsrechnungen(user_id, lieferant);
+create index if not exists idx_buero_eingangsrechnungen_dokument_id on buero_eingangsrechnungen(dokument_id);
+create index if not exists idx_buero_dokumente_eingangsrechnung_id on buero_dokumente(eingangsrechnung_id);
+create index if not exists idx_buero_dokumente_rechnung_id on buero_dokumente(rechnung_id);
+create index if not exists idx_buero_dokumente_angebot_id on buero_dokumente(angebot_id);
+create index if not exists idx_buero_dokumente_auftrag_id on buero_dokumente(auftrag_id);
 
 -- ── Einkauf / Lieferanten ───────────────────────────────────
 
@@ -223,21 +232,26 @@ create table if not exists einkauf_lieferanten (
 );
 
 create table if not exists einkauf_bestellungen (
-  id            text primary key,
-  user_id       uuid references auth.users not null default auth.uid(),
-  lieferant     text,
-  artikel       text,
-  menge         numeric default 0,
-  einheit       text default 'Stk',
-  einkaufspreis text,
-  gesamt        text,
-  status        text default 'Entwurf',
-  bestellt_am   text,
-  erwartet_am   text,
-  geliefert_am  text,
-  notiz         text,
-  created_at    timestamptz default now(),
-  updated_at    timestamptz default now()
+  id               text primary key,
+  user_id          uuid references auth.users not null default auth.uid(),
+  lieferant_id     text references einkauf_lieferanten(id),
+  lieferant        text,
+  artikel          text,
+  menge            numeric default 0,
+  einheit          text default 'Stk',
+  einkaufspreis    text,
+  gesamt           text,
+  status           text default 'Entwurf',
+  bestellt_am      text,
+  erwartet_am      text,
+  geliefert_am     text,
+  einzelpreis      numeric default 0,
+  gesamtpreis      numeric default 0,
+  bestelldatum     text,
+  lieferdatum_soll text,
+  notiz            text,
+  created_at       timestamptz default now(),
+  updated_at       timestamptz default now()
 );
 
 create table if not exists einkauf_wareneingaenge (
@@ -251,6 +265,10 @@ create table if not exists einkauf_wareneingaenge (
   datum           text,
   qualitaet       text default 'OK',
   mitarbeiter     text,
+  notiz           text,
+  eingangsdatum   text,
+  menge_bestellt  numeric default 0,
+  menge_erhalten  numeric default 0,
   created_at      timestamptz default now()
 );
 

@@ -205,7 +205,7 @@ type Lieferant = {
   ort: string; kategorie: string; zahlungsziel: string; status: 'Aktiv' | 'Inaktiv'; bewertung: number
 }
 type EinkaufsBestellung = {
-  id: string; lieferant: string; artikel: string; menge: number; einheit: string
+  id: string; lieferant_id?: string; lieferant: string; artikel: string; menge: number; einheit: string
   einkaufspreis: string; gesamt: string; status: 'Entwurf' | 'Bestellt' | 'Teillieferung' | 'Geliefert' | 'Storniert'
   bestellt_am: string; erwartet_am: string; geliefert_am?: string; notiz?: string
 }
@@ -2067,8 +2067,10 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
     const menge = parseFloat(bsForm.menge) || 0
     const ep = parseFloat(bsForm.einkaufspreis.replace(',', '.')) || 0
     const gesamt = (menge * ep).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' €'
+    const lieferant = lieferanten.find(l => l.name === bsForm.lieferant)
     const neu: EinkaufsBestellung = {
       id: `EB-2025-0${17 + bestellungen.filter(b => !isDemo || true).length}`,
+      lieferant_id: lieferant?.id,
       lieferant: bsForm.lieferant, artikel: bsForm.artikel, menge, einheit: bsForm.einheit,
       einkaufspreis: bsForm.einkaufspreis.includes('€') ? bsForm.einkaufspreis : `${bsForm.einkaufspreis} €`,
       gesamt, status: 'Entwurf', bestellt_am: heute(), erwartet_am: bsForm.erwartet_am || '',
