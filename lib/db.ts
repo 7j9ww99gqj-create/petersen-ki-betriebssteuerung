@@ -715,6 +715,101 @@ export async function getBueroDokumentById(id: string) {
   return data
 }
 
+export async function getBueroKundeDetailContext(id: string) {
+  const [kunde, angebote, auftraege, rechnungen, dokumente] = await Promise.all([
+    getBueroKundeById(id),
+    getBueroAngebote(),
+    getBueroAuftraege(),
+    getBueroRechnungen(),
+    getBueroDokumente(),
+  ])
+  if (!kunde) return null
+  const kundeName = firstText((kunde as { name?: string | null }).name)
+  const relatedAngebote = (angebote ?? []).filter(row => row.kunde_id === id || firstText(row.kunde).toLowerCase() === kundeName.toLowerCase())
+  const relatedAuftraege = (auftraege ?? []).filter(row => row.kunde_id === id || firstText(row.kunde).toLowerCase() === kundeName.toLowerCase())
+  const relatedRechnungen = (rechnungen ?? []).filter(row => row.kunde_id === id || firstText(row.kunde).toLowerCase() === kundeName.toLowerCase())
+  const angebotIds = new Set(relatedAngebote.map(row => row.id))
+  const auftragIds = new Set(relatedAuftraege.map(row => row.id))
+  const rechnungIds = new Set(relatedRechnungen.map(row => row.id))
+  const relatedDokumente = ((dokumente ?? []) as Array<Record<string, unknown>>).filter(doc => {
+    const bezug = firstText(doc.bezug as string | undefined).toLowerCase()
+    return angebotIds.has(String(doc.angebot_id ?? ''))
+      || auftragIds.has(String(doc.auftrag_id ?? ''))
+      || rechnungIds.has(String(doc.rechnung_id ?? ''))
+      || (!!kundeName && bezug === kundeName.toLowerCase())
+    })
+
+  return {
+    kunde,
+    angebote: relatedAngebote,
+    auftraege: relatedAuftraege,
+    rechnungen: relatedRechnungen,
+    dokumente: relatedDokumente,
+  }
+}
+
+export async function getEinkaufLieferantDetailContext(id: string) {
+  const [lieferant, bestellungen, eingangsrechnungen, dokumente] = await Promise.all([
+    getEinkaufLieferantById(id),
+    getEinkaufBestellungen(),
+    getBueroEingangsrechnungen(),
+    getBueroDokumente(),
+  ])
+  if (!lieferant) return null
+  const lieferantName = firstText((lieferant as { name?: string | null }).name)
+  const relatedBestellungen = (bestellungen ?? []).filter(row => row.lieferant_id === id || firstText(row.lieferant).toLowerCase() === lieferantName.toLowerCase())
+  const relatedEingangsrechnungen = (eingangsrechnungen ?? []).filter(row => row.lieferant_id === id || firstText(row.lieferant).toLowerCase() === lieferantName.toLowerCase())
+  const eingangsrechnungIds = new Set(relatedEingangsrechnungen.map(row => row.id))
+  const relatedDokumente = ((dokumente ?? []) as Array<Record<string, unknown>>).filter(doc => {
+    const bezug = firstText(doc.bezug as string | undefined).toLowerCase()
+    return eingangsrechnungIds.has(String(doc.eingangsrechnung_id ?? ''))
+      || (!!lieferantName && bezug === lieferantName.toLowerCase())
+  })
+
+  return {
+    lieferant,
+    bestellungen: relatedBestellungen,
+    eingangsrechnungen: relatedEingangsrechnungen,
+    dokumente: relatedDokumente,
+  }
+}
+
+export async function getBueroEingangsrechnungDetailContext(id: string) {
+  const [eingangsrechnung, dokumente, steuerbelege, bestellungen] = await Promise.all([
+    getBueroEingangsrechnungById(id),
+    getBueroDokumente(),
+    getSteuerBelege(),
+    getEinkaufBestellungen(),
+  ])
+  if (!eingangsrechnung) return null
+  const lieferant = eingangsrechnung.lieferant_id
+    ? await getEinkaufLieferantById(eingangsrechnung.lieferant_id)
+    : null
+  const lieferantName = firstText(eingangsrechnung.lieferant, (lieferant as { name?: string | null } | null)?.name)
+  const rechnungsnummer = firstText(eingangsrechnung.rechnungsnummer)
+  const relatedDokumente = ((dokumente ?? []) as Array<Record<string, unknown>>).filter(doc => {
+    if (String(doc.id ?? '') === String(eingangsrechnung.dokument_id ?? '')) return true
+    if (String(doc.eingangsrechnung_id ?? '') === id) return true
+    const bezug = firstText(doc.bezug as string | undefined).toLowerCase()
+    return (!!lieferantName && bezug === lieferantName.toLowerCase())
+  })
+  const relatedSteuerbelege = ((steuerbelege ?? []) as Array<Record<string, unknown>>).filter(beleg => {
+    const supplier = firstText(beleg.lieferant as string | undefined).toLowerCase()
+    const note = `${firstText(beleg.notiz as string | undefined)} ${firstText(beleg.belegnummer as string | undefined)}`.toLowerCase()
+    return (!!lieferantName && supplier === lieferantName.toLowerCase())
+      || (!!rechnungsnummer && note.includes(rechnungsnummer.toLowerCase()))
+  })
+  const relatedBestellungen = (bestellungen ?? []).filter(row => row.lieferant_id === eingangsrechnung.lieferant_id || firstText(row.lieferant).toLowerCase() === lieferantName.toLowerCase())
+
+  return {
+    eingangsrechnung,
+    lieferant,
+    dokumente: relatedDokumente,
+    steuerbelege: relatedSteuerbelege,
+    bestellungen: relatedBestellungen,
+  }
+}
+
 // ── WERKSTATT ────────────────────────────────────────────────────────────────
 
 export async function getWerkstattKarten() {
