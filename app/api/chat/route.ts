@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getLagerArtikel, getLagerStellplaetze, getLagerStellplatzBestand, getLagerUmlagerungen } from '@/lib/db'
+import { getRouteAccess } from '@/lib/server-auth'
 
 // ── Demo-Kontext (spiegelt die Demo-Daten aus lager/page.tsx wider) ──────────
 
@@ -105,30 +105,26 @@ ${none([...ueberlastet, ...verteilt])
 export async function POST(req: NextRequest) {
   try {
     const { messages, system, context, structuredOutput } = await req.json()
-
-    // Demo-Modus: Cookie aus Request lesen
-    const isDemo = req.cookies.get('pk_demo')?.value === '1'
+    const access = await getRouteAccess(req, ['Admin', 'Mitarbeiter', 'Lager', 'Werkstatt'])
+    if (access.error) return access.error
 
     // Systemkontext aufbauen
     let systemContext: typeof DEMO_CONTEXT
 
-    if (isDemo) {
+    if (access.isDemo) {
       systemContext = DEMO_CONTEXT
     } else {
-      // Live-Modus: Echte DB-Daten laden
-      // Hinweis: Ohne SSR-Auth-Client werden RLS-geschützte Tabellen leer zurückgegeben.
-      // Die Architektur ist korrekt — für vollständige Daten muss der Supabase-Client
-      // auf createServerClient (mit Cookie-Forwarding) umgestellt werden.
+      const supabase = access.supabase
       try {
         const [rawArtikel, rawStellplaetze, rawBestand, rawUmlagerungen] = await Promise.allSettled([
-          getLagerArtikel(),
-          getLagerStellplaetze(),
-          getLagerStellplatzBestand(),
-          getLagerUmlagerungen(),
+          supabase!.from('lager_artikel').select('*').order('id'),
+          supabase!.from('lager_stellplaetze').select('*').order('code'),
+          supabase!.from('lager_stellplatz_bestand').select('*, lager_stellplaetze(code, bereich, warengruppe, warenobergruppe)').order('created_at', { ascending: false }),
+          supabase!.from('lager_umlagerungen').select('*').order('datum', { ascending: false }).limit(200),
         ])
 
         systemContext = {
-          artikel: rawArtikel.status === 'fulfilled' ? rawArtikel.value.map((a: Record<string, unknown>) => ({
+          artikel: rawArtikel.status === 'fulfilled' && !rawArtikel.value.error ? (rawArtikel.value.data ?? []).map((a: Record<string, unknown>) => ({
             id: a.id as string,
             name: a.name as string,
             kategorie: a.kategorie as string,
@@ -138,7 +134,7 @@ export async function POST(req: NextRequest) {
             mindestbestand: (a.mindestbestand as number) ?? 0,
             status: a.status as string,
           })) : [],
-          stellplaetze: rawStellplaetze.status === 'fulfilled' ? rawStellplaetze.value.map((sp: Record<string, unknown>) => ({
+          stellplaetze: rawStellplaetze.status === 'fulfilled' && !rawStellplaetze.value.error ? (rawStellplaetze.value.data ?? []).map((sp: Record<string, unknown>) => ({
             id: sp.id as string,
             code: sp.code as string,
             bereich: sp.bereich as string,
@@ -146,14 +142,14 @@ export async function POST(req: NextRequest) {
             typ: sp.typ as string,
             aktiv: sp.aktiv as boolean,
           })) : [],
-          bestand: rawBestand.status === 'fulfilled' ? rawBestand.value.map((b: Record<string, unknown>) => ({
+          bestand: rawBestand.status === 'fulfilled' && !rawBestand.value.error ? (rawBestand.value.data ?? []).map((b: Record<string, unknown>) => ({
             stellplatz_code: (b.lager_stellplaetze as { code?: string } | null)?.code ?? '',
             artikelname: b.artikelname as string,
             menge: (b.menge as number) ?? 0,
             einheit: b.einheit as string,
             mhd: b.mhd as string | null,
           })) : [],
-          umlagerungen: rawUmlagerungen.status === 'fulfilled' ? rawUmlagerungen.value.map((u: Record<string, unknown>) => ({
+          umlagerungen: rawUmlagerungen.status === 'fulfilled' && !rawUmlagerungen.value.error ? (rawUmlagerungen.value.data ?? []).map((u: Record<string, unknown>) => ({
             artikelname: u.artikelname as string,
             von: u.von_stellplatz_id as string,
             nach: u.nach_stellplatz_id as string,

@@ -48,6 +48,67 @@ type EinkaufLieferantRecord = {
   name?: string | null
 }
 
+type BueroKundeRecord = {
+  id: string
+  name?: string | null
+}
+
+type BueroAngebotRecord = {
+  id: string
+  kunde_id?: string | null
+  kunde?: string | null
+  titel?: string | null
+  betrag?: string | null
+  datum?: string | null
+  gueltig?: string | null
+  status?: string | null
+}
+
+type BueroAuftragRecord = {
+  id: string
+  kunde_id?: string | null
+  kunde?: string | null
+  beschreibung?: string | null
+  wert?: string | null
+  start?: string | null
+  ende?: string | null
+  status?: string | null
+  fortschritt?: number | null
+}
+
+type BueroRechnungRecord = {
+  id: string
+  kunde_id?: string | null
+  kunde?: string | null
+  betrag?: string | null
+  faellig?: string | null
+  erstellt?: string | null
+  status?: string | null
+  bezahlt_am?: string | null
+}
+
+type BueroEingangsrechnungRecord = {
+  id: string
+  lieferant_id?: string | null
+  lieferant?: string | null
+  rechnungsnummer?: string | null
+  rechnungsdatum?: string | null
+  faelligkeit?: string | null
+  betrag_netto?: number | null
+  mwst?: number | null
+  betrag_brutto?: number | null
+  status?: string | null
+  kategorie?: string | null
+  iban?: string | null
+  verwendungszweck?: string | null
+  notiz?: string | null
+  dokument_url?: string | null
+  dokument_id?: string | null
+  bezahlt_am?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
 type EinkaufBestellungRecord = {
   id: string
   lieferant_id?: string | null
@@ -97,6 +158,16 @@ async function listEinkaufLieferantenIndex() {
   }
 }
 
+async function listBueroKundenIndex() {
+  const { data, error } = await db().from('buero_kunden').select('id, name')
+  if (error) throw error
+  const rows = (data ?? []) as BueroKundeRecord[]
+  return {
+    byId: new Map(rows.map(row => [row.id, row])),
+    byName: new Map(rows.filter(row => row.name).map(row => [String(row.name).trim().toLowerCase(), row])),
+  }
+}
+
 function normalizeEinkaufBestellung(
   row: EinkaufBestellungRecord,
   lieferantenById: Map<string, EinkaufLieferantRecord>,
@@ -138,6 +209,50 @@ function normalizeEinkaufWareneingang(
     qualitaet: firstText(row.qualitaet, 'OK'),
     mitarbeiter: firstText(row.mitarbeiter, '—'),
     notiz: firstText(row.notiz),
+  }
+}
+
+function normalizeBueroAngebot(
+  row: BueroAngebotRecord,
+  kundenById: Map<string, BueroKundeRecord>,
+) {
+  return {
+    ...row,
+    kunde_id: row.kunde_id ?? undefined,
+    kunde: firstText(row.kunde, row.kunde_id ? kundenById.get(row.kunde_id)?.name ?? '' : ''),
+  }
+}
+
+function normalizeBueroAuftrag(
+  row: BueroAuftragRecord,
+  kundenById: Map<string, BueroKundeRecord>,
+) {
+  return {
+    ...row,
+    kunde_id: row.kunde_id ?? undefined,
+    kunde: firstText(row.kunde, row.kunde_id ? kundenById.get(row.kunde_id)?.name ?? '' : ''),
+  }
+}
+
+function normalizeBueroRechnung(
+  row: BueroRechnungRecord,
+  kundenById: Map<string, BueroKundeRecord>,
+) {
+  return {
+    ...row,
+    kunde_id: row.kunde_id ?? undefined,
+    kunde: firstText(row.kunde, row.kunde_id ? kundenById.get(row.kunde_id)?.name ?? '' : ''),
+  }
+}
+
+function normalizeBueroEingangsrechnung(
+  row: BueroEingangsrechnungRecord,
+  lieferantenById: Map<string, EinkaufLieferantRecord>,
+) {
+  return {
+    ...row,
+    lieferant_id: row.lieferant_id ?? undefined,
+    lieferant: firstText(row.lieferant, row.lieferant_id ? lieferantenById.get(row.lieferant_id)?.name ?? '' : ''),
   }
 }
 
@@ -284,6 +399,12 @@ export async function getBueroKunden() {
   return data ?? []
 }
 
+export async function getBueroKundeById(id: string) {
+  const { data, error } = await db().from('buero_kunden').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  return data
+}
+
 export async function upsertBueroKunde(k: {
   id: string; name: string; typ?: string; ansprechpartner?: string
   email?: string; telefon?: string; ort?: string; umsatz?: string; status?: string
@@ -302,70 +423,147 @@ export async function deleteBueroKunde(id: string) {
 }
 
 export async function getBueroAngebote() {
-  const { data, error } = await db().from('buero_angebote').select('*').order('id', { ascending: false })
+  const [{ data, error }, kundenIndex] = await Promise.all([
+    db().from('buero_angebote').select('*').order('id', { ascending: false }),
+    listBueroKundenIndex(),
+  ])
   if (error) throw error
-  return data ?? []
+  return ((data ?? []) as BueroAngebotRecord[]).map(row => normalizeBueroAngebot(row, kundenIndex.byId))
 }
 
 export async function upsertBueroAngebot(a: {
-  id: string; kunde?: string; titel?: string; betrag?: string
+  id: string; kunde_id?: string; kunde?: string; titel?: string; betrag?: string
   datum?: string; gueltig?: string; status?: string
 }) {
+  const kundenIndex = await listBueroKundenIndex()
+  const kundeRecord = a.kunde_id
+    ? kundenIndex.byId.get(a.kunde_id)
+    : a.kunde
+      ? kundenIndex.byName.get(a.kunde.trim().toLowerCase())
+      : undefined
   const { data, error } = await db()
     .from('buero_angebote')
-    .upsert({ ...a, updated_at: new Date().toISOString() })
+    .upsert({
+      ...a,
+      kunde_id: a.kunde_id ?? kundeRecord?.id ?? null,
+      kunde: firstText(a.kunde, kundeRecord?.name),
+      updated_at: new Date().toISOString(),
+    })
     .select()
   if (error) throw error
   return data
+}
+
+export async function getBueroAngebotById(id: string) {
+  const [angebot, kundenIndex] = await Promise.all([
+    db().from('buero_angebote').select('*').eq('id', id).maybeSingle(),
+    listBueroKundenIndex(),
+  ])
+  if (angebot.error) throw angebot.error
+  if (!angebot.data) return null
+  return normalizeBueroAngebot(angebot.data as BueroAngebotRecord, kundenIndex.byId)
 }
 
 export async function getBueroAuftraege() {
-  const { data, error } = await db().from('buero_auftraege').select('*').order('id', { ascending: false })
+  const [{ data, error }, kundenIndex] = await Promise.all([
+    db().from('buero_auftraege').select('*').order('id', { ascending: false }),
+    listBueroKundenIndex(),
+  ])
   if (error) throw error
-  return data ?? []
+  return ((data ?? []) as BueroAuftragRecord[]).map(row => normalizeBueroAuftrag(row, kundenIndex.byId))
 }
 
 export async function upsertBueroAuftrag(a: {
-  id: string; kunde?: string; beschreibung?: string; wert?: string
+  id: string; kunde_id?: string; kunde?: string; beschreibung?: string; wert?: string
   start?: string; ende?: string; status?: string; fortschritt?: number
 }) {
+  const kundenIndex = await listBueroKundenIndex()
+  const kundeRecord = a.kunde_id
+    ? kundenIndex.byId.get(a.kunde_id)
+    : a.kunde
+      ? kundenIndex.byName.get(a.kunde.trim().toLowerCase())
+      : undefined
   const { data, error } = await db()
     .from('buero_auftraege')
-    .upsert({ ...a, updated_at: new Date().toISOString() })
+    .upsert({
+      ...a,
+      kunde_id: a.kunde_id ?? kundeRecord?.id ?? null,
+      kunde: firstText(a.kunde, kundeRecord?.name),
+      updated_at: new Date().toISOString(),
+    })
     .select()
   if (error) throw error
   return data
+}
+
+export async function getBueroAuftragById(id: string) {
+  const [auftrag, kundenIndex] = await Promise.all([
+    db().from('buero_auftraege').select('*').eq('id', id).maybeSingle(),
+    listBueroKundenIndex(),
+  ])
+  if (auftrag.error) throw auftrag.error
+  if (!auftrag.data) return null
+  return normalizeBueroAuftrag(auftrag.data as BueroAuftragRecord, kundenIndex.byId)
 }
 
 export async function getBueroRechnungen() {
-  const { data, error } = await db().from('buero_rechnungen').select('*').order('id', { ascending: false })
+  const [{ data, error }, kundenIndex] = await Promise.all([
+    db().from('buero_rechnungen').select('*').order('id', { ascending: false }),
+    listBueroKundenIndex(),
+  ])
   if (error) throw error
-  return data ?? []
+  return ((data ?? []) as BueroRechnungRecord[]).map(row => normalizeBueroRechnung(row, kundenIndex.byId))
 }
 
 export async function upsertBueroRechnung(r: {
-  id: string; kunde?: string; betrag?: string; faellig?: string
+  id: string; kunde_id?: string; kunde?: string; betrag?: string; faellig?: string
   erstellt?: string; status?: string; bezahlt_am?: string
 }) {
+  const kundenIndex = await listBueroKundenIndex()
+  const kundeRecord = r.kunde_id
+    ? kundenIndex.byId.get(r.kunde_id)
+    : r.kunde
+      ? kundenIndex.byName.get(r.kunde.trim().toLowerCase())
+      : undefined
   const { data, error } = await db()
     .from('buero_rechnungen')
-    .upsert({ ...r, updated_at: new Date().toISOString() })
+    .upsert({
+      ...r,
+      kunde_id: r.kunde_id ?? kundeRecord?.id ?? null,
+      kunde: firstText(r.kunde, kundeRecord?.name),
+      updated_at: new Date().toISOString(),
+    })
     .select()
   if (error) throw error
   return data
 }
 
+export async function getBueroRechnungById(id: string) {
+  const [rechnung, kundenIndex] = await Promise.all([
+    db().from('buero_rechnungen').select('*').eq('id', id).maybeSingle(),
+    listBueroKundenIndex(),
+  ])
+  if (rechnung.error) throw rechnung.error
+  if (!rechnung.data) return null
+  return normalizeBueroRechnung(rechnung.data as BueroRechnungRecord, kundenIndex.byId)
+}
+
 export async function getBueroEingangsrechnungen() {
-  const { data, error } = await db()
-    .from('buero_eingangsrechnungen')
-    .select('*')
-    .order('faelligkeit', { ascending: true })
+  const [result, lieferantenIndex] = await Promise.all([
+    db()
+      .from('buero_eingangsrechnungen')
+      .select('*')
+      .order('faelligkeit', { ascending: true }),
+    listEinkaufLieferantenIndex(),
+  ])
+  const { data, error } = result
   if (error) throw error
-  return data ?? []
+  return ((data ?? []) as BueroEingangsrechnungRecord[]).map(row => normalizeBueroEingangsrechnung(row, lieferantenIndex.byId))
 }
 
 export async function upsertBueroEingangsrechnung(r: {
   id: string
+  lieferant_id?: string
   lieferant: string
   rechnungsnummer?: string
   rechnungsdatum?: string
@@ -382,12 +580,33 @@ export async function upsertBueroEingangsrechnung(r: {
   dokument_id?: string
   bezahlt_am?: string
 }) {
+  const lieferantenIndex = await listEinkaufLieferantenIndex()
+  const lieferantRecord = r.lieferant_id
+    ? lieferantenIndex.byId.get(r.lieferant_id)
+    : r.lieferant
+      ? lieferantenIndex.byName.get(r.lieferant.trim().toLowerCase())
+      : undefined
   const { data, error } = await db()
     .from('buero_eingangsrechnungen')
-    .upsert({ ...r, updated_at: new Date().toISOString() })
+    .upsert({
+      ...r,
+      lieferant_id: r.lieferant_id ?? lieferantRecord?.id ?? null,
+      lieferant: firstText(r.lieferant, lieferantRecord?.name),
+      updated_at: new Date().toISOString(),
+    })
     .select()
   if (error) throw error
   return data
+}
+
+export async function getBueroEingangsrechnungById(id: string) {
+  const [rechnung, lieferantenIndex] = await Promise.all([
+    db().from('buero_eingangsrechnungen').select('*').eq('id', id).maybeSingle(),
+    listEinkaufLieferantenIndex(),
+  ])
+  if (rechnung.error) throw rechnung.error
+  if (!rechnung.data) return null
+  return normalizeBueroEingangsrechnung(rechnung.data as BueroEingangsrechnungRecord, lieferantenIndex.byId)
 }
 
 export async function deleteBueroEingangsrechnung(id: string) {
@@ -454,7 +673,21 @@ export async function updateBueroDokument(id: string, d: {
 }
 
 export async function deleteBueroDokument(id: string) {
-  const { error } = await db().from('buero_dokumente').delete().eq('id', id)
+  const supabase = db()
+  const { data: existing, error: readError } = await supabase
+    .from('buero_dokumente')
+    .select('storage_path')
+    .eq('id', id)
+    .maybeSingle()
+  if (readError) throw readError
+
+  const storagePath = normalizeDocumentStoragePath((existing as { storage_path?: string | null } | null)?.storage_path)
+  if (storagePath) {
+    const { error: storageError } = await supabase.storage.from('dokumente').remove([storagePath])
+    if (storageError && !/not found/i.test(storageError.message ?? '')) throw storageError
+  }
+
+  const { error } = await supabase.from('buero_dokumente').delete().eq('id', id)
   if (error) throw error
 }
 
@@ -811,6 +1044,12 @@ export async function getEinkaufLieferanten() {
   return data ?? []
 }
 
+export async function getEinkaufLieferantById(id: string) {
+  const { data, error } = await db().from('einkauf_lieferanten').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  return data
+}
+
 export async function upsertEinkaufLieferant(l: {
   id: string; name: string; kontakt?: string; email?: string; telefon?: string
   ort?: string; kategorie?: string; zahlungsziel?: string; status?: string; bewertung?: number
@@ -835,6 +1074,16 @@ export async function getEinkaufBestellungen() {
   ])
   if (error) throw error
   return ((data ?? []) as EinkaufBestellungRecord[]).map(row => normalizeEinkaufBestellung(row, lieferantenIndex.byId))
+}
+
+export async function getEinkaufBestellungById(id: string) {
+  const [bestellung, lieferantenIndex] = await Promise.all([
+    db().from('einkauf_bestellungen').select('*').eq('id', id).maybeSingle(),
+    listEinkaufLieferantenIndex(),
+  ])
+  if (bestellung.error) throw bestellung.error
+  if (!bestellung.data) return null
+  return normalizeEinkaufBestellung(bestellung.data as EinkaufBestellungRecord, lieferantenIndex.byId)
 }
 
 export async function upsertEinkaufBestellung(b: {

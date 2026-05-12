@@ -892,7 +892,7 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
 
           {parseResult && !parseResult.error && (
             <div style={{ padding: '12px 16px', borderRadius: 8, background: 'rgba(37,211,102,.06)', border: '1px solid rgba(37,211,102,.2)', fontSize: 13, marginBottom: 16 }}>
-              ✅ <strong>{parseResult.totalRows}</strong> Zeilen erkannt · <strong>{parseResult.headers.length}</strong> Spalten · Trennzeichen: <code>"{parseResult.delimiter}"</code>
+              ✅ <strong>{parseResult.totalRows}</strong> Zeilen erkannt · <strong>{parseResult.headers.length}</strong> Spalten · Trennzeichen: <code>&quot;{parseResult.delimiter}&quot;</code>
             </div>
           )}
           {parseResult?.error && (

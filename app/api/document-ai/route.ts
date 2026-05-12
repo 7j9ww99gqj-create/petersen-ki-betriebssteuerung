@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getRouteAccess } from '@/lib/server-auth'
 
 export const runtime = 'nodejs'
 
@@ -42,6 +43,9 @@ function pickOutputText(data: Record<string, unknown>): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const access = await getRouteAccess(req, ['Admin', 'Mitarbeiter', 'Büro', 'Werkstatt', 'Lager'])
+    if (access.error) return access.error
+
     const form = await req.formData()
     const rawFile = form.get('file')
 
