@@ -31,7 +31,7 @@
   - [`app/dashboard/cloud/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/cloud/page.tsx) nutzt jetzt echte Live-Kennzahlen statt Demo-Sync: Archivmengen, Verknüpfungsgrad, letzte Datenaktivität, Modulabdeckung und sofern verfügbar echte Storage-Nutzung des aktuellen Users.
   - Das Cloud-Modul zeigt jetzt zusätzlich eine ehrliche Backup-Historie aus realer Modulaktivität sowie eine Sitzungs-/Geräteübersicht aus aktuellem Browser- und Supabase-Kontext; es bleibt aber weiterhin ohne echtes Multi-Device-Backend.
   - Das Archiv sucht jetzt nicht mehr nur in `buero_dokumente`, sondern bezieht auch `steuer_belege` mit ein; Steuerbelege lassen sich damit zentral finden und direkt in den Steuerbereich öffnen.
-  - Der MarketingPilot hat jetzt eine grobe klickbare Demo-Fläche für künftige KI-/Autopilot-Features bekommen. Neu ist vor allem ein `KI-Demos`-Bereich mit SEO-/Keywords-Analyse-Vorschau sowie klickbaren Roadmap-Karten, bewusst noch ohne echte Logik oder Auswahlfluss.
+  - Der MarketingPilot zeigt jetzt eine präsentationsfähige `KI-Suite`: Autopilot-Marketing, SEO-/Keywords-Analyse, Lead Intelligence, KI-Vertriebsassistent, KI-Content, Funnel-Builder, Templates, Integrationen, Gamification und weitere KI-Module sind sichtbar und anklickbar; das Layout wurde dafür auch mobil sauber stapelbar gemacht. Sichtbares Demo-Wording im UI wurde entfernt.
   - Löschlogik für Büro-Dokumente entfernt jetzt nicht mehr nur die DB-Zeile, sondern versucht auch die zugehörige Storage-Datei zu löschen.
   - Lokaler Dependency-Zustand wurde repariert; [`package.json`](/Users/kevinpetersen/Documents/petersen-ki/package.json) und [`package-lock.json`](/Users/kevinpetersen/Documents/petersen-ki/package-lock.json) enthalten jetzt die expliziten Pakete `debug` und `caniuse-lite`, damit `next lint`/`next build` lokal wieder sauber laufen.
   - Betroffene Dateien: [`app/api/chat/route.ts`](/Users/kevinpetersen/Documents/petersen-ki/app/api/chat/route.ts), [`app/api/document-ai/route.ts`](/Users/kevinpetersen/Documents/petersen-ki/app/api/document-ai/route.ts), [`app/dashboard/archiv/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/archiv/page.tsx), [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx), [`app/dashboard/buero/[entity]/[id]/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/[entity]/[id]/page.tsx), [`app/dashboard/cloud/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/cloud/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`lib/server-auth.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/server-auth.ts), [`package.json`](/Users/kevinpetersen/Documents/petersen-ki/package.json), [`package-lock.json`](/Users/kevinpetersen/Documents/petersen-ki/package-lock.json), [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql), [`supabase/migrations/20260512103000_align_einkauf_schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512103000_align_einkauf_schema.sql), [`supabase/migrations/20260512114500_add_buero_document_relations.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512114500_add_buero_document_relations.sql), [`supabase/migrations/20260512142000_add_buero_core_relations.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512142000_add_buero_core_relations.sql), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md).
@@ -40,7 +40,7 @@
   - Bestehende Live-Eingangsrechnung `ER-MP2BP7FR-W2J5` wurde auf den neuen Lieferanten `LF-LIVE-001` (`Vistaprint`) gemappt; damit ist ein echter Backfill-Fall jetzt live vorhanden.
   - Aktuelle Live-Mengen nach Testdatensatz: `3` Lieferanten, `3` Kunden, `1` Angebot, `1` Auftrag, `1` Rechnung, `1` Bestellung, `2` Eingangsrechnungen.
   - Tests: `npm run lint` erfolgreich; `npm run build` erfolgreich. Weiterhin nur bestehende Warnungen zu `<img>` in [`app/dashboard/einstellungen/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/einstellungen/page.tsx), [`app/dashboard/lager/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/lager/page.tsx), [`components/DocumentPreviewModal.tsx`](/Users/kevinpetersen/Documents/petersen-ki/components/DocumentPreviewModal.tsx) sowie ein bestehender `useEffect`-Dependency-Hinweis in [`app/dashboard/planung/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/planung/page.tsx).
-  - Aktueller Branch: `feature/buero-einkauf-absicherung`
+  - Aktueller Branch: `main`
 - Zuletzt gearbeitet am `2026-05-12`:
   - Commit `7acf66f`: Dokumente öffnen + klickbare Detailflüsse verbessert.
   - Commit `032a1e5`: lokale Ignore-Bereinigung.
@@ -58,7 +58,7 @@
 - Teilweise implementiert:
   - KI-Erkennung: Upload, Klassifikation, Übernahmeflüsse vorhanden; Qualität abhängig von API-Key/Mapping.
   - SteuerPilot: funktional, aber noch nicht sauber mit Eingangsrechnungen verzahnt.
-  - Planung/Marketing: Live-CRUD vorhanden, aber fachlich noch leichtgewichtig; Marketing hat jetzt zusätzlich eine reine klickbare KI-Demo-/Roadmap-Fläche ohne Backend-Logik.
+  - Planung/Marketing: Live-CRUD vorhanden, aber fachlich noch leichtgewichtig; Marketing hat jetzt zusätzlich eine klickbare KI-Suite ohne echte Backend-Logik.
 - Fehlt oder ist schwach:
   - Durchgängige relationale Verknüpfungen zwischen Modulen.
   - Zentrale Detailseiten/Objektansichten.
@@ -94,7 +94,7 @@
 | [`app/dashboard/werkstatt/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/werkstatt/page.tsx) | Werkstattmodul | `lib/db.ts` | bei Werkstattprozessen |
 | [`app/dashboard/ki-erkennung/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/ki-erkennung/page.tsx) | Dokument-KI + Übernahme | `app/api/document-ai`, `lib/db.ts` | bei OCR/KI/Übernahmeflüssen |
 | [`app/dashboard/einstellungen/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/einstellungen/page.tsx) | Profil, Firma, Rollen, Import, Billing | `lib/importer.ts`, `lib/db.ts` | bei Setup, Import, Admin |
-| [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx) | Kampagnen, Leads, Newsletter, Demo-KI-Features | `lib/db.ts` | bei Marketing-Workflows, SEO-/Autopilot-Demos |
+| [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx) | Kampagnen, Leads, Newsletter, KI-Suite | `lib/db.ts` | bei Marketing-Workflows, SEO-/Autopilot-Modulen |
 | [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts) | zentraler Datenlayer | Supabase | bei Tabellen, CRUD, Storage-Pfaden |
 | [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql) | Soll-Schema | Migrations, UI-Felder | bei strukturellen DB-Änderungen |
 | [`supabase/migrations/`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations) | Live-Nachzüge | Supabase Live-System | bei Deployment-relevanten Änderungen |
@@ -124,7 +124,7 @@
 - [ ] Archiv um globale Suche über weitere Module außerhalb `buero_dokumente` erweitern.
 - [ ] Cloud-Modul um echte Hintergrundjobs, Backup-Historie und Geräteverwaltung ergänzen oder diese Funktionen klar getrennt als nicht-live kennzeichnen.
 - [ ] Weitere Archivquellen nachziehen, v. a. KI-Erkennungs-Verläufe und ggf. Werkstatt-/Lagerdokumente, falls diese eigenständige Dokumenttabellen bekommen.
-- [ ] Marketing-Demo-Bereich schrittweise mit echter Logik hinterlegen, zuerst SEO-/Keyword-Daten und danach Lead-Intelligence / Autopilot-Marketing.
+- [ ] Marketing-KI-Suite schrittweise mit echter Logik hinterlegen, zuerst SEO-/Keyword-Daten und danach Lead-Intelligence / Autopilot-Marketing.
 - [ ] Detailseiten für Kernobjekte einführen.
 - [ ] Rollen/Rechte von lokalem UI-Status auf echte serverseitige Autorisierung heben.
 - [ ] Fehlerbehandlung und Leersituationen je Pilot systematisch härten.

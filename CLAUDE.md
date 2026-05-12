@@ -14,7 +14,7 @@ KI-gestütztes Warenwirtschaftssystem als produktive SaaS-WebApp.
 - Archiv ist live angebunden und durchsucht jetzt `buero_dokumente` plus `steuer_belege`; Legacy-Dokumentpfade werden beim Öffnen berücksichtigt.
 - Cloud & Sync zeigt keine Fantasiewerte mehr, sondern echte Live-Kennzahlen, eine ehrliche Backup-Historie aus Modulaktivität und eine einfache Sitzungs-/Geräteübersicht.
 - Letzte relevante Commits auf `main`: `8e8183d` (Cloud-Modul an Live-Daten), `ecc1f62` (Cloud + globale Archivsuche).
-- MarketingPilot hat jetzt zusätzlich einen reinen Demo-Bereich `KI-Demos` mit klickbaren Roadmap-Karten und einer groben SEO-/Keywords-Analyse-Vorschau, bewusst noch ohne echte Ausführung.
+- MarketingPilot hat jetzt zusätzlich eine klickbare `KI-Suite` mit sichtbaren Modulen wie Autopilot-Marketing, SEO-/Keywords-Analyse, KI-Vertriebsassistent, Content-Erstellung, Funnel-Builder, Branchen-Templates und weiteren Marketing-KI-Bausteinen.
 
 ---
 
@@ -101,7 +101,7 @@ insertEinkaufWareneingang(w: { bestellung_id, eingangsdatum, menge_bestellt, men
 | LagerPilot | `/dashboard/lager` | ✅ Vollständig | 12 Tabs (siehe unten) |
 | BüroPilot | `/dashboard/buero` | ✅ Vollständig | kunden/angebote/auftraege/rechnungen/dokumente/einkauf |
 | WerkstattPilot | `/dashboard/werkstatt` | ✅ Vollständig | Karten/Zeit/Material/Prüfprotokoll |
-| MarketingPilot | `/dashboard/marketing` | ⚠️ Teilweise | Create OK, Edit/Delete fehlt; KI-Demos/SEO nur als klickbare Vorschau |
+| MarketingPilot | `/dashboard/marketing` | ⚠️ Teilweise | Create OK, Edit/Delete fehlt; KI-Suite sichtbar und klickbar, aber noch ohne echte KI-Logik |
 | AnalysePilot | `/dashboard/analyse` | ⚠️ Demo-Daten | Charts laufen, kein Supabase |
 | PlanungPilot | `/dashboard/planung` | ✅ Vollständig | Projekte/Aufgaben/Kalender/Ressourcen |
 | KI-Assistent | `/dashboard/ki-erkennung` | ✅ Vollständig | Tagesbrief/Erkennung/Chat + Aktions-Ausführung |

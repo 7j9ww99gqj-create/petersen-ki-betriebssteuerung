@@ -67,20 +67,20 @@ const demoNewsletter: Newsletter[] = [
 ]
 
 const demoMarketingFeatures: DemoMarketingFeature[] = [
-  { id: 'autopilot', title: 'Autopilot-Marketing', short: 'Vom Ziel zum Funnel', detail: 'Der Nutzer sagt nur, wofür er mehr Kunden will. Die Demo zeigt danach grob Zielgruppe, Kampagne, Ads, Landingpage und Funnel als nächsten KI-Flow.', icon: '🚀', level: 'Gamechanger' },
+  { id: 'autopilot', title: 'Autopilot-Marketing', short: 'Vom Ziel zum Funnel', detail: 'Der Nutzer sagt nur, wofür er mehr Kunden will. Danach zeigt der Flow grob Zielgruppe, Kampagne, Ads, Landingpage und Funnel als nächsten KI-Prozess.', icon: '🚀', level: 'Gamechanger' },
   { id: 'seo', title: 'SEO-/Keywords-Analyse', short: 'Keywords, Klicks, Sichtbarkeit', detail: 'Prüft wichtige Suchbegriffe, geschätzte Klickstärke, organische Sichtbarkeit und welche Themen für die eigene Seite Potenzial haben.', icon: '🔎', level: 'Stark' },
-  { id: 'lead-intelligence', title: 'Lead Intelligence Engine', short: 'Heiße Leads erkennen', detail: 'Die Demo markiert, welche Leads heiß wirken, wann Kontakt sinnvoll ist und welche nächste Nachricht oder welcher Anruf empfohlen würde.', icon: '🔥', level: 'Stark' },
-  { id: 'ab-testing', title: 'Automatisches A/B Testing', short: 'Varianten testen lassen', detail: 'Später soll die KI Varianten erzeugen, Verlierer stoppen und Gewinner skalieren. Aktuell nur als klickbare Vorschau.', icon: '🧪', level: 'Ausbau' },
+  { id: 'lead-intelligence', title: 'Lead Intelligence Engine', short: 'Heiße Leads erkennen', detail: 'Markiert, welche Leads heiß wirken, wann Kontakt sinnvoll ist und welche nächste Nachricht oder welcher Anruf empfohlen würde.', icon: '🔥', level: 'Stark' },
+  { id: 'ab-testing', title: 'Automatisches A/B Testing', short: 'Varianten testen lassen', detail: 'Die KI erzeugt mehrere Varianten, stoppt Verlierer und skaliert Gewinner im Kampagnenfluss.', icon: '🧪', level: 'Ausbau' },
   { id: 'content-ai', title: 'KI-Content & Reels', short: 'Hooks, Clips, Thumbnails', detail: 'Idee für automatische Content-Erstellung mit Hooks, Reels, Anzeigenvideos und Thumbnails für Social-Kampagnen.', icon: '🎥', level: 'Stark' },
-  { id: 'funnel-brain', title: 'Funnel-Builder mit Gehirn', short: 'Struktur + Conversion-Ideen', detail: 'Die Demo beschreibt einen späteren Funnel-Builder, der Seitenstruktur, Absprünge und Conversion-Verbesserungen automatisch einschätzt.', icon: '🧩', level: 'Ausbau' },
-  { id: 'sales-assistant', title: 'KI-Vertriebsassistent', short: 'Antwortet wie ein Verkäufer', detail: 'Später für E-Mail, WhatsApp und Chat mit Angebotswissen, Preisen und Einwandbehandlung. Aktuell als Feature-Vorschau.', icon: '🗣️', level: 'Stark' },
+  { id: 'funnel-brain', title: 'Funnel-Builder mit Gehirn', short: 'Struktur + Conversion-Ideen', detail: 'Ein Funnel-Builder, der Seitenstruktur, Absprünge und Conversion-Verbesserungen automatisch einschätzt.', icon: '🧩', level: 'Ausbau' },
+  { id: 'sales-assistant', title: 'KI-Vertriebsassistent', short: 'Antwortet wie ein Verkäufer', detail: 'Für E-Mail, WhatsApp und Chat mit Angebotswissen, Preisen und Einwandbehandlung als sichtbarer Vertriebs-Flow.', icon: '🗣️', level: 'Stark' },
   { id: 'sales-clone', title: 'Besten Verkäufer klonen', short: 'Calls zu Skripten machen', detail: 'Zielt auf die Analyse starker Sales Calls und die Ableitung von Skripten, E-Mails und Funnels.', icon: '🧬', level: 'Ausbau' },
-  { id: 'content-daily', title: 'Was soll ich morgen posten?', short: 'Tägliche Content-Ideen', detail: 'Zeigt eine spätere Funktion für tägliche Content-Vorschläge inklusive Hook und Struktur.', icon: '📊', level: 'Stark' },
-  { id: 'predictive', title: 'Predictive Marketing', short: 'Flops und Gewinner vorhersagen', detail: 'Später soll die KI Kampagnenrisiken und Trendchancen bewerten, bevor Budget verbrannt wird.', icon: '🔮', level: 'Ausbau' },
-  { id: 'templates', title: 'Branchen-Templates', short: 'Flows für Coaches, Makler, Agenturen', detail: 'Branchenspezifische Templates sollen eigene Flows und Kampagnenlogik je Markt liefern.', icon: '🧑‍🤝‍🧑', level: 'Stark' },
+  { id: 'content-daily', title: 'Was soll ich morgen posten?', short: 'Tägliche Content-Ideen', detail: 'Tägliche Content-Vorschläge inklusive Hook, Struktur und Startpunkt für den nächsten Post.', icon: '📊', level: 'Stark' },
+  { id: 'predictive', title: 'Predictive Marketing', short: 'Flops und Gewinner vorhersagen', detail: 'Die KI bewertet Kampagnenrisiken und Trendchancen, bevor Budget verbrannt wird.', icon: '🔮', level: 'Ausbau' },
+  { id: 'templates', title: 'Branchen-Templates', short: 'Flows für Coaches, Makler, Agenturen', detail: 'Branchenspezifische Templates liefern eigene Flows und Kampagnenlogik je Markt.', icon: '🧑‍🤝‍🧑', level: 'Stark' },
   { id: 'integrations', title: 'Integrationen', short: 'CRM, Ads, WhatsApp, Kalender', detail: 'Zentrale Anbindung an externe Tools, damit kein Copy-Paste mehr nötig ist.', icon: '⚙️', level: 'Ausbau' },
-  { id: 'gamification', title: 'Gamification', short: 'Score, Fortschritt, Achievements', detail: 'Später als Motivationsebene mit Funnel-Score, Performance-Zielen und kleinen Erfolgsmarkern.', icon: '🎮', level: 'Ausbau' },
-  { id: 'explainability', title: 'Warum funktioniert das?', short: 'KI erklärt die Wirkung', detail: 'Die Demo zeigt die Idee, Ergebnisse nicht nur auszugeben, sondern die Begründung dahinter sichtbar zu machen.', icon: '🧠', level: 'Stark' },
+  { id: 'gamification', title: 'Gamification', short: 'Score, Fortschritt, Achievements', detail: 'Motivationsebene mit Funnel-Score, Performance-Zielen und sichtbaren Erfolgsmarkern.', icon: '🎮', level: 'Ausbau' },
+  { id: 'explainability', title: 'Warum funktioniert das?', short: 'KI erklärt die Wirkung', detail: 'Ergebnisse werden nicht nur angezeigt, sondern samt Begründung und Wirkung transparent gemacht.', icon: '🧠', level: 'Stark' },
 ]
 
 const demoKeywordStats = [
@@ -159,17 +159,17 @@ function DemoLabTab() {
       <div className="pk-card" style={{ marginBottom: 18, border: '1px solid rgba(245,158,11,.18)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
           <div>
-            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em' }}>Demo-Labor</div>
-            <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>MarketingPilot Roadmap zum Anklicken</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em' }}>KI-Suite</div>
+            <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>MarketingPilot mit klickbaren KI-Modulen</div>
           </div>
-          <span className="badge badge-orange">Nur Demo · keine Live-Logik</span>
+          <span className="badge badge-orange">Autopilot · SEO · Content · Vertrieb</span>
         </div>
         <div style={{ fontSize: 13, color: '#aeb9c8', lineHeight: 1.6 }}>
-          Die folgenden Bereiche sind bewusst nur grob sichtbar. Man kann sie anklicken, aber noch nichts produktiv ausführen.
+          Alle Bereiche sind direkt sichtbar und anklickbar, damit der gesamte Marketing-Stack vom ersten Blick an erfassbar ist.
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr .8fr', gap: 18, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18, marginBottom: 18 }}>
         <div className="pk-card">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
             {demoMarketingFeatures.map(feature => (
@@ -195,9 +195,9 @@ function DemoLabTab() {
           </div>
           <div style={{ fontSize: 13, color: '#d0d9e8', lineHeight: 1.6, marginBottom: 14 }}>{selected.detail}</div>
           <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
-            <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 6 }}>Aktueller Status</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 6 }}>Modulbild</div>
             <div style={{ fontSize: 13, color: '#f8fbff' }}>
-              Sichtbar im MarketingPilot als klickbare Demo-Vorschau. Noch keine Auswahl, keine Speicherung, keine Integrationen.
+              Sichtbar im MarketingPilot als klickbarer Modulbereich mit klarer Einordnung, Fokus und Ausbaurichtung.
             </div>
           </div>
         </div>
@@ -208,10 +208,10 @@ function DemoLabTab() {
           <div>
             <div style={{ fontWeight: 900, fontSize: 16 }}>🔎 SEO-/Keywords-Analyse</div>
             <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>
-              Demo-Idee: wichtige Keywords prüfen, grobe Klickstärke sehen und Potenzial der eigenen Seite erkennen
+              Wichtige Keywords prüfen, grobe Klickstärke sehen und Potenzial der eigenen Seite erkennen
             </div>
           </div>
-          <span className="badge badge-blue">Klickbar · noch ohne Datenanbindung</span>
+          <span className="badge badge-blue">Keywords · Klicks · Sichtbarkeit</span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
@@ -229,7 +229,7 @@ function DemoLabTab() {
           ))}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr .9fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           <div>
             <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Keyword-Vorschau</div>
             <div style={{ display: 'grid', gap: 10 }}>
@@ -261,7 +261,7 @@ function DemoLabTab() {
           </div>
 
           <div>
-            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Geplante nächste Ausbaustufe</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Nächste Ausbaustufe</div>
             <div style={{ display: 'grid', gap: 10 }}>
               {[
                 'Keyword-Liste eingeben und Chancen live berechnen',
@@ -897,7 +897,7 @@ export default function MarketingPilotPage() {
         <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0 }}>📣</div>
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>MarketingPilot</h1>
-          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Kampagnen · Leads · Newsletter · Auswertungen · KI-Demos</p>
+          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Kampagnen · Leads · Newsletter · Auswertungen · KI-Suite</p>
         </div>
         <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>
       </div>
@@ -919,9 +919,9 @@ export default function MarketingPilotPage() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
         {([
-          { id: 'demo-lab', label: '🚀 KI-Demos' },
+          { id: 'demo-lab', label: '🚀 KI-Suite' },
           { id: 'kampagnen', label: '📣 Kampagnen' },
           { id: 'leads', label: '🎯 Leads' },
           { id: 'newsletter', label: '📰 Newsletter' },
