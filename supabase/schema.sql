@@ -159,7 +159,7 @@ create table if not exists buero_eingangsrechnungen (
   verwendungszweck  text,
   notiz             text,
   dokument_url      text,
-  dokument_id       text references buero_dokumente(id),
+  dokument_id       text,
   bezahlt_am        date,
   created_at        timestamptz default now(),
   updated_at        timestamptz default now()
@@ -189,6 +189,21 @@ create table if not exists buero_dokumente (
   created_at  timestamptz default now(),
   updated_at  timestamptz default now()
 );
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.table_constraints
+    where table_schema = 'public'
+      and table_name = 'buero_eingangsrechnungen'
+      and constraint_name = 'buero_eingangsrechnungen_dokument_id_fkey'
+  ) then
+    alter table buero_eingangsrechnungen
+      add constraint buero_eingangsrechnungen_dokument_id_fkey
+      foreign key (dokument_id) references buero_dokumente(id);
+  end if;
+end $$;
 
 alter table buero_kunden    enable row level security;
 alter table buero_angebote  enable row level security;

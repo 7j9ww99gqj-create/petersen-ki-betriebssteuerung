@@ -9,7 +9,7 @@ import {
   getBueroRechnungen, upsertBueroRechnung,
   getBueroEingangsrechnungen, upsertBueroEingangsrechnung, deleteBueroEingangsrechnung,
   markEingangsrechnungBezahlt, updateEingangsrechnungStatus,
-  getBueroDokumente, getBueroDokumentById, getDokumentUrl, insertBueroDokument, deleteBueroDokument, uploadDokument,
+  getBueroDokumente, getBueroDokumentById, getDokumentUrl, insertBueroDokument, updateBueroDokument, deleteBueroDokument, uploadDokument,
   getEinkaufLieferanten, upsertEinkaufLieferant, deleteEinkaufLieferant,
   getEinkaufBestellungen, upsertEinkaufBestellung,
   getEinkaufWareneingaenge, insertEinkaufWareneingang,
@@ -47,6 +47,10 @@ type Dokument = {
   id: string; name: string; typ: string; groesse: string; datum: string
   kategorie: 'Angebot' | 'Rechnung' | 'Vertrag' | 'Sonstiges'; bezug: string
   storage_path?: string
+  eingangsrechnung_id?: string
+  rechnung_id?: string
+  angebot_id?: string
+  auftrag_id?: string
 }
 
 type EingangsrechnungStatus = 'offen' | 'geprüft' | 'freigegeben' | 'bezahlt' | 'überfällig' | 'abgelehnt'
@@ -71,6 +75,8 @@ type Eingangsrechnung = {
   created_at?: string
   updated_at?: string
 }
+
+type DocumentRelationField = 'eingangsrechnung_id' | 'rechnung_id' | 'angebot_id' | 'auftrag_id'
 
 // ── Demo-Daten ──────────────────────────────────────────────────────────────
 
@@ -193,6 +199,19 @@ function getLocalFirmaDefaults() {
   } catch {
     return { zahlungsziel_tage: 30, standard_mwst: 19 }
   }
+}
+
+function getDocumentRelationLabel(doc: Dokument) {
+  if (doc.eingangsrechnung_id) return `Eingangsrechnung ${doc.eingangsrechnung_id}`
+  if (doc.rechnung_id) return `Rechnung ${doc.rechnung_id}`
+  if (doc.angebot_id) return `Angebot ${doc.angebot_id}`
+  if (doc.auftrag_id) return `Auftrag ${doc.auftrag_id}`
+  return 'Keine Verknüpfung'
+}
+
+function getLinkedDokument(dokumente: Dokument[], field: DocumentRelationField, value?: string | null) {
+  if (!value) return undefined
+  return dokumente.find(doc => doc[field] === value)
 }
 
 // ── Hilfs-Komponenten ───────────────────────────────────────────────────────
@@ -572,24 +591,28 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
 
 function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterStatus }: { isDemo: boolean; kunden: Kunde[]; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; initialFilterStatus?: string }) {
   const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
+  const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [showForm, setShowForm] = useState(false)
   const [toast, setToast] = useState('')
   const [toastError, setToastError] = useState(false)
   const [loading, setLoading] = useState(!isDemo)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
-  const [form, setForm] = useState({ kunde: '', titel: '', betrag: '', gueltig: '' })
+  const [form, setForm] = useState({ kunde: '', titel: '', betrag: '', gueltig: '', dokumentId: '' })
 
   // Edit-Modal
   const [editAngebot, setEditAngebot] = useState<Angebot | null>(null)
-  const [editForm, setEditForm] = useState({ kunde: '', titel: '', betrag: '', datum: '', gueltig: '', status: 'Entwurf' as Angebot['status'] })
+  const [editForm, setEditForm] = useState({ kunde: '', titel: '', betrag: '', datum: '', gueltig: '', status: 'Entwurf' as Angebot['status'], dokumentId: '' })
 
   // Delete-Bestätigung
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     if (isDemo) return
-    getBueroAngebote()
-      .then(data => setAngebote(data as Angebot[]))
+    Promise.all([getBueroAngebote(), getBueroDokumente()])
+      .then(([angeboteData, dokumenteData]) => {
+        setAngebote(angeboteData as Angebot[])
+        setDokumente(dokumenteData as Dokument[])
+      })
       .catch(() => showToast('Fehler beim Laden der Angebote', true))
       .finally(() => setLoading(false))
   }, [isDemo])
@@ -607,6 +630,28 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
   }
 
   const filtered = angebote.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
+  const dokumentOptionen = dokumente.filter(doc => Boolean(doc.storage_path) && (!doc.angebot_id || doc.angebot_id === editAngebot?.id))
+
+  const syncDokumentVerknuepfung = async (angebot: Angebot, dokumentId: string, previousDokumentId?: string) => {
+    if (isDemo) return
+    const nextDokumentId = dokumentId || null
+    if (previousDokumentId && previousDokumentId !== nextDokumentId) {
+      await updateBueroDokument(previousDokumentId, { angebot_id: null })
+    }
+    if (!nextDokumentId) return
+    await updateBueroDokument(nextDokumentId, {
+      angebot_id: angebot.id,
+      kategorie: 'Angebot',
+      bezug: angebot.kunde,
+    })
+    setDokumente(prev => prev.map(doc => (
+      doc.id === nextDokumentId
+        ? { ...doc, angebot_id: angebot.id, kategorie: 'Angebot', bezug: angebot.kunde }
+        : previousDokumentId && doc.id === previousDokumentId
+          ? { ...doc, angebot_id: undefined }
+          : doc
+    )))
+  }
 
   const handleSave = async () => {
     if (!form.kunde || !form.titel || !form.betrag) return
@@ -622,10 +667,13 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
       status: 'Entwurf',
     }
     if (!isDemo) {
-      try { await upsertBueroAngebot(newAng) } catch { showToast('Fehler beim Speichern', true); return }
+      try {
+        await upsertBueroAngebot(newAng)
+        await syncDokumentVerknuepfung(newAng, form.dokumentId)
+      } catch { showToast('Fehler beim Speichern', true); return }
     }
     setAngebote(prev => [newAng, ...prev])
-    setForm({ kunde: '', titel: '', betrag: '', gueltig: '' })
+    setForm({ kunde: '', titel: '', betrag: '', gueltig: '', dokumentId: '' })
     setShowForm(false)
     showToast(`✅ Angebot "${newAng.id}" wurde als Entwurf erstellt`)
   }
@@ -643,14 +691,26 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
 
   const openEdit = (a: Angebot) => {
     setEditAngebot(a)
-    setEditForm({ kunde: a.kunde, titel: a.titel, betrag: a.betrag, datum: a.datum, gueltig: a.gueltig, status: a.status })
+    setEditForm({
+      kunde: a.kunde,
+      titel: a.titel,
+      betrag: a.betrag,
+      datum: a.datum,
+      gueltig: a.gueltig,
+      status: a.status,
+      dokumentId: getLinkedDokument(dokumente, 'angebot_id', a.id)?.id ?? '',
+    })
   }
 
   const handleEditSave = async () => {
     if (!editAngebot) return
+    const previousDokumentId = getLinkedDokument(dokumente, 'angebot_id', editAngebot.id)?.id
     const updated: Angebot = { ...editAngebot, ...editForm, betrag: editForm.betrag.includes('€') ? editForm.betrag : `${editForm.betrag} €` }
     if (!isDemo) {
-      try { await upsertBueroAngebot(updated) } catch { showToast('Fehler beim Speichern', true); return }
+      try {
+        await upsertBueroAngebot(updated)
+        await syncDokumentVerknuepfung(updated, editForm.dokumentId, previousDokumentId)
+      } catch { showToast('Fehler beim Speichern', true); return }
     }
     setAngebote(prev => prev.map(a => a.id === updated.id ? updated : a))
     setEditAngebot(null)
@@ -664,10 +724,15 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
       // Angebote haben ggf. keinen expliziten deleteBueroAngebot – wir aktualisieren den Status auf Abgelehnt als Soft-Delete-Alternative
       const ang = angebote.find(a => a.id === id)
       if (ang) {
-        try { await upsertBueroAngebot({ ...ang, status: 'Abgelehnt' }) } catch { showToast('Fehler beim Löschen', true); return }
+        try {
+          const linkedDokument = getLinkedDokument(dokumente, 'angebot_id', id)
+          if (linkedDokument) await updateBueroDokument(linkedDokument.id, { angebot_id: null })
+          await upsertBueroAngebot({ ...ang, status: 'Abgelehnt' })
+        } catch { showToast('Fehler beim Löschen', true); return }
       }
     }
     setAngebote(prev => prev.filter(a => a.id !== id))
+    setDokumente(prev => prev.map(doc => doc.angebot_id === id ? { ...doc, angebot_id: undefined } : doc))
     showToast(`🗑️ Angebot ${id} wurde gelöscht`)
   }
 
@@ -743,6 +808,13 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                 <option>Abgelehnt</option>
               </select>
             </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Verknüpftes Dokument</label>
+              <select className="pk-input" value={editForm.dokumentId} onChange={e => setEditForm(p => ({ ...p, dokumentId: e.target.value }))}>
+                <option value="">Kein Dokument verknüpft</option>
+                {dokumentOptionen.map(doc => <option key={doc.id} value={doc.id}>{doc.name} ({doc.datum})</option>)}
+              </select>
+            </div>
           </div>
           <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
             <button className="pk-btn" onClick={handleEditSave}>Speichern</button>
@@ -791,6 +863,13 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
               <label style={labelStyle}>Gültig bis</label>
               <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.gueltig} onChange={e => setForm(p => ({ ...p, gueltig: e.target.value }))} />
             </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Verknüpftes Dokument</label>
+              <select className="pk-input" value={form.dokumentId} onChange={e => setForm(p => ({ ...p, dokumentId: e.target.value }))}>
+                <option value="">Kein Dokument verknüpft</option>
+                {dokumentOptionen.map(doc => <option key={doc.id} value={doc.id}>{doc.name} ({doc.datum})</option>)}
+              </select>
+            </div>
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
             <button className="pk-btn" onClick={handleSave}>Als Entwurf speichern</button>
@@ -808,12 +887,16 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
               <th>Betrag</th>
               <th>Erstellt</th>
               <th>Gültig bis</th>
+              <th>Dokument</th>
               <th>Status</th>
               <th>Aktion</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(a => (
+              (() => {
+                const linkedDokument = getLinkedDokument(dokumente, 'angebot_id', a.id)
+                return (
               <tr key={a.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(a)}>
                 <td style={{ color: '#aeb9c8', fontFamily: 'monospace', fontSize: 12 }}>{a.id}</td>
                 <td style={{ fontWeight: 600 }}>{a.kunde}</td>
@@ -821,6 +904,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                 <td style={{ fontWeight: 700, color: '#20c8ff' }}>{a.betrag}</td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{a.datum}</td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{a.gueltig}</td>
+                <td style={{ color: '#aeb9c8', fontSize: 13 }}>{linkedDokument?.name ?? '—'}</td>
                 <td><StatusBadgeAngebot status={a.status} /></td>
                 <td>
                   {deleteId === a.id ? (
@@ -856,6 +940,8 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                   )}
                 </td>
               </tr>
+                )
+              })()
             ))}
           </tbody>
         </table>
@@ -868,15 +954,16 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
 // ── Aufträge-Tab ────────────────────────────────────────────────────────────
 
 function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boolean; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; kunden: Kunde[] }) {
+  const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [toast, setToast] = useState('')
   const [toastError, setToastError] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ kunde: '', beschreibung: '', wert: '', start: '', ende: '' })
+  const [form, setForm] = useState({ kunde: '', beschreibung: '', wert: '', start: '', ende: '', dokumentId: '' })
 
   // Edit-Modal
   const [editAuftrag, setEditAuftrag] = useState<Auftrag | null>(null)
-  const [editForm, setEditForm] = useState({ kunde: '', beschreibung: '', wert: '', start: '', ende: '', status: 'Geplant' as Auftrag['status'], fortschritt: 0 })
+  const [editForm, setEditForm] = useState({ kunde: '', beschreibung: '', wert: '', start: '', ende: '', status: 'Geplant' as Auftrag['status'], fortschritt: 0, dokumentId: '' })
 
   // Delete-Bestätigung
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -886,13 +973,42 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
     setTimeout(() => setToast(''), 4000)
   }
 
+  useEffect(() => {
+    if (isDemo) return
+    getBueroDokumente()
+      .then(data => setDokumente(data as Dokument[]))
+      .catch(() => showToast('Fehler beim Laden der Dokumente', true))
+  }, [isDemo])
+
   const filtered = auftraege.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
+  const dokumentOptionen = dokumente.filter(doc => Boolean(doc.storage_path) && (!doc.auftrag_id || doc.auftrag_id === editAuftrag?.id))
 
   const statusColor: Record<string, string> = {
     'In Bearbeitung': '#1684ff',
     Abgeschlossen: '#25d366',
     Geplant: '#aeb9c8',
     Pausiert: '#f59e0b',
+  }
+
+  const syncDokumentVerknuepfung = async (auftrag: Auftrag, dokumentId: string, previousDokumentId?: string) => {
+    if (isDemo) return
+    const nextDokumentId = dokumentId || null
+    if (previousDokumentId && previousDokumentId !== nextDokumentId) {
+      await updateBueroDokument(previousDokumentId, { auftrag_id: null })
+    }
+    if (!nextDokumentId) return
+    await updateBueroDokument(nextDokumentId, {
+      auftrag_id: auftrag.id,
+      kategorie: 'Vertrag',
+      bezug: auftrag.kunde,
+    })
+    setDokumente(prev => prev.map(doc => (
+      doc.id === nextDokumentId
+        ? { ...doc, auftrag_id: auftrag.id, kategorie: 'Vertrag', bezug: auftrag.kunde }
+        : previousDokumentId && doc.id === previousDokumentId
+          ? { ...doc, auftrag_id: undefined }
+          : doc
+    )))
   }
 
   const handleAbschliessen = async (id: string) => {
@@ -917,24 +1033,40 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
       status: 'Geplant', fortschritt: 0,
     }
     if (!isDemo) {
-      try { await upsertBueroAuftrag(newA) } catch { showToast('Fehler beim Speichern', true); return }
+      try {
+        await upsertBueroAuftrag(newA)
+        await syncDokumentVerknuepfung(newA, form.dokumentId)
+      } catch { showToast('Fehler beim Speichern', true); return }
     }
     setAuftraege(prev => [newA, ...prev])
-    setForm({ kunde: '', beschreibung: '', wert: '', start: '', ende: '' })
+    setForm({ kunde: '', beschreibung: '', wert: '', start: '', ende: '', dokumentId: '' })
     setShowForm(false)
     showToast(`✅ Auftrag ${newA.id} wurde angelegt`)
   }
 
   const openEdit = (a: Auftrag) => {
     setEditAuftrag(a)
-    setEditForm({ kunde: a.kunde, beschreibung: a.beschreibung, wert: a.wert, start: a.start, ende: a.ende, status: a.status, fortschritt: a.fortschritt })
+    setEditForm({
+      kunde: a.kunde,
+      beschreibung: a.beschreibung,
+      wert: a.wert,
+      start: a.start,
+      ende: a.ende,
+      status: a.status,
+      fortschritt: a.fortschritt,
+      dokumentId: getLinkedDokument(dokumente, 'auftrag_id', a.id)?.id ?? '',
+    })
   }
 
   const handleEditSave = async () => {
     if (!editAuftrag) return
+    const previousDokumentId = getLinkedDokument(dokumente, 'auftrag_id', editAuftrag.id)?.id
     const updated: Auftrag = { ...editAuftrag, ...editForm, wert: editForm.wert.includes('€') ? editForm.wert : `${editForm.wert} €` }
     if (!isDemo) {
-      try { await upsertBueroAuftrag(updated) } catch { showToast('Fehler beim Speichern', true); return }
+      try {
+        await upsertBueroAuftrag(updated)
+        await syncDokumentVerknuepfung(updated, editForm.dokumentId, previousDokumentId)
+      } catch { showToast('Fehler beim Speichern', true); return }
     }
     setAuftraege(prev => prev.map(a => a.id === updated.id ? updated : a))
     setEditAuftrag(null)
@@ -946,10 +1078,15 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
     if (!isDemo) {
       const a = auftraege.find(x => x.id === id)
       if (a) {
-        try { await upsertBueroAuftrag({ ...a, status: 'Abgeschlossen' }) } catch { showToast('Fehler beim Löschen', true); return }
+        try {
+          const linkedDokument = getLinkedDokument(dokumente, 'auftrag_id', id)
+          if (linkedDokument) await updateBueroDokument(linkedDokument.id, { auftrag_id: null })
+          await upsertBueroAuftrag({ ...a, status: 'Abgeschlossen' })
+        } catch { showToast('Fehler beim Löschen', true); return }
       }
     }
     setAuftraege(prev => prev.filter(a => a.id !== id))
+    setDokumente(prev => prev.map(doc => doc.auftrag_id === id ? { ...doc, auftrag_id: undefined } : doc))
     showToast(`🗑️ Auftrag ${id} wurde gelöscht`)
   }
 
@@ -998,6 +1135,13 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
             <div>
               <label style={labelStyle}>Fortschritt: {editForm.fortschritt}%</label>
               <input type="range" min={0} max={100} value={editForm.fortschritt} onChange={e => setEditForm(p => ({ ...p, fortschritt: Number(e.target.value) }))} style={{ width: '100%', cursor: 'pointer', accentColor: '#20c8ff' }} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Verknüpftes Dokument</label>
+              <select className="pk-input" value={editForm.dokumentId} onChange={e => setEditForm(p => ({ ...p, dokumentId: e.target.value }))}>
+                <option value="">Kein Dokument verknüpft</option>
+                {dokumentOptionen.map(doc => <option key={doc.id} value={doc.id}>{doc.name} ({doc.datum})</option>)}
+              </select>
             </div>
           </div>
           <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
@@ -1051,6 +1195,13 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
               <label style={labelStyle}>Ende</label>
               <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.ende} onChange={e => setForm(p => ({ ...p, ende: e.target.value }))} />
             </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Verknüpftes Dokument</label>
+              <select className="pk-input" value={form.dokumentId} onChange={e => setForm(p => ({ ...p, dokumentId: e.target.value }))}>
+                <option value="">Kein Dokument verknüpft</option>
+                {dokumentOptionen.map(doc => <option key={doc.id} value={doc.id}>{doc.name} ({doc.datum})</option>)}
+              </select>
+            </div>
           </div>
           <div style={{ marginTop: 16 }}>
             <button className="pk-btn" onClick={handleNeuSave}>Auftrag anlegen</button>
@@ -1060,6 +1211,9 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
 
       <div style={{ display: 'grid', gap: 12 }}>
         {filtered.map(a => (
+          (() => {
+            const linkedDokument = getLinkedDokument(dokumente, 'auftrag_id', a.id)
+            return (
           <div key={a.id} className="pk-card" style={{ border: `1px solid ${statusColor[a.status]}20`, cursor: 'pointer' }} onClick={() => openEdit(a)}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
@@ -1069,6 +1223,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
                 </div>
                 <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 2 }}>{a.beschreibung}</div>
                 <div style={{ color: '#aeb9c8', fontSize: 13 }}>🏢 {a.kunde}</div>
+                <div style={{ color: '#aeb9c8', fontSize: 12, marginTop: 4 }}>Dokument: {linkedDokument?.name ?? '—'}</div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div style={{ fontWeight: 800, fontSize: 18, color: '#20c8ff' }}>{a.wert}</div>
@@ -1094,6 +1249,8 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
               )}
             </div>
           </div>
+            )
+          })()
         ))}
       </div>
     </div>
@@ -1104,24 +1261,28 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
 
 function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolean; kunden: Kunde[]; initialFilterStatus?: string }) {
   const [rechnungen, setRechnungen] = useState<Rechnung[]>(isDemo ? demoRechnungen : [])
+  const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [toast, setToast] = useState('')
   const [toastError, setToastError] = useState(false)
   const [loading, setLoading] = useState(!isDemo)
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
-  const [form, setForm] = useState({ kunde: '', betrag: '', faellig: '' })
+  const [form, setForm] = useState({ kunde: '', betrag: '', faellig: '', dokumentId: '' })
 
   // Edit-Modal
   const [editRechnung, setEditRechnung] = useState<Rechnung | null>(null)
-  const [editForm, setEditForm] = useState({ kunde: '', betrag: '', faellig: '', status: 'Offen' as Rechnung['status'] })
+  const [editForm, setEditForm] = useState({ kunde: '', betrag: '', faellig: '', status: 'Offen' as Rechnung['status'], dokumentId: '' })
 
   // Delete-Bestätigung
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     if (isDemo) return
-    getBueroRechnungen()
-      .then(data => setRechnungen(data as Rechnung[]))
+    Promise.all([getBueroRechnungen(), getBueroDokumente()])
+      .then(([rechnungenData, dokumenteData]) => {
+        setRechnungen(rechnungenData as Rechnung[])
+        setDokumente(dokumenteData as Dokument[])
+      })
       .catch(() => showToast('Fehler beim Laden der Rechnungen', true))
       .finally(() => setLoading(false))
   }, [isDemo])
@@ -1139,6 +1300,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
   }
 
   const filtered = rechnungen.filter(r => filterStatus === 'Alle' || r.status === filterStatus)
+  const dokumentOptionen = dokumente.filter(doc => Boolean(doc.storage_path) && (!doc.rechnung_id || doc.rechnung_id === editRechnung?.id))
   const counts: Record<string, number> = { Alle: rechnungen.length }
   rechnungen.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1 })
 
@@ -1147,6 +1309,27 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
   const sumBezahlt = rechnungen.filter(r => r.status === 'Bezahlt').reduce((s, r) => s + parseBetrag(r.betrag), 0)
   const sumUeberfaellig = rechnungen.filter(r => r.status === 'Überfällig' || r.status === 'Mahnung').reduce((s, r) => s + parseBetrag(r.betrag), 0)
   const fmtEur = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+
+  const syncDokumentVerknuepfung = async (rechnung: Rechnung, dokumentId: string, previousDokumentId?: string) => {
+    if (isDemo) return
+    const nextDokumentId = dokumentId || null
+    if (previousDokumentId && previousDokumentId !== nextDokumentId) {
+      await updateBueroDokument(previousDokumentId, { rechnung_id: null })
+    }
+    if (!nextDokumentId) return
+    await updateBueroDokument(nextDokumentId, {
+      rechnung_id: rechnung.id,
+      kategorie: 'Rechnung',
+      bezug: rechnung.kunde,
+    })
+    setDokumente(prev => prev.map(doc => (
+      doc.id === nextDokumentId
+        ? { ...doc, rechnung_id: rechnung.id, kategorie: 'Rechnung', bezug: rechnung.kunde }
+        : previousDokumentId && doc.id === previousDokumentId
+          ? { ...doc, rechnung_id: undefined }
+          : doc
+    )))
+  }
 
   const handleBezahlt = async (id: string) => {
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -1181,24 +1364,37 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
       status: 'Offen',
     }
     if (!isDemo) {
-      try { await upsertBueroRechnung(newRe) } catch { showToast('Fehler beim Speichern', true); return }
+      try {
+        await upsertBueroRechnung(newRe)
+        await syncDokumentVerknuepfung(newRe, form.dokumentId)
+      } catch { showToast('Fehler beim Speichern', true); return }
     }
     setRechnungen(prev => [newRe, ...prev])
-    setForm({ kunde: '', betrag: '', faellig: '' })
+    setForm({ kunde: '', betrag: '', faellig: '', dokumentId: '' })
     setShowForm(false)
     showToast(`✅ Rechnung ${newRe.id} wurde erstellt`)
   }
 
   const openEdit = (r: Rechnung) => {
     setEditRechnung(r)
-    setEditForm({ kunde: r.kunde, betrag: r.betrag, faellig: r.faellig, status: r.status })
+    setEditForm({
+      kunde: r.kunde,
+      betrag: r.betrag,
+      faellig: r.faellig,
+      status: r.status,
+      dokumentId: getLinkedDokument(dokumente, 'rechnung_id', r.id)?.id ?? '',
+    })
   }
 
   const handleEditSave = async () => {
     if (!editRechnung) return
+    const previousDokumentId = getLinkedDokument(dokumente, 'rechnung_id', editRechnung.id)?.id
     const updated: Rechnung = { ...editRechnung, ...editForm, betrag: editForm.betrag.includes('€') ? editForm.betrag : `${editForm.betrag} €` }
     if (!isDemo) {
-      try { await upsertBueroRechnung(updated) } catch { showToast('Fehler beim Speichern', true); return }
+      try {
+        await upsertBueroRechnung(updated)
+        await syncDokumentVerknuepfung(updated, editForm.dokumentId, previousDokumentId)
+      } catch { showToast('Fehler beim Speichern', true); return }
     }
     setRechnungen(prev => prev.map(r => r.id === updated.id ? updated : r))
     setEditRechnung(null)
@@ -1210,10 +1406,15 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
     if (!isDemo) {
       const r = rechnungen.find(x => x.id === id)
       if (r) {
-        try { await upsertBueroRechnung({ ...r, status: 'Bezahlt' }) } catch { showToast('Fehler beim Löschen', true); return }
+        try {
+          const linkedDokument = getLinkedDokument(dokumente, 'rechnung_id', id)
+          if (linkedDokument) await updateBueroDokument(linkedDokument.id, { rechnung_id: null })
+          await upsertBueroRechnung({ ...r, status: 'Bezahlt' })
+        } catch { showToast('Fehler beim Löschen', true); return }
       }
     }
     setRechnungen(prev => prev.filter(r => r.id !== id))
+    setDokumente(prev => prev.map(doc => doc.rechnung_id === id ? { ...doc, rechnung_id: undefined } : doc))
     showToast(`🗑️ Rechnung ${id} wurde gelöscht`)
   }
 
@@ -1257,6 +1458,13 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
                 <option>Bezahlt</option>
                 <option>Überfällig</option>
                 <option>Mahnung</option>
+              </select>
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Verknüpftes Dokument</label>
+              <select className="pk-input" value={editForm.dokumentId} onChange={e => setEditForm(p => ({ ...p, dokumentId: e.target.value }))}>
+                <option value="">Kein Dokument verknüpft</option>
+                {dokumentOptionen.map(doc => <option key={doc.id} value={doc.id}>{doc.name} ({doc.datum})</option>)}
               </select>
             </div>
           </div>
@@ -1327,6 +1535,13 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
               <label style={labelStyle}>Fällig am</label>
               <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.faellig} onChange={e => setForm(p => ({ ...p, faellig: e.target.value }))} />
             </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Verknüpftes Dokument</label>
+              <select className="pk-input" value={form.dokumentId} onChange={e => setForm(p => ({ ...p, dokumentId: e.target.value }))}>
+                <option value="">Kein Dokument verknüpft</option>
+                {dokumentOptionen.map(doc => <option key={doc.id} value={doc.id}>{doc.name} ({doc.datum})</option>)}
+              </select>
+            </div>
           </div>
           <div style={{ marginTop: 16 }}>
             <button className="pk-btn" onClick={handleNeu}>Rechnung erstellen</button>
@@ -1343,12 +1558,16 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
               <th>Betrag</th>
               <th>Erstellt</th>
               <th>Fällig</th>
+              <th>Dokument</th>
               <th>Status</th>
               <th>Aktionen</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(r => (
+              (() => {
+                const linkedDokument = getLinkedDokument(dokumente, 'rechnung_id', r.id)
+                return (
               <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(r)}>
                 <td style={{ color: '#aeb9c8', fontFamily: 'monospace', fontSize: 12 }}>{r.id}</td>
                 <td style={{ fontWeight: 600 }}>{r.kunde}</td>
@@ -1357,6 +1576,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
                 <td style={{ color: r.status === 'Überfällig' ? '#ffb347' : '#aeb9c8', fontSize: 13, fontWeight: r.status === 'Überfällig' ? 700 : 400 }}>
                   {r.bezahltAm ? `Bezahlt: ${r.bezahltAm}` : r.faellig}
                 </td>
+                <td style={{ color: '#aeb9c8', fontSize: 13 }}>{linkedDokument?.name ?? '—'}</td>
                 <td><StatusBadgeRechnung status={r.status} /></td>
                 <td>
                   {deleteId === r.id ? (
@@ -1391,6 +1611,8 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
                   )}
                 </td>
               </tr>
+                )
+              })()
             ))}
           </tbody>
         </table>
@@ -1410,6 +1632,7 @@ const emptyEingangsForm = {
 
 function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean; initialFilterStatus?: string }) {
   const [rechnungen, setRechnungen] = useState<Eingangsrechnung[]>(isDemo ? demoEingangsrechnungen : [])
+  const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [loading, setLoading] = useState(!isDemo)
   const [toast, setToast] = useState('')
   const [toastError, setToastError] = useState(false)
@@ -1432,8 +1655,11 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
 
   useEffect(() => {
     if (isDemo) return
-    getBueroEingangsrechnungen()
-      .then(data => setRechnungen(data as Eingangsrechnung[]))
+    Promise.all([getBueroEingangsrechnungen(), getBueroDokumente()])
+      .then(([rechnungenData, dokumenteData]) => {
+        setRechnungen(rechnungenData as Eingangsrechnung[])
+        setDokumente(dokumenteData as Dokument[])
+      })
       .catch(() => showToast('Fehler beim Laden der Eingangsrechnungen', true))
       .finally(() => setLoading(false))
   }, [isDemo])
@@ -1490,6 +1716,28 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
   const ueberfaellig = visibleRows.filter(r => r.status === 'überfällig').length
   const bezahlt = visibleRows.filter(r => r.status === 'bezahlt').length
   const sumOffen = visibleRows.filter(r => r.status !== 'bezahlt' && r.status !== 'abgelehnt').reduce((s, r) => s + Number(r.betrag_brutto ?? 0), 0)
+  const dokumentOptionen = dokumente.filter(d => Boolean(d.storage_path))
+
+  const syncDokumentVerknuepfung = async (rechnung: Eingangsrechnung, previousDokumentId?: string) => {
+    if (isDemo) return
+    const nextDokumentId = rechnung.dokument_id ?? null
+    if (previousDokumentId && previousDokumentId !== nextDokumentId) {
+      await updateBueroDokument(previousDokumentId, { eingangsrechnung_id: null })
+    }
+    if (!nextDokumentId) return
+    await updateBueroDokument(nextDokumentId, {
+      eingangsrechnung_id: rechnung.id,
+      kategorie: 'Rechnung',
+      bezug: rechnung.lieferant,
+    })
+    setDokumente(prev => prev.map(doc => (
+      doc.id === nextDokumentId
+        ? { ...doc, eingangsrechnung_id: rechnung.id, kategorie: 'Rechnung', bezug: rechnung.lieferant }
+        : previousDokumentId && doc.id === previousDokumentId
+          ? { ...doc, eingangsrechnung_id: undefined }
+          : doc
+    )))
+  }
 
   const openNew = () => { setEditRechnung(null); setForm(emptyEingangsForm); setShowForm(true) }
   const openEdit = (r: Eingangsrechnung) => {
@@ -1505,6 +1753,7 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
 
   const save = async () => {
     if (!form.lieferant.trim()) { showToast('Lieferant ist Pflicht', true); return }
+    const previousDokumentId = editRechnung?.dokument_id
     const payload: Eingangsrechnung = {
       id: editRechnung?.id ?? `ER-${Date.now().toString(36).toUpperCase()}`,
       lieferant: form.lieferant.trim(),
@@ -1524,7 +1773,12 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
       bezahlt_am: form.status === 'bezahlt' ? (editRechnung?.bezahlt_am ?? today) : undefined,
     }
     if (!isDemo) {
-      try { await upsertBueroEingangsrechnung(payload) } catch { showToast('Fehler beim Speichern', true); return }
+      try {
+        await upsertBueroEingangsrechnung(payload)
+        await syncDokumentVerknuepfung(payload, previousDokumentId)
+      } catch {
+        showToast('Fehler beim Speichern', true); return
+      }
     }
     setRechnungen(prev => editRechnung ? prev.map(r => r.id === payload.id ? payload : r) : [payload, ...prev])
     setShowForm(false); setEditRechnung(null); setForm(emptyEingangsForm)
@@ -1533,10 +1787,17 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
 
   const remove = async (id: string) => {
     if (deleteId !== id) { setDeleteId(id); return }
+    const rechnung = rechnungen.find(r => r.id === id)
     if (!isDemo) {
-      try { await deleteBueroEingangsrechnung(id) } catch { showToast('Fehler beim Löschen', true); return }
+      try {
+        if (rechnung?.dokument_id) await updateBueroDokument(rechnung.dokument_id, { eingangsrechnung_id: null })
+        await deleteBueroEingangsrechnung(id)
+      } catch { showToast('Fehler beim Löschen', true); return }
     }
     setRechnungen(prev => prev.filter(r => r.id !== id))
+    if (rechnung?.dokument_id) {
+      setDokumente(prev => prev.map(doc => doc.id === rechnung.dokument_id ? { ...doc, eingangsrechnung_id: undefined } : doc))
+    }
     setDeleteId(null)
     showToast('🗑️ Eingangsrechnung gelöscht')
   }
@@ -1663,6 +1924,21 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
             <div><label style={labelStyle}>Status</label><select className="pk-input" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as EingangsrechnungStatus }))}>{(['offen', 'geprüft', 'freigegeben', 'bezahlt', 'überfällig', 'abgelehnt'] as const).map(s => <option key={s}>{s}</option>)}</select></div>
             <div><label style={labelStyle}>Kategorie</label><input className="pk-input" value={form.kategorie} onChange={e => setForm(p => ({ ...p, kategorie: e.target.value }))} /></div>
             <div><label style={labelStyle}>IBAN</label><input className="pk-input" value={form.iban} onChange={e => setForm(p => ({ ...p, iban: e.target.value }))} /></div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Verknüpftes Dokument</label>
+              <select
+                className="pk-input"
+                value={form.dokument_id}
+                onChange={e => setForm(p => ({ ...p, dokument_id: e.target.value, dokument_url: '' }))}
+              >
+                <option value="">Kein Dokument verknüpft</option>
+                {dokumentOptionen.map(doc => (
+                  <option key={doc.id} value={doc.id}>
+                    {doc.name} ({doc.datum})
+                  </option>
+                ))}
+              </select>
+            </div>
             <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Verwendungszweck</label><input className="pk-input" value={form.verwendungszweck} onChange={e => setForm(p => ({ ...p, verwendungszweck: e.target.value }))} /></div>
             <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Notiz</label><textarea className="pk-input" rows={3} value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} /></div>
           </div>
@@ -1758,7 +2034,8 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
     (
       d.name.toLowerCase().includes(search.toLowerCase()) ||
       d.bezug.toLowerCase().includes(search.toLowerCase()) ||
-      d.kategorie.toLowerCase().includes(search.toLowerCase())
+      d.kategorie.toLowerCase().includes(search.toLowerCase()) ||
+      getDocumentRelationLabel(d).toLowerCase().includes(search.toLowerCase())
     )
   )
 
@@ -1915,6 +2192,7 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
               <th>Dateiname</th>
               <th>Kategorie</th>
               <th>Bezug</th>
+              <th>Verknüpfung</th>
               <th>Größe</th>
               <th>Datum</th>
               <th>Aktion</th>
@@ -1935,6 +2213,7 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
                 </td>
                 <td><span className={`badge ${kategorieBadge[d.kategorie]}`}>{d.kategorie}</span></td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{d.bezug}</td>
+                <td style={{ color: '#aeb9c8', fontSize: 13 }}>{getDocumentRelationLabel(d)}</td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{d.groesse}</td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{d.datum}</td>
                 <td>
@@ -1959,7 +2238,7 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: '#aeb9c8', fontSize: 13, padding: '24px 0' }}>
+                <td colSpan={7} style={{ textAlign: 'center', color: '#aeb9c8', fontSize: 13, padding: '24px 0' }}>
                   Keine Dokumente gefunden
                 </td>
               </tr>

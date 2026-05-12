@@ -22,11 +22,14 @@
 
 ## 2. Aktueller Arbeitsstand
 - Aktuell in Arbeit am `2026-05-12`:
-  - Phase 1 gestartet: Einkaufsschema zwischen UI, `lib/db.ts`, `schema.sql` und Live-Migrationen vereinheitlicht.
-  - `lib/db.ts` normalisiert jetzt alte und neue Einkaufsspalten und hat Fallback-Upserts/Inserts für beide Schemavarianten.
-  - Neue Migration [`supabase/migrations/20260512103000_align_einkauf_schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512103000_align_einkauf_schema.sql) führt UI-Felder und FK-/Kompatibilitätsspalten zusammen; `einkauf_wareneingaenge.id` wird bei Altbestand auf `text` vereinheitlicht.
-  - Betroffene Dateien: [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql), [`supabase/migrations/20260512103000_align_einkauf_schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512103000_align_einkauf_schema.sql).
-  - Tests: `npx tsc --noEmit` erfolgreich; `npm run lint` nicht ausführbar, weil `next lint` interaktiv eine neue ESLint-Konfiguration verlangt.
+  - Phase 1 läuft jetzt auf zwei Strängen: Einkaufsschema wurde vereinheitlicht und die Büro-Dokumentrelation ist im UI für Eingangsrechnungen, Rechnungen, Angebote und Aufträge nutzbar.
+  - `lib/db.ts` akzeptiert Dokument-Relationsfelder (`eingangsrechnung_id`, `rechnung_id`, `angebot_id`, `auftrag_id`) für `buero_dokumente`; [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx) nutzt diese Relationslogik jetzt in allen vier Büro-Belegtypen.
+  - Neue Migration [`supabase/migrations/20260512103000_align_einkauf_schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512103000_align_einkauf_schema.sql) hält Einkauf Alt-/Neuschema kompatibel; neue Migration [`supabase/migrations/20260512114500_add_buero_document_relations.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512114500_add_buero_document_relations.sql) ergänzt echte FK-Relationen zwischen `buero_dokumente` und Büro-Belegen und backfillt `Eingangsrechnung -> Dokument`.
+  - Büro-UI: Formulare für Angebot, Auftrag und Rechnung können jetzt ein archiviertes Dokument verknüpfen; Listen/Karten zeigen den Dokumentnamen sichtbar an; beim Umhängen/Löschen wird die Relation in `buero_dokumente` zurücksynchronisiert.
+  - Betroffene Dateien: [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql), [`supabase/migrations/20260512103000_align_einkauf_schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512103000_align_einkauf_schema.sql), [`supabase/migrations/20260512114500_add_buero_document_relations.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512114500_add_buero_document_relations.sql), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md).
+  - Offene Punkte: beide Migrationen live anwenden und die neue Relationslogik mit Echtdaten validieren; danach dieselbe Denke für globale Archivsicht und echte Objekt-Detailseiten nutzen.
+  - Tests: `npx tsc --noEmit` erfolgreich; `npm run lint` weiter nicht ausführbar, weil `next lint` interaktiv eine neue ESLint-Konfiguration verlangt.
+  - Aktueller Branch: `feature/buero-dokumentrelationen`
 - Zuletzt gearbeitet am `2026-05-12`:
   - Commit `7acf66f`: Dokumente öffnen + klickbare Detailflüsse verbessert.
   - Commit `032a1e5`: lokale Ignore-Bereinigung.
@@ -108,7 +111,7 @@
 ## 6. Offene Aufgaben
 - [ ] Datenmodell für Kunde/Lieferant/Auftrag/Rechnung/Dokument sauber relationalisieren.
 - [ ] Einkaufsmigration auf Live-Datenbank anwenden und Bestellungen/Wareneingänge mit Echtdaten gegen Alt- und Neuschema validieren.
-- [ ] Dokument ↔ Eingangsrechnung/Rechnung/Angebot/Auftrag als echte FK-Relationen abbilden.
+- [ ] Neue Dokumentrelationen für Eingangsrechnungen, Rechnungen, Angebote und Aufträge live migrieren und mit Echtdaten durchtesten.
 - [ ] Archiv von Demo-Liste auf echte globale Dokumentübersicht umstellen.
 - [ ] Detailseiten für Kernobjekte einführen.
 - [ ] Rollen/Rechte von lokalem UI-Status auf echte serverseitige Autorisierung heben.
@@ -128,6 +131,8 @@
 ## 8. Änderungsverlauf
 | Datum | Agent | Änderungen | Betroffene Dateien | Nächste Schritte |
 | --- | --- | --- | --- | --- |
+| 2026-05-12 | Codex | Dokumentverknüpfung im Büro-UI auf Rechnungen, Angebote und Aufträge erweitert; Formulare können archivierte Dokumente auswählen und Listen/Karten zeigen den Link sichtbar an | [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Beide Migrationen live anwenden und Relationslogik mit Echtdaten für Einkauf + alle vier Belegtypen prüfen |
+| 2026-05-12 | Codex | Erste echte Büro-Dokumentrelation ergänzt: `buero_dokumente` mit FK-Spalten erweitert, Eingangsrechnungen können archivierte Dokumente auswählen und die Dokumentliste zeigt die Verknüpfung | [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql), [`supabase/migrations/20260512114500_add_buero_document_relations.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512114500_add_buero_document_relations.sql), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Migration live anwenden, Eingangsrechnungs-Linking mit Echtdaten prüfen, danach gleiche Relationstiefe für Rechnungen/Angebote/Aufträge nachziehen |
 | 2026-05-12 | Codex | Phase 1 begonnen: Einkaufsschema vereinheitlicht, Datenlayer für Alt-/Neuschema kompatibel gemacht, Migrationspfad für Wareneingänge/Bestellungen ergänzt | [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql), [`supabase/migrations/20260512103000_align_einkauf_schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512103000_align_einkauf_schema.sql), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Migration live anwenden, Einkaufsdaten durchtesten, dann Phase-1-FKs angehen |
 | 2026-05-12 | Codex | Projektanalyse erstellt, Statusdatei angelegt, Architektur/DB/Marktreife bewertet | [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Einkauf-Schema-Divergenz beheben, Kernrelationen definieren |
 | 2026-05-12 | Entwickler | Dokumentöffnung und klickbare Detailflüsse verbessert | `app/dashboard/buero/page.tsx`, `app/dashboard/ki-erkennung/page.tsx`, `components/DocumentPreviewModal.tsx`, `lib/db.ts`, `lib/documents.ts` | Archiv/echte Detailseiten nachziehen |
@@ -267,6 +272,6 @@
 
 ## 15. Nächste Empfehlung
 - Als NÄCHSTES umsetzen:
-  1. Einkaufsschema, `lib/db.ts` und Büro-Einkaufs-UI auf ein verbindliches Datenmodell zusammenziehen.
-  2. Danach die Kernrelationen `kunde_id`, `lieferant_id`, `dokument_id`, `auftrag_id` einführen.
-  3. Anschließend Archiv/Dokumente und Steuer/Eingangsrechnungen durchgängig verknüpfen.
+  1. Beide neuen Migrationen live anwenden und Einkauf plus Dokumentrelationen aller vier Büro-Belegtypen mit Echtdaten validieren.
+  2. Danach Archiv/Dokumente von der lokalen Liste zu einer globalen, relationsbasierten Übersicht ausbauen.
+  3. Anschließend echte Detailseiten für Rechnung, Angebot, Auftrag und Eingangsrechnung nachziehen.
