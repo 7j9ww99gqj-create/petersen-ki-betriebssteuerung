@@ -401,15 +401,18 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
   const [toast, setToast] = useState('')
   const [toastError, setToastError] = useState(false)
   const [loading, setLoading] = useState(!isDemo)
+  const [loadError, setLoadError] = useState('')
+  const [retryKey, setRetryKey] = useState(0)
   const [form, setForm] = useState({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '' })
 
   useEffect(() => {
     if (isDemo) return
+    setLoading(true); setLoadError('')
     getBueroKunden()
       .then(data => setKunden(data as Kunde[]))
-      .catch(() => showToast('Fehler beim Laden der Kunden', true))
+      .catch(() => setLoadError('Kunden konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
-  }, [isDemo])
+  }, [isDemo, retryKey])
 
   const filtered = kunden.filter(k =>
     k.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -445,6 +448,17 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 28, height: 28, border: '3px solid rgba(32,200,255,.3)', borderTopColor: '#20c8ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
         <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Kunden…</div>
+      </div>
+    </div>
+  )
+
+  if (loadError) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+      <div className="pk-card" style={{ textAlign: 'center', padding: 36, maxWidth: 420 }}>
+        <div style={{ fontSize: 32, marginBottom: 10 }}>👥</div>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: '#f8fbff' }}>Laden fehlgeschlagen</div>
+        <div style={{ color: '#aeb9c8', fontSize: 13, marginBottom: 18 }}>{loadError}</div>
+        <button onClick={() => setRetryKey(k => k + 1)} className="pk-btn" style={{ fontSize: 13 }}>↺ Erneut laden</button>
       </div>
     </div>
   )

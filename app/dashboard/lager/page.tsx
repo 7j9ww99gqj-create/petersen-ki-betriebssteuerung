@@ -791,6 +791,8 @@ export default function LagerPilotPage() {
   const [artikel, setArtikel] = useState<Artikel[]>(isDemo ? demoArtikel : [])
   const [bewegungen, setBewegungen] = useState<Bewegung[]>(isDemo ? demoBewegungen : [])
   const [loading, setLoading] = useState(!isDemo)
+  const [loadError, setLoadError] = useState('')
+  const [retryKey, setRetryKey] = useState(0)
   const [saving, setSaving] = useState(false)
   const [modal, setModal] = useState<null | 'new' | Artikel>(null)
   const [newEingang, setNewEingang] = useState({ artikel: '', menge: '', lagerplatz: '', mitarbeiter: '' })
@@ -847,11 +849,12 @@ export default function LagerPilotPage() {
   // Daten laden
   useEffect(() => {
     if (isDemo) return
+    setLoading(true); setLoadError('')
     Promise.all([getLagerArtikel(), getLagerBewegungen()])
       .then(([a, b]) => { setArtikel(a as Artikel[]); setBewegungen(b as Bewegung[]) })
-      .catch(() => showToast('Fehler beim Laden', false))
+      .catch(() => setLoadError('Lagerdaten konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
-  }, [isDemo])
+  }, [isDemo, retryKey])
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab')
@@ -1617,6 +1620,17 @@ export default function LagerPilotPage() {
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 32, height: 32, border: '3px solid rgba(22,132,255,.3)', borderTopColor: '#1684ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
         <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Lagerdaten…</div>
+      </div>
+    </div>
+  )
+
+  if (loadError) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+      <div className="pk-card" style={{ textAlign: 'center', padding: 40, maxWidth: 440 }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>📦</div>
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8, color: '#f8fbff' }}>Laden fehlgeschlagen</div>
+        <div style={{ color: '#aeb9c8', fontSize: 13, marginBottom: 20 }}>{loadError}</div>
+        <button onClick={() => setRetryKey(k => k + 1)} className="pk-btn" style={{ fontSize: 13 }}>↺ Erneut laden</button>
       </div>
     </div>
   )

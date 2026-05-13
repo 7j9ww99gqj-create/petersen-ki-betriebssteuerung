@@ -14,7 +14,7 @@ import {
   getImportProtokolle, insertImportProtokoll,
   bulkImportLagerArtikel, bulkImportBueroKunden, bulkImportEinkaufLieferanten,
   bulkImportBueroRechnungen, bulkImportSteuerBelege, bulkImportSteuerBuchungen,
-  bulkImportSteuerKonten,
+  bulkImportSteuerKonten, bulkImportWerkstattZeitbuchungen, bulkImportWerkstattMaterial,
   getFirmaEinstellungen, upsertFirmaEinstellungen, uploadFirmenLogo,
   type FirmaEinstellungen,
 } from '@/lib/db'
@@ -675,6 +675,8 @@ const DATA_TYPE_LABELS: Record<ImportDataType, string> = {
   steuer_buchungen: '📒 Buchungen → steuer_buchungen',
   steuer_ustva: '📊 UStVA-Daten → steuer_ustva',
   steuer_konten: '🗂️ Steuerkonten / Kontenrahmen → steuer_konten',
+  werkstatt_zeitbuchungen: '⏱️ Werkstatt-Zeitbuchungen → werkstatt_zeitbuchungen',
+  werkstatt_material: '🔩 Werkstatt-Materialverbrauch → werkstatt_material',
 }
 
 function genId(prefix: string) { return `${prefix}-${Date.now().toString(36).toUpperCase()}` }
@@ -1167,7 +1169,29 @@ async function runBulkImport(dataType: ImportDataType, rows: Record<string, stri
     const prepared = rows.map(r => ({ id: genId('KTO'), kontonummer: r.kontonummer ?? '', name: r.name ?? '', typ: r.typ, steuersatz: normalizeNumber(r.steuersatz ?? '') ?? undefined, aktiv: r.aktiv !== 'false' }))
     await bulkImportSteuerKonten(prepared); return prepared.length
   }
-  // Unsupported types: return 0 with TODO note
+  if (dataType === 'werkstatt_zeitbuchungen') {
+    const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const prepared = rows.map(r => ({
+      mitarbeiter: r.mitarbeiter ?? '',
+      auftragsnr: r.auftragsnr ?? '',
+      stunden: normalizeNumber(r.stunden ?? '') ?? 0,
+      datum: r.datum || today,
+      taetigkeit: r.taetigkeit ?? '',
+    }))
+    await bulkImportWerkstattZeitbuchungen(prepared); return prepared.length
+  }
+  if (dataType === 'werkstatt_material') {
+    const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const prepared = rows.map(r => ({
+      artikel: r.artikel ?? '',
+      menge: normalizeNumber(r.menge ?? '') ?? 0,
+      einheit: r.einheit ?? 'Stk',
+      auftragsnr: r.auftragsnr ?? '',
+      datum: r.datum || today,
+      mitarbeiter: r.mitarbeiter ?? '',
+    }))
+    await bulkImportWerkstattMaterial(prepared); return prepared.length
+  }
   // TODO: implement auftraege, angebote, bewegungen, projekte, steuer_ustva bulk imports
   return 0
 }

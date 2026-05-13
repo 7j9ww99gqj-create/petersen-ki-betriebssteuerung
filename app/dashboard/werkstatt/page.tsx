@@ -321,6 +321,7 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen }: { isDemo:
   const [toastError, setToastError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(!isDemo)
+  const [retryKey, setRetryKey] = useState(0)
   const [editKarte, setEditKarte] = useState<Arbeitskarte | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [sliderValues, setSliderValues] = useState<Record<string, number>>({})
@@ -331,11 +332,12 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen }: { isDemo:
 
   useEffect(() => {
     if (isDemo) return
+    setLoading(true); setErrorMsg('')
     getWerkstattKarten()
       .then(data => setKarten(data as Arbeitskarte[]))
-      .catch(() => setErrorMsg('Fehler beim Laden der Arbeitskarten'))
+      .catch(() => setErrorMsg('Arbeitskarten konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
-  }, [isDemo])
+  }, [isDemo, retryKey])
 
   const showToast = (msg: string, error = false) => {
     setToast(msg); setToastError(error)
@@ -438,7 +440,12 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen }: { isDemo:
   return (
     <div>
       <Toast msg={toast} isError={toastError} />
-      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
+      {errorMsg && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ flex: 1 }}>⚠️ {errorMsg}</span>
+          <button onClick={() => setRetryKey(k => k + 1)} style={{ padding: '4px 12px', borderRadius: 8, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.1)', color: '#ff8080', cursor: 'pointer', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>↺ Erneut laden</button>
+        </div>
+      )}
 
       {/* KPI-Karten */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
@@ -662,15 +669,17 @@ function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitar
   const [toastError, setToastError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(!isDemo)
+  const [retryKey, setRetryKey] = useState(0)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
   useEffect(() => {
     if (isDemo) return
+    setLoading(true); setErrorMsg('')
     getWerkstattZeitbuchungen()
       .then(data => setBuchungen(data as Zeitbuchung[]))
-      .catch(() => setErrorMsg('Fehler beim Laden der Zeitbuchungen'))
+      .catch(() => setErrorMsg('Zeitbuchungen konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
-  }, [isDemo])
+  }, [isDemo, retryKey])
 
   const showToast = (msg: string, error = false) => {
     setToast(msg); setToastError(error)
@@ -710,7 +719,12 @@ function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitar
   return (
     <div>
       <Toast msg={toast} isError={toastError} />
-      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
+      {errorMsg && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ flex: 1 }}>⚠️ {errorMsg}</span>
+          <button onClick={() => setRetryKey(k => k + 1)} style={{ padding: '4px 12px', borderRadius: 8, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.1)', color: '#ff8080', cursor: 'pointer', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>↺ Erneut laden</button>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
           { label: 'Stunden heute', value: `${gesamtHeute}h`, icon: '⏱️', color: '#a78bfa' },
@@ -755,6 +769,13 @@ function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitar
       </div>
 
       <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+        {buchungen.length === 0 && !errorMsg ? (
+          <div style={{ textAlign: 'center', padding: '36px 24px', color: '#aeb9c8' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>⏱️</div>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Noch keine Zeitbuchungen</div>
+            <div style={{ fontSize: 13 }}>Buche Stunden über das Formular oben auf einen Auftrag.</div>
+          </div>
+        ) : (
         <table className="pk-table">
           <thead>
             <tr>
@@ -788,6 +809,7 @@ function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitar
             ))}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   )
@@ -802,15 +824,17 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
   const [toastError, setToastError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(!isDemo)
+  const [retryKey, setRetryKey] = useState(0)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
   useEffect(() => {
     if (isDemo) return
+    setLoading(true); setErrorMsg('')
     getWerkstattMaterial()
       .then(data => setMaterial(data as Materialverbrauch[]))
-      .catch(() => setErrorMsg('Fehler beim Laden des Materialverbrauchs'))
+      .catch(() => setErrorMsg('Materialverbrauch konnte nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
-  }, [isDemo])
+  }, [isDemo, retryKey])
 
   const showToast = (msg: string, error = false) => {
     setToast(msg); setToastError(error)
@@ -847,7 +871,12 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
   return (
     <div>
       <Toast msg={toast} isError={toastError} />
-      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
+      {errorMsg && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ flex: 1 }}>⚠️ {errorMsg}</span>
+          <button onClick={() => setRetryKey(k => k + 1)} style={{ padding: '4px 12px', borderRadius: 8, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.1)', color: '#ff8080', cursor: 'pointer', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>↺ Erneut laden</button>
+        </div>
+      )}
       <div className="pk-card fade-in" style={{ marginBottom: 16, border: '1px solid rgba(167,139,250,.2)' }}>
         <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 800 }}>🔩 Materialverbrauch buchen</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
@@ -883,6 +912,13 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
       </div>
 
       <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+        {material.length === 0 && !errorMsg ? (
+          <div style={{ textAlign: 'center', padding: '36px 24px', color: '#aeb9c8' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🔩</div>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Noch kein Materialverbrauch</div>
+            <div style={{ fontSize: 13 }}>Buche verbrauchtes Material über das Formular oben.</div>
+          </div>
+        ) : (
         <table className="pk-table">
           <thead>
             <tr>
@@ -916,6 +952,7 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
             ))}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   )
@@ -930,15 +967,17 @@ function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeit
   const [toastError, setToastError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(!isDemo)
+  const [retryKey, setRetryKey] = useState(0)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
   useEffect(() => {
     if (isDemo) return
+    setLoading(true); setErrorMsg('')
     getWerkstattPruefprotokolle()
       .then(data => setProtokolle(data as Pruefprotokoll[]))
-      .catch(() => setErrorMsg('Fehler beim Laden der Prüfprotokolle'))
+      .catch(() => setErrorMsg('Prüfprotokolle konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
-  }, [isDemo])
+  }, [isDemo, retryKey])
 
   const showToast = (msg: string, error = false) => {
     setToast(msg); setToastError(error)
@@ -1003,7 +1042,12 @@ function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeit
   return (
     <div>
       <Toast msg={toast} isError={toastError} />
-      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
+      {errorMsg && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ flex: 1 }}>⚠️ {errorMsg}</span>
+          <button onClick={() => setRetryKey(k => k + 1)} style={{ padding: '4px 12px', borderRadius: 8, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.1)', color: '#ff8080', cursor: 'pointer', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>↺ Erneut laden</button>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12, marginBottom: 20 }}>
         <div className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
           <div style={{ fontSize: 22, marginBottom: 4 }}>✅</div>
@@ -1047,6 +1091,13 @@ function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeit
       </div>
 
       <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+        {protokolle.length === 0 && !errorMsg ? (
+          <div style={{ textAlign: 'center', padding: '36px 24px', color: '#aeb9c8' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Noch keine Prüfprotokolle</div>
+            <div style={{ fontSize: 13 }}>Füge Prüfpunkte über das Formular oben hinzu.</div>
+          </div>
+        ) : (
         <table className="pk-table">
           <thead>
             <tr>
@@ -1101,6 +1152,7 @@ function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeit
             ))}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   )

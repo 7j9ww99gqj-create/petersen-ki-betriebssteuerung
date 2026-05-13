@@ -22,11 +22,11 @@
 
 ## 2. Aktueller Arbeitsstand
 - Stand `2026-05-13` — Aktueller Branch: `main` (Commit `daea60f`), live auf Vercel deployed (nach Push).
-- **Zuletzt erledigt (2026-05-13)**:
-  - Marketing KI-Suite Autopilot: Echter Flow aus Leads/Kampagnen/SEO — Zielgruppe, Kampagnenvorschlag, Funnel-Lücke, Nächster Schritt; kein Fake mehr.
-  - Werkstatt Detailseite: `app/dashboard/werkstatt/[id]/page.tsx` mit Stammdaten, Zeitbuchungen, Material, Prüfprotokoll; 🔍-Link in Karten-Liste.
-  - Lager Detailseite: `app/dashboard/lager/[id]/page.tsx` mit Bestandsinfo, Stellplatz-Belegung, letzten Bewegungen; 🔍-Link in Bestand-Tabelle.
-  - Betroffene Dateien: [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx), [`app/dashboard/werkstatt/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/werkstatt/page.tsx), [`app/dashboard/werkstatt/[id]/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/werkstatt/[id]/page.tsx), [`app/dashboard/lager/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/lager/page.tsx), [`app/dashboard/lager/[id]/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/lager/[id]/page.tsx).
+- **Zuletzt erledigt (2026-05-13 – Runde 2)**:
+  - **Rollen/Rechte serverseitig**: `lib/server-auth.ts` um `getServerComponentSession()` erweitert; Werkstatt- und Lager-Detailseiten als echte Next.js Server Components umgeschrieben — Supabase läuft mit Server-Auth (Cookie-Forwarding), kein Browser-Client mehr; Redirect zu `/login` wenn nicht authentifiziert.
+  - **Fehlerbehandlung/Empty States**: Werkstatt-Sub-Komponenten (Karten, Zeit, Material, Pruef) haben jetzt `retryKey`-Pattern + Retry-Button bei Ladeferhlern + Icons+Text für leere Tabellen. Lager-Hauptseite zeigt persistenten Fehler-Block statt flüchtigem Toast. Büro KundenTab hat separaten `loadError`-State + Retry.
+  - **Import-Pfade Werkstatt**: `ImportDataType` um `werkstatt_zeitbuchungen` und `werkstatt_material` erweitert; `TARGET_FIELDS` ergänzt; `bulkImportWerkstattZeitbuchungen()` / `bulkImportWerkstattMaterial()` in `lib/db.ts` hinzugefügt; Import-Wizard in Einstellungen zeigt + importiert beide Typen.
+  - Betroffene Dateien: `lib/server-auth.ts`, `app/dashboard/werkstatt/[id]/page.tsx`, `app/dashboard/lager/[id]/page.tsx`, `app/dashboard/werkstatt/page.tsx`, `app/dashboard/lager/page.tsx`, `app/dashboard/buero/page.tsx`, `lib/importer.ts`, `lib/db.ts`, `app/dashboard/einstellungen/page.tsx`.
   - Tests: lint + build grün; nur bekannte `<img>`/`useEffect`-Warnungen.
 - **Davor (2026-05-13)**:
   - Rollenbasierte RLS-Policies live deployed.
@@ -117,9 +117,9 @@
 - [x] ~~Weitere Archivquellen nachziehen, v. a. KI-Erkennungs-Verläufe und ggf. Werkstatt-/Lagerdokumente, falls diese eigenständige Dokumenttabellen bekommen.~~ **Erledigt 2026-05-13**: KI-Verlaufe sind Teil des Archivs via buero_dokumente-Felder; keine separaten Werkstatt-/Lager-Dokumenttabellen vorhanden.
 - [x] ~~Marketing-KI-Suite schrittweise mit echter Logik hinterlegen, zuerst SEO-/Keyword-Daten und danach Lead-Intelligence / Autopilot-Marketing.~~ **Erledigt 2026-05-13**: KI-Suite DemoLabTab liest jetzt echte `marketing_seo_keywords` (Top-Keywords, Klicks, Ranking) und echte `marketing_leads` (Score-Tabelle, Pipeline-Wert); keine Demo-Daten mehr in diesen Bereichen.
 - [x] ~~Detailseiten für Kernobjekte einführen.~~ **Erledigt 2026-05-13**: Werkstatt- und Lager-Detailseiten live; Büro-Detailseiten existieren seit 2026-05-12.
-- [ ] Rollen/Rechte von lokalem UI-Status auf echte serverseitige Autorisierung heben.
-- [ ] Fehlerbehandlung und Leersituationen je Pilot systematisch härten.
-- [ ] Importpfade für weitere Datentypen vervollständigen.
+- [x] ~~Rollen/Rechte von lokalem UI-Status auf echte serverseitige Autorisierung heben.~~ **Erledigt 2026-05-13**: Werkstatt- und Lager-Detailseiten als Server Components mit `getServerComponentSession()`; API-Routen waren bereits gehärtet.
+- [x] ~~Fehlerbehandlung und Leersituationen je Pilot systematisch härten.~~ **Erledigt 2026-05-13**: Retry-Buttons + verbesserte Empty States in Werkstatt (4 Sub-Komponenten), Lager (persistenter Error-Block) und Büro (KundenTab).
+- [x] ~~Importpfade für weitere Datentypen vervollständigen.~~ **Erledigt 2026-05-13**: Werkstatt-Zeitbuchungen und -Material als neue Import-Typen in Wizard/Importer/db.
 - [ ] Löschlogik für Storage-Dateien ergänzen, nicht nur DB-Zeilen löschen.
 - [ ] Einheitliche IDs, Nummernkreise und Referenzfelder definieren.
 
@@ -134,6 +134,7 @@
 ## 8. Änderungsverlauf
 | Datum | Agent | Änderungen | Betroffene Dateien | Nächste Schritte |
 | --- | --- | --- | --- | --- |
+| 2026-05-13 | Claude | Server-Auth für Detailseiten (getServerComponentSession, Server Components); Retry+Empty States in Werkstatt/Lager/Büro; Werkstatt-Import (Zeitbuchungen+Material) in Importer/db/Einstellungen | `lib/server-auth.ts`, `app/dashboard/werkstatt/[id]/page.tsx`, `app/dashboard/lager/[id]/page.tsx`, `app/dashboard/werkstatt/page.tsx`, `app/dashboard/lager/page.tsx`, `app/dashboard/buero/page.tsx`, `lib/importer.ts`, `lib/db.ts`, `app/dashboard/einstellungen/page.tsx` | Löschlogik Storage; IDs/Nummernkreise definieren |
 | 2026-05-13 | Claude | Autopilot-Marketing mit echter Logik (Zielgruppe/Kampagnenvorschlag/Funnel-Lücke/Nächster Schritt aus Leads+Kampagnen+SEO); Werkstatt-Detailseite [id] mit Stammdaten/Zeit/Material/Prüfprotokoll; Lager-Detailseite [id] mit Bestand/Stellplätze/Bewegungen; 🔍-Links in Listen | [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx), [`app/dashboard/werkstatt/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/werkstatt/page.tsx), `app/dashboard/werkstatt/[id]/page.tsx`, [`app/dashboard/lager/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/lager/page.tsx), `app/dashboard/lager/[id]/page.tsx` | Rollen/Rechte serverseitig härten; Fehlerbehandlung/Empty States systematisieren |
 | 2026-05-13 | Claude | Archiv um KI-Erkennungsverläufe erweitert (Badge/Filter/Stat); Cloud-Modul ehrlich als Datenstand-Übersicht ohne echtes Backup gekennzeichnet; Marketing KI-Suite DemoLabTab liest echte marketing_seo_keywords und marketing_leads | [`app/dashboard/archiv/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/archiv/page.tsx), [`app/dashboard/cloud/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/cloud/page.tsx), [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Autopilot-Marketing mit echter Logik; Detailseiten Werkstatt/Lager |
 | 2026-05-13 | Claude | Einkaufsschema und FK-Beziehungen validiert: alle 12 Migrationen Local=Remote bestätigt; Bug in `handleKonvertieren` behoben (kunde_id wurde beim Angebot→Auftrag-Konvertieren nicht weitergegeben); lint+build grün; auf main gepusht (Commit `5d590cf`) | [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Rollen/Rechte serverseitig härten, AnalysePilot Live-Daten anbinden, Archiv weiter ausbauen |

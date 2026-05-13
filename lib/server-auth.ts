@@ -69,3 +69,26 @@ export async function getRouteAccess(req: NextRequest, allowedRoles?: ServerAppR
 
   return { isDemo: false as const, role, user: data.user, supabase, error: null }
 }
+
+export async function getServerComponentSession() {
+  const { cookies } = await import('next/headers')
+  const cookieStore = cookies()
+  const isDemo = cookieStore.get('pk_demo')?.value === '1'
+  if (isDemo) return { isDemo: true as const, user: null, supabase: null }
+
+  const { url, key } = getEnv()
+  if (!url || !key) return { isDemo: false as const, user: null, supabase: null }
+
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      get(name) { return cookieStore.get(name)?.value },
+      set() {},
+      remove() {},
+    },
+  })
+
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) return { isDemo: false as const, user: null, supabase: null }
+
+  return { isDemo: false as const, user, supabase }
+}

@@ -1,8 +1,6 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { hasDemoCookie } from '@/lib/auth'
-import { getLagerArtikel, getLagerBewegungen, getLagerStellplatzBestand } from '@/lib/db'
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { getServerComponentSession } from '@/lib/server-auth'
 
 type Artikel = {
   id: string; name: string; kategorie: string; bestand: number; einheit: string
@@ -15,68 +13,52 @@ type Bewegung = {
 type StellplatzBestand = {
   id: string; stellplatz_id: string; artikelnummer?: string; artikelname?: string
   charge?: string; mhd?: string; menge: number; einheit?: string; status?: string
-  eingelagert_am?: string; notiz?: string
+  eingelagert_am?: string
   lager_stellplaetze?: { code: string; bereich: string }
 }
 
 const STATUS_COLOR: Record<string, string> = { ok: '#10b981', niedrig: '#f59e0b', leer: '#f43f5e' }
 const STATUS_LABEL: Record<string, string> = { ok: '✅ OK', niedrig: '⚠️ Niedrig', leer: '🚨 Leer' }
 
-export default function LagerDetailPage() {
-  const params = useParams()
-  const router = useRouter()
-  const id = decodeURIComponent(params.id as string)
-  const [artikel, setArtikel] = useState<Artikel | null>(null)
-  const [bewegungen, setBewegungen] = useState<Bewegung[]>([])
-  const [bestand, setBestand] = useState<StellplatzBestand[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+export default async function LagerDetailPage({ params }: { params: { id: string } }) {
+  const id = decodeURIComponent(params.id)
+  const { isDemo, user, supabase } = await getServerComponentSession()
 
-  useEffect(() => {
-    const isDemo = hasDemoCookie()
-    async function load() {
-      try {
-        const [alleArtikel, alleBeweg, alleBestand] = await Promise.all([
-          getLagerArtikel(),
-          isDemo ? Promise.resolve([]) : getLagerBewegungen(),
-          isDemo ? Promise.resolve([]) : getLagerStellplatzBestand(),
-        ])
-        const found = (alleArtikel as Artikel[]).find(a => a.id === id)
-        if (!found) { setError('Artikel nicht gefunden.'); return }
-        setArtikel(found)
-        setBewegungen(
-          (alleBeweg as Bewegung[])
-            .filter(b => b.artikel === found.name)
-            .slice(0, 20)
-        )
-        setBestand(
-          (alleBestand as StellplatzBestand[])
-            .filter(b => b.artikelnummer === found.id || b.artikelname === found.name)
-        )
-      } catch {
-        setError('Fehler beim Laden der Daten.')
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [id])
+  if (!isDemo && !user) redirect('/login')
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 28, height: 28, border: '3px solid rgba(22,132,255,.3)', borderTopColor: '#1684ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
-        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Artikel…</div>
+  if (isDemo) {
+    return (
+      <div className="pk-card" style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8, color: '#f8fbff' }}>Demo-Modus</div>
+        <div style={{ marginBottom: 20 }}>Detailansichten erfordern einen Live-Account.</div>
+        <Link href="/dashboard/lager" style={{ color: '#1684ff', fontSize: 14, textDecoration: 'none' }}>← Zurück zum Lager</Link>
       </div>
-    </div>
-  )
+    )
+  }
 
-  if (error || !artikel) return (
-    <div className="pk-card" style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>
-      <div style={{ fontSize: 32, marginBottom: 12 }}>📦</div>
-      <div style={{ marginBottom: 16 }}>{error || 'Nicht gefunden.'}</div>
-      <button onClick={() => router.back()} style={{ color: '#1684ff', fontSize: 14, background: 'none', border: 'none', cursor: 'pointer' }}>← Zurück zum Lager</button>
-    </div>
+  const [artikelRes, bewegRes, bestandRes] = await Promise.all([
+    supabase!.from('lager_artikel').select('*').eq('id', id).maybeSingle(),
+    supabase!.from('lager_bewegungen').select('*').order('created_at', { ascending: false }).limit(20),
+    supabase!.from('lager_stellplatz_bestand').select('*, lager_stellplaetze(code, bereich)'),
+  ])
+
+  const artikel = artikelRes.data as Artikel | null
+
+  if (!artikel) {
+    return (
+      <div className="pk-card" style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>📦</div>
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8, color: '#f8fbff' }}>Artikel nicht gefunden</div>
+        <div style={{ marginBottom: 20, fontSize: 14 }}>Der Artikel &bdquo;{id}&ldquo; wurde nicht gefunden oder du hast keinen Zugriff.</div>
+        <Link href="/dashboard/lager" style={{ color: '#1684ff', fontSize: 14, textDecoration: 'none' }}>← Zurück zum Lager</Link>
+      </div>
+    )
+  }
+
+  const bewegungen = ((bewegRes.data ?? []) as Bewegung[]).filter(b => b.artikel === artikel.name)
+  const bestand = ((bestandRes.data ?? []) as StellplatzBestand[]).filter(
+    b => b.artikelnummer === artikel.id || b.artikelname === artikel.name
   )
 
   const statusColor = STATUS_COLOR[artikel.status] ?? '#aeb9c8'
@@ -85,11 +67,10 @@ export default function LagerDetailPage() {
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 0 40px' }}>
-      {/* Back */}
       <div style={{ marginBottom: 20 }}>
-        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: '#1684ff', fontSize: 14, cursor: 'pointer', padding: 0 }}>
+        <Link href="/dashboard/lager" style={{ color: '#1684ff', fontSize: 14, textDecoration: 'none' }}>
           ← Zurück zum Lager
-        </button>
+        </Link>
       </div>
 
       {/* Header */}
@@ -137,7 +118,10 @@ export default function LagerDetailPage() {
       <div className="pk-card" style={{ marginBottom: 18 }}>
         <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>📍 Stellplatz-Belegung</div>
         {bestand.length === 0 ? (
-          <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine Stellplatz-Zuordnung vorhanden.</div>
+          <div style={{ textAlign: 'center', padding: '28px 0', color: '#aeb9c8' }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>📍</div>
+            <div style={{ fontSize: 13 }}>Keine Stellplatz-Zuordnung vorhanden. Artikel im Lager einlagern, um Stellplätze zu belegen.</div>
+          </div>
         ) : (
           <div style={{ display: 'grid', gap: 8 }}>
             {bestand.map(b => (
@@ -151,9 +135,7 @@ export default function LagerDetailPage() {
                   </div>
                 </div>
                 <span style={{ fontWeight: 700, color: '#1684ff', fontSize: 14 }}>{b.menge} {b.einheit || artikel.einheit}</span>
-                {b.mhd && (
-                  <span style={{ fontSize: 11, color: '#aeb9c8' }}>MHD: {b.mhd}</span>
-                )}
+                {b.mhd && <span style={{ fontSize: 11, color: '#aeb9c8' }}>MHD: {b.mhd}</span>}
                 <span className={`badge ${b.status === 'Gesperrt' ? 'badge-red' : 'badge-green'}`} style={{ fontSize: 10 }}>
                   {b.status || 'Verfügbar'}
                 </span>
@@ -167,13 +149,14 @@ export default function LagerDetailPage() {
       <div className="pk-card">
         <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 12 }}>🔄 Letzte Lagerbewegungen</div>
         {bewegungen.length === 0 ? (
-          <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine Bewegungen für diesen Artikel gefunden.</div>
+          <div style={{ textAlign: 'center', padding: '28px 0', color: '#aeb9c8' }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>🔄</div>
+            <div style={{ fontSize: 13 }}>Keine Lagerbewegungen für diesen Artikel gefunden.</div>
+          </div>
         ) : (
           <table className="pk-table" style={{ width: '100%' }}>
             <thead>
-              <tr>
-                <th>Datum</th><th>Typ</th><th>Artikel</th><th>Menge</th><th>Mitarbeiter</th><th>Status</th>
-              </tr>
+              <tr><th>Datum</th><th>Typ</th><th>Artikel</th><th>Menge</th><th>Mitarbeiter</th><th>Status</th></tr>
             </thead>
             <tbody>
               {bewegungen.map(b => (

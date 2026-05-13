@@ -9,6 +9,7 @@ export type ImportDataType =
   | 'artikel' | 'kunden' | 'lieferanten' | 'rechnungen'
   | 'angebote' | 'auftraege' | 'bewegungen' | 'belege' | 'projekte'
   | 'steuer_belege' | 'steuer_buchungen' | 'steuer_ustva' | 'steuer_konten'
+  | 'werkstatt_zeitbuchungen' | 'werkstatt_material'
 
 export type ImportSource =
   | 'WISO' | 'Lexware' | 'sevDesk' | 'JTL' | 'Billbee' | 'DATEV CSV' | 'Generisch'
@@ -165,6 +166,21 @@ export const TARGET_FIELDS: Record<ImportDataType, TargetField[]> = {
     { key: 'typ',           label: 'Typ' },
     { key: 'steuersatz',    label: 'Steuersatz %',    type: 'number' },
     { key: 'aktiv',         label: 'Aktiv' },
+  ],
+  werkstatt_zeitbuchungen: [
+    { key: 'mitarbeiter',   label: 'Mitarbeiter',    required: true },
+    { key: 'auftragsnr',    label: 'Auftragsnr.',    required: true },
+    { key: 'stunden',       label: 'Stunden',        required: true, type: 'number' },
+    { key: 'datum',         label: 'Datum',           type: 'date' },
+    { key: 'taetigkeit',    label: 'Tätigkeit' },
+  ],
+  werkstatt_material: [
+    { key: 'artikel',       label: 'Artikel',        required: true },
+    { key: 'menge',         label: 'Menge',          required: true, type: 'number' },
+    { key: 'einheit',       label: 'Einheit' },
+    { key: 'auftragsnr',    label: 'Auftragsnr.' },
+    { key: 'datum',         label: 'Datum',           type: 'date' },
+    { key: 'mitarbeiter',   label: 'Mitarbeiter' },
   ],
 }
 

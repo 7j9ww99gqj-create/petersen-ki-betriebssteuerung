@@ -1610,6 +1610,24 @@ export async function bulkImportSteuerKonten(rows: Array<{
   return data
 }
 
+export async function bulkImportWerkstattZeitbuchungen(rows: Array<{
+  mitarbeiter: string; auftragsnr: string; stunden: number
+  datum?: string; taetigkeit?: string
+}>) {
+  const { data, error } = await db().from('werkstatt_zeitbuchungen').insert(rows).select()
+  if (error) throw error
+  return data
+}
+
+export async function bulkImportWerkstattMaterial(rows: Array<{
+  artikel: string; menge: number; einheit?: string
+  auftragsnr?: string; datum?: string; mitarbeiter?: string
+}>) {
+  const { data, error } = await db().from('werkstatt_material').insert(rows).select()
+  if (error) throw error
+  return data
+}
+
 // ── LAGER STELLPLÄTZE ─────────────────────────────────────────────────────────
 
 export async function getLagerStellplaetze() {
