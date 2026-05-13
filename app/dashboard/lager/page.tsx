@@ -1941,6 +1941,7 @@ export default function LagerPilotPage() {
                             </div>
                           ) : (
                             <div style={{ display: 'flex', gap: 6 }}>
+                              <a href={`/dashboard/lager/${encodeURIComponent(a.id)}`} onClick={e => e.stopPropagation()} title="Detailansicht" style={{ background: 'rgba(167,139,250,.1)', border: '1px solid rgba(167,139,250,.24)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#c4b5fd', fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>🔍</a>
                               <button onClick={e => { e.stopPropagation(); setModal(a) }} title="Bearbeiten" style={{ background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#6cb6ff', fontSize: 13 }}>✏️</button>
                               <button onClick={e => { e.stopPropagation(); openEinlagern(a.id) }} title="Auf Stellplatz buchen" style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#34d399', fontSize: 13 }}>📥</button>
                               <button onClick={e => { e.stopPropagation(); setLabelModal({ type: 'artikel', artikel: a }) }} title="QR-/Etikett drucken" style={{ background: 'rgba(167,139,250,.1)', border: '1px solid rgba(167,139,250,.24)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#c4b5fd', fontSize: 13 }}>🏷️</button>

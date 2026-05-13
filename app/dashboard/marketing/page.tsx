@@ -391,6 +391,22 @@ function getFeatureSignals(featureId: string, kampagnen: Kampagne[], leads: Lead
     }
   }
 
+  if (featureId === 'autopilot') {
+    const active = leads.filter(l => !['Gewonnen', 'Verloren'].includes(l.status))
+    const bySource: Record<string, number> = {}
+    active.forEach(l => { bySource[l.quelle] = (bySource[l.quelle] ?? 0) + 1 })
+    const topSource = Object.entries(bySource).sort((a, b) => b[1] - a[1])[0]
+    const bestCampaign = activeCampaigns[0]
+    return {
+      signals: [
+        { label: 'Top-Zielgruppe', value: topSource ? `${topSource[0]} (${topSource[1]} Leads)` : 'Keine Leads', tone: COLOR },
+        { label: 'Kampagnen-Hebel', value: bestCampaign ? bestCampaign.name : 'Keine aktive Kampagne', tone: '#1684ff' },
+        { label: 'Naechster Schritt', value: hotLeads[0] ? `${hotLeads[0].name}: ${getLeadAction(hotLeads[0])}` : 'Neue Leads sammeln', tone: '#25d366' },
+      ],
+      actions: sharedActions,
+    }
+  }
+
   return {
     signals: [
       { label: 'Aktive Kampagnen', value: String(activeCampaigns.length), tone: COLOR },
@@ -399,6 +415,71 @@ function getFeatureSignals(featureId: string, kampagnen: Kampagne[], leads: Lead
     ],
     actions: sharedActions,
   }
+}
+
+function AutopilotFlowPanel({ kampagnen, leads, seoKeywords }: { kampagnen: Kampagne[]; leads: Lead[]; seoKeywords: SeoKeyword[] }) {
+  const active = leads.filter(l => !['Gewonnen', 'Verloren'].includes(l.status))
+  const bySource: Record<string, number> = {}
+  active.forEach(l => { bySource[l.quelle] = (bySource[l.quelle] ?? 0) + 1 })
+  const topSource = Object.entries(bySource).sort((a, b) => b[1] - a[1])[0]
+  const bestCampaign = kampagnen.find(k => k.status === 'Aktiv')
+  const bestKeyword = [...seoKeywords].sort((a, b) => b.klicks - a.klicks)[0]
+  const byStatus: Record<string, number> = {}
+  active.forEach(l => { byStatus[l.status] = (byStatus[l.status] ?? 0) + 1 })
+  const stuckStage = Object.entries(byStatus).sort((a, b) => b[1] - a[1])[0]
+  const hotLead = [...active].sort((a, b) => getLeadScore(b) - getLeadScore(a))[0]
+
+  const steps = [
+    {
+      nr: '01', label: 'Zielgruppe', icon: '🎯', color: COLOR,
+      value: topSource ? `${topSource[0]}-Leads fokussieren` : 'Alle offenen Leads aktivieren',
+      detail: topSource
+        ? `${topSource[1]} von ${active.length} Leads kommen ueber ${topSource[0]}`
+        : 'Noch keine klare Kanal-Quelle erkennbar',
+    },
+    {
+      nr: '02', label: 'Kampagnenvorschlag', icon: '📣', color: '#1684ff',
+      value: bestCampaign ? `Kampagne „${bestCampaign.name}" nutzen` : bestKeyword ? `Neues Thema: „${bestKeyword.keyword}"` : 'Neue Kampagne erstellen',
+      detail: bestCampaign
+        ? `${bestCampaign.typ} · Status: ${bestCampaign.status}`
+        : bestKeyword ? `${bestKeyword.klicks} Klicks · Rang #${bestKeyword.ranking}` : 'Noch keine aktiven Kampagnen vorhanden',
+    },
+    {
+      nr: '03', label: 'Funnel-Luecke', icon: '🔍', color: '#f59e0b',
+      value: stuckStage ? `Meiste Leads bei „${stuckStage[0]}" (${stuckStage[1]})` : 'Funnel prufen',
+      detail: stuckStage
+        ? `${stuckStage[1]} Leads warten in Stufe „${stuckStage[0]}" auf naechste Aktion`
+        : 'Keine offenen Leads im Funnel',
+    },
+    {
+      nr: '04', label: 'Naechster Schritt', icon: '⚡', color: '#25d366',
+      value: hotLead ? `${hotLead.name} · Score ${getLeadScore(hotLead)}` : 'Neuen Lead anlegen',
+      detail: hotLead ? getLeadAction(hotLead) : 'Leads manuell aufnehmen oder Kampagne starten',
+    },
+  ]
+
+  return (
+    <div className="pk-card" style={{ marginTop: 18, border: '1px solid rgba(245,158,11,.2)' }}>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontWeight: 900, fontSize: 16 }}>🚀 Autopilot-Flow — Vom Ziel zum naechsten Schritt</div>
+        <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>
+          Abgeleitet aus {leads.length} Leads, {kampagnen.length} Kampagnen und {seoKeywords.length} Keywords
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+        {steps.map(step => (
+          <div key={step.nr} style={{ padding: '14px 16px', borderRadius: 14, background: `${step.color}0d`, border: `1px solid ${step.color}30` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: `${step.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>{step.icon}</div>
+              <div style={{ fontSize: 10, color: '#aeb9c8', textTransform: 'uppercase' as const, fontWeight: 800, letterSpacing: '.06em' }}>Schritt {step.nr} · {step.label}</div>
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 14, color: step.color, marginBottom: 4 }}>{step.value}</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', lineHeight: 1.5 }}>{step.detail}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function DemoFeatureCard({ feature, active, onClick }: { feature: DemoMarketingFeature; active: boolean; onClick: () => void }) {
@@ -547,6 +628,10 @@ function DemoLabTab({
           ))}
         </div>
       </div>
+
+      {selected.id === 'autopilot' && (
+        <AutopilotFlowPanel kampagnen={kampagnen} leads={leads} seoKeywords={seoKeywords} />
+      )}
 
       {leads.length > 0 && (() => {
         const active = leads.filter(l => !['Gewonnen', 'Verloren'].includes(l.status))

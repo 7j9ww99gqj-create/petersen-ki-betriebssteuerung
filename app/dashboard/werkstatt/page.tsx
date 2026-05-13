@@ -592,6 +592,9 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen }: { isDemo:
                 )}
                 {/* Edit + Delete */}
                 <div style={{ display: 'flex', gap: 6 }}>
+                  <a href={`/dashboard/werkstatt/${encodeURIComponent(k.id)}`} onClick={e => e.stopPropagation()} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(167,139,250,.3)', background: 'transparent', color: '#c4b5fd', cursor: 'pointer', textDecoration: 'none' }}>
+                    🔍
+                  </a>
                   <button onClick={() => setEditKarte(k)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(167,139,250,.3)', background: 'transparent', color: '#c4b5fd', cursor: 'pointer' }}>
                     ✏️
                   </button>
