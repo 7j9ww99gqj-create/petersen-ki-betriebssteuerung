@@ -548,6 +548,21 @@ export async function getBueroRechnungById(id: string) {
   return normalizeBueroRechnung(rechnung.data as BueroRechnungRecord, kundenIndex.byId)
 }
 
+export async function deleteBueroAngebot(id: string) {
+  const { error } = await db().from('buero_angebote').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteBueroAuftrag(id: string) {
+  const { error } = await db().from('buero_auftraege').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteBueroRechnung(id: string) {
+  const { error } = await db().from('buero_rechnungen').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function getBueroEingangsrechnungen() {
   const [result, lieferantenIndex] = await Promise.all([
     db()
