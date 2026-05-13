@@ -1464,7 +1464,18 @@ export async function upsertSteuerBeleg(b: {
 }
 
 export async function deleteSteuerBeleg(id: string) {
-  const { error } = await db().from('steuer_belege').delete().eq('id', id)
+  const supabase = createSupabaseClient()
+  const { data: existing } = await supabase
+    .from('steuer_belege')
+    .select('datei_url')
+    .eq('id', id)
+    .single()
+  const storagePath = normalizeDocumentStoragePath((existing as { datei_url?: string | null } | null)?.datei_url)
+  if (storagePath && !storagePath.startsWith('http')) {
+    const { error: storageError } = await supabase.storage.from('dokumente').remove([storagePath])
+    if (storageError && !/not found/i.test(storageError.message ?? '')) throw storageError
+  }
+  const { error } = await supabase.from('steuer_belege').delete().eq('id', id)
   if (error) throw error
 }
 
