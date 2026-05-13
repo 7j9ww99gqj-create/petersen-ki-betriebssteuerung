@@ -1,15 +1,34 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   LineChart, Line,
   PieChart, Pie, Cell,
   AreaChart, Area,
 } from 'recharts'
+import { hasDemoCookie } from '@/lib/auth'
+import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 
-// ── Demo-Daten ────────────────────────────────────────────────────────────────
+// ── Typen ──────────────────────────────────────────────────────────────────────
 
-const umsatzData = [
+interface UmsatzPoint { monat: string; umsatz: number; kosten: number; gewinn: number }
+interface BestandPoint { woche: string; artikel: number; niedrig: number; leer: number }
+interface KpiData {
+  umsatzMonat: number
+  gewinnMonat: number
+  artikelGesamt: number
+  artikelNiedrig: number
+  artikelLeer: number
+  aktivKunden: number
+  offeneAngebote: number
+  offeneRechnungen: number
+  offeneRechnungenSumme: number
+  offeneAngeboteSumme: number
+}
+
+// ── Demo-Fallback ──────────────────────────────────────────────────────────────
+
+const DEMO_UMSATZ: UmsatzPoint[] = [
   { monat: 'Okt', umsatz: 38400, kosten: 24200, gewinn: 14200 },
   { monat: 'Nov', umsatz: 41200, kosten: 26100, gewinn: 15100 },
   { monat: 'Dez', umsatz: 52800, kosten: 31400, gewinn: 21400 },
@@ -20,13 +39,33 @@ const umsatzData = [
   { monat: 'Mai', umsatz: 47200, kosten: 28400, gewinn: 18800 },
 ]
 
-const bestandData = [
+const DEMO_BESTAND: BestandPoint[] = [
   { woche: 'KW14', artikel: 1180, niedrig: 5, leer: 2 },
   { woche: 'KW15', artikel: 1210, niedrig: 4, leer: 1 },
   { woche: 'KW16', artikel: 1195, niedrig: 6, leer: 3 },
   { woche: 'KW17', artikel: 1240, niedrig: 3, leer: 0 },
   { woche: 'KW18', artikel: 1248, niedrig: 3, leer: 1 },
 ]
+
+const DEMO_KPI: KpiData = {
+  umsatzMonat: 47200, gewinnMonat: 18800,
+  artikelGesamt: 1248, artikelNiedrig: 3, artikelLeer: 1,
+  aktivKunden: 5, offeneAngebote: 4, offeneRechnungen: 4,
+  offeneRechnungenSumme: 14300, offeneAngeboteSumme: 38150,
+}
+
+const MONATSNAMEN = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+
+function parseEuro(v: unknown): number {
+  if (typeof v === 'number') return v
+  if (typeof v === 'string') {
+    const n = parseFloat(v.replace(/[^0-9.,\-]/g, '').replace(',', '.'))
+    return isNaN(n) ? 0 : n
+  }
+  return 0
+}
+
+// ── Pilot-Nutzungsverteilung (statisch – kein Logging vorhanden) ──────────────
 
 const pilotNutzungData = [
   { name: 'LagerPilot', value: 38, color: '#1684ff' },
@@ -37,6 +76,7 @@ const pilotNutzungData = [
   { name: 'PlanungPilot', value: 4, color: '#f43f5e' },
 ]
 
+// KI-Erkennungsdaten (statisch – kein Logging vorhanden)
 const kiErkennungData = [
   { tag: 'Mo', erkennungen: 42, korrekt: 40, fehler: 2 },
   { tag: 'Di', erkennungen: 58, korrekt: 55, fehler: 3 },
@@ -47,7 +87,7 @@ const kiErkennungData = [
   { tag: 'So', erkennungen: 18, korrekt: 17, fehler: 1 },
 ]
 
-// ── Tooltip-Styles ────────────────────────────────────────────────────────────
+// ── Tooltip-Styles ─────────────────────────────────────────────────────────────
 
 const tooltipStyle = {
   backgroundColor: '#0b1420',
@@ -56,19 +96,16 @@ const tooltipStyle = {
   color: '#f8fbff',
   fontSize: 13,
 }
-
 const axisStyle = { fill: '#aeb9c8', fontSize: 11 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TFmt = (...args: any[]) => any
 
 function formatEuro(v: number) { return `${(v / 1000).toFixed(0)}k €` }
-function formatPct(v: number) { return `${v}%` }
-
 const fmtEuro: TFmt = (v) => [`${Number(v).toLocaleString('de-DE')} €`]
 const fmtPct: TFmt = (v) => [`${v}%`, 'Anteil']
 
-// ── KPI Card ──────────────────────────────────────────────────────────────────
+// ── KPI Card ───────────────────────────────────────────────────────────────────
 
 function KPICard({ icon, label, value, delta, color, sub }: {
   icon: string; label: string; value: string; delta?: string; color: string; sub?: string
@@ -96,13 +133,171 @@ function KPICard({ icon, label, value, delta, color, sub }: {
   )
 }
 
-// ── Tabs ──────────────────────────────────────────────────────────────────────
+// ── Tabs ───────────────────────────────────────────────────────────────────────
 
 type Tab = 'uebersicht' | 'umsatz' | 'bestand' | 'ki'
 
 export default function AnalysePilotPage() {
   const [tab, setTab] = useState<Tab>('uebersicht')
   const [zeitraum, setZeitraum] = useState<'7T' | '30T' | '3M' | '6M' | '1J'>('6M')
+  const [loading, setLoading] = useState(true)
+  const [kpi, setKpi] = useState<KpiData>(DEMO_KPI)
+  const [umsatzData, setUmsatzData] = useState<UmsatzPoint[]>(DEMO_UMSATZ)
+  const [bestandData, setBestandData] = useState<BestandPoint[]>(DEMO_BESTAND)
+  const [isDemo, setIsDemo] = useState(false)
+
+  useEffect(() => {
+    const demo = hasDemoCookie()
+    setIsDemo(demo)
+    if (demo || !isSupabaseConfigured()) {
+      setLoading(false)
+      return
+    }
+    loadLiveData()
+  }, [])
+
+  async function loadLiveData() {
+    try {
+      const supabase = createSupabaseClient()
+      const [rechnungen, eingangsrechnungen, kunden, angebote, artikel] = await Promise.allSettled([
+        supabase.from('buero_rechnungen').select('betrag,summe,datum,status').order('created_at'),
+        supabase.from('buero_eingangsrechnungen').select('betrag_brutto,rechnungsdatum,status'),
+        supabase.from('buero_kunden').select('status'),
+        supabase.from('buero_angebote').select('betrag,datum,status'),
+        supabase.from('lager_artikel').select('bestand,status,mindestbestand,created_at'),
+      ])
+
+      // ── Rechnungen ──
+      const raws = rechnungen.status === 'fulfilled' && !rechnungen.value.error
+        ? rechnungen.value.data ?? []
+        : []
+      type RechnungRow = { betrag?: string | null; summe?: number | null; datum?: string | null; status?: string | null }
+      const rechnungenRows = raws as RechnungRow[]
+
+      // ── Eingangsrechnungen als Kostenquelle ──
+      const kosten = eingangsrechnungen.status === 'fulfilled' && !eingangsrechnungen.value.error
+        ? (eingangsrechnungen.value.data ?? []) as Array<{ betrag_brutto?: number | null; rechnungsdatum?: string | null }>
+        : []
+
+      // ── Kunden ──
+      const kundenRows = kunden.status === 'fulfilled' && !kunden.value.error
+        ? (kunden.value.data ?? []) as Array<{ status?: string | null }>
+        : []
+
+      // ── Angebote ──
+      type AngebotRow = { betrag?: string | null; datum?: string | null; status?: string | null }
+      const angeboteRows = angebote.status === 'fulfilled' && !angebote.value.error
+        ? (angebote.value.data ?? []) as AngebotRow[]
+        : []
+
+      // ── Artikel ──
+      type ArtikelRow = { bestand?: number | null; status?: string | null; mindestbestand?: number | null; created_at?: string | null }
+      const artikelRows = artikel.status === 'fulfilled' && !artikel.value.error
+        ? (artikel.value.data ?? []) as ArtikelRow[]
+        : []
+
+      // ── KPI berechnen ──
+      const now = new Date()
+      const monatStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+      const umsatzDiesen = rechnungenRows
+        .filter(r => r.datum && new Date(r.datum) >= monatStart)
+        .reduce((s, r) => s + (r.summe ?? parseEuro(r.betrag)), 0)
+
+      const kostenDiesen = kosten
+        .filter(k => k.rechnungsdatum && new Date(k.rechnungsdatum) >= monatStart)
+        .reduce((s, k) => s + (k.betrag_brutto ?? 0), 0)
+
+      const offeneRechnungenList = rechnungenRows.filter(r => r.status === 'Offen' || r.status === 'Fällig')
+      const offeneRechnungenSumme = offeneRechnungenList.reduce((s, r) => s + (r.summe ?? parseEuro(r.betrag)), 0)
+
+      const offeneAngeboteList = angeboteRows.filter(a => a.status === 'Entwurf' || a.status === 'Gesendet')
+      const offeneAngeboteSumme = offeneAngeboteList.reduce((s, a) => s + parseEuro(a.betrag), 0)
+
+      setKpi({
+        umsatzMonat: Math.round(umsatzDiesen),
+        gewinnMonat: Math.round(umsatzDiesen - kostenDiesen),
+        artikelGesamt: artikelRows.length,
+        artikelNiedrig: artikelRows.filter(a => a.status === 'niedrig').length,
+        artikelLeer: artikelRows.filter(a => a.status === 'leer').length,
+        aktivKunden: kundenRows.filter(k => k.status !== 'Inaktiv').length,
+        offeneAngebote: offeneAngeboteList.length,
+        offeneRechnungen: offeneRechnungenList.length,
+        offeneRechnungenSumme: Math.round(offeneRechnungenSumme),
+        offeneAngeboteSumme: Math.round(offeneAngeboteSumme),
+      })
+
+      // ── Umsatz-Chart: letzte 8 Monate ──
+      const umsatzByMonth = new Map<string, { umsatz: number; kosten: number }>()
+      for (let i = 7; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        umsatzByMonth.set(key, { umsatz: 0, kosten: 0 })
+      }
+      for (const r of rechnungenRows) {
+        if (!r.datum) continue
+        const d = new Date(r.datum)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        if (umsatzByMonth.has(key)) {
+          umsatzByMonth.get(key)!.umsatz += r.summe ?? parseEuro(r.betrag)
+        }
+      }
+      for (const k of kosten) {
+        if (!k.rechnungsdatum) continue
+        const d = new Date(k.rechnungsdatum)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        if (umsatzByMonth.has(key)) {
+          umsatzByMonth.get(key)!.kosten += k.betrag_brutto ?? 0
+        }
+      }
+      const newUmsatz: UmsatzPoint[] = Array.from(umsatzByMonth.entries()).map(([key, v]) => {
+        const [, m] = key.split('-')
+        return {
+          monat: MONATSNAMEN[parseInt(m, 10) - 1],
+          umsatz: Math.round(v.umsatz),
+          kosten: Math.round(v.kosten),
+          gewinn: Math.round(v.umsatz - v.kosten),
+        }
+      })
+      if (newUmsatz.some(p => p.umsatz > 0 || p.kosten > 0)) {
+        setUmsatzData(newUmsatz)
+      }
+
+      // ── Bestand-Chart: Snapshot der letzten 5 Wochen aus lager_bewegungen ──
+      // Da wir keinen Verlauf haben, zeigen wir den aktuellen Snapshot als letzten Datenpunkt
+      // und befüllen frühere Wochen mit Nullwerten.
+      const gesamtArtikel = artikelRows.length
+      const niedrig = artikelRows.filter(a => a.status === 'niedrig').length
+      const leer = artikelRows.filter(a => a.status === 'leer').length
+      if (gesamtArtikel > 0) {
+        const kw = Math.ceil((now.getDate() + new Date(now.getFullYear(), now.getMonth(), 1).getDay()) / 7)
+        const year = now.getFullYear()
+        const bestandPunkte: BestandPoint[] = Array.from({ length: 5 }, (_, i) => {
+          const weekOffset = 4 - i
+          const weekNr = kw - weekOffset
+          return {
+            woche: `KW${String(weekNr > 0 ? weekNr : weekNr + 52).padStart(2, '0')}`,
+            artikel: i < 4 ? gesamtArtikel : gesamtArtikel,
+            niedrig: i < 4 ? 0 : niedrig,
+            leer: i < 4 ? 0 : leer,
+          }
+        })
+        // Letzten Punkt immer mit echten Zahlen befüllen
+        if (bestandPunkte.length > 0) {
+          bestandPunkte[bestandPunkte.length - 1].niedrig = niedrig
+          bestandPunkte[bestandPunkte.length - 1].leer = leer
+        }
+        void year
+        setBestandData(bestandPunkte)
+      }
+    } catch {
+      // Fallback auf Demo-Daten
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fmtK = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1).replace('.0', '')}k €` : `${n.toLocaleString('de-DE')} €`
 
   return (
     <div className="fade-in">
@@ -117,7 +312,11 @@ export default function AnalysePilotPage() {
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>AnalysePilot</h1>
           <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Echtzeit-Dashboards · KPIs · Diagramme · Prognosen</p>
         </div>
-        <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          {isDemo && <span className="badge badge-orange">Demo</span>}
+          {loading && <span className="badge badge-blue">⏳ Lädt…</span>}
+          {!loading && !isDemo && <span className="badge badge-green">● Live</span>}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -141,14 +340,18 @@ export default function AnalysePilotPage() {
         <div>
           {/* KPI Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 24 }}>
-            <KPICard icon="💶" label="Umsatz (lfd. Monat)" value="47.200 €" delta="+8%" color="#10b981" />
-            <KPICard icon="📈" label="Gewinn (lfd. Monat)" value="18.800 €" delta="+12%" color="#1684ff" />
-            <KPICard icon="📦" label="Artikel im Lager" value="1.248" delta="+12" color="#f59e0b" sub="Davon 3 niedrig" />
-            <KPICard icon="🧠" label="KI-Assistenten-Auswertungen" value="847" delta="+14%" color="#a78bfa" sub="Diese Woche" />
-            <KPICard icon="✅" label="Auftragsquote" value="94%" color="#10b981" sub="Pünktlich abgeschlossen" />
-            <KPICard icon="👥" label="Aktive Kunden" value="5" color="#20c8ff" sub="1 Inaktiv" />
-            <KPICard icon="📋" label="Offene Angebote" value="4" color="#f59e0b" sub="Wert: 38.150 €" />
-            <KPICard icon="💶" label="Offene Rechnungen" value="4" delta="-2 vs. Vormon." color="#f43f5e" sub="Gesamt: 14.300 €" />
+            <KPICard icon="💶" label="Umsatz (lfd. Monat)" value={fmtK(kpi.umsatzMonat)} color="#10b981" />
+            <KPICard icon="📈" label="Gewinn (lfd. Monat)" value={fmtK(kpi.gewinnMonat)} color="#1684ff" />
+            <KPICard icon="📦" label="Artikel im Lager" value={kpi.artikelGesamt.toLocaleString('de-DE')} color="#f59e0b"
+              sub={kpi.artikelNiedrig > 0 ? `Davon ${kpi.artikelNiedrig} niedrig` : 'Alle ausreichend'} />
+            <KPICard icon="✅" label="Ø Lagerauslastung" value={kpi.artikelLeer > 0 ? `${Math.round((1 - kpi.artikelLeer / Math.max(kpi.artikelGesamt, 1)) * 100)}%` : '100%'} color="#10b981" sub="Artikel mit Bestand > 0" />
+            <KPICard icon="👥" label="Aktive Kunden" value={String(kpi.aktivKunden)} color="#20c8ff" />
+            <KPICard icon="📋" label="Offene Angebote" value={String(kpi.offeneAngebote)} color="#f59e0b"
+              sub={kpi.offeneAngeboteSumme > 0 ? `Wert: ${fmtK(kpi.offeneAngeboteSumme)}` : undefined} />
+            <KPICard icon="💶" label="Offene Rechnungen" value={String(kpi.offeneRechnungen)} color="#f43f5e"
+              sub={kpi.offeneRechnungenSumme > 0 ? `Gesamt: ${fmtK(kpi.offeneRechnungenSumme)}` : undefined} />
+            <KPICard icon="⚠️" label="Kritische Artikel" value={String(kpi.artikelNiedrig + kpi.artikelLeer)} color="#f59e0b"
+              sub={`${kpi.artikelLeer} leer · ${kpi.artikelNiedrig} niedrig`} />
           </div>
 
           {/* Sparkline Umsatz */}
@@ -210,12 +413,12 @@ export default function AnalysePilotPage() {
               </div>
             </div>
             <div className="pk-card">
-              <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📦 Bestandstrend (KW14–18)</h3>
+              <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📦 Bestandstrend</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={bestandData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
                   <XAxis dataKey="woche" tick={axisStyle} axisLine={false} tickLine={false} />
-                  <YAxis tick={axisStyle} axisLine={false} tickLine={false} domain={[1100, 1300]} width={44} />
+                  <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={44} />
                   <Tooltip contentStyle={tooltipStyle} />
                   <Line type="monotone" dataKey="artikel" stroke="#1684ff" strokeWidth={2} dot={{ fill: '#1684ff', r: 4 }} name="Artikel gesamt" />
                   <Line type="monotone" dataKey="niedrig" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 3 }} name="Niedr. Bestand" />
@@ -298,7 +501,7 @@ export default function AnalysePilotPage() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
                 <XAxis dataKey="woche" tick={axisStyle} axisLine={false} tickLine={false} />
-                <YAxis tick={axisStyle} axisLine={false} tickLine={false} domain={[1100, 1300]} width={44} />
+                <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={44} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend wrapperStyle={{ fontSize: 12, color: '#aeb9c8', paddingTop: 8 }} />
                 <Area type="monotone" dataKey="artikel" stroke="#1684ff" strokeWidth={2.5}
@@ -348,6 +551,9 @@ export default function AnalysePilotPage() {
       {/* ── KI-NUTZUNG ── */}
       {tab === 'ki' && (
         <div>
+          <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.2)', fontSize: 13, color: '#aeb9c8' }}>
+            KI-Erkennungsstatistiken werden noch nicht automatisch erfasst. Die Anzeige basiert auf Beispielwerten.
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
             {[
               { label: 'Erkennungen diese Woche', value: '333', icon: '🧠', color: '#a78bfa' },

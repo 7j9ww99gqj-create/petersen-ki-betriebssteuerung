@@ -3,6 +3,30 @@
 -- Einmal im Supabase SQL Editor ausführen
 -- ============================================================
 
+-- ── Rollenbasierte Hilfsfunktionen ──────────────────────────
+-- pk_get_role(): liest app_metadata.role bzw. user_metadata.role aus dem JWT;
+-- Fallback 'Mitarbeiter' für User ohne explizite Rollenzuweisung.
+create or replace function pk_get_role()
+returns text
+language sql
+stable security definer
+as $$
+  select coalesce(
+    nullif(auth.jwt() -> 'app_metadata' ->> 'role', ''),
+    nullif(auth.jwt() -> 'user_metadata' ->> 'role', ''),
+    'Mitarbeiter'
+  );
+$$;
+
+-- pk_can_write(): Admin, Mitarbeiter und Büro dürfen schreiben/löschen.
+create or replace function pk_can_write()
+returns boolean
+language sql
+stable security definer
+as $$
+  select pk_get_role() in ('Admin', 'Mitarbeiter', 'Büro');
+$$;
+
 -- ── Mandant / Firmeneinstellungen ───────────────────────────
 
 create table if not exists firma_einstellungen (
