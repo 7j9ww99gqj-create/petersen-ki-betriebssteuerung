@@ -21,76 +21,23 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
-- Aktuell in Arbeit am `2026-05-13` (Archiv/Cloud/Marketing KI-Suite):
-  - **Archiv**: KI-Erkennungsverläufe jetzt im Archiv sichtbar: `document_type` und `confidence` als Badge pro Dokument, `🧠 KI-erkannt`-Filter-Button, neue Stat-Karte. Werkstatt- und LagerPilot klar als „kein eigenes Dokumentarchiv" gekennzeichnet.
-  - **Cloud**: „Backup-Historie" umbenannt zu „Datenstand-Übersicht" mit Untertitel „kein echtes Backup-System". Geräte-Sektion mit ehrlichem Hinweis auf fehlendes Multi-Device-Backend. Status-Badges von „Aktuell/Begrenzt" auf „Live-Daten/Leer" geändert.
-  - **Marketing KI-Suite**: `DemoLabTab` zeigt jetzt echte Daten: SEO-Analyse aus `marketing_seo_keywords` (Top-Keywords sortiert nach Klicks, Ø Ranking, Optimiert-Zähler, bestes Ranking); Lead Intelligence aus `marketing_leads` (Score-Tabelle Top-5, Pipeline-Wert, heisse Leads ≥75).
-  - Betroffene Dateien: [`app/dashboard/archiv/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/archiv/page.tsx), [`app/dashboard/cloud/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/cloud/page.tsx), [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx).
-  - Tests: `npm run lint` erfolgreich; `npm run build` erfolgreich. Nur bekannte Warnungen.
-  - Aktueller Branch: `feature/archiv-cloud-marketing-ki` (Commit `b5cec2c`)
-- Aktuell in Arbeit am `2026-05-13` (Einkaufsschema + FK-Validierung):
-  - **Analyse:** Einkaufsschema-Migration (`20260512103000`) und FK-Beziehungs-Migration (`20260512142000`) sind vollständig auf der Live-Datenbank angewendet – alle 12 Migrationen Local = Remote.
-  - **Fix:** `handleKonvertieren` in [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx) übergab beim Konvertieren eines Angebots zu einem Auftrag nicht die `kunde_id`. Dieser Bug wurde behoben: der neue Auftrag erhält jetzt `kunde_id: a.kunde_id` und damit die saubere FK-Referenz.
-  - **Bestätigt vorhanden:** `buero_angebote.kunde_id`, `buero_auftraege.kunde_id`, `buero_rechnungen.kunde_id`, `buero_eingangsrechnungen.lieferant_id`, `buero_eingangsrechnungen.dokument_id` existieren im Schema und werden von `lib/db.ts` korrekt geschrieben (dual-write: ID + text-Fallback).
-  - **Bestätigt vorhanden:** `einkauf_bestellungen` hat beide Spaltenkonventionen (`einkaufspreis`/`einzelpreis`, `gesamt`/`gesamtpreis`, `bestellt_am`/`bestelldatum`, etc.) – `upsertEinkaufBestellung` schreibt beide.
-  - Betroffene Dateien: [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx).
-  - Tests: `npm run lint` erfolgreich; `npm run build` erfolgreich. Nur bestehende Warnungen (`<img>`, `useEffect`-Dependency).
-  - Aktueller Branch: `main` (Commit `5d590cf`).
-- Aktuell in Arbeit am `2026-05-13` (Marketing-Persistenz + Rollen):
-  - MarketingPilot ist jetzt voll auf echte Supabase-Persistenz gehoben: neben `SEO` speichern jetzt auch `Content`, `Posting`, `Automationen` und `Integrationen` serverseitig statt nur lokal im Browser.
-  - Neue Live-Tabellen sind eingeführt und remote ausgerollt: `marketing_content_ideas`, `marketing_posting_plans`, `marketing_automation_rules`, `marketing_integration_items` via [`supabase/migrations/20260513103000_add_marketing_workspace_tables.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260513103000_add_marketing_workspace_tables.sql).
-  - [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx) lädt und speichert diese Bereiche jetzt live über [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts); Default-Daten bleiben nur noch als Erstbefüllung/Fallback.
-  - Rollenlogik ist produktionsnäher: [`lib/roles.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/roles.ts), [`app/dashboard/layout.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/layout.tsx), [`app/dashboard/einstellungen/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/einstellungen/page.tsx) und [`app/register/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/register/page.tsx) nutzen jetzt Benutzer-Metadaten als primäre Rollenquelle; neue Registrierungen starten mit Rolle `Mitarbeiter`.
-  - Betroffene Dateien: [`app/dashboard/layout.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/layout.tsx), [`app/dashboard/einstellungen/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/einstellungen/page.tsx), [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx), [`app/register/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/register/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`lib/roles.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/roles.ts), [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql), [`supabase/migrations/20260513103000_add_marketing_workspace_tables.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260513103000_add_marketing_workspace_tables.sql), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md).
-  - Offene Punkte: Externe Marketing-Integrationen sind weiterhin nur fachlich vorbereitet; es fehlen noch echte API-Anbindungen, detailliertere Rechteprüfung pro Datensatz/Aktion und weitere relationale Härtung zwischen Büro/Einkauf/Archiv.
-  - Tests: `npm run lint` erfolgreich; `npm run build` erfolgreich. Weiterhin nur bestehende Warnungen zu `<img>` in [`app/dashboard/einstellungen/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/einstellungen/page.tsx), [`app/dashboard/lager/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/lager/page.tsx), [`components/DocumentPreviewModal.tsx`](/Users/kevinpetersen/Documents/petersen-ki/components/DocumentPreviewModal.tsx) sowie ein bestehender `useEffect`-Dependency-Hinweis in [`app/dashboard/planung/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/planung/page.tsx). `npx --yes supabase@latest db push` erfolgreich; Remote-Schema enthält jetzt die vier neuen Marketing-Tabellen.
-  - Aktueller Branch: `feature/marketing-seo-persist`
-- Aktuell in Arbeit am `2026-05-12`:
-  - Der MarketingPilot wurde funktional deutlich ausgebaut und auf `main` gepusht (Commit `5a1816f`): [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx) enthält jetzt neben Kampagnen, Leads, Newsletter und Auswertungen auch echte Arbeitsbereiche für `SEO`, `Content`, `Posting`, `Automationen` und `Integrationen`.
-  - `SEO` ist jetzt als eigener Workspace nutzbar: Keywords, Zielseiten, Intent, Suchvolumen, Schwierigkeit, Ranking, Klicks und Status können gepflegt werden.
-  - `Content` ist jetzt als kleines Studio eingebaut: Ideen, Hook, CTA, Keyword-Zuordnung, Kanal und Status lassen sich direkt im MarketingPilot verwalten.
-  - `Posting` hat jetzt eine eigene Planungsansicht mit Kanal, Termin, Owner, Quelle und Veröffentlichungsstatus.
-  - `Automationen` enthält jetzt nicht nur Regelkarten, sondern auch eine sichtbare Follow-up-Queue aus heißen Leads als operative Arbeitsliste.
-  - `Integrationen` ist als vorbereiteter Systembereich vorhanden und bildet CRM-, Ads-, WhatsApp- und SEO-Anbindungen mit Status, Datenbasis und nächstem Schritt ab.
-  - `Auswertungen` wurden erweitert und zeigen jetzt zusätzlich SEO-, Content- und Posting-Fortschritt neben Lead-, Kampagnen- und Newsletter-Zahlen.
-  - `SEO` speichert jetzt auch ausserhalb des Demo-Modus echt in Supabase: neue Tabelle `marketing_seo_keywords`, Loader/Upsert in [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts) und Live-Laden/Speichern im [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx).
-  - `Content`, `Posting`, `Automationen` und `Integrationen` bleiben vorerst lokal im Browser (`localStorage`); nur `SEO` hat jetzt echte Backend-Persistenz.
-  - Mobile Header-Navigation wurde gezielt nachgeschaerft: die Benachrichtigungsglocke im Dashboard-Topbar hat jetzt mehr Safe-Area-Abstand nach oben und eine groessere Touch-Flaeche, damit sie auf kleinen Geraeten nicht mehr abgeschnitten ist und sauber klickbar bleibt.
-  - Betroffene Dateien: [`app/dashboard/layout.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/layout.tsx), [`components/NotificationBell.tsx`](/Users/kevinpetersen/Documents/petersen-ki/components/NotificationBell.tsx), [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql), [`supabase/migrations/20260512190000_add_marketing_seo_keywords.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512190000_add_marketing_seo_keywords.sql), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md).
-  - Die neue SEO-Migration `20260512190000_add_marketing_seo_keywords.sql` ist jetzt auch remote auf Supabase angewendet; die Live-Datenbank kennt damit die Tabelle `marketing_seo_keywords` inklusive RLS/Policy.
-  - Offene Punkte: MarketingPilot-CRUD für `Content`, `Posting`, `Automationen` und `Integrationen` ist weiter lokal; als naechster Marketing-Schritt fehlen jetzt vor allem weitere Persistenz fuer diese Bereiche sowie echte externe SEO-/API-Integrationen.
-  - Tests: `npm run lint` erfolgreich; `npm run build` erfolgreich. Danach `npx --yes supabase@latest migration list --linked` geprueft und `npx --yes supabase@latest db push` erfolgreich fuer die einzelne offene SEO-Migration ausgefuehrt. Weiterhin nur bestehende Warnungen zu `<img>` in [`app/dashboard/einstellungen/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/einstellungen/page.tsx), [`app/dashboard/lager/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/lager/page.tsx), [`components/DocumentPreviewModal.tsx`](/Users/kevinpetersen/Documents/petersen-ki/components/DocumentPreviewModal.tsx) sowie ein bestehender `useEffect`-Dependency-Hinweis in [`app/dashboard/planung/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/planung/page.tsx).
-  - Aktueller Branch: `feature/marketing-seo-persist`
-  - [`app/dashboard/buero/[entity]/[id]/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/[entity]/[id]/page.tsx) zeigt Kunden-, Lieferanten- und Eingangsrechnungsdetails jetzt fachlich statt generisch: Stammdaten, Kennzahlen, verknüpfte Vorgänge, Dokumente und Belegkontext sind direkt sichtbar.
-  - [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts) hat dafür drei kleine Kontext-Loader erhalten, die bestehende Listen/Relationen bündeln, ohne neues größeres Datenmodell einzuführen.
-  - Die drei Phase-1-Migrationen sind jetzt live auf Supabase: Einkaufsschema, Büro-Dokumentrelationen und neue Kernrelationen (`kunde_id`, `lieferant_id`) wurden remote angewendet.
-  - `lib/db.ts` normalisiert jetzt Kunden-/Lieferantenbezüge über IDs und Namen parallel; Angebote, Aufträge, Rechnungen und Eingangsrechnungen können Relationstiefe nutzen, ohne alte Datensätze zu brechen.
-  - Das Archiv ist nicht mehr Demo-only: [`app/dashboard/archiv/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/archiv/page.tsx) zeigt Live-Dokumente aus `buero_dokumente`, kann Dateien öffnen, unterstützt Legacy-`dokument_url`-Pfadfälle und filtert jetzt nach Objektverknüpfung.
-  - Erste echte Detailseiten sind da: [`app/dashboard/buero/[entity]/[id]/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/[entity]/[id]/page.tsx) deckt Kunden, Angebote, Aufträge, Rechnungen, Eingangsrechnungen, Dokumente, Lieferanten und Bestellungen ab; Büro-Listen verlinken auf diese Detailansichten.
-  - Kritische API-Routen sind serverseitig gehärtet: [`app/api/chat/route.ts`](/Users/kevinpetersen/Documents/petersen-ki/app/api/chat/route.ts) nutzt jetzt echten Server-Supabase-Zugriff mit Session-Cookies; [`app/api/document-ai/route.ts`](/Users/kevinpetersen/Documents/petersen-ki/app/api/document-ai/route.ts) prüft Auth/Rolle serverseitig und erlaubt jetzt auch die im UI sichtbaren Rollen `Werkstatt` und `Lager`.
-  - Büro-UI hält neue Relations-IDs jetzt konsistent auch lokal mit: neue Angebote, Aufträge, Rechnungen und Eingangsrechnungen übernehmen `kunde_id` bzw. `lieferant_id` direkt aus den gewählten Stammdaten.
-  - [`app/dashboard/cloud/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/cloud/page.tsx) nutzt jetzt echte Live-Kennzahlen statt Demo-Sync: Archivmengen, Verknüpfungsgrad, letzte Datenaktivität, Modulabdeckung und sofern verfügbar echte Storage-Nutzung des aktuellen Users.
-  - Das Cloud-Modul zeigt jetzt zusätzlich eine ehrliche Backup-Historie aus realer Modulaktivität sowie eine Sitzungs-/Geräteübersicht aus aktuellem Browser- und Supabase-Kontext; es bleibt aber weiterhin ohne echtes Multi-Device-Backend.
-  - Das Archiv sucht jetzt nicht mehr nur in `buero_dokumente`, sondern bezieht auch `steuer_belege` mit ein; Steuerbelege lassen sich damit zentral finden und direkt in den Steuerbereich öffnen.
-  - Der MarketingPilot zeigt jetzt eine präsentationsfähige `KI-Suite`: Autopilot-Marketing, SEO-/Keywords-Analyse, Lead Intelligence, KI-Vertriebsassistent, KI-Content, Funnel-Builder, Templates, Integrationen, Gamification und weitere KI-Module sind sichtbar und anklickbar; das Layout wurde dafür auch mobil sauber stapelbar gemacht. Sichtbares Demo-Wording im UI wurde entfernt.
-  - Löschlogik für Büro-Dokumente entfernt jetzt nicht mehr nur die DB-Zeile, sondern versucht auch die zugehörige Storage-Datei zu löschen.
-  - Lokaler Dependency-Zustand wurde repariert; [`package.json`](/Users/kevinpetersen/Documents/petersen-ki/package.json) und [`package-lock.json`](/Users/kevinpetersen/Documents/petersen-ki/package-lock.json) enthalten jetzt die expliziten Pakete `debug` und `caniuse-lite`, damit `next lint`/`next build` lokal wieder sauber laufen.
-  - Betroffene Dateien: [`app/dashboard/buero/[entity]/[id]/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/[entity]/[id]/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md).
-  - Offene Punkte: Die neuen Detailansichten arbeiten bewusst mit bestehenden Listen und Namens-/ID-Matching; für vollständig belastbare Büro-/Einkaufsbeziehungen fehlen weiterhin tiefere FKs und mehr echte Live-Daten.
-  - Live-Testdatensatz am `2026-05-12` angelegt: Lieferanten `LF-LIVE-001` bis `LF-LIVE-003`, Kunden `K-LIVE-001` bis `K-LIVE-003`, Angebot `ANG-LIVE-001`, Auftrag `A-LIVE-001`, Rechnung `RE-LIVE-001`, Bestellung `EB-LIVE-001`, Eingangsrechnung `ER-LIVE-001`.
-  - Bestehende Live-Eingangsrechnung `ER-MP2BP7FR-W2J5` wurde auf den neuen Lieferanten `LF-LIVE-001` (`Vistaprint`) gemappt; damit ist ein echter Backfill-Fall jetzt live vorhanden.
-  - Aktuelle Live-Mengen nach Testdatensatz: `3` Lieferanten, `3` Kunden, `1` Angebot, `1` Auftrag, `1` Rechnung, `1` Bestellung, `2` Eingangsrechnungen.
-  - Tests: `npm run lint` erfolgreich; `npm run build` erfolgreich. Weiterhin nur bestehende Warnungen zu `<img>` in [`app/dashboard/einstellungen/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/einstellungen/page.tsx), [`app/dashboard/lager/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/lager/page.tsx), [`components/DocumentPreviewModal.tsx`](/Users/kevinpetersen/Documents/petersen-ki/components/DocumentPreviewModal.tsx) sowie ein bestehender `useEffect`-Dependency-Hinweis in [`app/dashboard/planung/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/planung/page.tsx).
-  - Aktueller Branch: `feature/detailseiten-kontext`
-- Zuletzt gearbeitet am `2026-05-12`:
-  - Commit `7acf66f`: Dokumente öffnen + klickbare Detailflüsse verbessert.
-  - Commit `032a1e5`: lokale Ignore-Bereinigung.
-- Größere Arbeiten am `2026-05-11`:
-  - Dokumentenworkflow vervollständigt.
-  - Werkstatt-Wartungen/Störungen ergänzt.
-  - Lager-Scanning/Pickliste/Stellplatz-Logik ergänzt.
-  - Live-Schema/Migrationen erweitert.
-- Stabil bzw. weit:
+- Stand `2026-05-13` — Aktueller Branch: `main` (Commit `ca33d02`), live auf Vercel deployed.
+- **Zuletzt erledigt (2026-05-13)**:
+  - Rollenbasierte RLS-Policies (`20260513200000_add_role_based_rls.sql`) live deployed.
+  - AnalysePilot auf echte Supabase-Daten umgestellt (Rechnungen, Kunden, Artikel, Angebote).
+  - MarketingPilot vollständig auf Supabase-Persistenz gehoben: SEO, Content, Posting, Automationen, Integrationen speichern live; Rollenquelle auf Benutzer-Metadaten vereinheitlicht.
+  - Archiv: KI-Erkennungsverläufe sichtbar (`document_type`/`confidence` als Badge, KI-Filter-Button, Stat-Karte); Werkstatt/Lager als „kein Dokumentarchiv" gekennzeichnet.
+  - Cloud: „Datenstand-Übersicht" statt „Backup-Historie", ehrliche Hinweise auf kein Backup-System / kein Multi-Device-Backend.
+  - Marketing KI-Suite (DemoLabTab): SEO-Analyse live aus `marketing_seo_keywords` (Top-Keywords, Klicks, Ranking); Lead Intelligence live aus `marketing_leads` (Score-Tabelle, Pipeline-Wert).
+  - Betroffene Dateien: [`app/dashboard/archiv/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/archiv/page.tsx), [`app/dashboard/cloud/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/cloud/page.tsx), [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`lib/roles.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/roles.ts), diverse Supabase-Migrationen.
+  - Tests: lint + build grün; nur bekannte `<img>`/`useEffect`-Warnungen.
+- **Stabile Basis (2026-05-12/13)**:
+  - Einkaufsschema vereinheitlicht; alle 12 Migrationen Local = Remote.
+  - `handleKonvertieren`-Bug (fehlende `kunde_id`) behoben.
+  - Büro-Detailseiten unter `app/dashboard/buero/[entity]/[id]/page.tsx` für alle Kernentitäten vorhanden.
+  - API-Routen (`/api/chat`, `/api/document-ai`) serverseitig mit Auth/Rolle gehärtet.
+  - Live-Testdatensatz vorhanden: 3 Lieferanten, 3 Kunden, 1 Angebot, 1 Auftrag, 1 Rechnung, 1 Bestellung, 2 Eingangsrechnungen.
+- **Stabil bzw. weit**:
   - Auth-Grundfluss, Dashboard-Shell, Sidebar, Rollen-Badge.
   - LagerPilot als funktionsstärkstes Modul.
   - BüroPilot Kernlisten inkl. Dokument-Upload/Preview.
@@ -323,17 +270,15 @@
   - Begründung: Stabilität bei wachsendem Datenvolumen.
 
 ## 14. Wichtigste Erkenntnisse
-- Das Projekt ist breit und ambitioniert; Lager, Büro und Werkstatt haben bereits echten Substanzgrad.
-- Die größte technische Schwäche ist nicht UI, sondern Datenmodell-/Schema-Konsistenz.
-- Dokumente wurden zuletzt gezielt verbessert, aber globales Archiv und Relationen sind noch nicht fertig.
-- Einkauf ist aktuell der deutlichste strukturelle Bruch zwischen UI, `lib/db.ts` und Live-Migrationen.
-- Viele Business-Bezüge sind textbasiert; für Marktreife müssen sie relational und eindeutig werden.
-- Einige Module wirken produktiv, andere noch demo-/simulationsnah (`Archiv`, `Cloud`, Teile `Analyse`).
-- KI-Funktionen sind sinnvoll integriert, hängen aber stark an sauberem Daten- und Auth-Zugriff.
+- Das Projekt ist breit und ambitioniert; Lager, Büro, Werkstatt und Marketing haben jetzt echten Substanzgrad.
+- Einkaufsschema ist vereinheitlicht; FK-Spalten für Kernentitäten sind live und werden korrekt beschrieben.
+- Archiv, Cloud und Marketing KI-Suite sind jetzt ehrlich live – keine Demo-Fantasiewerte mehr.
+- Marketing KI-Suite zeigt echte Leads und SEO-Keywords; nächster Schritt: Autopilot mit echter Logik.
+- Viele Business-Bezüge sind noch textbasiert; für Marktreife müssen mehr FK-Beziehungen entstehen.
 - Ohne serverseitige Rechteprüfung und Auditierbarkeit ist kein sicherer Mehrbenutzer-Launch ratsam.
 
 ## 15. Nächste Empfehlung
 - Als NÄCHSTES umsetzen:
-  1. **Rollen/Rechte serverseitig härten**: Rechteprüfung nicht nur im UI, sondern in allen API-Routen und per RLS-Policies pro Aktion/Datensatz – Voraussetzung für Mehrbenutzer-Launch.
-  2. **AnalysePilot Live-Daten**: Demo-Charts durch echte Supabase-Abfragen ersetzen – aktuell einziger Pilot ohne Live-Anbindung.
-  3. **Archiv weiter ausbauen**: Globale Suche auf Werkstatt-/Lager-Dokumente ausweiten; KI-Erkennungs-Verläufe ins Archiv einbeziehen.
+  1. **Autopilot-Marketing mit echter Logik**: Flow „Ziel → Zielgruppe → Kampagne → Funnel → nächster Schritt" aus echten Leads/Kampagnen/SEO ableiten; schrittweise im KI-Suite-Tab umsetzen.
+  2. **Detailseiten für Werkstatt-/Lager-Kernobjekte**: Arbeitskarten und Artikel haben keine dedizierten Detailseiten/URLs; tiefere Verlinkung und Objektkontext fehlen noch.
+  3. **Rollen/Rechte serverseitig vervollständigen**: RLS-Policies pro Aktion/Datensatz weiter ausbauen; Grundlage für Mehrbenutzer-Launch.
