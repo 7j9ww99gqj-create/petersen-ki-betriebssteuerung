@@ -5,6 +5,8 @@
  */
 import { createSupabaseClient } from './supabase'
 import { normalizeDocumentStoragePath } from './documents'
+import { genId } from './ids'
+import type { BookingStatus, EmployeeTierId, PackageId, PilotId } from './pricingConfig'
 
 function db() { return createSupabaseClient() }
 
@@ -46,6 +48,20 @@ function isSchemaMismatch(error: unknown) {
 type EinkaufLieferantRecord = {
   id: string
   name?: string | null
+}
+
+type BillingSubscriptionRow = {
+  id: string
+  user_key?: string | null
+  user_email?: string | null
+  package_id?: string | null
+  pilot_ids?: string[] | null
+  employee_tier?: string | null
+  monthly_price?: number | null
+  status?: string | null
+  next_payment?: string | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 type BueroKundeRecord = {
@@ -165,6 +181,23 @@ async function listBueroKundenIndex() {
   return {
     byId: new Map(rows.map(row => [row.id, row])),
     byName: new Map(rows.filter(row => row.name).map(row => [String(row.name).trim().toLowerCase(), row])),
+  }
+}
+
+function normalizeBillingSubscription(row: BillingSubscriptionRow) {
+  const packageId = firstText(row.package_id)
+  return {
+    id: row.id,
+    userKey: firstText(row.user_key),
+    userEmail: firstText(row.user_email),
+    packageId: packageId ? packageId as PackageId : undefined,
+    pilotIds: Array.isArray(row.pilot_ids) ? row.pilot_ids.filter(Boolean) as PilotId[] : [],
+    employeeTier: firstText(row.employee_tier, '1-3') as EmployeeTierId,
+    monthlyPrice: typeof row.monthly_price === 'number' ? row.monthly_price : null,
+    status: firstText(row.status, 'pending_payment') as BookingStatus,
+    createdAt: firstText(row.created_at),
+    updatedAt: firstText(row.updated_at),
+    nextPayment: firstText(row.next_payment) || undefined,
   }
 }
 
@@ -342,6 +375,76 @@ export async function markFirmaOnboardingCompleted() {
   const current = await getFirmaEinstellungen()
   if (!current) throw new Error('Keine Firmendaten vorhanden.')
   return upsertFirmaEinstellungen({ ...current, onboarding_completed: true })
+}
+
+export async function getBillingSubscription() {
+  const { data, error } = await db()
+    .from('billing_subscriptions')
+    .select('*')
+    .maybeSingle()
+  if (error) throw error
+  return data ? normalizeBillingSubscription(data as BillingSubscriptionRow) : null
+}
+
+export async function upsertBillingSubscription(input: {
+  userKey: string
+  userEmail?: string
+  packageId?: PackageId
+  pilotIds: PilotId[]
+  employeeTier: EmployeeTierId
+  monthlyPrice: number | null
+  status: BookingStatus
+  nextPayment?: string | null
+}) {
+  const current = await getBillingSubscription()
+  const payload = {
+    id: current?.id ?? genId('BOOK'),
+    user_key: input.userKey,
+    user_email: input.userEmail ?? null,
+    package_id: input.packageId ?? null,
+    pilot_ids: input.pilotIds,
+    employee_tier: input.employeeTier,
+    monthly_price: input.monthlyPrice,
+    status: input.status,
+    next_payment: input.nextPayment ?? null,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (current) {
+    const { data, error } = await db()
+      .from('billing_subscriptions')
+      .update(payload)
+      .eq('id', current.id)
+      .select('*')
+      .single()
+    if (error) throw error
+    return normalizeBillingSubscription(data as BillingSubscriptionRow)
+  }
+
+  const { data, error } = await db()
+    .from('billing_subscriptions')
+    .insert(payload)
+    .select('*')
+    .single()
+  if (error) throw error
+  return normalizeBillingSubscription(data as BillingSubscriptionRow)
+}
+
+export async function updateBillingSubscriptionStatus(status: BookingStatus) {
+  const current = await getBillingSubscription()
+  if (!current) return null
+
+  const { data, error } = await db()
+    .from('billing_subscriptions')
+    .update({
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', current.id)
+    .select('*')
+    .single()
+  if (error) throw error
+  return normalizeBillingSubscription(data as BillingSubscriptionRow)
 }
 
 // ── LAGER ────────────────────────────────────────────────────────────────────

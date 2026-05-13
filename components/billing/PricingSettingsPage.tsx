@@ -37,22 +37,27 @@ export function PricingSettingsPage({
   useEffect(() => {
     let mounted = true
     async function load() {
-      if (isDemo) {
-        const current = await getCurrentSubscription('demo-user')
-        if (mounted) setSubscription(current)
-        return
+      try {
+        if (isDemo) {
+          const current = await getCurrentSubscription('demo-user')
+          if (mounted) setSubscription(current)
+          return
+        }
+        const supabase = createSupabaseClient()
+        const { data } = await supabase.auth.getUser()
+        const key = data.user?.id || data.user?.email || ''
+        if (!mounted) return
+        setUserKey(key)
+        setUserEmail(data.user?.email ?? '')
+        setSubscription(key ? await getCurrentSubscription(key) : null)
+      } catch (err) {
+        if (!mounted) return
+        showToast(err instanceof Error ? err.message : 'Billing-Daten konnten nicht geladen werden', 'error')
       }
-      const supabase = createSupabaseClient()
-      const { data } = await supabase.auth.getUser()
-      const key = data.user?.id || data.user?.email || 'live-user'
-      if (!mounted) return
-      setUserKey(key)
-      setUserEmail(data.user?.email ?? '')
-      setSubscription(await getCurrentSubscription(key))
     }
     load()
     return () => { mounted = false }
-  }, [isDemo])
+  }, [isDemo, showToast])
 
   const packagePilots = packageId ? PACKAGE_PRICING[packageId].pilots : []
   const total = useMemo<PriceValue>(() => {
@@ -87,6 +92,7 @@ export function PricingSettingsPage({
 
   const createBooking = async () => {
     if (!packageId && pilotIds.length === 0) { showToast('Bitte zuerst ein Paket oder Piloten auswählen', 'error'); return }
+    if (!isDemo && !userKey) { showToast('Bitte zuerst anmelden', 'error'); return }
     setLoading(true)
     try {
       const record = await createBookingRequest({
@@ -107,9 +113,13 @@ export function PricingSettingsPage({
   }
 
   const markProofSent = async () => {
-    const updated = await updateBookingStatus(userKey, 'proof_sent')
-    if (updated) setSubscription(updated)
-    showToast('✅ Zahlungsbeleg-Status gesetzt')
+    try {
+      const updated = await updateBookingStatus(userKey, 'proof_sent')
+      if (updated) setSubscription(updated)
+      showToast('✅ Zahlungsbeleg-Status gesetzt')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Status konnte nicht aktualisiert werden', 'error')
+    }
   }
 
   return (
