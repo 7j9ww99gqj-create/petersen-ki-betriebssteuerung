@@ -21,7 +21,7 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
-- Stand `2026-05-13` — Aktueller Branch: `main` (Commit `daea60f`), live auf Vercel deployed (nach Push).
+- Stand `2026-05-13` — Aktueller Branch: `main` (Commit `f612513`), live auf Vercel deployed (nach Push).
 - **Zuletzt erledigt (2026-05-13 – Runde 2)**:
   - **Rollen/Rechte serverseitig**: `lib/server-auth.ts` um `getServerComponentSession()` erweitert; Werkstatt- und Lager-Detailseiten als echte Next.js Server Components umgeschrieben — Supabase läuft mit Server-Auth (Cookie-Forwarding), kein Browser-Client mehr; Redirect zu `/login` wenn nicht authentifiziert.
   - **Fehlerbehandlung/Empty States**: Werkstatt-Sub-Komponenten (Karten, Zeit, Material, Pruef) haben jetzt `retryKey`-Pattern + Retry-Button bei Ladeferhlern + Icons+Text für leere Tabellen. Lager-Hauptseite zeigt persistenten Fehler-Block statt flüchtigem Toast. Büro KundenTab hat separaten `loadError`-State + Retry.
@@ -121,7 +121,7 @@
 - [x] ~~Fehlerbehandlung und Leersituationen je Pilot systematisch härten.~~ **Erledigt 2026-05-13**: Retry-Buttons + verbesserte Empty States in Werkstatt (4 Sub-Komponenten), Lager (persistenter Error-Block) und Büro (KundenTab).
 - [x] ~~Importpfade für weitere Datentypen vervollständigen.~~ **Erledigt 2026-05-13**: Werkstatt-Zeitbuchungen und -Material als neue Import-Typen in Wizard/Importer/db.
 - [x] ~~Löschlogik für Storage-Dateien ergänzen, nicht nur DB-Zeilen löschen.~~ **Erledigt 2026-05-13**: `deleteSteuerBeleg` liest jetzt `datei_url` und entfernt die Datei aus Storage vor dem DB-Delete (analog zu `deleteBueroDokument`).
-- [ ] Einheitliche IDs, Nummernkreise und Referenzfelder definieren.
+- [x] ~~Einheitliche IDs, Nummernkreise und Referenzfelder definieren.~~ **Erledigt 2026-05-13**: `lib/ids.ts` mit `genId(prefix)` eingeführt (Format: `PREFIX-TIMESTAMP36-RANDOM4`); 6 lokale Kopien und 8 length-basierte Muster in buero/werkstatt/steuer/planung/ki-erkennung/einstellungen ersetzt; Präfix-Konvention vollständig dokumentiert.
 
 ## 7. Regeln für Coding-Agenten
 - Vor Änderungen zuerst diese Datei, dann betroffene Seite, dann `lib/db.ts`, dann Schema/Migration prüfen.
@@ -134,6 +134,7 @@
 ## 8. Änderungsverlauf
 | Datum | Agent | Änderungen | Betroffene Dateien | Nächste Schritte |
 | --- | --- | --- | --- | --- |
+| 2026-05-13 | Claude | Zentrale ID-Generierung: `lib/ids.ts` mit `genId(prefix)` (PREFIX-TIMESTAMP36-RANDOM4); 6 lokale Kopien + 8 length-basierte Muster ersetzt; Präfix-Konvention dokumentiert | `lib/ids.ts`, `buero/page.tsx`, `werkstatt/page.tsx`, `steuer/page.tsx`, `planung/page.tsx`, `ki-erkennung/page.tsx`, `einstellungen/page.tsx` | — |
 | 2026-05-13 | Claude | Storage-Cleanup: `deleteSteuerBeleg` entfernt jetzt `datei_url`-Datei aus Storage vor DB-Delete | `lib/db.ts` | Einheitliche IDs/Nummernkreise definieren |
 | 2026-05-13 | Claude | Server-Auth für Detailseiten (getServerComponentSession, Server Components); Retry+Empty States in Werkstatt/Lager/Büro; Werkstatt-Import (Zeitbuchungen+Material) in Importer/db/Einstellungen | `lib/server-auth.ts`, `app/dashboard/werkstatt/[id]/page.tsx`, `app/dashboard/lager/[id]/page.tsx`, `app/dashboard/werkstatt/page.tsx`, `app/dashboard/lager/page.tsx`, `app/dashboard/buero/page.tsx`, `lib/importer.ts`, `lib/db.ts`, `app/dashboard/einstellungen/page.tsx` | Löschlogik Storage; IDs/Nummernkreise definieren |
 | 2026-05-13 | Claude | Autopilot-Marketing mit echter Logik (Zielgruppe/Kampagnenvorschlag/Funnel-Lücke/Nächster Schritt aus Leads+Kampagnen+SEO); Werkstatt-Detailseite [id] mit Stammdaten/Zeit/Material/Prüfprotokoll; Lager-Detailseite [id] mit Bestand/Stellplätze/Bewegungen; 🔍-Links in Listen | [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx), [`app/dashboard/werkstatt/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/werkstatt/page.tsx), `app/dashboard/werkstatt/[id]/page.tsx`, [`app/dashboard/lager/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/lager/page.tsx), `app/dashboard/lager/[id]/page.tsx` | Rollen/Rechte serverseitig härten; Fehlerbehandlung/Empty States systematisieren |
