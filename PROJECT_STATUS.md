@@ -21,7 +21,15 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
-- Aktuell in Arbeit am `2026-05-13`:
+- Aktuell in Arbeit am `2026-05-13` (Einkaufsschema + FK-Validierung):
+  - **Analyse:** Einkaufsschema-Migration (`20260512103000`) und FK-Beziehungs-Migration (`20260512142000`) sind vollständig auf der Live-Datenbank angewendet – alle 12 Migrationen Local = Remote.
+  - **Fix:** `handleKonvertieren` in [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx) übergab beim Konvertieren eines Angebots zu einem Auftrag nicht die `kunde_id`. Dieser Bug wurde behoben: der neue Auftrag erhält jetzt `kunde_id: a.kunde_id` und damit die saubere FK-Referenz.
+  - **Bestätigt vorhanden:** `buero_angebote.kunde_id`, `buero_auftraege.kunde_id`, `buero_rechnungen.kunde_id`, `buero_eingangsrechnungen.lieferant_id`, `buero_eingangsrechnungen.dokument_id` existieren im Schema und werden von `lib/db.ts` korrekt geschrieben (dual-write: ID + text-Fallback).
+  - **Bestätigt vorhanden:** `einkauf_bestellungen` hat beide Spaltenkonventionen (`einkaufspreis`/`einzelpreis`, `gesamt`/`gesamtpreis`, `bestellt_am`/`bestelldatum`, etc.) – `upsertEinkaufBestellung` schreibt beide.
+  - Betroffene Dateien: [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx).
+  - Tests: `npm run lint` erfolgreich; `npm run build` erfolgreich. Nur bestehende Warnungen (`<img>`, `useEffect`-Dependency).
+  - Aktueller Branch: `main` (Commit `5d590cf`).
+- Aktuell in Arbeit am `2026-05-13` (Marketing-Persistenz + Rollen):
   - MarketingPilot ist jetzt voll auf echte Supabase-Persistenz gehoben: neben `SEO` speichern jetzt auch `Content`, `Posting`, `Automationen` und `Integrationen` serverseitig statt nur lokal im Browser.
   - Neue Live-Tabellen sind eingeführt und remote ausgerollt: `marketing_content_ideas`, `marketing_posting_plans`, `marketing_automation_rules`, `marketing_integration_items` via [`supabase/migrations/20260513103000_add_marketing_workspace_tables.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260513103000_add_marketing_workspace_tables.sql).
   - [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx) lädt und speichert diese Bereiche jetzt live über [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts); Default-Daten bleiben nur noch als Erstbefüllung/Fallback.
@@ -142,12 +150,12 @@
 - Live-Datenrisiko:
   - `app/api/chat/route.ts` nutzt jetzt Server-Supabase mit Cookie-Forwarding; weitere Serverpfade außerhalb der zwei API-Routen sind aber noch nicht zentral über ein produktionsreifes Rechtekonzept abgesichert.
 - Schema-Risiko:
-  - `schema.sql`, Migrationen und UI-Feldnamen divergieren, besonders im Einkauf.
+  - ~~`schema.sql`, Migrationen und UI-Feldnamen divergieren, besonders im Einkauf.~~ **Behoben 2026-05-13**: Einkaufsschema-Migration live, dual-write in `lib/db.ts` bestätigt.
 
 ## 6. Offene Aufgaben
-- [ ] Datenmodell für Kunde/Lieferant/Auftrag/Rechnung/Dokument sauber relationalisieren.
-- [ ] Einkaufsmigration auf Live-Datenbank anwenden und Bestellungen/Wareneingänge mit Echtdaten gegen Alt- und Neuschema validieren.
-- [ ] Neue Dokumentrelationen für Eingangsrechnungen, Rechnungen, Angebote und Aufträge live migrieren und mit Echtdaten durchtesten.
+- [x] ~~Datenmodell für Kunde/Lieferant/Auftrag/Rechnung/Dokument sauber relationalisieren.~~ **Erledigt 2026-05-13**: FK-Spalten existieren und werden korrekt beschrieben; `handleKonvertieren`-Bug behoben.
+- [x] ~~Einkaufsmigration auf Live-Datenbank anwenden und Bestellungen/Wareneingänge mit Echtdaten gegen Alt- und Neuschema validieren.~~ **Erledigt 2026-05-13**: Alle 12 Migrationen Local = Remote, dual-write validiert.
+- [x] ~~Neue Dokumentrelationen für Eingangsrechnungen, Rechnungen, Angebote und Aufträge live migrieren und mit Echtdaten durchtesten.~~ **Erledigt 2026-05-13**: FK-Spalten live auf Remote-DB vorhanden.
 - [ ] Archiv um globale Suche über weitere Module außerhalb `buero_dokumente` erweitern.
 - [ ] Cloud-Modul um echte Hintergrundjobs, Backup-Historie und Geräteverwaltung ergänzen oder diese Funktionen klar getrennt als nicht-live kennzeichnen.
 - [ ] Weitere Archivquellen nachziehen, v. a. KI-Erkennungs-Verläufe und ggf. Werkstatt-/Lagerdokumente, falls diese eigenständige Dokumenttabellen bekommen.
@@ -170,6 +178,7 @@
 ## 8. Änderungsverlauf
 | Datum | Agent | Änderungen | Betroffene Dateien | Nächste Schritte |
 | --- | --- | --- | --- | --- |
+| 2026-05-13 | Claude | Einkaufsschema und FK-Beziehungen validiert: alle 12 Migrationen Local=Remote bestätigt; Bug in `handleKonvertieren` behoben (kunde_id wurde beim Angebot→Auftrag-Konvertieren nicht weitergegeben); lint+build grün; auf main gepusht (Commit `5d590cf`) | [`app/dashboard/buero/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/buero/page.tsx), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Rollen/Rechte serverseitig härten, AnalysePilot Live-Daten anbinden, Archiv weiter ausbauen |
 | 2026-05-13 | Codex | Marketing-Workspaces `Content`, `Posting`, `Automationen` und `Integrationen` auf echte Supabase-Persistenz gehoben; Rollenquelle im Frontend auf Benutzer-Metadaten vereinheitlicht; neue Remote-Migration erfolgreich ausgerollt | [`app/dashboard/layout.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/layout.tsx), [`app/dashboard/einstellungen/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/einstellungen/page.tsx), [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx), [`app/register/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/register/page.tsx), [`lib/db.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/db.ts), [`lib/roles.ts`](/Users/kevinpetersen/Documents/petersen-ki/lib/roles.ts), [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql), [`supabase/migrations/20260513103000_add_marketing_workspace_tables.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260513103000_add_marketing_workspace_tables.sql), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Externe Marketing-Integrationen anbinden, Rollenprüfung pro Aktion weiter serverseitig vertiefen, relationale Modellhärtung zwischen Büro/Einkauf/Archiv fortsetzen |
 | 2026-05-13 | Codex | Mobile Topbar im Dashboard fuer kleine Geraete nachgeschaerft: mehr oberer Safe-Area-Abstand und groessere Touch-Flaeche fuer die Benachrichtigungsglocke; nebenbei fehlenden `useLocalStorageState`-Helper im MarketingPilot wiederhergestellt, damit `build` wieder gruen laeuft | [`app/dashboard/layout.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/layout.tsx), [`components/NotificationBell.tsx`](/Users/kevinpetersen/Documents/petersen-ki/components/NotificationBell.tsx), [`app/dashboard/marketing/page.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/marketing/page.tsx), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Mobile Header kurz auf echtem Geraet gegenpruefen; danach nur bei Bedarf weitere Topbar-Abstaende feintunen |
 | 2026-05-13 | Codex | Remote-Supabase-Migration `20260512190000_add_marketing_seo_keywords.sql` erfolgreich angewendet; Live-Datenbank kennt jetzt `marketing_seo_keywords` inkl. RLS/Policy | [`supabase/migrations/20260512190000_add_marketing_seo_keywords.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations/20260512190000_add_marketing_seo_keywords.sql), [`PROJECT_STATUS.md`](/Users/kevinpetersen/Documents/petersen-ki/PROJECT_STATUS.md) | Content/Posting/Automationen/Integrationen als naechste Marketing-Bereiche ebenfalls serverseitig anbinden |
@@ -317,6 +326,6 @@
 
 ## 15. Nächste Empfehlung
 - Als NÄCHSTES umsetzen:
-  1. Beide neuen Migrationen live anwenden und Einkauf plus Dokumentrelationen aller vier Büro-Belegtypen mit Echtdaten validieren.
-  2. Danach Archiv/Dokumente von der lokalen Liste zu einer globalen, relationsbasierten Übersicht ausbauen.
-  3. Anschließend echte Detailseiten für Rechnung, Angebot, Auftrag und Eingangsrechnung nachziehen.
+  1. **Rollen/Rechte serverseitig härten**: Rechteprüfung nicht nur im UI, sondern in allen API-Routen und per RLS-Policies pro Aktion/Datensatz – Voraussetzung für Mehrbenutzer-Launch.
+  2. **AnalysePilot Live-Daten**: Demo-Charts durch echte Supabase-Abfragen ersetzen – aktuell einziger Pilot ohne Live-Anbindung.
+  3. **Archiv weiter ausbauen**: Globale Suche auf Werkstatt-/Lager-Dokumente ausweiten; KI-Erkennungs-Verläufe ins Archiv einbeziehen.
