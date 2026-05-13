@@ -30,7 +30,7 @@ export function PricingSettingsPage({
   const [userEmail, setUserEmail] = useState(isDemo ? 'demo@petersen-ki.de' : '')
   const [subscription, setSubscription] = useState<SubscriptionRecord | null>(null)
   const [tier, setTier] = useState<EmployeeTierId>('1-3')
-  const [packageId, setPackageId] = useState<PackageId | undefined>('business')
+  const [packageId, setPackageId] = useState<PackageId | undefined>()
   const [pilotIds, setPilotIds] = useState<PilotId[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -74,6 +74,15 @@ export function PricingSettingsPage({
   const togglePilot = (id: PilotId) => {
     setPackageId(undefined)
     setPilotIds(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
+  }
+
+  const removePilot = (id: PilotId) => {
+    setPilotIds(current => current.filter(x => x !== id))
+  }
+
+  const clearSelection = () => {
+    setPackageId(undefined)
+    setPilotIds([])
   }
 
   const createBooking = async () => {
@@ -162,7 +171,17 @@ export function PricingSettingsPage({
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-          <BookingSummary tier={tier} packageId={packageId} pilotIds={pilotIds} total={total} loading={loading} onCreate={createBooking} />
+          <BookingSummary
+            tier={tier}
+            packageId={packageId}
+            pilotIds={pilotIds}
+            total={total}
+            loading={loading}
+            onCreate={createBooking}
+            onRemovePackage={() => setPackageId(undefined)}
+            onRemovePilot={removePilot}
+            onClear={clearSelection}
+          />
           <PaymentInstructions
             subscription={subscription}
             packageId={subscription?.packageId ?? packageId}

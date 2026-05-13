@@ -59,9 +59,8 @@ export function PackageCard({
       </div>
 
       <button className={selected ? 'pk-btn' : 'pk-btn-ghost'} onClick={onSelect} style={{ width: '100%', fontWeight: 800 }}>
-        {selected ? 'Ausgewählt' : 'Paket auswählen'}
+        {selected ? 'Paket entfernen' : 'Paket auswählen'}
       </button>
     </div>
   )
 }
-

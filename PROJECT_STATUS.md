@@ -21,7 +21,13 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
-- Stand `2026-05-13` — Aktueller Branch: `main` (Commit `f4533b7`), live auf Vercel deployed (nach Push).
+- Stand `2026-05-13` — Aktueller Branch: `feature/billing-cart-fix`, Basis weiterhin `main` Commit `f4533b7`.
+- **Zuletzt erledigt (2026-05-13 – Billing Schritt 1)**:
+  - **Buchung & Abonnement / Warenkorb**: Standard-Vorauswahl `Business` entfernt; Warenkorb startet leer statt automatisch befüllt.
+  - **Warenkorb editierbar**: Paket oder einzelne Piloten können direkt im Warenkorb entfernt werden; zusätzlich gibt es `Alles entfernen`.
+  - **UX-Hinweis**: Ausgewählte Pakete zeigen jetzt klar `Paket entfernen` statt nur `Ausgewählt`.
+  - Betroffene Dateien: `components/billing/PricingSettingsPage.tsx`, `components/billing/BookingSummary.tsx`, `components/billing/PackageCard.tsx`.
+  - Tests: lint + build grün; nur bekannte `<img>`/`useEffect`-Warnungen.
 - **Zuletzt erledigt (2026-05-13 – Runde 3)**:
   - **Storage-Cleanup**: `deleteSteuerBeleg` entfernt jetzt `datei_url`-Datei vor DB-Delete (analog zu `deleteBueroDokument`).
   - **Zentrale ID-Generierung**: `lib/ids.ts` mit `genId(prefix)` (Format `PREFIX-TIMESTAMP36-RANDOM4`); 6 lokale Kopien + 8 length-basierte Muster ersetzt; Präfix-Konvention dokumentiert.
@@ -115,6 +121,9 @@
   - ~~`schema.sql`, Migrationen und UI-Feldnamen divergieren, besonders im Einkauf.~~ **Behoben 2026-05-13**: Einkaufsschema-Migration live, dual-write in `lib/db.ts` bestätigt.
 
 ## 6. Offene Aufgaben
+- [ ] Billing-Datenmodell von `localStorage` auf persistente Live-Daten umstellen.
+- [ ] Einzelne Piloten nicht nur auswählbar, sondern vollständig als eigene Buchungsart inkl. Zahlungs-/Statusfluss abbilden.
+- [ ] Firmenkonto/Qonto, Lastschrift-Mandat und monatliche Zahlungslogik konzipieren und integrieren.
 - [ ] MarketingPilot Edit + Delete für Kampagnen, Leads, Newsletter ergänzen.
 - [ ] AnalysePilot auf echte Supabase-Daten umstellen (Charts laufen bereits, nur Demo-Daten ersetzen).
 - [ ] `deleteBueroAngebot`/`Auftrag`/`Rechnung` in `buero/page.tsx` verdrahten (Funktionen existieren seit Runde 3).
@@ -144,6 +153,7 @@
 ## 8. Änderungsverlauf
 | Datum | Agent | Änderungen | Betroffene Dateien | Nächste Schritte |
 | --- | --- | --- | --- | --- |
+| 2026-05-13 | Codex | Billing Schritt 1: automatische `Business`-Vorauswahl entfernt; Warenkorb startet leer und ist direkt editierbar (`Entfernen`, `Alles entfernen`); Paket-CTA klarer benannt | `components/billing/PricingSettingsPage.tsx`, `components/billing/BookingSummary.tsx`, `components/billing/PackageCard.tsx`, `PROJECT_STATUS.md` | Billing von localStorage auf Live-Daten heben; danach Einzel-Piloten als vollwertige Buchungsart und Qonto/SEPA vorbereiten |
 | 2026-05-13 | Claude | Zentrale ID-Generierung: `lib/ids.ts` mit `genId(prefix)` (PREFIX-TIMESTAMP36-RANDOM4); 6 lokale Kopien + 8 length-basierte Muster ersetzt; Präfix-Konvention dokumentiert | `lib/ids.ts`, `buero/page.tsx`, `werkstatt/page.tsx`, `steuer/page.tsx`, `planung/page.tsx`, `ki-erkennung/page.tsx`, `einstellungen/page.tsx` | — |
 | 2026-05-13 | Claude | Storage-Cleanup: `deleteSteuerBeleg` entfernt jetzt `datei_url`-Datei aus Storage vor DB-Delete | `lib/db.ts` | Einheitliche IDs/Nummernkreise definieren |
 | 2026-05-13 | Claude | Server-Auth für Detailseiten (getServerComponentSession, Server Components); Retry+Empty States in Werkstatt/Lager/Büro; Werkstatt-Import (Zeitbuchungen+Material) in Importer/db/Einstellungen | `lib/server-auth.ts`, `app/dashboard/werkstatt/[id]/page.tsx`, `app/dashboard/lager/[id]/page.tsx`, `app/dashboard/werkstatt/page.tsx`, `app/dashboard/lager/page.tsx`, `app/dashboard/buero/page.tsx`, `lib/importer.ts`, `lib/db.ts`, `app/dashboard/einstellungen/page.tsx` | Löschlogik Storage; IDs/Nummernkreise definieren |
