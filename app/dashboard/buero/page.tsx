@@ -17,6 +17,7 @@ import {
 import { generateRechnungPDF, generateAngebotPDF } from '@/lib/pdf'
 import { createSupabaseClient } from '@/lib/supabase'
 import { normalizeDocumentStoragePath, type StoredDocumentLink } from '@/lib/documents'
+import { genId } from '@/lib/ids'
 import DocumentPreviewModal from '@/components/DocumentPreviewModal'
 
 // ── Typen ───────────────────────────────────────────────────────────────────
@@ -428,7 +429,7 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
   const handleSave = async () => {
     if (!form.name || !form.email) return
     const newKunde: Kunde = {
-      id: `K-${String(kunden.length + 1).padStart(3, '0')}`,
+      id: genId('K'),
       name: form.name, typ: form.typ as Kunde['typ'],
       ansprechpartner: form.ansprechpartner || form.name,
       email: form.email, telefon: form.telefon, ort: form.ort,
@@ -705,7 +706,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
     const kunde = kunden.find(entry => entry.name === form.kunde)
     const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const newAng: Angebot = {
-      id: `ANG-2025-0${43 + angebote.length - demoAngebote.length}`,
+      id: genId('ANG'),
       kunde_id: kunde?.id,
       kunde: form.kunde, titel: form.titel,
       betrag: form.betrag.includes('€') ? form.betrag : `${form.betrag} €`,
@@ -788,7 +789,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
     const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const today = new Date()
     const newAuftrag: Auftrag = {
-      id: `A-2025-0${35 + auftraege.length}`,
+      id: genId('A'),
       kunde_id: a.kunde_id,
       kunde: a.kunde,
       beschreibung: a.titel,
@@ -1080,7 +1081,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden }: { isDemo: boo
     const today = new Date()
     const kunde = kunden.find(entry => entry.name === form.kunde)
     const newA: Auftrag = {
-      id: `A-2025-0${35 + auftraege.length}`,
+      id: genId('A'),
       kunde_id: kunde?.id,
       kunde: form.kunde, beschreibung: form.beschreibung,
       wert: form.wert.includes('€') ? form.wert : `${form.wert} €`,
@@ -1419,7 +1420,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
     const kunde = kunden.find(entry => entry.name === form.kunde)
     const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const newRe: Rechnung = {
-      id: `RE-2025-0${79 + rechnungen.length - demoRechnungen.length}`,
+      id: genId('RE'),
       kunde_id: kunde?.id,
       kunde: form.kunde,
       betrag: form.betrag.includes('€') ? form.betrag : `${form.betrag} €`,
@@ -1828,7 +1829,7 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
     const previousDokumentId = editRechnung?.dokument_id
     const lieferant = lieferantenStamm.find(entry => entry.name === form.lieferant.trim())
     const payload: Eingangsrechnung = {
-      id: editRechnung?.id ?? `ER-${Date.now().toString(36).toUpperCase()}`,
+      id: editRechnung?.id ?? genId('ER'),
       lieferant_id: lieferant?.id ?? editRechnung?.lieferant_id,
       lieferant: form.lieferant.trim(),
       rechnungsnummer: form.rechnungsnummer.trim(),
@@ -2128,7 +2129,7 @@ function DokumenteTab({ isDemo }: { isDemo: boolean }) {
     const ext = file.name.split('.').pop()?.toUpperCase() ?? 'PDF'
 
     const newDoc: Dokument = {
-      id: `DOK-${Date.now().toString(36).toUpperCase()}`,
+      id: genId('DOK'),
       name: file.name,
       typ: ext,
       groesse: groesseKB,
@@ -2396,7 +2397,7 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
       showToast(`✅ Lieferant "${updated.name}" aktualisiert`)
     } else {
       const neu: Lieferant = {
-        id: `LF-${String(lieferanten.length + 1).padStart(3, '0')}`,
+        id: genId('LF'),
         ...lfForm, status: 'Aktiv', bewertung: 4,
       }
       if (!isDemo) {
@@ -2425,7 +2426,7 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
     const gesamt = (menge * ep).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' €'
     const lieferant = lieferanten.find(l => l.name === bsForm.lieferant)
     const neu: EinkaufsBestellung = {
-      id: `EB-2025-0${17 + bestellungen.filter(b => !isDemo || true).length}`,
+      id: genId('EB'),
       lieferant_id: lieferant?.id,
       lieferant: bsForm.lieferant, artikel: bsForm.artikel, menge, einheit: bsForm.einheit,
       einkaufspreis: bsForm.einkaufspreis.includes('€') ? bsForm.einkaufspreis : `${bsForm.einkaufspreis} €`,

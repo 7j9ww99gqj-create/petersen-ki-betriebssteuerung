@@ -10,6 +10,7 @@ import {
 import { hasDemoCookie } from '@/lib/auth'
 import { createSupabaseClient } from '@/lib/supabase'
 import { normalizeDocumentStoragePath, type StoredDocumentLink } from '@/lib/documents'
+import { genId } from '@/lib/ids'
 import DocumentPreviewModal from '@/components/DocumentPreviewModal'
 
 // ─── Demo-Daten ───────────────────────────────────────────────────────────────
@@ -146,9 +147,6 @@ function labelForDocumentType(type: DocumentAiResult['documentType']) {
   return labels[type]
 }
 
-function genId(prefix: string) {
-  return `${prefix}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
-}
 
 function parseMoney(value: unknown): number {
   const text = fieldToString(value).replace(/[^\d,.-]/g, '').replace(',', '.')

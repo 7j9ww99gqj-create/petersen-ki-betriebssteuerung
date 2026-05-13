@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
 import { getSteuerBelege, upsertSteuerBeleg, deleteSteuerBeleg, getSteuerUstva, upsertSteuerUstva, uploadSteuerBeleg } from '@/lib/db'
+import { genId } from '@/lib/ids'
 import { createSupabaseClient } from '@/lib/supabase'
 import { getSteuerWarnings, type Warning } from '@/lib/warnings'
 
@@ -35,9 +36,6 @@ type SteuerTab = 'uebersicht' | 'belege' | 'ustva' | 'pruefungen' | 'export'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function genId(prefix: string) {
-  return `${prefix}-${Date.now().toString(36).toUpperCase()}`
-}
 
 function fmt(n: number) {
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'

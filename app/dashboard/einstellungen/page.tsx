@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
+import { genId } from '@/lib/ids'
 import { isDemoUser, hasDemoCookie, performLogout } from '@/lib/auth'
 import { type AppRole, APP_ROLES, ROLE_LABELS, ROLE_PILOTS, PERMISSIONS, normalizeRole, useRole } from '@/lib/roles'
 import {
@@ -679,7 +680,6 @@ const DATA_TYPE_LABELS: Record<ImportDataType, string> = {
   werkstatt_material: '🔩 Werkstatt-Materialverbrauch → werkstatt_material',
 }
 
-function genId(prefix: string) { return `${prefix}-${Date.now().toString(36).toUpperCase()}` }
 
 function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg: string, type?: 'success' | 'error') => void }) {
   const [step, setStep] = useState(1)
@@ -1121,7 +1121,6 @@ const DEMO_PROTOKOLLE: ImportProtokoll[] = [
 ]
 
 async function runBulkImport(dataType: ImportDataType, rows: Record<string, string>[]): Promise<number> {
-  const genId = (p: string) => `${p}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
 
   if (dataType === 'artikel') {
     const prepared = rows.map(r => ({

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
+import { genId } from '@/lib/ids'
 import {
   getPlanungProjekte, upsertPlanungProjekt, deletePlanungProjekt,
   getPlanungAufgaben, upsertPlanungAufgabe, deletePlanungAufgabe,
@@ -126,9 +127,6 @@ const demoRessourcen: Ressource[] = [
 
 const COLOR = '#f43f5e'
 
-function genId(prefix: string) {
-  return `${prefix}-${Date.now().toString(36).toUpperCase()}`
-}
 
 function todayDE() {
   return new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })

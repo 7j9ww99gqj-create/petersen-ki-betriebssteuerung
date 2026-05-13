@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
+import { genId } from '@/lib/ids'
 import {
   getWerkstattKarten, upsertWerkstattKarte, deleteWerkstattKarte,
   getWerkstattMitarbeiter, upsertWerkstattMitarbeiter, deleteWerkstattMitarbeiter,
@@ -150,8 +151,8 @@ const stoerungLabel: Record<StoerungStatus, string> = {
   offen: 'Offen', in_bearbeitung: 'In Bearbeitung', behoben: 'Behoben',
 }
 
-function genId() {
-  return `AK-${Date.now().toString(36).toUpperCase()}`
+function genAkId() {
+  return genId('AK')
 }
 
 function isoToday() {
@@ -365,7 +366,7 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen }: { isDemo:
   const handleSave = async () => {
     if (!form.auftragsnr || !form.beschreibung || !form.mitarbeiter) return
     const newKarte: Arbeitskarte = {
-      id: genId(), auftragsnr: form.auftragsnr, beschreibung: form.beschreibung,
+      id: genAkId(), auftragsnr: form.auftragsnr, beschreibung: form.beschreibung,
       mitarbeiter: form.mitarbeiter, prioritaet: form.prioritaet, status: form.status,
       erstellt: today, geplant: form.geplant || '—', stunden: Number(form.stunden) || 0,
       fortschritt: 0, maschine: form.maschine || '—',
@@ -1184,7 +1185,7 @@ function MitarbeiterTab({ isDemo, mitarbeiter, setMitarbeiter }: {
   const save = async () => {
     if (!form.name.trim()) { showToast('Name ist Pflicht', true); return }
     const payload: Mitarbeiter = {
-      id: editId ?? `MA-${Date.now().toString(36).toUpperCase()}`,
+      id: editId ?? genId('MA'),
       name: form.name.trim(),
       rolle: form.rolle || undefined,
       email: form.email || undefined,
@@ -1321,7 +1322,7 @@ function BereicheTab({ isDemo, bereiche, setBereiche }: {
     const duplicate = bereiche.some(b => b.name.toLowerCase() === form.name.trim().toLowerCase() && b.id !== editId)
     if (duplicate) { showToast('Dieser Name existiert bereits', true); return }
     const payload: WerkstattBereich = {
-      id: editId ?? `WB-${Date.now().toString(36).toUpperCase()}`,
+      id: editId ?? genId('WB'),
       name: form.name.trim(),
       typ: form.typ || 'Bereich',
       aktiv: form.aktiv,
@@ -1451,7 +1452,7 @@ function WartungTab({ isDemo, bereiche, mitarbeiterNamen, wartungen, setWartunge
     if (!form.maschine || !form.faellig_am) { showToast('Maschine und Fälligkeit sind Pflicht', true); return }
     const status = isPastDate(form.faellig_am) && form.status !== 'erledigt' ? 'überfällig' : form.status
     const payload: WerkstattWartung = {
-      id: editId ?? `WT-${Date.now().toString(36).toUpperCase()}`,
+      id: editId ?? genId('WT'),
       maschine: form.maschine,
       intervall: form.intervall || undefined,
       faellig_am: form.faellig_am,
@@ -1606,7 +1607,7 @@ function StoerungenTab({ isDemo, bereiche, mitarbeiterNamen, stoerungen, setStoe
   const save = async () => {
     if (!form.maschine || !form.titel.trim()) { showToast('Maschine und Titel sind Pflicht', true); return }
     const payload: WerkstattStoerung = {
-      id: `ST-${Date.now().toString(36).toUpperCase()}`,
+      id: genId('ST'),
       maschine: form.maschine,
       titel: form.titel.trim(),
       beschreibung: form.beschreibung || undefined,
