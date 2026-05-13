@@ -27,6 +27,7 @@
   - **DB-Layer ergänzt**: `lib/db.ts` hat jetzt `getBillingSubscription`, `upsertBillingSubscription`, `updateBillingSubscriptionStatus`.
   - **Legacy-Migration im Client**: Falls ein Nutzer noch alte lokale Billing-Daten hat und noch kein Live-Datensatz existiert, werden diese beim Laden einmalig in Supabase übernommen.
   - **Billing-Härtung**: Billing-UI zeigt Lade-/Statusfehler jetzt sauber per Toast statt still zu scheitern.
+  - **Remote-Supabase aktualisiert**: Migration `20260513234500_add_billing_subscriptions.sql` wurde auf das verknüpfte Live-Projekt `cchmjrnzaqvowqihcdte` angewendet; Local/Remote für Billing wieder synchron.
   - Betroffene Dateien: `lib/billing.ts`, `lib/db.ts`, `components/billing/PricingSettingsPage.tsx`, `supabase/schema.sql`, `supabase/migrations/20260513234500_add_billing_subscriptions.sql`.
   - Tests: lint + build grün; nur bekannte `<img>`/`useEffect`-Warnungen.
 - **Zuletzt erledigt (2026-05-13 – Billing Schritt 1)**:
@@ -128,7 +129,6 @@
   - ~~`schema.sql`, Migrationen und UI-Feldnamen divergieren, besonders im Einkauf.~~ **Behoben 2026-05-13**: Einkaufsschema-Migration live, dual-write in `lib/db.ts` bestätigt.
 
 ## 6. Offene Aufgaben
-- [ ] Neue Migration `20260513234500_add_billing_subscriptions.sql` auf Remote-Supabase anwenden; in dieser Session nicht ausgerollt, da kein `supabase`-CLI verfügbar war.
 - [ ] Einzelne Piloten nicht nur auswählbar, sondern vollständig als eigene Buchungsart inkl. Zahlungs-/Statusfluss abbilden.
 - [ ] Firmenkonto/Qonto, Lastschrift-Mandat und monatliche Zahlungslogik konzipieren und integrieren.
 - [ ] MarketingPilot Edit + Delete für Kampagnen, Leads, Newsletter ergänzen.
@@ -160,6 +160,7 @@
 ## 8. Änderungsverlauf
 | Datum | Agent | Änderungen | Betroffene Dateien | Nächste Schritte |
 | --- | --- | --- | --- | --- |
+| 2026-05-13 | Codex | Remote-Supabase-Zugriff wiederhergestellt; CLI lokal via `npx supabase` genutzt; Migration `20260513234500_add_billing_subscriptions.sql` erfolgreich auf Live-Projekt `cchmjrnzaqvowqihcdte` angewendet | `PROJECT_STATUS.md` | Einzel-Piloten als echte Buchungsart ausbauen; danach Billing/Invoice/Qonto/SEPA-Flow fachlich sauber aufsetzen |
 | 2026-05-13 | Codex | Billing Schritt 2: Live-Persistenz fuer Buchung & Abonnement via neue Tabelle `billing_subscriptions`; DB-Layer in `lib/db.ts`; Billing-UI von reinem localStorage auf Supabase umgestellt; Legacy-localStorage wird beim Laden einmalig migriert | `lib/billing.ts`, `lib/db.ts`, `components/billing/PricingSettingsPage.tsx`, `supabase/schema.sql`, `supabase/migrations/20260513234500_add_billing_subscriptions.sql`, `PROJECT_STATUS.md` | Remote-Migration anwenden; danach Einzel-Piloten als vollwertige Buchungsart und Qonto/SEPA-Fluss ausbauen |
 | 2026-05-13 | Codex | Billing Schritt 1: automatische `Business`-Vorauswahl entfernt; Warenkorb startet leer und ist direkt editierbar (`Entfernen`, `Alles entfernen`); Paket-CTA klarer benannt | `components/billing/PricingSettingsPage.tsx`, `components/billing/BookingSummary.tsx`, `components/billing/PackageCard.tsx`, `PROJECT_STATUS.md` | Billing von localStorage auf Live-Daten heben; danach Einzel-Piloten als vollwertige Buchungsart und Qonto/SEPA vorbereiten |
 | 2026-05-13 | Claude | Zentrale ID-Generierung: `lib/ids.ts` mit `genId(prefix)` (PREFIX-TIMESTAMP36-RANDOM4); 6 lokale Kopien + 8 length-basierte Muster ersetzt; Präfix-Konvention dokumentiert | `lib/ids.ts`, `buero/page.tsx`, `werkstatt/page.tsx`, `steuer/page.tsx`, `planung/page.tsx`, `ki-erkennung/page.tsx`, `einstellungen/page.tsx` | — |
