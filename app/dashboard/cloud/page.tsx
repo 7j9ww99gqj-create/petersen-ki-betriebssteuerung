@@ -573,14 +573,17 @@ export default function CloudPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
         <div className="pk-card">
-          <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800 }}>🧷 Backup-Historie</h3>
+          <div style={{ marginBottom: 14 }}>
+            <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>🧷 Datenstand-Übersicht</h3>
+            <div style={{ fontSize: 11, color: '#6b7280' }}>Aktivitätsdaten aus Live-Modulen — kein echtes Backup-System</div>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {snapshot.backupHistory.map(entry => (
               <div key={entry.label} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                   <div style={{ fontWeight: 700, fontSize: 13 }}>{entry.label}</div>
-                  <span className={entry.status === 'ok' ? 'badge badge-green' : 'badge badge-orange'}>
-                    {entry.status === 'ok' ? 'Aktuell' : 'Begrenzt'}
+                  <span className={entry.status === 'ok' ? 'badge badge-blue' : 'badge badge-gray'}>
+                    {entry.status === 'ok' ? 'Live-Daten' : 'Leer'}
                   </span>
                 </div>
                 <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 4 }}>{entry.detail}</div>
@@ -590,7 +593,10 @@ export default function CloudPage() {
         </div>
 
         <div className="pk-card">
-          <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800 }}>💻 Geräte & Sitzungen</h3>
+          <div style={{ marginBottom: 14 }}>
+            <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>💻 Geräte & Sitzungen</h3>
+            <div style={{ fontSize: 11, color: '#6b7280' }}>Aktueller Browser + Supabase-Auth — kein Multi-Device-Backend</div>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {snapshot.devices.map(device => (
               <div key={device.name} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)' }}>

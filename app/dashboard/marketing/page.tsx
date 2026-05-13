@@ -432,11 +432,13 @@ function DemoLabTab({
   kampagnen,
   leads,
   newsletter,
+  seoKeywords,
   onJump,
 }: {
   kampagnen: Kampagne[]
   leads: Lead[]
   newsletter: Newsletter[]
+  seoKeywords: SeoKeyword[]
   onJump: (tab: Tab) => void
 }) {
   const [selected, setSelected] = useState<DemoMarketingFeature>(demoMarketingFeatures[0])
@@ -546,62 +548,132 @@ function DemoLabTab({
         </div>
       </div>
 
-      <div className="pk-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
-          <div>
-            <div style={{ fontWeight: 900, fontSize: 16 }}>SEO-/Keywords-Analyse</div>
-            <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>Keyword-Ideen bleiben als sichtbarer Ausbaupfad im MarketingPilot erhalten</div>
-          </div>
-          <span className="badge badge-blue">Keywords · Klicks · Sichtbarkeit</span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
-          {[
-            { label: 'Keywords im Fokus', value: '24', icon: '🏷️', color: COLOR },
-            { label: 'Geschaetzte Klicks', value: '348', icon: '🖱️', color: '#1684ff' },
-            { label: 'Seitenklicks', value: String(kampagnen.reduce((sum, item) => sum + item.geklickt, 0)), icon: '🌐', color: '#10b981' },
-            { label: 'Top-Chancen', value: String(Math.max(3, kampagnen.filter(item => item.status !== 'Abgeschlossen').length)), icon: '🚀', color: '#a78bfa' },
-          ].map(item => (
-            <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
-              <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: item.color }}>{item.value}</div>
-              <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
+      {leads.length > 0 && (() => {
+        const active = leads.filter(l => !['Gewonnen', 'Verloren'].includes(l.status))
+        const hot = active.filter(l => getLeadScore(l) >= 75)
+        const pipelineWert = active.reduce((sum, l) => sum + parseCurrency(l.wert), 0)
+        const byStatus: Record<string, number> = {}
+        active.forEach(l => { byStatus[l.status] = (byStatus[l.status] ?? 0) + 1 })
+        const sorted = [...active].sort((a, b) => getLeadScore(b) - getLeadScore(a)).slice(0, 5)
+        return (
+          <div className="pk-card" style={{ marginBottom: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 16 }}>🔥 Lead Intelligence</div>
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>Live-Auswertung aus {leads.length} Leads in marketing_leads</div>
+              </div>
+              <span className="badge badge-green">Live aus marketing_leads</span>
             </div>
-          ))}
-        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-          <div>
-            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Keyword-Vorschau</div>
-            <div style={{ display: 'grid', gap: 10 }}>
-              {demoKeywordStats.map(row => (
-                <div key={row.keyword} style={{ display: 'grid', gridTemplateColumns: '1.4fr .6fr .6fr .5fr', gap: 10, alignItems: 'center', padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>{row.keyword}</span>
-                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>{row.klicks} Klicks</span>
-                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>{row.sichtbarkeit}% Sichtbarkeit</span>
-                  <span style={{ fontSize: 12, color: '#4ddb7e', fontWeight: 700 }}>{row.trend}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Direkt weiter nutzbar</div>
-            <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
               {[
-                'Keyword-Liste in Kampagnenbriefings uebernehmen',
-                'Top-Themen fuer Newsletter und Social Posts ableiten',
-                'Lead-Quellen gegen Content-Performance spiegeln',
-                'Neue Rankings spaeter an echte Quellen koppeln',
+                { label: 'Aktive Leads', value: String(active.length), icon: '👤', color: COLOR },
+                { label: 'Heisse Leads ≥75', value: String(hot.length), icon: '🔥', color: '#25d366' },
+                { label: 'Pipeline-Wert', value: formatCurrency(pipelineWert), icon: '💶', color: '#a78bfa' },
+                { label: 'Stufen', value: String(Object.keys(byStatus).length), icon: '📊', color: '#1684ff' },
               ].map(item => (
-                <div key={item} style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', color: '#d0d9e8', fontSize: 13 }}>
-                  {item}
+                <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+                  <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: item.color }}>{item.value}</div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'grid', gap: 8 }}>
+              <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 4 }}>Top-Leads nach Score</div>
+              {sorted.map(lead => (
+                <div key={lead.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 12, alignItems: 'center', padding: '10px 14px', borderRadius: 12, background: getLeadScore(lead) >= 75 ? 'rgba(37,211,102,.06)' : 'rgba(255,255,255,.03)', border: `1px solid ${getLeadScore(lead) >= 75 ? 'rgba(37,211,102,.2)' : 'rgba(255,255,255,.06)'}` }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{lead.name}</div>
+                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>{lead.firma || lead.quelle}</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>{lead.wert}</span>
+                  <span className={`badge ${getLeadScore(lead) >= 75 ? 'badge-green' : 'badge-blue'}`}>Score {getLeadScore(lead)}</span>
+                  <span style={{ fontSize: 11, color: '#aeb9c8', whiteSpace: 'nowrap' }}>{getLeadAction(lead)}</span>
                 </div>
               ))}
             </div>
           </div>
+        )
+      })()}
+
+      {seoKeywords.length > 0 && (() => {
+        const totalKlicks = seoKeywords.reduce((sum, item) => sum + item.klicks, 0)
+        const avgRanking = seoKeywords.length > 0 ? Math.round(seoKeywords.reduce((sum, item) => sum + item.ranking, 0) / seoKeywords.length) : 0
+        const topChance = [...seoKeywords].sort((a, b) => a.ranking - b.ranking)[0]
+        const optimiert = seoKeywords.filter(item => item.status === 'Optimiert').length
+        const sortedByKlicks = [...seoKeywords].sort((a, b) => b.klicks - a.klicks)
+        return (
+          <div className="pk-card">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 16 }}>SEO-/Keywords-Analyse</div>
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>Live-Auswertung aus {seoKeywords.length} gespeicherten Keywords</div>
+              </div>
+              <span className="badge badge-green">Live aus marketing_seo_keywords</span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+              {[
+                { label: 'Keywords gesamt', value: String(seoKeywords.length), icon: '🏷️', color: COLOR },
+                { label: 'Klicks gesamt', value: String(totalKlicks), icon: '🖱️', color: '#1684ff' },
+                { label: 'Ø Ranking', value: `#${avgRanking}`, icon: '📊', color: '#10b981' },
+                { label: 'Optimiert', value: String(optimiert), icon: '✅', color: '#a78bfa' },
+              ].map(item => (
+                <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+                  <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: item.color }}>{item.value}</div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>Top-Keywords nach Klicks</div>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {sortedByKlicks.slice(0, 5).map(row => (
+                    <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 10, alignItems: 'center', padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>{row.keyword}</span>
+                      <span style={{ fontSize: 12, color: '#aeb9c8' }}>{row.klicks} Klicks</span>
+                      <span style={{ fontSize: 12, color: '#aeb9c8' }}>#{row.ranking}</span>
+                      <span className={`badge ${row.status === 'Optimiert' ? 'badge-green' : row.status === 'In Arbeit' ? 'badge-blue' : 'badge-gray'}`} style={{ fontSize: 10 }}>{row.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                {topChance && (
+                  <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 6 }}>Bestes Ranking</div>
+                    <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 4 }}>{topChance.keyword}</div>
+                    <div style={{ fontSize: 12, color: '#d0d9e8' }}>Rang #{topChance.ranking} · {topChance.klicks} Klicks · {topChance.zielseite}</div>
+                  </div>
+                )}
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {[
+                    'Keyword-Liste in Kampagnenbriefings uebernehmen',
+                    'Top-Themen fuer Newsletter und Social Posts ableiten',
+                    'Schwache Rankings gezielt mit Content verbessern',
+                  ].map(item => (
+                    <div key={item} style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', color: '#d0d9e8', fontSize: 13 }}>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {seoKeywords.length === 0 && (
+        <div className="pk-card" style={{ textAlign: 'center', color: '#aeb9c8', padding: 24 }}>
+          Noch keine Keywords im SEO-Workspace gepflegt. Wechsel in den SEO-Tab, um Keywords hinzuzufügen.
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -2172,7 +2244,7 @@ export default function MarketingPilotPage() {
         ))}
       </div>
 
-      {tab === 'demo-lab' && <DemoLabTab kampagnen={kampagnen} leads={leads} newsletter={newsletter} onJump={setTab} />}
+      {tab === 'demo-lab' && <DemoLabTab kampagnen={kampagnen} leads={leads} newsletter={newsletter} seoKeywords={seoKeywords} onJump={setTab} />}
       {tab === 'seo' && <SeoTab isDemo={isDemo} seoKeywords={seoKeywords} onChange={saveSeoKeywords} />}
       {tab === 'content' && <ContentTab isDemo={isDemo} seoKeywords={seoKeywords} contentIdeas={contentIdeas} onChange={saveContentIdeas} />}
       {tab === 'posting' && <PostingTab isDemo={isDemo} postingPlans={postingPlans} contentIdeas={contentIdeas} onChange={savePostingPlans} />}

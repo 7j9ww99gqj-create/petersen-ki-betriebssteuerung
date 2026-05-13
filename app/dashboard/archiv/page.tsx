@@ -23,6 +23,9 @@ type ArchivDokument = {
   quelle?: 'buero' | 'steuer'
   datei_url?: string
   status?: string
+  document_type?: string
+  confidence?: number
+  summary?: string
 }
 
 const demoArchivData: ArchivDokument[] = [
@@ -44,6 +47,7 @@ export default function ArchivPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('Alle')
   const [relationFilter, setRelationFilter] = useState<'alle' | 'verknuepft' | 'ohne'>('alle')
+  const [kiFilter, setKiFilter] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [openingId, setOpeningId] = useState('')
@@ -82,7 +86,13 @@ export default function ArchivPage() {
           } satisfies ArchivDokument
         })
 
-        const mappedBuero = ((bueroDocs ?? []) as ArchivDokument[]).map(doc => ({ ...doc, quelle: 'buero' as const }))
+        const mappedBuero = ((bueroDocs ?? []) as ArchivDokument[]).map(doc => ({
+          ...doc,
+          quelle: 'buero' as const,
+          document_type: (doc as { document_type?: string }).document_type,
+          confidence: (doc as { confidence?: number }).confidence,
+          summary: (doc as { summary?: string }).summary,
+        }))
         setDocs([...mappedBuero, ...mappedSteuer].sort((a, b) => String(b.datum ?? '').localeCompare(String(a.datum ?? ''))))
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Archiv konnte nicht geladen werden.'))
@@ -97,14 +107,15 @@ export default function ArchivPage() {
   const filtered = docs.filter(doc => {
     const q = search.toLowerCase()
     const relation = getRelationLabel(doc)
-    const matchSearch = !q || [doc.name, doc.bezug, doc.id, doc.kategorie, doc.typ, relation?.label, doc.quelle, doc.status].some(value => (value ?? '').toLowerCase().includes(q))
+    const matchSearch = !q || [doc.name, doc.bezug, doc.id, doc.kategorie, doc.typ, relation?.label, doc.quelle, doc.status, doc.document_type, doc.summary].some(value => (value ?? '').toLowerCase().includes(q))
     const typeValue = doc.kategorie || doc.typ || 'Sonstiges'
     const matchFilter = filter === 'Alle' || typeValue === filter
     const hasRelation = Boolean(relation)
     const matchRelation = relationFilter === 'alle'
       || (relationFilter === 'verknuepft' && hasRelation)
       || (relationFilter === 'ohne' && !hasRelation)
-    return matchSearch && matchFilter && matchRelation
+    const matchKi = !kiFilter || Boolean(doc.document_type)
+    return matchSearch && matchFilter && matchRelation && matchKi
   })
 
   const stats = useMemo(() => {
@@ -112,6 +123,7 @@ export default function ArchivPage() {
     const incoming = docs.filter(doc => doc.eingangsrechnung_id).length
     const outgoing = docs.filter(doc => doc.rechnung_id || doc.angebot_id || doc.auftrag_id).length
     const steuer = docs.filter(doc => doc.quelle === 'steuer').length
+    const kiErkannt = docs.filter(doc => doc.document_type).length
     return {
       total: docs.length,
       linked,
@@ -119,6 +131,7 @@ export default function ArchivPage() {
       incoming,
       outgoing,
       steuer,
+      kiErkannt,
     }
   }, [docs])
 
@@ -193,6 +206,17 @@ export default function ArchivPage() {
           <option value="verknuepft">Nur verknüpfte Dokumente</option>
           <option value="ohne">Ohne Objektverknüpfung</option>
         </select>
+        <button
+          onClick={() => setKiFilter(prev => !prev)}
+          style={{
+            padding: '7px 14px', borderRadius: 999, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+            background: kiFilter ? 'rgba(167,139,250,.2)' : 'rgba(255,255,255,.06)',
+            color: kiFilter ? '#a78bfa' : '#aeb9c8',
+            border: kiFilter ? '1px solid rgba(167,139,250,.4)' : '1px solid rgba(255,255,255,.08)',
+          }}
+        >
+          🧠 KI-erkannt {kiFilter ? `(${stats.kiErkannt})` : ''}
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 16 }}>
@@ -201,8 +225,8 @@ export default function ArchivPage() {
           { label: 'Verknüpft', value: stats.linked, color: '#4ddb7e' },
           { label: 'Ohne Bezug', value: stats.unlinked, color: '#f59e0b' },
           { label: 'Eingangsbelege', value: stats.incoming, color: '#ffb347' },
-          { label: 'Ausgang/Verträge', value: stats.outgoing, color: '#aeb9c8' },
           { label: 'Steuerbelege', value: stats.steuer, color: '#f59e0b' },
+          { label: 'KI-erkannt', value: stats.kiErkannt, color: '#a78bfa' },
         ].map(item => (
           <div key={item.label} className="pk-card" style={{ padding: 14 }}>
             <div style={{ fontSize: 22, fontWeight: 900, color: item.color }}>{item.value}</div>
@@ -225,8 +249,8 @@ export default function ArchivPage() {
               <th>Typ</th>
               <th>Bezug</th>
               <th>Quelle</th>
+              <th>KI</th>
               <th>Datum</th>
-              <th>Größe</th>
               <th>Detail</th>
               <th></th>
             </tr>
@@ -243,8 +267,19 @@ export default function ArchivPage() {
                   <td><span className="badge badge-gray">{doc.kategorie || doc.typ || 'Sonstiges'}</span></td>
                   <td style={{ color: '#aeb9c8', fontSize: 13 }}>{doc.bezug || '—'}</td>
                   <td style={{ color: '#aeb9c8', fontSize: 13 }}>{doc.quelle === 'steuer' ? 'SteuerPilot' : 'BüroPilot'}</td>
+                  <td style={{ fontSize: 12 }}>
+                    {doc.document_type
+                      ? (
+                        <span title={doc.summary || ''} style={{ display: 'inline-flex', flexDirection: 'column', gap: 2 }}>
+                          <span className="badge badge-purple" style={{ fontSize: 10 }}>🧠 {doc.document_type}</span>
+                          {doc.confidence !== undefined && (
+                            <span style={{ color: '#aeb9c8', fontSize: 10 }}>{Math.round(doc.confidence * 100)}%</span>
+                          )}
+                        </span>
+                      )
+                      : <span style={{ color: '#4a5568', fontSize: 11 }}>—</span>}
+                  </td>
                   <td style={{ color: '#aeb9c8', fontSize: 13 }}>{doc.datum || '—'}</td>
-                  <td style={{ color: '#aeb9c8', fontSize: 13 }}>{doc.groesse || '—'}</td>
                   <td style={{ fontSize: 13 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {doc.quelle === 'steuer' ? (
@@ -294,6 +329,24 @@ export default function ArchivPage() {
 
       <div style={{ marginTop: 10, fontSize: 12, color: '#aeb9c8' }}>
         {filtered.length} von {docs.length} Dokumenten angezeigt
+      </div>
+
+      <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        {[
+          { icon: '🧾', label: 'BüroPilot', color: '#20c8ff', note: 'Dokumente, Rechnungen, Angebote' },
+          { icon: '💰', label: 'SteuerPilot', color: '#f59e0b', note: 'Steuerbelege' },
+          { icon: '🧠', label: 'KI-Erkennung', color: '#a78bfa', note: 'Dokumente mit KI-Analyse (Typ + Konfidenz)' },
+          { icon: '🛠️', label: 'WerkstattPilot', color: '#6b7280', note: 'Kein eigenes Dokumentarchiv vorhanden' },
+          { icon: '📦', label: 'LagerPilot', color: '#6b7280', note: 'Kein eigenes Dokumentarchiv vorhanden' },
+        ].map(item => (
+          <div key={item.label} style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.05)', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 14 }}>{item.icon}</span>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: item.color }}>{item.label}</div>
+              <div style={{ fontSize: 11, color: '#6b7280' }}>{item.note}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
