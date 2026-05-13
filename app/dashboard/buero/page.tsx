@@ -775,6 +775,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
     const today = new Date()
     const newAuftrag: Auftrag = {
       id: `A-2025-0${35 + auftraege.length}`,
+      kunde_id: a.kunde_id,
       kunde: a.kunde,
       beschreibung: a.titel,
       wert: a.betrag,
