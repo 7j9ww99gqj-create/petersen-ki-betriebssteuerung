@@ -21,7 +21,13 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
-- Stand `2026-05-13` — Aktueller Branch: `main` (Commit `f612513`), live auf Vercel deployed (nach Push).
+- Stand `2026-05-13` — Aktueller Branch: `main` (Commit `f4533b7`), live auf Vercel deployed (nach Push).
+- **Zuletzt erledigt (2026-05-13 – Runde 3)**:
+  - **Storage-Cleanup**: `deleteSteuerBeleg` entfernt jetzt `datei_url`-Datei vor DB-Delete (analog zu `deleteBueroDokument`).
+  - **Zentrale ID-Generierung**: `lib/ids.ts` mit `genId(prefix)` (Format `PREFIX-TIMESTAMP36-RANDOM4`); 6 lokale Kopien + 8 length-basierte Muster ersetzt; Präfix-Konvention dokumentiert.
+  - **Fehlende Delete-Funktionen**: `deleteBueroAngebot`, `deleteBueroAuftrag`, `deleteBueroRechnung` in `lib/db.ts` ergänzt.
+  - Betroffene Dateien: `lib/db.ts`, `lib/ids.ts` (neu), `app/dashboard/buero/page.tsx`, `app/dashboard/werkstatt/page.tsx`, `app/dashboard/steuer/page.tsx`, `app/dashboard/planung/page.tsx`, `app/dashboard/ki-erkennung/page.tsx`, `app/dashboard/einstellungen/page.tsx`.
+  - Tests: lint + build grün.
 - **Zuletzt erledigt (2026-05-13 – Runde 2)**:
   - **Rollen/Rechte serverseitig**: `lib/server-auth.ts` um `getServerComponentSession()` erweitert; Werkstatt- und Lager-Detailseiten als echte Next.js Server Components umgeschrieben — Supabase läuft mit Server-Auth (Cookie-Forwarding), kein Browser-Client mehr; Redirect zu `/login` wenn nicht authentifiziert.
   - **Fehlerbehandlung/Empty States**: Werkstatt-Sub-Komponenten (Karten, Zeit, Material, Pruef) haben jetzt `retryKey`-Pattern + Retry-Button bei Ladeferhlern + Icons+Text für leere Tabellen. Lager-Hauptseite zeigt persistenten Fehler-Block statt flüchtigem Toast. Büro KundenTab hat separaten `loadError`-State + Retry.
@@ -109,6 +115,10 @@
   - ~~`schema.sql`, Migrationen und UI-Feldnamen divergieren, besonders im Einkauf.~~ **Behoben 2026-05-13**: Einkaufsschema-Migration live, dual-write in `lib/db.ts` bestätigt.
 
 ## 6. Offene Aufgaben
+- [ ] MarketingPilot Edit + Delete für Kampagnen, Leads, Newsletter ergänzen.
+- [ ] AnalysePilot auf echte Supabase-Daten umstellen (Charts laufen bereits, nur Demo-Daten ersetzen).
+- [ ] `deleteBueroAngebot`/`Auftrag`/`Rechnung` in `buero/page.tsx` verdrahten (Funktionen existieren seit Runde 3).
+
 - [x] ~~Datenmodell für Kunde/Lieferant/Auftrag/Rechnung/Dokument sauber relationalisieren.~~ **Erledigt 2026-05-13**: FK-Spalten existieren und werden korrekt beschrieben; `handleKonvertieren`-Bug behoben.
 - [x] ~~Einkaufsmigration auf Live-Datenbank anwenden und Bestellungen/Wareneingänge mit Echtdaten gegen Alt- und Neuschema validieren.~~ **Erledigt 2026-05-13**: Alle 12 Migrationen Local = Remote, dual-write validiert.
 - [x] ~~Neue Dokumentrelationen für Eingangsrechnungen, Rechnungen, Angebote und Aufträge live migrieren und mit Echtdaten durchtesten.~~ **Erledigt 2026-05-13**: FK-Spalten live auf Remote-DB vorhanden.
