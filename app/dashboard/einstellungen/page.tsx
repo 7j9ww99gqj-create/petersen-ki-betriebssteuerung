@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
 import { genId } from '@/lib/ids'
 import { isDemoUser, hasDemoCookie, performLogout } from '@/lib/auth'
-import { type AppRole, APP_ROLES, ROLE_LABELS, ROLE_PILOTS, PERMISSIONS, normalizeRole, useRole } from '@/lib/roles'
+import { type AppRole, APP_ROLES, INHABER_EMAIL, ROLE_LABELS, ROLE_PILOTS, PERMISSIONS, normalizeRole, useRole } from '@/lib/roles'
 import {
   parseCsvFile, validateImportRows, autoMapColumns, buildImportRows,
   normalizeNumber, normalizeDate,
@@ -20,6 +20,7 @@ import {
   type FirmaEinstellungen,
 } from '@/lib/db'
 import { PricingSettingsPage } from '@/components/billing/PricingSettingsPage'
+import { OwnerCustomerControlPanel } from '@/components/billing/OwnerCustomerControlPanel'
 
 type NotifSettings = {
   wareneingaenge: boolean; niedrigerBestand: boolean; auftraege: boolean
@@ -28,7 +29,7 @@ type NotifSettings = {
 
 export default function EinstellungenPage() {
   const router = useRouter()
-  const [section, setSection] = useState<'profil' | 'firma' | 'billing' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
+  const [section, setSection] = useState<'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
   const [toast, setToast] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [isDemo, setIsDemo] = useState(false)
@@ -64,6 +65,8 @@ export default function EinstellungenPage() {
     const saved = localStorage.getItem('pk_notif')
     if (saved) setNotif(JSON.parse(saved))
   }, [])
+
+  const isInhaberAccount = profil.email.toLowerCase() === INHABER_EMAIL || currentRole === 'Inhaber'
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast(msg); setToastType(type)
@@ -159,6 +162,7 @@ export default function EinstellungenPage() {
           <NavItem id="profil" icon="👤" label="Profil" />
           <NavItem id="firma" icon="🏢" label="Firmendaten" />
           <NavItem id="billing" icon="💳" label="Buchung & Abonnement" />
+          {isInhaberAccount && <NavItem id="kundensteuerung" icon="👑" label="Kundensteuerung" />}
           <NavItem id="benachrichtigungen" icon="🔔" label="Benachricht." />
           <NavItem id="rollen" icon="🔑" label="Rollen" />
           <NavItem id="import" icon="📥" label="Import" />
@@ -248,6 +252,10 @@ export default function EinstellungenPage() {
             <PricingSettingsPage isDemo={isDemo} showToast={showToast} />
           )}
 
+          {section === 'kundensteuerung' && (
+            <OwnerCustomerControlPanel enabled={isInhaberAccount} showToast={showToast} />
+          )}
+
           {section === 'benachrichtigungen' && (
             <div className="pk-card">
               <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>🔔 Benachrichtigungen</h3>
@@ -266,13 +274,14 @@ export default function EinstellungenPage() {
 
           {section === 'rollen' && (() => {
             const roleDescriptions: Record<AppRole, string> = {
+              Inhaber: 'Versteckte Betreiberrolle fuer zentrale Kundensteuerung, Billing und Freischaltung',
               Admin: 'Vollzugriff auf alle Funktionen und Einstellungen',
               Mitarbeiter: 'Zugriff auf Kernfunktionen, kein Löschen',
               Büro: 'Büro, Analyse, Archiv und Einstellungen',
               Werkstatt: 'Werkstatt, Lager, Planung und KI-Assistent',
               Lager: 'Nur Lagerverwaltung und KI-Assistent',
             }
-            const allRoles = APP_ROLES
+            const allRoles = isInhaberAccount ? APP_ROLES : APP_ROLES.filter(role => role !== 'Inhaber')
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* Aktuelle Rolle */}

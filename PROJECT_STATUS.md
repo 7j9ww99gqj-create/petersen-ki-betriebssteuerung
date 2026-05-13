@@ -21,7 +21,15 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
-- Stand `2026-05-13` — Aktueller Branch: `feature/billing-cart-fix`, Basis weiterhin `main` Commit `f4533b7`.
+- Stand `2026-05-14` — Aktueller Branch: `feature/billing-cart-fix`, Basis weiterhin `main` Commit `f4533b7`.
+- **Zuletzt erledigt (2026-05-14 – Billing Schritt 3 / Inhaber-Setup)**:
+  - **Inhaber-Account angelegt**: interner Firmen-Account `info@petersen-ki-pilot.de` in Supabase Auth erstellt; Zugangsdaten wurden bewusst nicht im Projekt abgelegt.
+  - **Versteckte Rolle `Inhaber`**: neue Betreiberrolle ergänzt; nur Inhaber-Account sieht sie in der UI und bekommt die exklusive Kundensteuerung.
+  - **Kundensteuerung nur fuer Inhaber**: neue Admin-Fläche in Einstellungen erlaubt zentrale Sicht auf Buchungen sowie `Status` und `Software aktiv/aus` pro Kunde.
+  - **Buchung → BüroPilot**: Billing-Trigger spiegelt neue/aktualisierte `billing_subscriptions` automatisch als zentrale `buero_kunden` in den Firmen-Account.
+  - **Remote-Supabase aktualisiert**: Migration `20260514002000_add_owner_billing_controls.sql` live auf Projekt `cchmjrnzaqvowqihcdte` angewendet; Local/Remote sind synchron.
+  - Betroffene Dateien: `app/dashboard/einstellungen/page.tsx`, `components/billing/OwnerCustomerControlPanel.tsx`, `lib/billing.ts`, `lib/db.ts`, `lib/roles.ts`, `lib/server-auth.ts`, `supabase/schema.sql`, `supabase/migrations/20260514002000_add_owner_billing_controls.sql`.
+  - Tests: lint + build grün; nur bekannte `<img>`/`useEffect`-Warnungen.
 - **Zuletzt erledigt (2026-05-13 – Billing Schritt 2)**:
   - **Live-Persistenz statt localStorage**: Billing läuft für echte Nutzer jetzt über Supabase-Tabelle `billing_subscriptions`; `localStorage` bleibt nur noch für Demo und als einmaliger Legacy-Fallback.
   - **DB-Layer ergänzt**: `lib/db.ts` hat jetzt `getBillingSubscription`, `upsertBillingSubscription`, `updateBillingSubscriptionStatus`.
@@ -129,6 +137,9 @@
   - ~~`schema.sql`, Migrationen und UI-Feldnamen divergieren, besonders im Einkauf.~~ **Behoben 2026-05-13**: Einkaufsschema-Migration live, dual-write in `lib/db.ts` bestätigt.
 
 ## 6. Offene Aufgaben
+- [ ] Rechnungsmodell fuer Buchungen/Abos ergänzen (`invoices`, Versandstatus, Rechnungsnummern, PDF-Flow).
+- [ ] Billing um Lastschrift-/Mandatsmodell für Qonto/SEPA erweitern.
+- [ ] Zentrale Kundensteuerung von Billing auf echte Benutzerverwaltung erweitern (z. B. Login-Zugriff pro Kunde sperren/freischalten statt nur Billing-Status).
 - [ ] Einzelne Piloten nicht nur auswählbar, sondern vollständig als eigene Buchungsart inkl. Zahlungs-/Statusfluss abbilden.
 - [ ] Firmenkonto/Qonto, Lastschrift-Mandat und monatliche Zahlungslogik konzipieren und integrieren.
 - [ ] MarketingPilot Edit + Delete für Kampagnen, Leads, Newsletter ergänzen.
@@ -160,6 +171,7 @@
 ## 8. Änderungsverlauf
 | Datum | Agent | Änderungen | Betroffene Dateien | Nächste Schritte |
 | --- | --- | --- | --- | --- |
+| 2026-05-14 | Codex | Inhaber-Setup: internen Firmen-Account `info@petersen-ki-pilot.de` angelegt; versteckte Rolle `Inhaber`; neue exklusive Kundensteuerung; Billing-Trigger spiegelt Buchungen als `buero_kunden`; Migration `20260514002000_add_owner_billing_controls.sql` live ausgerollt | `app/dashboard/einstellungen/page.tsx`, `components/billing/OwnerCustomerControlPanel.tsx`, `lib/billing.ts`, `lib/db.ts`, `lib/roles.ts`, `lib/server-auth.ts`, `supabase/schema.sql`, `supabase/migrations/20260514002000_add_owner_billing_controls.sql`, `PROJECT_STATUS.md` | Rechnungsmodell und Qonto-/SEPA-Flow als naechsten Billing-Schritt aufbauen |
 | 2026-05-13 | Codex | Remote-Supabase-Zugriff wiederhergestellt; CLI lokal via `npx supabase` genutzt; Migration `20260513234500_add_billing_subscriptions.sql` erfolgreich auf Live-Projekt `cchmjrnzaqvowqihcdte` angewendet | `PROJECT_STATUS.md` | Einzel-Piloten als echte Buchungsart ausbauen; danach Billing/Invoice/Qonto/SEPA-Flow fachlich sauber aufsetzen |
 | 2026-05-13 | Codex | Billing Schritt 2: Live-Persistenz fuer Buchung & Abonnement via neue Tabelle `billing_subscriptions`; DB-Layer in `lib/db.ts`; Billing-UI von reinem localStorage auf Supabase umgestellt; Legacy-localStorage wird beim Laden einmalig migriert | `lib/billing.ts`, `lib/db.ts`, `components/billing/PricingSettingsPage.tsx`, `supabase/schema.sql`, `supabase/migrations/20260513234500_add_billing_subscriptions.sql`, `PROJECT_STATUS.md` | Remote-Migration anwenden; danach Einzel-Piloten als vollwertige Buchungsart und Qonto/SEPA-Fluss ausbauen |
 | 2026-05-13 | Codex | Billing Schritt 1: automatische `Business`-Vorauswahl entfernt; Warenkorb startet leer und ist direkt editierbar (`Entfernen`, `Alles entfernen`); Paket-CTA klarer benannt | `components/billing/PricingSettingsPage.tsx`, `components/billing/BookingSummary.tsx`, `components/billing/PackageCard.tsx`, `PROJECT_STATUS.md` | Billing von localStorage auf Live-Daten heben; danach Einzel-Piloten als vollwertige Buchungsart und Qonto/SEPA vorbereiten |

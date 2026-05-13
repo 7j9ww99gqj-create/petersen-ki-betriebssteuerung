@@ -3,6 +3,7 @@ import type { BookingStatus, EmployeeTierId, PackageId, PilotId } from './pricin
 
 export type SubscriptionRecord = {
   id: string
+  userId?: string
   userKey: string
   userEmail?: string
   packageId?: PackageId
@@ -10,6 +11,7 @@ export type SubscriptionRecord = {
   employeeTier: EmployeeTierId
   monthlyPrice: number | null
   status: BookingStatus
+  softwareEnabled: boolean
   createdAt: string
   updatedAt: string
   nextPayment?: string
@@ -85,6 +87,7 @@ export async function createBookingRequest(input: BookingRequestInput): Promise<
       employeeTier: input.employeeTier,
       monthlyPrice: input.monthlyPrice,
       status: 'pending_payment',
+      softwareEnabled: false,
       createdAt: now,
       updatedAt: now,
     }
@@ -97,6 +100,7 @@ export async function createBookingRequest(input: BookingRequestInput): Promise<
   return upsertBillingSubscription({
     ...input,
     status: 'pending_payment',
+    softwareEnabled: false,
   })
 }
 

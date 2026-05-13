@@ -24,7 +24,15 @@ returns boolean
 language sql
 stable security definer
 as $$
-  select pk_get_role() in ('Admin', 'Mitarbeiter', 'Büro');
+  select pk_get_role() in ('Inhaber', 'Admin', 'Mitarbeiter', 'Büro');
+$$;
+
+create or replace function pk_is_owner()
+returns boolean
+language sql
+stable security definer
+as $$
+  select lower(coalesce(auth.jwt() ->> 'email', '')) = 'info@petersen-ki-pilot.de';
 $$;
 
 -- ── Mandant / Firmeneinstellungen ───────────────────────────
@@ -79,6 +87,7 @@ create table if not exists billing_subscriptions (
   employee_tier  text not null default '1-3',
   monthly_price  numeric,
   status         text not null default 'pending_payment' check (status in ('no_subscription', 'pending_payment', 'proof_sent', 'active', 'rejected', 'cancelled')),
+  software_enabled boolean not null default false,
   next_payment   date,
   created_at     timestamptz default now(),
   updated_at     timestamptz default now(),
@@ -87,10 +96,79 @@ create table if not exists billing_subscriptions (
 
 alter table billing_subscriptions enable row level security;
 
-create policy "billing_subscriptions_user" on billing_subscriptions
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "billing_subscriptions_select" on billing_subscriptions
+  for select using (auth.uid() = user_id or pk_is_owner());
+
+create policy "billing_subscriptions_insert" on billing_subscriptions
+  for insert with check (auth.uid() = user_id or pk_is_owner());
+
+create policy "billing_subscriptions_update" on billing_subscriptions
+  for update using (auth.uid() = user_id or pk_is_owner())
+  with check (auth.uid() = user_id or pk_is_owner());
 
 create index if not exists idx_billing_subscriptions_user_status on billing_subscriptions(user_id, status);
+
+create or replace function sync_billing_subscription_to_owner_customer()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  owner_user_id uuid;
+  customer_name text;
+  customer_status text;
+begin
+  select id into owner_user_id
+  from auth.users
+  where lower(email) = 'info@petersen-ki-pilot.de'
+  limit 1;
+
+  if owner_user_id is null then
+    return new;
+  end if;
+
+  customer_name := coalesce(
+    nullif(split_part(coalesce(new.user_email, ''), '@', 1), ''),
+    nullif(new.user_key, ''),
+    'Kunde'
+  );
+
+  customer_status := case
+    when coalesce(new.software_enabled, false) then 'Aktiv'
+    when new.status in ('cancelled', 'rejected') then 'Inaktiv'
+    else 'In Prüfung'
+  end;
+
+  insert into public.buero_kunden (
+    id, user_id, name, typ, ansprechpartner, email, umsatz, status, updated_at
+  ) values (
+    'BILL-' || new.id,
+    owner_user_id,
+    customer_name,
+    'SaaS-Kunde',
+    customer_name,
+    new.user_email,
+    coalesce(new.monthly_price::text, 'auf Anfrage'),
+    customer_status,
+    now()
+  )
+  on conflict (id) do update set
+    name = excluded.name,
+    ansprechpartner = excluded.ansprechpartner,
+    email = excluded.email,
+    umsatz = excluded.umsatz,
+    status = excluded.status,
+    updated_at = now();
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_sync_billing_subscription_to_owner_customer on billing_subscriptions;
+create trigger trg_sync_billing_subscription_to_owner_customer
+after insert or update on billing_subscriptions
+for each row execute function sync_billing_subscription_to_owner_customer();
 
 -- ── LagerPilot ──────────────────────────────────────────────
 

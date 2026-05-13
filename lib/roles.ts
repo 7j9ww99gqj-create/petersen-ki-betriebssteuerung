@@ -3,10 +3,13 @@ import { useEffect, useState } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 
-export type AppRole = 'Admin' | 'Mitarbeiter' | 'Büro' | 'Werkstatt' | 'Lager'
-export const APP_ROLES: AppRole[] = ['Admin', 'Mitarbeiter', 'Büro', 'Werkstatt', 'Lager']
+export const INHABER_EMAIL = 'info@petersen-ki-pilot.de'
+
+export type AppRole = 'Inhaber' | 'Admin' | 'Mitarbeiter' | 'Büro' | 'Werkstatt' | 'Lager'
+export const APP_ROLES: AppRole[] = ['Inhaber', 'Admin', 'Mitarbeiter', 'Büro', 'Werkstatt', 'Lager']
 
 export const ROLE_LABELS: Record<AppRole, string> = {
+  Inhaber: '👑 Inhaber',
   Admin: '🔑 Admin',
   Mitarbeiter: '👤 Mitarbeiter',
   Büro: '🧾 Büro',
@@ -15,6 +18,7 @@ export const ROLE_LABELS: Record<AppRole, string> = {
 }
 
 export const ROLE_PILOTS: Record<AppRole, string[]> = {
+  Inhaber: ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'ki-erkennung', 'cloud', 'archiv', 'einstellungen'],
   Admin: ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'ki-erkennung', 'cloud', 'archiv', 'einstellungen'],
   Mitarbeiter: ['lager', 'buero', 'werkstatt', 'analyse', 'planung', 'ki-erkennung'],
   Büro: ['buero', 'analyse', 'archiv', 'einstellungen'],
@@ -23,11 +27,12 @@ export const ROLE_PILOTS: Record<AppRole, string[]> = {
 }
 
 export const PERMISSIONS = {
-  canDelete: (role: AppRole) => role === 'Admin',
-  canCreate: (role: AppRole) => role === 'Admin' || role === 'Mitarbeiter',
+  canDelete: (role: AppRole) => role === 'Inhaber' || role === 'Admin',
+  canCreate: (role: AppRole) => role === 'Inhaber' || role === 'Admin' || role === 'Mitarbeiter',
   canEdit: (role: AppRole) => role !== 'Lager',
-  canManageRoles: (role: AppRole) => role === 'Admin',
-  canExport: (role: AppRole) => role === 'Admin' || role === 'Büro',
+  canManageRoles: (role: AppRole) => role === 'Inhaber' || role === 'Admin',
+  canExport: (role: AppRole) => role === 'Inhaber' || role === 'Admin' || role === 'Büro',
+  canManageUsers: (role: AppRole) => role === 'Inhaber',
 }
 
 export function normalizeRole(value: unknown): AppRole {
@@ -75,19 +80,26 @@ export async function setRole(role: AppRole): Promise<AppRole> {
   if (typeof window === 'undefined') return role
 
   const normalized = normalizeRole(role)
-  localStorage.setItem('pk_role', normalized)
-
-  if (hasDemoCookie() || !isSupabaseConfigured()) return normalized
+  if (hasDemoCookie() || !isSupabaseConfigured()) {
+    localStorage.setItem('pk_role', normalized)
+    return normalized
+  }
 
   try {
     const supabase = createSupabaseClient()
-    const { error } = await supabase.auth.updateUser({ data: { role: normalized } })
+    const { data: { user } } = await supabase.auth.getUser()
+    const email = user?.email?.toLowerCase() ?? ''
+    const currentRole = normalizeRole(user?.app_metadata?.role ?? user?.user_metadata?.role)
+    const mayUseInhaber = email === INHABER_EMAIL || currentRole === 'Inhaber'
+    const safeRole = normalized === 'Inhaber' && !mayUseInhaber ? 'Admin' : normalized
+    localStorage.setItem('pk_role', safeRole)
+    const { error } = await supabase.auth.updateUser({ data: { role: safeRole } })
     if (error) throw error
   } catch {
     // lokale Rolle als Fallback beibehalten
   }
 
-  return normalized
+  return localStorage.getItem('pk_role') as AppRole ?? normalized
 }
 
 export function useRole(): {
@@ -99,6 +111,7 @@ export function useRole(): {
     canEdit: boolean
     canManageRoles: boolean
     canExport: boolean
+    canManageUsers: boolean
   }
 } {
   const [role, setRoleState] = useState<AppRole>('Admin')
@@ -122,6 +135,7 @@ export function useRole(): {
       canEdit: PERMISSIONS.canEdit(role),
       canManageRoles: PERMISSIONS.canManageRoles(role),
       canExport: PERMISSIONS.canExport(role),
+      canManageUsers: PERMISSIONS.canManageUsers(role),
     },
   }
 }

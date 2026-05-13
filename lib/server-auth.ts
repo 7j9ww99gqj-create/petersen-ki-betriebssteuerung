@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
-const SERVER_ROLES = ['Admin', 'Mitarbeiter', 'Büro', 'Werkstatt', 'Lager'] as const
+const SERVER_ROLES = ['Inhaber', 'Admin', 'Mitarbeiter', 'Büro', 'Werkstatt', 'Lager'] as const
 
 export type ServerAppRole = (typeof SERVER_ROLES)[number]
 

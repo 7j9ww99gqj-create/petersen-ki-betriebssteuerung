@@ -52,6 +52,7 @@ type EinkaufLieferantRecord = {
 
 type BillingSubscriptionRow = {
   id: string
+  user_id?: string | null
   user_key?: string | null
   user_email?: string | null
   package_id?: string | null
@@ -59,6 +60,7 @@ type BillingSubscriptionRow = {
   employee_tier?: string | null
   monthly_price?: number | null
   status?: string | null
+  software_enabled?: boolean | null
   next_payment?: string | null
   created_at?: string | null
   updated_at?: string | null
@@ -188,6 +190,7 @@ function normalizeBillingSubscription(row: BillingSubscriptionRow) {
   const packageId = firstText(row.package_id)
   return {
     id: row.id,
+    userId: firstText(row.user_id) || undefined,
     userKey: firstText(row.user_key),
     userEmail: firstText(row.user_email),
     packageId: packageId ? packageId as PackageId : undefined,
@@ -195,6 +198,7 @@ function normalizeBillingSubscription(row: BillingSubscriptionRow) {
     employeeTier: firstText(row.employee_tier, '1-3') as EmployeeTierId,
     monthlyPrice: typeof row.monthly_price === 'number' ? row.monthly_price : null,
     status: firstText(row.status, 'pending_payment') as BookingStatus,
+    softwareEnabled: Boolean(row.software_enabled),
     createdAt: firstText(row.created_at),
     updatedAt: firstText(row.updated_at),
     nextPayment: firstText(row.next_payment) || undefined,
@@ -377,10 +381,21 @@ export async function markFirmaOnboardingCompleted() {
   return upsertFirmaEinstellungen({ ...current, onboarding_completed: true })
 }
 
+async function getCurrentUserId() {
+  const supabase = db()
+  const { data: auth, error } = await supabase.auth.getUser()
+  if (error) throw error
+  const userId = auth.user?.id
+  if (!userId) throw new Error('Nicht angemeldet.')
+  return userId
+}
+
 export async function getBillingSubscription() {
+  const userId = await getCurrentUserId()
   const { data, error } = await db()
     .from('billing_subscriptions')
     .select('*')
+    .eq('user_id', userId)
     .maybeSingle()
   if (error) throw error
   return data ? normalizeBillingSubscription(data as BillingSubscriptionRow) : null
@@ -394,11 +409,14 @@ export async function upsertBillingSubscription(input: {
   employeeTier: EmployeeTierId
   monthlyPrice: number | null
   status: BookingStatus
+  softwareEnabled?: boolean
   nextPayment?: string | null
 }) {
+  const userId = await getCurrentUserId()
   const current = await getBillingSubscription()
   const payload = {
     id: current?.id ?? genId('BOOK'),
+    user_id: userId,
     user_key: input.userKey,
     user_email: input.userEmail ?? null,
     package_id: input.packageId ?? null,
@@ -406,6 +424,7 @@ export async function upsertBillingSubscription(input: {
     employee_tier: input.employeeTier,
     monthly_price: input.monthlyPrice,
     status: input.status,
+    software_enabled: input.softwareEnabled ?? current?.softwareEnabled ?? false,
     next_payment: input.nextPayment ?? null,
     updated_at: new Date().toISOString(),
   }
@@ -441,6 +460,35 @@ export async function updateBillingSubscriptionStatus(status: BookingStatus) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', current.id)
+    .select('*')
+    .single()
+  if (error) throw error
+  return normalizeBillingSubscription(data as BillingSubscriptionRow)
+}
+
+export async function listBillingSubscriptionsForOwner() {
+  const { data, error } = await db()
+    .from('billing_subscriptions')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return ((data ?? []) as BillingSubscriptionRow[]).map(normalizeBillingSubscription)
+}
+
+export async function updateBillingSubscriptionControls(id: string, input: {
+  status?: BookingStatus
+  softwareEnabled?: boolean
+}) {
+  const payload: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (typeof input.status === 'string') payload.status = input.status
+  if (typeof input.softwareEnabled === 'boolean') payload.software_enabled = input.softwareEnabled
+
+  const { data, error } = await db()
+    .from('billing_subscriptions')
+    .update(payload)
+    .eq('id', id)
     .select('*')
     .single()
   if (error) throw error
