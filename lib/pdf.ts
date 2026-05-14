@@ -5,9 +5,16 @@ export type PDFRechnung = {
   nummer?: string
   kunde: string
   betrag: string
+  netto?: number
+  steuerbetrag?: number
+  summe?: number
+  steuer_satz?: number
   faellig: string
   erstellt: string
   status: string
+  internalReference?: string
+  leistungszeitraum_von?: string
+  leistungszeitraum_bis?: string
 }
 
 export type PDFAngebot = {
@@ -99,173 +106,281 @@ function heuteFormatiert(): string {
   return new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+function fmtEuro(n: number): string {
+  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DocType = any
+
+function drawHeader(doc: DocType, company: PDFCompanySettings, logoData: string | null, accent: [number, number, number]): void {
+  const pageW = 210
+  const margin = 20
+
+  doc.setFillColor(10, 18, 30)
+  doc.rect(0, 0, pageW, 26, 'F')
+  doc.setFillColor(...accent)
+  doc.rect(0, 25, pageW, 1, 'F')
+
+  if (logoData) {
+    try { doc.addImage(logoData, imageFormat(logoData), margin, 4, 17, 17) } catch {}
+  }
+  const nameX = logoData ? margin + 20 : margin
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.setTextColor(...accent)
+  doc.text((company.firmenname || FALLBACK_COMPANY.firmenname!).toUpperCase(), nameX, 12)
+
+  const contactParts: string[] = []
+  if (company.website) contactParts.push(company.website)
+  if (company.email) contactParts.push(company.email)
+  if (company.telefon) contactParts.push(company.telefon)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(150, 170, 190)
+  if (contactParts.length) doc.text(contactParts.join('  ·  '), pageW - margin, 12, { align: 'right' })
+
+  const adressParts: string[] = []
+  if (company.adresse) adressParts.push(company.adresse)
+  if (company.plz || company.ort) adressParts.push([company.plz, company.ort].filter(Boolean).join(' '))
+  if (adressParts.length) {
+    doc.setFontSize(7.5)
+    doc.setTextColor(120, 140, 160)
+    doc.text(adressParts.join(', '), nameX, 19)
+  }
+
+  const taxParts: string[] = []
+  if (company.briefpapier_layout?.showUstId !== false && company.ust_id) taxParts.push(`USt-ID: ${company.ust_id}`)
+  if (company.briefpapier_layout?.showSteuernummer !== false && company.steuernummer) taxParts.push(`St.-Nr.: ${company.steuernummer}`)
+  if (taxParts.length) {
+    doc.setFontSize(7.5)
+    doc.setTextColor(120, 140, 160)
+    doc.text(taxParts.join('  ·  '), pageW - margin, 19, { align: 'right' })
+  }
+}
+
+function drawFooter(doc: DocType, company: PDFCompanySettings, accent: [number, number, number]): void {
+  const pageW = 210
+  const margin = 20
+
+  doc.setFillColor(10, 18, 30)
+  doc.rect(0, 268, pageW, 29, 'F')
+  doc.setFillColor(...accent)
+  doc.rect(0, 268, pageW, 1, 'F')
+
+  const parts: string[] = []
+  if (company.dokument_footer) parts.push(company.dokument_footer)
+  if (company.briefpapier_layout?.showWebsite !== false && company.website) parts.push(company.website)
+  if (company.briefpapier_layout?.showBankdaten !== false && company.bankname) parts.push(company.bankname)
+  if (company.briefpapier_layout?.showBankdaten !== false && company.iban) parts.push(`IBAN ${company.iban}`)
+  if (company.briefpapier_layout?.showBankdaten !== false && company.bic) parts.push(`BIC ${company.bic}`)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(120, 140, 160)
+  if (parts.length) doc.text(parts.join('  ·  '), pageW / 2, 276, { align: 'center' })
+
+  doc.setFontSize(7)
+  doc.setTextColor(80, 100, 115)
+  doc.text(`Seite 1  ·  erstellt am ${heuteFormatiert()}`, pageW / 2, 283, { align: 'center' })
+}
+
 export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: string): Promise<void> {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const company = getCompanySettings()
   const accent = hexToRgb(company.briefpapier_layout?.akzentfarbe || '#20c8ff')
   const logoData = await loadImageDataUrl(company.logo_url)
-
   const pageW = 210
   const margin = 20
-  const companyTextX = logoData ? margin + 24 : margin
 
-  // ── Header ─────────────────────────────────────────────────────────────
-  if (logoData) {
-    try { doc.addImage(logoData, imageFormat(logoData), margin, 8, 18, 18) } catch {}
-  }
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.setTextColor(100, 120, 140)
-  doc.text((company.firmenname || FALLBACK_COMPANY.firmenname!).toUpperCase(), companyTextX, 16)
+  drawHeader(doc, company, logoData, accent)
+  drawFooter(doc, company, accent)
+
+  // Absenderzeile (DIN-5008)
+  const senderLine = [
+    company.firmenname || FALLBACK_COMPANY.firmenname,
+    company.adresse,
+    [company.plz, company.ort].filter(Boolean).join(' '),
+  ].filter(Boolean).join(', ')
 
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.text(`Datum: ${heuteFormatiert()}`, pageW - margin, 16, { align: 'right' })
+  doc.setFontSize(6.5)
+  doc.setTextColor(140, 155, 170)
+  doc.text(senderLine, margin, 38)
+  doc.setDrawColor(180, 195, 210)
+  doc.setLineWidth(0.2)
+  doc.line(margin, 39.5, margin + 80, 39.5)
 
-  // Trennlinie
-  doc.setDrawColor(...accent)
-  doc.setLineWidth(0.5)
-  doc.line(margin, 20, pageW - margin, 20)
-
-  // ── Dokumenttyp ─────────────────────────────────────────────────────────
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(28)
-  doc.setTextColor(20, 20, 30)
-  doc.text('RECHNUNG', margin, 38)
-
-  // Rechnungsnummer
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(12)
-  doc.setTextColor(80, 100, 120)
-  doc.text(`Rechnungsnummer: ${rechnung.nummer || rechnung.id}`, margin, 48)
-
-  // ── Empfänger-Block ─────────────────────────────────────────────────────
-  doc.setFillColor(240, 245, 250)
-  doc.roundedRect(margin, 56, 80, 28, 2, 2, 'F')
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(100, 120, 140)
-  doc.text('AN', margin + 4, 63)
-
+  // Empfänger
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
-  doc.setTextColor(20, 20, 30)
-  doc.text(kundenName, margin + 4, 71)
-
+  doc.setTextColor(20, 25, 35)
+  doc.text(kundenName, margin, 47)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.setTextColor(80, 100, 120)
-  doc.text('Sehr geehrte Damen und Herren,', margin + 4, 78)
+  doc.setTextColor(90, 105, 120)
+  doc.text('Sehr geehrte Damen und Herren,', margin, 53)
 
-  // ── Metadaten rechts ───────────────────────────────────────────────────
+  // Metadaten rechts
+  const metaX = 130
+  const metaLabelW = 28
+  const metaRows: [string, string][] = [
+    ['Datum:', heuteFormatiert()],
+    ['Rechnungs-Nr.:', rechnung.nummer || rechnung.id],
+    ['Fällig am:', rechnung.faellig],
+    ['Status:', rechnung.status],
+  ]
+  if (rechnung.leistungszeitraum_von && rechnung.leistungszeitraum_bis) {
+    metaRows.push(['Leistungszeit.:', `${rechnung.leistungszeitraum_von} – ${rechnung.leistungszeitraum_bis}`])
+  }
+  metaRows.forEach(([label, value], i) => {
+    const y = 38 + i * 6.5
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(100, 115, 130)
+    doc.text(label, metaX, y)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(20, 25, 35)
+    doc.text(value, metaX + metaLabelW, y)
+  })
+
+  // Titel
+  const titleY = 68
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(20)
+  doc.setTextColor(10, 16, 26)
+  doc.text('RECHNUNG', margin, titleY)
+  doc.setFillColor(...accent)
+  doc.rect(margin, titleY + 2, 40, 0.8, 'F')
+
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(80, 100, 120)
-  const metaX = pageW - margin - 60
-  doc.text(`Erstellt am:`, metaX, 63)
-  doc.text(`Fällig am:`, metaX, 70)
-  doc.text(`Status:`, metaX, 77)
+  doc.setFontSize(9.5)
+  doc.setTextColor(40, 48, 60)
+  doc.text('vielen Dank für Ihr Vertrauen. Nachfolgend stellen wir Ihnen die folgende Leistung in Rechnung:', margin, 80, { maxWidth: 170 })
+
+  // Tabelle
+  const tableY = 90
+  doc.setFillColor(10, 18, 30)
+  doc.rect(margin, tableY, pageW - 2 * margin, 8.5, 'F')
+  doc.setFillColor(...accent)
+  doc.rect(margin, tableY, 2, 8.5, 'F')
 
   doc.setFont('helvetica', 'bold')
-  doc.setTextColor(20, 20, 30)
-  doc.text(rechnung.erstellt, metaX + 28, 63)
-  doc.text(rechnung.faellig, metaX + 28, 70)
-  doc.text(rechnung.status, metaX + 28, 77)
+  doc.setFontSize(8.5)
+  doc.setTextColor(200, 215, 230)
+  doc.text('Pos.', margin + 4, tableY + 5.8)
+  doc.text('Bezeichnung', margin + 16, tableY + 5.8)
+  doc.text('Menge', pageW - margin - 58, tableY + 5.8)
+  doc.text('Einzelpreis', pageW - margin - 40, tableY + 5.8)
+  doc.text('Betrag (netto)', pageW - margin - 3, tableY + 5.8, { align: 'right' })
 
-  // ── Einleitungstext ────────────────────────────────────────────────────
+  const betragRaw = parseFloat(rechnung.betrag.replace(/[^\d,\.]/g, '').replace(',', '.')) || 0
+  const mwstSatz = rechnung.steuer_satz ?? Number(company.standard_mwst ?? 19)
+  const nettoVal = rechnung.netto ?? (rechnung.summe ? rechnung.summe / (1 + mwstSatz / 100) : betragRaw)
+  const steuerVal = rechnung.steuerbetrag ?? (nettoVal * mwstSatz / 100)
+  const bruttoVal = rechnung.summe ?? (nettoVal + steuerVal)
+
+  const row1Y = tableY + 8.5
+  doc.setFillColor(248, 251, 254)
+  doc.rect(margin, row1Y, pageW - 2 * margin, 11, 'F')
   doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(30, 38, 50)
+  doc.text('1', margin + 4, row1Y + 7)
+  doc.text('Petersen KI Betriebssoftware – monatliches Abonnement', margin + 16, row1Y + 7)
+  doc.text('1', pageW - margin - 55, row1Y + 7)
+  doc.text(fmtEuro(nettoVal), pageW - margin - 38, row1Y + 7)
+  doc.text(fmtEuro(nettoVal), pageW - margin - 3, row1Y + 7, { align: 'right' })
+
+  // Summen-Block
+  const sumY = row1Y + 11
+  const sumX = pageW - margin - 70
+  const sumW = 70
+  const sumRowsData: [string, string][] = [
+    ['Nettobetrag', fmtEuro(nettoVal)],
+    [`zzgl. ${mwstSatz}% MwSt.`, fmtEuro(steuerVal)],
+  ]
+  sumRowsData.forEach(([label, value], i) => {
+    const y = sumY + 6 + i * 6.5
+    doc.setFillColor(i % 2 === 0 ? 245 : 250, i % 2 === 0 ? 248 : 252, 255)
+    doc.rect(sumX, y - 4.5, sumW, 6.5, 'F')
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(90, 105, 120)
+    doc.text(label, sumX + 3, y)
+    doc.setTextColor(20, 28, 40)
+    doc.text(value, sumX + sumW - 3, y, { align: 'right' })
+  })
+
+  const totalY = sumY + 6 + sumRowsData.length * 6.5 + 1
+  doc.setFillColor(10, 18, 30)
+  doc.rect(sumX, totalY - 4.5, sumW, 9, 'F')
+  doc.setFillColor(...accent)
+  doc.rect(sumX, totalY - 4.5, 2, 9, 'F')
+  doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
-  doc.setTextColor(40, 40, 50)
-  doc.text('vielen Dank fuer Ihr Vertrauen. Fuer Ihr gebuchtes Petersen-KI-Paket stellen wir Ihnen folgende Leistung in Rechnung:', margin, 96)
-
-  // ── Tabelle ─────────────────────────────────────────────────────────────
-  const tableY = 104
-  // Tabellen-Header
-  doc.setFillColor(32, 200, 255)
-  doc.rect(margin, tableY, pageW - 2 * margin, 8, 'F')
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.setTextColor(255, 255, 255)
-  doc.text('Pos.', margin + 3, tableY + 5.5)
-  doc.text('Bezeichnung', margin + 20, tableY + 5.5)
-  doc.text('Betrag (netto)', pageW - margin - 3, tableY + 5.5, { align: 'right' })
-
-  // Zeile 1
-  const row1Y = tableY + 8
-  doc.setFillColor(248, 250, 252)
-  doc.rect(margin, row1Y, pageW - 2 * margin, 10, 'F')
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(40, 40, 50)
-  doc.text('1', margin + 3, row1Y + 6.5)
-  doc.text('Petersen KI Betriebssoftware - Abo / Leistungszeitraum', margin + 20, row1Y + 6.5)
-  doc.text(rechnung.betrag, pageW - margin - 3, row1Y + 6.5, { align: 'right' })
-
-  // Zeile 2 (MwSt)
-  const row2Y = row1Y + 10
-  doc.setFillColor(255, 255, 255)
-  doc.rect(margin, row2Y, pageW - 2 * margin, 10, 'F')
-  const betragNetto = parseFloat(rechnung.betrag.replace(/[^\d,\.]/g, '').replace(',', '.')) || 0
-  const mwstSatz = Number(company.standard_mwst ?? 19)
-  const mwst = betragNetto * (mwstSatz / 100)
-  const brutto = betragNetto + mwst
-  const fmtNum = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
-
-  doc.setTextColor(80, 100, 120)
-  doc.text('', margin + 3, row2Y + 6.5)
-  doc.text(`Zzgl. ${mwstSatz}% MwSt.`, margin + 20, row2Y + 6.5)
-  doc.text(fmtNum(mwst), pageW - margin - 3, row2Y + 6.5, { align: 'right' })
-
-  // Gesamtbetrag
-  const totalY = row2Y + 10
-  doc.setFillColor(20, 30, 40)
-  doc.rect(margin, totalY, pageW - 2 * margin, 12, 'F')
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
+  doc.setTextColor(200, 215, 230)
+  doc.text('Gesamtbetrag', sumX + 4, totalY + 1)
   doc.setTextColor(...accent)
-  doc.text('GESAMTBETRAG (brutto)', margin + 3, totalY + 8)
-  doc.text(fmtNum(brutto), pageW - margin - 3, totalY + 8, { align: 'right' })
+  doc.text(fmtEuro(bruttoVal), sumX + sumW - 3, totalY + 1, { align: 'right' })
 
-  // Trennlinie
-  doc.setDrawColor(200, 210, 220)
-  doc.setLineWidth(0.3)
-  doc.line(margin, totalY + 18, pageW - margin, totalY + 18)
+  // Zahlungshinweis-Box
+  const hasRef = !!rechnung.internalReference
+  const hinweisH = company.iban ? (hasRef ? 24 : 18) : (hasRef ? 18 : 14)
+  const hinweisY = totalY + 14
+  doc.setFillColor(12, 22, 36)
+  doc.roundedRect(margin, hinweisY, pageW - 2 * margin, hinweisH, 3, 3, 'F')
+  doc.setFillColor(...accent)
+  doc.roundedRect(margin, hinweisY, 3, hinweisH, 1.5, 1.5, 'F')
 
-  // ── Zahlungshinweis ───────────────────────────────────────────────────
-  doc.setFont('helvetica', 'normal')
+  doc.setFont('helvetica', 'bold')
   doc.setFontSize(9)
-  doc.setTextColor(80, 100, 120)
-  doc.text(`Bitte begleichen Sie den Gesamtbetrag bis zum ${rechnung.faellig}.`, margin, totalY + 26)
+  doc.setTextColor(...accent)
+  doc.text('Zahlungshinweis', margin + 6, hinweisY + 6.5)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  doc.setTextColor(170, 185, 205)
+  doc.text(`Bitte überweisen Sie ${fmtEuro(bruttoVal)} bis zum ${rechnung.faellig}.`, margin + 6, hinweisY + 12.5)
+
+  let bankLineY = hinweisY + 18
   if (company.iban && company.briefpapier_layout?.showBankdaten !== false) {
-    doc.text(`${company.bankname ? company.bankname + ' · ' : ''}IBAN ${company.iban}${company.bic ? ' · BIC ' + company.bic : ''}`, margin, totalY + 31)
+    const bankLine = [
+      company.bankname,
+      `IBAN ${company.iban}`,
+      company.bic ? `BIC ${company.bic}` : '',
+    ].filter(Boolean).join('  ·  ')
+    doc.setFontSize(8)
+    doc.setTextColor(130, 150, 170)
+    doc.text(bankLine, margin + 6, bankLineY)
+    bankLineY += 5.5
   }
-  doc.setTextColor(...accent)
+
+  if (hasRef) {
+    doc.setFontSize(7.5)
+    doc.setTextColor(100, 120, 140)
+    doc.text(`Verwendungszweck: ${rechnung.internalReference}`, margin + 6, bankLineY)
+  }
+
+  // Signatur
+  const signY = hinweisY + hinweisH + 10
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(60, 75, 90)
+  doc.text('Mit freundlichen Grüßen', margin, signY)
   doc.setFont('helvetica', 'bold')
-  doc.text('Petersen KI Betriebssteuerung', margin, totalY + 34)
+  doc.setFontSize(9.5)
+  doc.setTextColor(...accent)
+  doc.text(company.firmenname || FALLBACK_COMPANY.firmenname!, margin, signY + 7)
   doc.setFont('helvetica', 'normal')
-  doc.setTextColor(80, 100, 120)
-  doc.text('Digitale Betriebssteuerung fuer moderne Unternehmen.', margin, totalY + 39)
+  doc.setFontSize(8.5)
+  doc.setTextColor(100, 115, 130)
+  doc.text('Digitale Betriebssteuerung für moderne Unternehmen', margin, signY + 13)
 
-  // ── Footer ─────────────────────────────────────────────────────────────
-  doc.setDrawColor(...accent)
-  doc.setLineWidth(0.4)
-  doc.line(margin, 272, pageW - margin, 272)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.setTextColor(120, 140, 160)
-  const footerParts = [
-    company.dokument_footer || FALLBACK_COMPANY.dokument_footer,
-    company.briefpapier_layout?.showWebsite !== false ? company.website : '',
-    company.briefpapier_layout?.showUstId !== false ? company.ust_id : '',
-    company.briefpapier_layout?.showSteuernummer !== false ? company.steuernummer : '',
-  ].filter(Boolean)
-  doc.text(footerParts.join('  ·  '), pageW / 2, 277, { align: 'center' })
-
-  doc.save(`Rechnung_${rechnung.id}.pdf`)
+  doc.save(`Rechnung_${rechnung.nummer || rechnung.id}.pdf`)
 }
 
 export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string): Promise<void> {
@@ -274,157 +389,161 @@ export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string
   const company = getCompanySettings()
   const accent = hexToRgb(company.briefpapier_layout?.akzentfarbe || '#20c8ff')
   const logoData = await loadImageDataUrl(company.logo_url)
-
   const pageW = 210
   const margin = 20
-  const companyTextX = logoData ? margin + 24 : margin
 
-  // ── Header ─────────────────────────────────────────────────────────────
-  if (logoData) {
-    try { doc.addImage(logoData, imageFormat(logoData), margin, 8, 18, 18) } catch {}
-  }
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.setTextColor(100, 120, 140)
-  doc.text((company.firmenname || FALLBACK_COMPANY.firmenname!).toUpperCase(), companyTextX, 16)
+  drawHeader(doc, company, logoData, accent)
+  drawFooter(doc, company, accent)
+
+  // Absenderzeile
+  const senderLine = [
+    company.firmenname || FALLBACK_COMPANY.firmenname,
+    company.adresse,
+    [company.plz, company.ort].filter(Boolean).join(' '),
+  ].filter(Boolean).join(', ')
 
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.text(`Datum: ${heuteFormatiert()}`, pageW - margin, 16, { align: 'right' })
+  doc.setFontSize(6.5)
+  doc.setTextColor(140, 155, 170)
+  doc.text(senderLine, margin, 38)
+  doc.setDrawColor(180, 195, 210)
+  doc.setLineWidth(0.2)
+  doc.line(margin, 39.5, margin + 80, 39.5)
 
-  // Trennlinie
-  doc.setDrawColor(...accent)
-  doc.setLineWidth(0.5)
-  doc.line(margin, 20, pageW - margin, 20)
-
-  // ── Dokumenttyp ─────────────────────────────────────────────────────────
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(28)
-  doc.setTextColor(20, 20, 30)
-  doc.text('ANGEBOT', margin, 38)
-
-  // Angebotsnummer
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(12)
-  doc.setTextColor(80, 100, 120)
-  doc.text(`Angebotsnummer: ${angebot.id}`, margin, 48)
-
-  // ── Empfänger-Block ─────────────────────────────────────────────────────
-  doc.setFillColor(240, 245, 250)
-  doc.roundedRect(margin, 56, 80, 28, 2, 2, 'F')
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(100, 120, 140)
-  doc.text('AN', margin + 4, 63)
-
+  // Empfänger
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
-  doc.setTextColor(20, 20, 30)
-  doc.text(kundenName, margin + 4, 71)
-
+  doc.setTextColor(20, 25, 35)
+  doc.text(kundenName, margin, 47)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.setTextColor(80, 100, 120)
-  doc.text('Sehr geehrte Damen und Herren,', margin + 4, 78)
+  doc.setTextColor(90, 105, 120)
+  doc.text('Sehr geehrte Damen und Herren,', margin, 53)
 
-  // ── Metadaten rechts ───────────────────────────────────────────────────
+  // Metadaten rechts
+  const metaX = 130
+  const metaLabelW = 28
+  const metaRows: [string, string][] = [
+    ['Datum:', heuteFormatiert()],
+    ['Angebots-Nr.:', angebot.id],
+    ['Gültig bis:', angebot.gueltig],
+    ['Status:', angebot.status],
+  ]
+  metaRows.forEach(([label, value], i) => {
+    const y = 38 + i * 6.5
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(100, 115, 130)
+    doc.text(label, metaX, y)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(20, 25, 35)
+    doc.text(value, metaX + metaLabelW, y)
+  })
+
+  // Titel
+  const titleY = 68
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(20)
+  doc.setTextColor(10, 16, 26)
+  doc.text('ANGEBOT', margin, titleY)
+  doc.setFillColor(...accent)
+  doc.rect(margin, titleY + 2, 30, 0.8, 'F')
+
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(80, 100, 120)
-  const metaX = pageW - margin - 60
-  doc.text(`Erstellt am:`, metaX, 63)
-  doc.text(`Gültig bis:`, metaX, 70)
-  doc.text(`Status:`, metaX, 77)
+  doc.setFontSize(9.5)
+  doc.setTextColor(40, 48, 60)
+  doc.text('wir freuen uns, Ihnen folgendes Angebot unterbreiten zu dürfen:', margin, 80)
+
+  // Tabelle
+  const tableY = 90
+  doc.setFillColor(10, 18, 30)
+  doc.rect(margin, tableY, pageW - 2 * margin, 8.5, 'F')
+  doc.setFillColor(...accent)
+  doc.rect(margin, tableY, 2, 8.5, 'F')
 
   doc.setFont('helvetica', 'bold')
-  doc.setTextColor(20, 20, 30)
-  doc.text(angebot.datum, metaX + 28, 63)
-  doc.text(angebot.gueltig, metaX + 28, 70)
-  doc.text(angebot.status, metaX + 28, 77)
+  doc.setFontSize(8.5)
+  doc.setTextColor(200, 215, 230)
+  doc.text('Pos.', margin + 4, tableY + 5.8)
+  doc.text('Leistung / Bezeichnung', margin + 16, tableY + 5.8)
+  doc.text('Betrag (netto)', pageW - margin - 3, tableY + 5.8, { align: 'right' })
 
-  // ── Einleitungstext ────────────────────────────────────────────────────
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(40, 40, 50)
-  doc.text('wir freuen uns, Ihnen folgendes Angebot unterbreiten zu dürfen:', margin, 96)
-
-  // ── Tabelle ─────────────────────────────────────────────────────────────
-  const tableY = 104
-  doc.setFillColor(32, 200, 255)
-  doc.rect(margin, tableY, pageW - 2 * margin, 8, 'F')
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.setTextColor(255, 255, 255)
-  doc.text('Pos.', margin + 3, tableY + 5.5)
-  doc.text('Leistung / Bezeichnung', margin + 20, tableY + 5.5)
-  doc.text('Betrag (netto)', pageW - margin - 3, tableY + 5.5, { align: 'right' })
-
-  // Zeile 1
-  const row1Y = tableY + 8
-  doc.setFillColor(248, 250, 252)
-  doc.rect(margin, row1Y, pageW - 2 * margin, 10, 'F')
+  const row1Y = tableY + 8.5
+  doc.setFillColor(248, 251, 254)
+  doc.rect(margin, row1Y, pageW - 2 * margin, 11, 'F')
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.setTextColor(40, 40, 50)
-  doc.text('1', margin + 3, row1Y + 6.5)
-  // Titel ggf. kürzen
-  const titelText = angebot.titel.length > 60 ? angebot.titel.substring(0, 57) + '...' : angebot.titel
-  doc.text(titelText, margin + 20, row1Y + 6.5)
-  doc.text(angebot.betrag, pageW - margin - 3, row1Y + 6.5, { align: 'right' })
+  doc.setTextColor(30, 38, 50)
+  doc.text('1', margin + 4, row1Y + 7)
+  const titelText = angebot.titel.length > 70 ? angebot.titel.substring(0, 67) + '…' : angebot.titel
+  doc.text(titelText, margin + 16, row1Y + 7)
+  doc.text(angebot.betrag, pageW - margin - 3, row1Y + 7, { align: 'right' })
 
-  // Zeile 2 (MwSt)
-  const row2Y = row1Y + 10
-  doc.setFillColor(255, 255, 255)
-  doc.rect(margin, row2Y, pageW - 2 * margin, 10, 'F')
+  // Summen-Block
   const betragNetto = parseFloat(angebot.betrag.replace(/[^\d,\.]/g, '').replace(',', '.')) || 0
   const mwstSatz = Number(company.standard_mwst ?? 19)
   const mwst = betragNetto * (mwstSatz / 100)
   const brutto = betragNetto + mwst
-  const fmtNum = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 
-  doc.setTextColor(80, 100, 120)
-  doc.text(`Zzgl. ${mwstSatz}% MwSt.`, margin + 20, row2Y + 6.5)
-  doc.text(fmtNum(mwst), pageW - margin - 3, row2Y + 6.5, { align: 'right' })
+  const sumY = row1Y + 11
+  const sumX = pageW - margin - 70
+  const sumW = 70
+  const sumRowsData: [string, string][] = [
+    ['Nettobetrag', fmtEuro(betragNetto)],
+    [`zzgl. ${mwstSatz}% MwSt.`, fmtEuro(mwst)],
+  ]
+  sumRowsData.forEach(([label, value], i) => {
+    const y = sumY + 6 + i * 6.5
+    doc.setFillColor(i % 2 === 0 ? 245 : 250, i % 2 === 0 ? 248 : 252, 255)
+    doc.rect(sumX, y - 4.5, sumW, 6.5, 'F')
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(90, 105, 120)
+    doc.text(label, sumX + 3, y)
+    doc.setTextColor(20, 28, 40)
+    doc.text(value, sumX + sumW - 3, y, { align: 'right' })
+  })
 
-  // Gesamtbetrag
-  const totalY = row2Y + 10
-  doc.setFillColor(20, 30, 40)
-  doc.rect(margin, totalY, pageW - 2 * margin, 12, 'F')
+  const totalY = sumY + 6 + sumRowsData.length * 6.5 + 1
+  doc.setFillColor(10, 18, 30)
+  doc.rect(sumX, totalY - 4.5, sumW, 9, 'F')
+  doc.setFillColor(...accent)
+  doc.rect(sumX, totalY - 4.5, 2, 9, 'F')
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
+  doc.setFontSize(10)
+  doc.setTextColor(200, 215, 230)
+  doc.text('Gesamtbetrag', sumX + 4, totalY + 1)
   doc.setTextColor(...accent)
-  doc.text('GESAMTBETRAG (brutto)', margin + 3, totalY + 8)
-  doc.text(fmtNum(brutto), pageW - margin - 3, totalY + 8, { align: 'right' })
+  doc.text(fmtEuro(brutto), sumX + sumW - 3, totalY + 1, { align: 'right' })
 
-  // Trennlinie
-  doc.setDrawColor(200, 210, 220)
-  doc.setLineWidth(0.3)
-  doc.line(margin, totalY + 18, pageW - margin, totalY + 18)
+  // Gültigkeitshinweis-Box
+  const hinweisY = totalY + 14
+  doc.setFillColor(12, 22, 36)
+  doc.roundedRect(margin, hinweisY, pageW - 2 * margin, 15, 3, 3, 'F')
+  doc.setFillColor(...accent)
+  doc.roundedRect(margin, hinweisY, 3, 15, 1.5, 1.5, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8.5)
+  doc.setTextColor(...accent)
+  doc.text('Hinweis', margin + 6, hinweisY + 6)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(170, 185, 205)
+  doc.text(`Dieses Angebot ist gültig bis zum ${angebot.gueltig}. Wir freuen uns auf Ihren Auftrag!`, margin + 6, hinweisY + 11.5)
 
-  // ── Gültigkeitshinweis ────────────────────────────────────────────────
+  // Signatur
+  const signY = hinweisY + 22
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.setTextColor(80, 100, 120)
-  doc.text(`Dieses Angebot ist gültig bis zum ${angebot.gueltig}.`, margin, totalY + 26)
-  doc.text('Wir freuen uns auf Ihren Auftrag!', margin, totalY + 34)
-
-  // ── Footer ─────────────────────────────────────────────────────────────
-  doc.setDrawColor(...accent)
-  doc.setLineWidth(0.4)
-  doc.line(margin, 272, pageW - margin, 272)
-
+  doc.setTextColor(60, 75, 90)
+  doc.text('Mit freundlichen Grüßen', margin, signY)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  doc.setTextColor(...accent)
+  doc.text(company.firmenname || FALLBACK_COMPANY.firmenname!, margin, signY + 7)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.setTextColor(120, 140, 160)
-  const footerParts = [
-    company.dokument_footer || FALLBACK_COMPANY.dokument_footer,
-    company.briefpapier_layout?.showWebsite !== false ? company.website : '',
-    company.briefpapier_layout?.showUstId !== false ? company.ust_id : '',
-    company.briefpapier_layout?.showSteuernummer !== false ? company.steuernummer : '',
-  ].filter(Boolean)
-  doc.text(footerParts.join('  ·  '), pageW / 2, 277, { align: 'center' })
+  doc.setFontSize(8.5)
+  doc.setTextColor(100, 115, 130)
+  doc.text('Digitale Betriebssteuerung für moderne Unternehmen', margin, signY + 13)
 
   doc.save(`Angebot_${angebot.id}.pdf`)
 }

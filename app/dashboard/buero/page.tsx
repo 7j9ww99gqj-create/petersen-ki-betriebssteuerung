@@ -6,7 +6,7 @@ import {
   getBueroKunden, upsertBueroKunde, deleteBueroKunde,
   getBueroAngebote, upsertBueroAngebot,
   getBueroAuftraege, upsertBueroAuftrag,
-  getBueroRechnungen, upsertBueroRechnung,
+  getBueroRechnungen, upsertBueroRechnung, getNextInvoiceNumber,
   getBueroEingangsrechnungen, upsertBueroEingangsrechnung, deleteBueroEingangsrechnung,
   markEingangsrechnungBezahlt, updateEingangsrechnungStatus,
   getBueroDokumente, getBueroDokumentById, getDokumentUrl, insertBueroDokument, updateBueroDokument, deleteBueroDokument, uploadDokument,
@@ -39,7 +39,7 @@ type Auftrag = {
 }
 
 type Rechnung = {
-  id: string; kunde_id?: string; kunde: string; betrag: string; faellig: string
+  id: string; nummer?: string; kunde_id?: string; kunde: string; betrag: string; faellig: string
   erstellt: string; status: 'Offen' | 'Bezahlt' | 'Überfällig' | 'Mahnung'
   bezahltAm?: string
 }
@@ -528,7 +528,7 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
               {rechnungen.filter(r => r.kunde === selected.name && r.status !== 'Bezahlt').map(r => (
                 <div key={r.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{r.id}</div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{r.nummer || r.id}</div>
                     <div style={{ color: '#aeb9c8', fontSize: 12 }}>Fällig: {r.faellig}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -1419,8 +1419,13 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
     const firmaDefaults = getLocalFirmaDefaults()
     const kunde = kunden.find(entry => entry.name === form.kunde)
     const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const reId = genId('RE')
+    const nummer = isDemo
+      ? `RE-${new Date().getFullYear()}-DEMO`
+      : await getNextInvoiceNumber().catch(() => reId)
     const newRe: Rechnung = {
-      id: genId('RE'),
+      id: reId,
+      nummer,
       kunde_id: kunde?.id,
       kunde: form.kunde,
       betrag: form.betrag.includes('€') ? form.betrag : `${form.betrag} €`,
@@ -1634,7 +1639,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
                 const linkedDokument = getLinkedDokument(dokumente, 'rechnung_id', r.id)
                 return (
               <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(r)}>
-                <td style={{ color: '#aeb9c8', fontFamily: 'monospace', fontSize: 12 }}>{r.id}</td>
+                <td style={{ color: '#aeb9c8', fontFamily: 'monospace', fontSize: 12 }}>{r.nummer || r.id}</td>
                 <td style={{ fontWeight: 600 }}>{r.kunde}</td>
                 <td style={{ fontWeight: 800, fontSize: 15, color: r.status === 'Bezahlt' ? '#4ddb7e' : '#f8fbff' }}>{r.betrag}</td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{r.erstellt}</td>
