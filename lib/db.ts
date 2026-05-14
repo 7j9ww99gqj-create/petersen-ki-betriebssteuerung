@@ -335,7 +335,9 @@ export type OwnerRecentActivity = {
 
 export type OwnerDashboardSnapshot = OwnerBillingSnapshot & {
   revenueTotal: number
+  revenueLast30Days: number
   pendingActivations: number
+  overdueInvoices: number
   recentActivities: OwnerRecentActivity[]
 }
 
@@ -898,14 +900,34 @@ export async function getOwnerDashboardSnapshot(): Promise<OwnerDashboardSnapsho
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 6)
 
+  const now = Date.now()
+  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000
+  const fourteenDaysAgo = now - 14 * 24 * 60 * 60 * 1000
+  const parseDate = (raw?: string | null) => {
+    if (!raw) return 0
+    const t = new Date(raw).getTime()
+    return Number.isFinite(t) ? t : 0
+  }
+
   return {
     activeCustomers: subscriptions.filter(item => item.softwareEnabled || item.status === 'active').length,
     pendingApprovals: subscriptions.filter(item => item.status === 'pending_payment' || item.status === 'proof_sent').length,
     pendingActivations: subscriptions.filter(item => !item.softwareEnabled && (item.status === 'pending_payment' || item.status === 'proof_sent' || item.status === 'active')).length,
     failedPayments: payments.filter(item => item.status === 'failed').length,
     openInvoices: invoices.filter(item => item.status !== 'Bezahlt').length,
+    overdueInvoices: invoices.filter(item => {
+      if (item.status === 'Bezahlt') return false
+      const created = parseDate(item.erstellt)
+      return created > 0 && created < fourteenDaysAgo
+    }).length,
     monthlyRecurringRevenue: subscriptions.reduce((sum, item) => sum + (item.status === 'active' ? item.monthlyPrice ?? 0 : 0), 0),
     revenueTotal: invoices.reduce((sum, item) => sum + ((item.status === 'Bezahlt' ? item.summe ?? 0 : 0)), 0),
+    revenueLast30Days: invoices.reduce((sum, item) => {
+      if (item.status !== 'Bezahlt') return sum
+      const paid = parseDate(item.bezahlt_am) || parseDate(item.erstellt)
+      if (paid > 0 && paid >= thirtyDaysAgo) return sum + (item.summe ?? 0)
+      return sum
+    }, 0),
     unreadNotifications: notifications.filter(item => !item.seenAt).length,
     recentActivities,
   }

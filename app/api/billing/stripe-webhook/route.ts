@@ -38,6 +38,19 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createSupabaseAdminClient()
+
+  // Idempotenz: Stripe wiederholt Webhooks bei 5xx oder Timeout bis zu 3 Tage.
+  // Wir schreiben event.id zuerst; bei Konflikt war das Event schon verarbeitet.
+  if (event.id) {
+    const insertEvent = await admin
+      .from('stripe_webhook_events')
+      .insert({ event_id: event.id, event_type: event.type })
+      .select('event_id')
+      .maybeSingle()
+    if (insertEvent.error && (insertEvent.error.code === '23505' || /duplicate key/i.test(insertEvent.error.message ?? ''))) {
+      return NextResponse.json({ ok: true, ignored: 'already_processed', event_id: event.id }, { status: 202 })
+    }
+  }
   let query = admin
     .from('buero_rechnungen')
     .select('id, nummer, status, summe, kunde, billing_subscription_id, payment_link_id, payment_link_status, payment_link_reference, bezahlt_am')

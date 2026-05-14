@@ -44,8 +44,10 @@ const demoOwnerSnapshot: OwnerDashboardSnapshot = {
   pendingActivations: 4,
   failedPayments: 1,
   openInvoices: 6,
+  overdueInvoices: 2,
   monthlyRecurringRevenue: 3890,
   revenueTotal: 28460,
+  revenueLast30Days: 4120,
   unreadNotifications: 5,
   recentActivities: [
     { id: 'owner-demo-1', source: 'stripe', severity: 'success', title: 'Zahlung eingegangen', description: 'RE-2026-00014 wurde per Stripe bezahlt.', createdAt: new Date().toISOString(), linkUrl: '/dashboard/einstellungen' },
@@ -350,9 +352,10 @@ export default function DashboardPage() {
           <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
             {[
               { label: 'Aktive Kunden', value: ownerSnapshot.activeCustomers.toLocaleString('de-DE'), icon: '👥', color: '#20c8ff', href: '/dashboard/einstellungen', delta: 'Live aus Billing' },
-              { label: 'Umsatz', value: `${ownerSnapshot.revenueTotal.toLocaleString('de-DE')} €`, icon: '💶', color: '#10b981', href: '/dashboard/buero?tab=rechnungen', delta: `MRR ${ownerSnapshot.monthlyRecurringRevenue.toLocaleString('de-DE')} €` },
+              { label: 'Umsatz gesamt', value: `${ownerSnapshot.revenueTotal.toLocaleString('de-DE')} €`, icon: '💶', color: '#10b981', href: '/dashboard/buero?tab=rechnungen', delta: `MRR ${ownerSnapshot.monthlyRecurringRevenue.toLocaleString('de-DE')} €` },
+              { label: 'Umsatz 30 Tage', value: `${ownerSnapshot.revenueLast30Days.toLocaleString('de-DE')} €`, icon: '📈', color: '#34d399', href: '/dashboard/buero?tab=rechnungen&filter=Bezahlt', delta: 'Bezahlt letzte 30 T' },
               { label: 'Freischaltungen offen', value: ownerSnapshot.pendingActivations.toLocaleString('de-DE'), icon: '⏳', color: '#f59e0b', href: '/dashboard/einstellungen', delta: `${ownerSnapshot.pendingApprovals} Pending / Beleg` },
-              { label: 'Offene Rechnungen', value: ownerSnapshot.openInvoices.toLocaleString('de-DE'), icon: '🧾', color: '#f43f5e', href: '/dashboard/buero?tab=rechnungen&filter=Offen', delta: 'BüroPilot' },
+              { label: 'Offene Rechnungen', value: ownerSnapshot.openInvoices.toLocaleString('de-DE'), icon: '🧾', color: '#f43f5e', href: '/dashboard/buero?tab=rechnungen&filter=Offen', delta: `${ownerSnapshot.overdueInvoices} überfällig >14 T` },
               { label: 'Fehler-Zahlungen', value: ownerSnapshot.failedPayments.toLocaleString('de-DE'), icon: '💥', color: '#ef4444', href: '/dashboard/einstellungen', delta: 'Stripe / Billing' },
               { label: 'Ungelesen', value: ownerSnapshot.unreadNotifications.toLocaleString('de-DE'), icon: '🔔', color: '#a78bfa', href: '/dashboard/einstellungen', delta: 'Owner-Hinweise' },
             ].map(item => (
