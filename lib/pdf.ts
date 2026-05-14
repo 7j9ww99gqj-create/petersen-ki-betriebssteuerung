@@ -187,7 +187,7 @@ function drawFooter(doc: DocType, company: PDFCompanySettings, accent: [number, 
   doc.text(`Seite 1  ·  erstellt am ${heuteFormatiert()}`, pageW / 2, 283, { align: 'center' })
 }
 
-export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: string): Promise<void> {
+export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: string, returnBase64?: boolean): Promise<string | void> {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const company = getCompanySettings()
@@ -380,10 +380,11 @@ export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: str
   doc.setTextColor(100, 115, 130)
   doc.text('Digitale Betriebssteuerung für moderne Unternehmen', margin, signY + 13)
 
+  if (returnBase64) return doc.output('datauristring').split(',')[1]
   doc.save(`Rechnung_${rechnung.nummer || rechnung.id}.pdf`)
 }
 
-export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string): Promise<void> {
+export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string, returnBase64?: boolean): Promise<string | void> {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const company = getCompanySettings()
@@ -545,5 +546,6 @@ export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string
   doc.setTextColor(100, 115, 130)
   doc.text('Digitale Betriebssteuerung für moderne Unternehmen', margin, signY + 13)
 
+  if (returnBase64) return doc.output('datauristring').split(',')[1]
   doc.save(`Angebot_${angebot.id}.pdf`)
 }
