@@ -21,7 +21,18 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
-- Stand `2026-05-14` — Aktueller Branch: `main` (sauberes Working Tree); offene Arbeit ueber Feature-Branches.
+- Stand `2026-05-14` — Branch: `feature/resend-mail-integration` (Commit `713c3b6`), wartet auf Merge.
+- **Zuletzt erledigt (2026-05-14 – Welle 7 / Resend Mail-Integration)**:
+  - **Resend angebunden**: `lib/mail.ts` kapselt `sendDocumentMail()`, graceful fallback wenn `RESEND_API_KEY` fehlt.
+  - **Server-Route** `app/api/mail/send-document/route.ts`: Auth-Guard (alle Rollen außer Lager), empfängt PDF als Base64, sendet via Resend mit Anhang, schreibt Audit-Log.
+  - **PDF-Funktionen erweitert**: `generateRechnungPDF` und `generateAngebotPDF` haben optionalen `returnBase64`-Parameter; Download-Verhalten unveraendert.
+  - **BueroePilot**: `✉️ Mail`-Button neben PDF bei Rechnungen und Angeboten; oeffnet Modal mit vorausgefuellter Kunden-Email (aus `buero_kunden`), editierbar; Toast-Feedback; Audit-Log bei Versand.
+  - **Env**: `.env.example` um `RESEND_API_KEY` und `MAIL_FROM_ADDRESS` ergaenzt.
+  - Fuer Live-Betrieb benoetigt: `RESEND_API_KEY` in Vercel setzen + Domain `petersen-ki-pilot.de` bei Resend verifizieren.
+  - Betroffene Dateien: `lib/mail.ts` (neu), `app/api/mail/send-document/route.ts` (neu), `lib/pdf.ts`, `app/dashboard/buero/page.tsx`, `.env.example`, `package.json`.
+  - Tests: lint gruen (keine neuen Fehler); build gruen.
+
+
 - **Zuletzt erledigt (2026-05-14 – Welle 6 / Webhook-Idempotenz + Owner KPIs Phase 2)**:
   - **Stripe-Webhook Event-ID-Dedupe**: neue Tabelle `stripe_webhook_events` (PK `event_id`) plus Migration `20260514040000_add_stripe_webhook_events.sql`; Webhook-Route prueft jetzt zuerst `event.id` und antwortet bei Wiederholung `202 already_processed`. Verhindert doppelte `billing_payments` und `audit_logs` bei Stripe-Retries (bis zu 3 Tage). Bestehender Status-Mapping- und Owner-Event-Pfad (`syncStripeInvoiceState`) bleibt unveraendert.
   - **Owner-Dashboard erweitert**: `OwnerDashboardSnapshot` um `revenueLast30Days` und `overdueInvoices` ergaenzt. Dashboard zeigt jetzt zusaetzlich zwei Kacheln: `Umsatz 30 Tage` und `Überfällig >14 T` als Delta auf der `Offene Rechnungen`-Karte. UI bleibt Petersen-KI-konform (gleiche Kachel-Logik, eigene Akzentfarbe `#34d399` fuer 30-Tage-Umsatz).
