@@ -65,9 +65,14 @@
   - **Inhaber-Dashboard Action-Banner**: Dashboard-Cockpit zeigt bei `pendingActivations > 0` einen grünen Aktions-Banner und bei `failedPayments > 0` einen roten Banner – beide mit Direktlink zur Kundensteuerung.
   - Betroffene Dateien: `components/billing/OwnerCustomerControlPanel.tsx`, `app/dashboard/einstellungen/page.tsx`, `app/dashboard/page.tsx`.
   - Tests: lint + build grün; bekannte Warnungen unverändert. Commit `8d76a46` auf `feature/billing-ux-improvements`.
+- **Zuletzt erledigt (2026-05-14 – Welle 5 / Nummernkreis + PDF)**:
+  - **Nummernkreis finalisiert**: Manuelle Büro-Rechnungen holen jetzt `getNextInvoiceNumber()` und setzen `nummer` (RE-YYYY-XXXXX); Rechnungsliste und Kunden-Detailansicht zeigen `nummer` statt `id`; PDF-Dateiname nutzt `nummer`.
+  - **PDF grundlegend veredelt** (`lib/pdf.ts`): Petersen-KI-konformes dunkles Header-Band mit vollem Firmenkontakt, DIN-5008-Absenderzeile, Metadaten-Block rechts, dunkle Tabellen-Header, Netto/MwSt/Brutto aus DB-Feldern, Zahlungshinweis-Box mit Bankdaten + Verwendungszweck, dunkler Footer. Gilt für Rechnung und Angebot.
+  - Betroffene Dateien: `lib/pdf.ts`, `app/dashboard/buero/page.tsx`. Commit `32be432` auf `feature/invoice-numbering-pdf`.
+  - Tests: lint + build grün, nur bekannte Warnungen.
 - **Naechster Umsetzungsschritt**:
-  - Webhook-URL in Stripe-Dashboard auf `app.petersen-ki-pilot.de/api/billing/stripe-webhook` umstellen (aktuell noch vercel.app)
-  - Branch `feature/billing-ux-improvements` nach Prüfung in main mergen und pushen
+  - Branch `feature/invoice-numbering-pdf` mergen und pushen
+  - Webhook-URL in Stripe-Dashboard auf `app.petersen-ki-pilot.de/api/billing/stripe-webhook` prüfen
 - **Zuletzt erledigt (2026-05-14 – Welle 2A / Billing Entities)**:
   - **Billing-faehige Stammdaten erweitert**: `buero_kunden` und `buero_rechnungen` um Billing-/Abo-/Rechnungsfelder erweitert.
   - **Neue Tabellen vorbereitet**: `billing_payments` und `audit_logs` inkl. RLS/Indizes als Fundament fuer Zahlungen und Nachvollziehbarkeit.
