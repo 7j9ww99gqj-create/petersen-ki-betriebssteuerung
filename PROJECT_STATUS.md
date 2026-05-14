@@ -21,16 +21,27 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
-- Stand `2026-05-14` — Branch: `feature/resend-mail-integration` (Commit `713c3b6`), wartet auf Merge.
+- Stand `2026-05-14` — Branch: `main` (Commit `dd6b046`), Vercel Production deployed und Ready.
 - **Zuletzt erledigt (2026-05-14 – Welle 7 / Resend Mail-Integration)**:
   - **Resend angebunden**: `lib/mail.ts` kapselt `sendDocumentMail()`, graceful fallback wenn `RESEND_API_KEY` fehlt.
   - **Server-Route** `app/api/mail/send-document/route.ts`: Auth-Guard (alle Rollen außer Lager), empfängt PDF als Base64, sendet via Resend mit Anhang, schreibt Audit-Log.
   - **PDF-Funktionen erweitert**: `generateRechnungPDF` und `generateAngebotPDF` haben optionalen `returnBase64`-Parameter; Download-Verhalten unveraendert.
   - **BueroePilot**: `✉️ Mail`-Button neben PDF bei Rechnungen und Angeboten; oeffnet Modal mit vorausgefuellter Kunden-Email (aus `buero_kunden`), editierbar; Toast-Feedback; Audit-Log bei Versand.
   - **Env**: `.env.example` um `RESEND_API_KEY` und `MAIL_FROM_ADDRESS` ergaenzt.
-  - Fuer Live-Betrieb benoetigt: `RESEND_API_KEY` in Vercel setzen + Domain `petersen-ki-pilot.de` bei Resend verifizieren.
   - Betroffene Dateien: `lib/mail.ts` (neu), `app/api/mail/send-document/route.ts` (neu), `lib/pdf.ts`, `app/dashboard/buero/page.tsx`, `.env.example`, `package.json`.
   - Tests: lint gruen (keine neuen Fehler); build gruen.
+- **Vercel Env-Stand (2026-05-14, nach Session-Ende)**:
+  - ✅ `RESEND_API_KEY` gesetzt (Production)
+  - ✅ `MAIL_FROM_ADDRESS` = `rechnungen@petersen-ki-pilot.de` gesetzt
+  - ✅ `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` gesetzt
+  - ✅ `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` gesetzt
+  - ✅ `OPENAI_API_KEY` gesetzt
+  - ❌ `ANTHROPIC_API_KEY` fehlt noch → KI-Assistent (Lager-Chat, Tagesbericht) funktioniert live nicht
+- **Naechster Schritt morgen**:
+  - 🔴 Resend Domain-Verifikation: resend.com → Domains → `petersen-ki-pilot.de` hinzufuegen → 3 DNS-Eintraege beim Domain-Provider setzen. Dann kommen Mails von `rechnungen@petersen-ki-pilot.de` statt `onboarding@resend.dev`.
+  - 🟡 `ANTHROPIC_API_KEY` in Vercel eintragen (console.anthropic.com → API Keys)
+  - 🟢 Mail-Versand testen: BueroPilot → Rechnung → ✉️ Mail → Test-Mail an eigene Adresse
+  - 🟢 Naechste Features: Stripe Customer Portal Link, Mahnwesen/Dunning, Onboarding-Mail bei Freischaltung
 
 
 - **Zuletzt erledigt (2026-05-14 – Welle 6 / Webhook-Idempotenz + Owner KPIs Phase 2)**:
