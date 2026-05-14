@@ -42,6 +42,9 @@ export function OwnerCustomerControlPanel({
 
   if (!enabled) return null
 
+  const pendingActivations = rows.filter(r => r.status === 'proof_sent' && !r.softwareEnabled)
+  const pendingPayments = rows.filter(r => r.status === 'pending_payment')
+
   return (
     <div className="pk-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
@@ -51,6 +54,77 @@ export function OwnerCustomerControlPanel({
         </div>
         <span className="badge badge-blue">{rows.length} Buchungen</span>
       </div>
+
+      {/* Freischaltungs-Review-Flow */}
+      {pendingActivations.length > 0 && (
+        <div style={{
+          marginBottom: 16, padding: '14px 16px', borderRadius: 12,
+          background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.25)',
+        }}>
+          <div style={{ fontWeight: 800, fontSize: 14, color: '#4ddb7e', marginBottom: 10 }}>
+            ✅ {pendingActivations.length} Freischaltung{pendingActivations.length > 1 ? 'en' : ''} bereit – Zahlungsbeleg eingegangen
+          </div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {pendingActivations.map(row => (
+              <div key={row.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 13 }}>
+                  <span style={{ fontWeight: 700 }}>{row.userEmail || row.userKey}</span>
+                  <span style={{ color: '#aeb9c8', marginLeft: 8 }}>
+                    {row.packageId ? PACKAGE_PRICING[row.packageId]?.name ?? row.packageId
+                      : row.pilotIds.map(id => PILOT_PRICING[id]?.name).filter(Boolean).join(', ') || 'Einzelbuchung'}
+                  </span>
+                </div>
+                <button
+                  className="pk-btn"
+                  disabled={savingId === row.id}
+                  onClick={() => applyChange(row.id, { softwareEnabled: true, status: 'active' })}
+                  style={{ fontWeight: 800, fontSize: 13 }}
+                >
+                  {savingId === row.id ? '⏳ Wird freigeschalten…' : '🔓 Jetzt freischalten'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Ausstehende Zahlungen */}
+      {pendingPayments.length > 0 && (
+        <div style={{
+          marginBottom: 16, padding: '12px 16px', borderRadius: 12,
+          background: 'rgba(245,158,11,.07)', border: '1px solid rgba(245,158,11,.22)',
+        }}>
+          <div style={{ fontWeight: 800, fontSize: 13, color: '#fbbf24', marginBottom: 8 }}>
+            ⏳ {pendingPayments.length} Buchung{pendingPayments.length > 1 ? 'en' : ''} mit ausstehender Zahlung
+          </div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {pendingPayments.map(row => (
+              <div key={row.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 13, flexWrap: 'wrap' }}>
+                <span style={{ color: '#dbe4ef' }}>{row.userEmail || row.userKey}</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {row.userEmail && (
+                    <a
+                      href={`mailto:${row.userEmail}?subject=Ihre%20Buchung%20bei%20Petersen%20KI&body=Guten%20Tag%2C%20Ihre%20Buchung%20wartet%20noch%20auf%20eine%20Zahlung.%20Bitte%20schließen%20Sie%20den%20Checkout%20ab.`}
+                      className="pk-btn-ghost"
+                      style={{ fontSize: 12, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                    >
+                      Erneut kontaktieren
+                    </a>
+                  )}
+                  <button
+                    className="pk-btn-ghost"
+                    disabled={savingId === row.id}
+                    onClick={() => applyChange(row.id, { status: 'cancelled' })}
+                    style={{ fontSize: 12, fontWeight: 700, color: '#f43f5e' }}
+                  >
+                    Stornieren
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Kundenbuchungen…</div>
@@ -62,8 +136,17 @@ export function OwnerCustomerControlPanel({
             const label = row.packageId
               ? PACKAGE_PRICING[row.packageId]?.name ?? row.packageId
               : row.pilotIds.map(id => PILOT_PRICING[id]?.name).filter(Boolean).join(', ') || 'Einzelbuchung'
+            const isProofSent = row.status === 'proof_sent'
+            const isPendingPayment = row.status === 'pending_payment'
             return (
-              <div key={row.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 14, background: 'rgba(255,255,255,.03)' }}>
+              <div
+                key={row.id}
+                style={{
+                  border: `1px solid ${isProofSent ? 'rgba(16,185,129,.25)' : isPendingPayment ? 'rgba(245,158,11,.2)' : 'rgba(255,255,255,.08)'}`,
+                  borderRadius: 12, padding: 14,
+                  background: isProofSent ? 'rgba(16,185,129,.04)' : isPendingPayment ? 'rgba(245,158,11,.03)' : 'rgba(255,255,255,.03)',
+                }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontWeight: 800 }}>{row.userEmail || row.userKey}</div>

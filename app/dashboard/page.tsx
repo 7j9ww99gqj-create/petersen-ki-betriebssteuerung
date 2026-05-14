@@ -376,6 +376,57 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
+          {(ownerSnapshot.pendingActivations > 0 || ownerSnapshot.failedPayments > 0) && (
+            <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
+              {ownerSnapshot.pendingActivations > 0 && (
+                <div style={{
+                  padding: '14px 18px', borderRadius: 14,
+                  background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.28)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 14, color: '#4ddb7e' }}>
+                      ✅ {ownerSnapshot.pendingActivations} Freischaltung{ownerSnapshot.pendingActivations > 1 ? 'en' : ''} bereit
+                    </div>
+                    <div style={{ fontSize: 12, color: '#86efac', marginTop: 3, opacity: .85 }}>
+                      Zahlungsbeleg eingegangen – Kunden warten auf Software-Freischaltung.
+                    </div>
+                  </div>
+                  <button
+                    className="pk-btn"
+                    onClick={() => router.push('/dashboard/einstellungen?section=kundensteuerung')}
+                    style={{ fontSize: 13, fontWeight: 800, flexShrink: 0 }}
+                  >
+                    Jetzt freischalten →
+                  </button>
+                </div>
+              )}
+              {ownerSnapshot.failedPayments > 0 && (
+                <div style={{
+                  padding: '14px 18px', borderRadius: 14,
+                  background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.28)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 14, color: '#fca5a5' }}>
+                      💥 {ownerSnapshot.failedPayments} fehlgeschlagene Zahlung{ownerSnapshot.failedPayments > 1 ? 'en' : ''}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#fca5a5', marginTop: 3, opacity: .8 }}>
+                      Betroffene Kunden kontaktieren oder Buchung stornieren.
+                    </div>
+                  </div>
+                  <button
+                    className="pk-btn-ghost"
+                    onClick={() => router.push('/dashboard/einstellungen?section=kundensteuerung')}
+                    style={{ fontSize: 13, fontWeight: 800, flexShrink: 0 }}
+                  >
+                    Prüfen →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{
             marginTop: 16,
             border: '1px solid rgba(255,255,255,.08)',
