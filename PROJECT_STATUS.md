@@ -21,7 +21,18 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
-- Stand `2026-05-14` — Aktueller Branch: `feature/billing-cart-fix`, letzter Commit `8fc7e9a` (Stripe + Owner KPIs committed, 25 Dateien).
+- Stand `2026-05-14` — Aktueller Branch: `main` (sauberes Working Tree); offene Arbeit ueber Feature-Branches.
+- **Zuletzt erledigt (2026-05-14 – Welle 6 / Webhook-Idempotenz + Owner KPIs Phase 2)**:
+  - **Stripe-Webhook Event-ID-Dedupe**: neue Tabelle `stripe_webhook_events` (PK `event_id`) plus Migration `20260514040000_add_stripe_webhook_events.sql`; Webhook-Route prueft jetzt zuerst `event.id` und antwortet bei Wiederholung `202 already_processed`. Verhindert doppelte `billing_payments` und `audit_logs` bei Stripe-Retries (bis zu 3 Tage). Bestehender Status-Mapping- und Owner-Event-Pfad (`syncStripeInvoiceState`) bleibt unveraendert.
+  - **Owner-Dashboard erweitert**: `OwnerDashboardSnapshot` um `revenueLast30Days` und `overdueInvoices` ergaenzt. Dashboard zeigt jetzt zusaetzlich zwei Kacheln: `Umsatz 30 Tage` und `Überfällig >14 T` als Delta auf der `Offene Rechnungen`-Karte. UI bleibt Petersen-KI-konform (gleiche Kachel-Logik, eigene Akzentfarbe `#34d399` fuer 30-Tage-Umsatz).
+  - **Architekturentscheidung kurz**: Idempotenz wird bewusst nicht ueber `provider_event_id`-Spaltenumdeutung gemacht, sondern ueber eine eigenstaendige Tabelle. So bleibt das bestehende Datenmodell stabil und der Dedupe-Pfad ist unabhaengig vom Audit-/Payment-Schreibpfad.
+  - Betroffene Dateien: `app/api/billing/stripe-webhook/route.ts`, `app/dashboard/page.tsx`, `lib/db.ts`, `supabase/schema.sql`, `supabase/migrations/20260514040000_add_stripe_webhook_events.sql`.
+  - Offene Punkte:
+    - Migration `20260514040000_add_stripe_webhook_events.sql` muss noch auf Remote-Supabase angewendet werden (`supabase db push`).
+    - Polling-Pfad (`/api/billing/stripe-sync`) bleibt bewusst dedupe-frei, da bewusst Owner-getrieben.
+  - Tests: `npm run lint` gruen mit bekannten Warnungen (`<img>`, `useEffect`-Dependency); `npm run build` gruen, alle Routen kompilieren.
+
+
 - **Leitplanken fuer weitere Arbeit**:
   - Keine Login-Daten, Secrets, Zugangsdaten oder Tokens ins Repo schreiben.
   - Fuer Owner-/Billing-Planung bei Bedarf Zusatzkontext in `/Users/kevinpetersen/owner-dashboard-project/project-status.md`.

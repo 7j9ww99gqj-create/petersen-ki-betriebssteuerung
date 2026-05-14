@@ -563,6 +563,14 @@ create table if not exists billing_sequences (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists stripe_webhook_events (
+  event_id text primary key,
+  event_type text,
+  received_at timestamptz not null default now()
+);
+create index if not exists idx_stripe_webhook_events_received_at
+  on stripe_webhook_events (received_at desc);
+
 create or replace function pk_next_invoice_number()
 returns text
 language plpgsql
@@ -684,6 +692,10 @@ create index if not exists idx_buero_rechnungen_kunde_id on buero_rechnungen(kun
 create index if not exists idx_buero_rechnungen_payment_link_id on buero_rechnungen(payment_link_id);
 create index if not exists idx_buero_rechnungen_payment_link_reference on buero_rechnungen(payment_link_reference);
 create index if not exists idx_billing_payments_invoice_provider on billing_payments(invoice_id, provider);
+
+alter table stripe_webhook_events enable row level security;
+drop policy if exists "stripe_webhook_events service" on stripe_webhook_events;
+create policy "stripe_webhook_events service" on stripe_webhook_events for all to service_role using (true) with check (true);
 
 -- ── Einkauf / Lieferanten ───────────────────────────────────
 
