@@ -39,6 +39,7 @@
     - Falls spaeter weitere Stripe-Zahlarten oder Billing-Subscriptions gewuenscht sind, sollte das bewusst als eigener Ausbauschritt erfolgen.
   - Tests: `npm run lint` gruen mit bekannten Warnungen (`<img>`, `useEffect`-Dependency); `npm run build` gruen.
   - Commit: `8fc7e9a` auf `feature/billing-cart-fix` – alle neuen Dateien und Migrations eingecheckt; leere Qonto-Ordner entfernt.
+  - **Live-Test bestätigt (2026-05-14)**: Stripe-Checkout funktioniert auf `app.petersen-ki-pilot.de`; Zahlungsbestätigung per SMS erhalten. Fehlende Migrationen nachgezogen (`db push`). Invoice-Anlage server-seitig gefixt (Commits `f29ba53`, `001e500`).
 - **Zuletzt erledigt (2026-05-14 – Welle 3A / Qonto Invoice Sync + Owner KPIs)**:
   - **Qonto-Link an echte Rechnung gekoppelt**: neue Server-Route `app/api/billing/qonto-link/route.ts` erzeugt/reused Qonto-Payment-Links jetzt direkt aus `buero_rechnungen`, speichert Link-Metadaten an der Rechnung und haelt eine interne Referenz fuer Idempotenz.
   - **Sicherer Fallback bleibt aktiv**: wenn Qonto/API/Provider noch nicht fertig konfiguriert ist, wird kein Secret benoetigt; Rechnung markiert den sauberen Fallback und die UI bleibt beim Banktransfer/WhatsApp-Belegfluss nutzbar.
