@@ -649,6 +649,10 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
   // Delete-Bestätigung
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
+  // Mail-Versand
+  const [angebotMailTarget, setAngebotMailTarget] = useState<{ id: string; email: string } | null>(null)
+  const [angebotMailSending, setAngebotMailSending] = useState(false)
+
   useEffect(() => {
     if (isDemo) return
     Promise.all([getBueroAngebote(), getBueroDokumente()])
@@ -670,6 +674,37 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
   const showToast = (msg: string, error = false) => {
     setToast(msg); setToastError(error)
     setTimeout(() => setToast(''), 4000)
+  }
+
+  const handleAngebotMailSend = async (email: string, angebot: Angebot) => {
+    setAngebotMailSending(true)
+    try {
+      const base64 = await generateAngebotPDF(angebot as never, angebot.kunde, true) as string
+      const filename = `Angebot_${angebot.id}.pdf`
+      const res = await fetch('/api/mail/send-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: email,
+          subject: `Ihr Angebot von Petersen KI`,
+          pdfBase64: base64,
+          filename,
+          documentType: 'angebot',
+          documentId: angebot.id,
+        }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        showToast(`Angebot per Mail an ${email} gesendet.`)
+      } else {
+        showToast(data.error || 'Mail konnte nicht gesendet werden.', true)
+      }
+    } catch {
+      showToast('Fehler beim Mail-Versand.', true)
+    } finally {
+      setAngebotMailSending(false)
+      setAngebotMailTarget(null)
+    }
   }
 
   const filtered = angebote.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
@@ -979,6 +1014,13 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                       <button onClick={e => { e.stopPropagation(); generateAngebotPDF(a, a.kunde) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
                         📄 PDF
                       </button>
+                      <button onClick={e => {
+                        e.stopPropagation()
+                        const k = kunden.find(k => k.id === a.kunde_id || k.name === a.kunde)
+                        setAngebotMailTarget({ id: a.id, email: k?.email || '' })
+                      }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
+                        ✉️ Mail
+                      </button>
                       <button onClick={e => { e.stopPropagation(); window.location.href = `/dashboard/buero/angebote/${encodeURIComponent(a.id)}` }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>
                         ↗ Details
                       </button>
@@ -999,6 +1041,44 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
         </table>
       </div>
       <div style={{ marginTop: 10, fontSize: 12, color: '#aeb9c8' }}>{filtered.length} Angebote</div>
+
+      {/* Mail-Modal Angebote */}
+      {angebotMailTarget && (() => {
+        const angebot = angebote.find(a => a.id === angebotMailTarget.id)
+        if (!angebot) return null
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setAngebotMailTarget(null)}>
+            <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>✉️ Angebot per Mail senden</h3>
+                <button onClick={() => setAngebotMailTarget(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
+              </div>
+              <div style={{ fontSize: 13, color: '#aeb9c8', marginBottom: 14 }}>
+                <strong style={{ color: '#f8fbff' }}>{angebot.titel || angebot.id}</strong> — {angebot.kunde} — {angebot.betrag}
+              </div>
+              <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>E-Mail-Adresse des Empfängers</label>
+              <input
+                className="pk-input"
+                type="email"
+                value={angebotMailTarget.email}
+                onChange={e => setAngebotMailTarget({ ...angebotMailTarget, email: e.target.value })}
+                placeholder="kunde@beispiel.de"
+                style={{ width: '100%', marginBottom: 16 }}
+              />
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button className="pk-btn-ghost" onClick={() => setAngebotMailTarget(null)} disabled={angebotMailSending}>Abbrechen</button>
+                <button
+                  className="pk-btn"
+                  disabled={angebotMailSending || !angebotMailTarget.email.includes('@')}
+                  onClick={() => handleAngebotMailSend(angebotMailTarget.email, angebot)}
+                >
+                  {angebotMailSending ? '⏳ Sende…' : '✉️ Jetzt senden'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -1336,6 +1416,10 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
   // Delete-Bestätigung
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
+  // Mail-Versand
+  const [mailTarget, setMailTarget] = useState<{ id: string; email: string; typ: 'rechnung' } | null>(null)
+  const [mailSending, setMailSending] = useState(false)
+
   useEffect(() => {
     if (isDemo) return
     Promise.all([getBueroRechnungen(), getBueroDokumente()])
@@ -1357,6 +1441,37 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
   const showToast = (msg: string, error = false) => {
     setToast(msg); setToastError(error)
     setTimeout(() => setToast(''), 4000)
+  }
+
+  const handleRechnungMailSend = async (email: string, rechnung: Rechnung) => {
+    setMailSending(true)
+    try {
+      const base64 = await generateRechnungPDF(rechnung, rechnung.kunde, true) as string
+      const filename = `Rechnung_${rechnung.nummer || rechnung.id}.pdf`
+      const res = await fetch('/api/mail/send-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: email,
+          subject: `Ihre Rechnung ${rechnung.nummer || rechnung.id} von Petersen KI`,
+          pdfBase64: base64,
+          filename,
+          documentType: 'rechnung',
+          documentId: rechnung.id,
+        }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        showToast(`Rechnung per Mail an ${email} gesendet.`)
+      } else {
+        showToast(data.error || 'Mail konnte nicht gesendet werden.', true)
+      }
+    } catch {
+      showToast('Fehler beim Mail-Versand.', true)
+    } finally {
+      setMailSending(false)
+      setMailTarget(null)
+    }
   }
 
   const filtered = rechnungen.filter(r => filterStatus === 'Alle' || r.status === filterStatus)
@@ -1671,6 +1786,13 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
                       <button onClick={e => { e.stopPropagation(); generateRechnungPDF(r, r.kunde) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
                         📄 PDF
                       </button>
+                      <button onClick={e => {
+                        e.stopPropagation()
+                        const k = kunden.find(k => k.id === r.kunde_id || k.name === r.kunde)
+                        setMailTarget({ id: r.id, email: k?.email || '', typ: 'rechnung' })
+                      }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
+                        ✉️ Mail
+                      </button>
                       <button onClick={e => { e.stopPropagation(); window.location.href = `/dashboard/buero/rechnungen/${encodeURIComponent(r.id)}` }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>
                         ↗ Details
                       </button>
@@ -1691,6 +1813,44 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
         </table>
       </div>
       <div style={{ marginTop: 10, fontSize: 12, color: '#aeb9c8' }}>{filtered.length} Rechnungen</div>
+
+      {/* Mail-Modal */}
+      {mailTarget && (() => {
+        const rechnung = rechnungen.find(r => r.id === mailTarget.id)
+        if (!rechnung) return null
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setMailTarget(null)}>
+            <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>✉️ Rechnung per Mail senden</h3>
+                <button onClick={() => setMailTarget(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
+              </div>
+              <div style={{ fontSize: 13, color: '#aeb9c8', marginBottom: 14 }}>
+                <strong style={{ color: '#f8fbff' }}>{rechnung.nummer || rechnung.id}</strong> — {rechnung.kunde} — {rechnung.betrag}
+              </div>
+              <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>E-Mail-Adresse des Empfängers</label>
+              <input
+                className="pk-input"
+                type="email"
+                value={mailTarget.email}
+                onChange={e => setMailTarget({ ...mailTarget, email: e.target.value })}
+                placeholder="kunde@beispiel.de"
+                style={{ width: '100%', marginBottom: 16 }}
+              />
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button className="pk-btn-ghost" onClick={() => setMailTarget(null)} disabled={mailSending}>Abbrechen</button>
+                <button
+                  className="pk-btn"
+                  disabled={mailSending || !mailTarget.email.includes('@')}
+                  onClick={() => handleRechnungMailSend(mailTarget.email, rechnung)}
+                >
+                  {mailSending ? '⏳ Sende…' : '✉️ Jetzt senden'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
