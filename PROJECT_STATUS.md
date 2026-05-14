@@ -22,6 +22,76 @@
 
 ## 2. Aktueller Arbeitsstand
 - Stand `2026-05-14` — Aktueller Branch: `feature/billing-cart-fix`, Basis weiterhin `main` Commit `f4533b7`.
+- **Leitplanken fuer weitere Arbeit**:
+  - Keine Login-Daten, Secrets, Zugangsdaten oder Tokens ins Repo schreiben.
+  - Fuer Owner-/Billing-Planung bei Bedarf Zusatzkontext in `/Users/kevinpetersen/owner-dashboard-project/project-status.md`.
+- **Zuletzt erledigt (2026-05-14 – Welle 3B / Stripe statt Qonto)**:
+  - **Zahlungsanbieter umgestellt**: die aktive Checkout-/Webhook-/Polling-Integration laeuft jetzt ueber Stripe Checkout Sessions statt ueber Qonto.
+  - **Serverseitige Stripe-Schicht eingebaut**: neue Dateien `lib/stripe.ts`, `lib/stripe-sync.ts` sowie API-Routen `app/api/billing/stripe-link/route.ts`, `app/api/billing/stripe-sync/route.ts` und `app/api/billing/stripe-webhook/route.ts`.
+  - **Qonto-Pfade entfernt**: bisherige Qonto-Routen und -Helper wurden aus der aktiven Integrationsschicht entfernt, damit das Projekt klar auf Stripe zeigt.
+  - **Bestehendes Rechnungsmodell beibehalten**: vorhandene Rechnungs-/Payment-/Owner-Tabellen wurden bewusst weiterverwendet; `payment_link_*` Felder tragen jetzt Stripe-Checkout-Session-Daten.
+  - **Owner-Events erweitert**: Supabase-Checks erlauben jetzt auch Quelle `stripe`; Dashboard-/Aktivitaetsansicht und Demo-Texte sprechen entsprechend Stripe.
+  - **Architekturentscheidung kurz**: statt eines grossen Refactorings bleibt das Datenmodell generisch, nur die Provider-Kapselung wurde ausgetauscht. Idempotenz bleibt je Rechnung ueber `payment_link_reference`.
+  - Betroffene Dateien: `app/api/billing/stripe-link/route.ts`, `app/api/billing/stripe-sync/route.ts`, `app/api/billing/stripe-webhook/route.ts`, `components/billing/PaymentInstructions.tsx`, `app/dashboard/page.tsx`, `lib/billing.ts`, `lib/db.ts`, `lib/stripe.ts`, `lib/stripe-sync.ts`, `package.json`, `package-lock.json`, `supabase/schema.sql`, `supabase/migrations/20260514030000_add_stripe_owner_source.sql`, `.env.example`.
+  - Offene Punkte:
+    - Fuer Live-Betrieb werden `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` und `SUPABASE_SERVICE_ROLE_KEY` serverseitig benoetigt.
+    - Stripe-Webhook deckt `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` und `checkout.session.expired` ab; echte Sandbox-/Testmode-Validierung sollte als naechstes erfolgen.
+    - Falls spaeter weitere Stripe-Zahlarten oder Billing-Subscriptions gewuenscht sind, sollte das bewusst als eigener Ausbauschritt erfolgen.
+  - Tests: `npm run lint` gruen mit bekannten Warnungen (`<img>`, `useEffect`-Dependency); `npm run build` gruen.
+- **Zuletzt erledigt (2026-05-14 – Welle 3A / Qonto Invoice Sync + Owner KPIs)**:
+  - **Qonto-Link an echte Rechnung gekoppelt**: neue Server-Route `app/api/billing/qonto-link/route.ts` erzeugt/reused Qonto-Payment-Links jetzt direkt aus `buero_rechnungen`, speichert Link-Metadaten an der Rechnung und haelt eine interne Referenz fuer Idempotenz.
+  - **Sicherer Fallback bleibt aktiv**: wenn Qonto/API/Provider noch nicht fertig konfiguriert ist, wird kein Secret benoetigt; Rechnung markiert den sauberen Fallback und die UI bleibt beim Banktransfer/WhatsApp-Belegfluss nutzbar.
+  - **Webhook-/Polling-Struktur vorbereitet**: `app/api/billing/qonto-webhook/route.ts`, `app/api/billing/qonto-sync/route.ts` sowie `lib/qonto-sync.ts` mappen Qonto-Link-/Payment-Status auf Rechnung + `billing_payments`, schreiben Audit-Logs und stoßen Owner-Events ueber neue DB-Funktion `pk_register_owner_event()` an.
+  - **Owner-Dashboard erweitert**: neue Snapshot-Logik fuer Umsatz, ausstehende Freischaltungen, offene Rechnungen, fehlgeschlagene Zahlungen und letzte Aktivitaeten; UI bleibt im bestehenden Dashboard.
+  - **Architekturentscheidung kurz**: Qonto bleibt komplett serverseitig gekapselt; Client-UI fragt nur interne API-Routen an. Idempotenz laeuft ueber `payment_link_reference` je echter Rechnung statt ueber harte Fremd-Header/Secrets im Frontend.
+  - Betroffene Dateien: `app/api/billing/qonto-link/route.ts`, `app/api/billing/qonto-sync/route.ts`, `app/api/billing/qonto-webhook/route.ts`, `app/dashboard/page.tsx`, `components/billing/PaymentInstructions.tsx`, `components/billing/PricingSettingsPage.tsx`, `lib/db.ts`, `lib/qonto.ts`, `lib/qonto-sync.ts`, `lib/supabase-admin.ts`, `supabase/schema.sql`, `supabase/migrations/20260514023000_add_qonto_invoice_sync_fields.sql`, `.env.example`.
+  - Offene Punkte:
+    - Qonto-Provider-Connection (`/v2/payment_links/connections`) wird noch nicht aktiv im UI geprueft; aktuell wird fehlende Konfiguration sauber als Fallback behandelt.
+    - Webhook ist signaturpruefend vorbereitet, braucht fuer Live-Nutzung aber `QONTO_WEBHOOK_SECRET` und `SUPABASE_SERVICE_ROLE_KEY`.
+    - Qonto-Webhooks liefern laut Doku Payment-Link- und Payment-Status; fuer Sonderfaelle wie Teilzahlungen/Mehrfachzahlungen ist noch ein fachlicher Owner-Entscheid noetig.
+  - Tests: `npm run lint` gruen mit bekannten Warnungen (`<img>`, `useEffect`-Dependency); `npm run build` gruen.
+- **Zuletzt erledigt (2026-05-14 – Welle 1 / Owner Notifications)**:
+  - **Owner-Event-Inbox vorbereitet**: neues DB-Fundament fuer `owner_event_inbox` und `owner_notifications` in `schema.sql` plus Migration angelegt.
+  - **Billing → Glocke gekoppelt**: Billing-Insert/Statuswechsel/Freischaltung erzeugen jetzt Owner-Events/Notifications ueber DB-Trigger.
+  - **NotificationBell erweitert**: Owner-Billing-Hinweise laufen jetzt in die bestehende Glocke; Read-State wird lokal gespeichert.
+  - **DB-Zugriff ergänzt**: `listOwnerNotifications()` in `lib/db.ts` ergaenzt; `lib/warnings.ts` mischt Owner-Hinweise in die bestehende Warnungslogik.
+  - Betroffene Dateien: `supabase/schema.sql`, `supabase/migrations/20260514010000_add_owner_notifications_inbox.sql`, `lib/db.ts`, `lib/warnings.ts`, `components/NotificationBell.tsx`.
+  - Tests: `npm run lint` gruen mit bekannten Warnungen (`<img>`, `useEffect`-Dependency); `npm run build` gruen.
+- **Naechster Umsetzungsschritt**:
+  - Stripe-Testmodus mit echten Checkout-/Webhook-Events gegen die neue Serverroute verifizieren
+  - Erfolg-/Abbruch-Rueckfuehrung im Billing-UI fuer Stripe noch sichtbarer machen
+  - Offene Owner-Aktionen fuer Payment-Fehler/Freischaltungen im Dashboard ergaenzen
+- **Zuletzt erledigt (2026-05-14 – Welle 2A / Billing Entities)**:
+  - **Billing-faehige Stammdaten erweitert**: `buero_kunden` und `buero_rechnungen` um Billing-/Abo-/Rechnungsfelder erweitert.
+  - **Neue Tabellen vorbereitet**: `billing_payments` und `audit_logs` inkl. RLS/Indizes als Fundament fuer Zahlungen und Nachvollziehbarkeit.
+  - **Owner-Kundensync gehaertet**: Trigger schreibt jetzt `auth_user_id`, `source`, `billing_subscription_id` und `software_enabled` mit.
+  - **Service-Helfer ergänzt**: in `lib/billing.ts` jetzt Helfer fuer Customer-Sync, Invoice-Draft/Invoice-Erzeugung und Payment-Recording.
+  - Betroffene Dateien: `supabase/schema.sql`, `supabase/migrations/20260514013000_add_billing_entities_and_audit.sql`, `lib/db.ts`, `lib/billing.ts`.
+  - Tests: `npm run lint` gruen mit bekannten Warnungen (`<img>`, `useEffect`-Dependency); `npm run build` gruen.
+- **Zuletzt erledigt (2026-05-14 – Welle 2B / Booking Automation)**:
+  - **Buchung -> Kunde -> Rechnung verdrahtet**: `createBookingRequest()` erzeugt bei echter Buchung jetzt automatisch Owner-Kunde und Initialrechnung.
+  - **Idempotenz gegen Doppelrechnung**: bei erneuter Buchung fuer dasselbe Abo wird eine bestehende Subscription-Rechnung wiederverwendet statt neu erzeugt.
+  - **Rechnungsabfrage ergänzt**: `getLatestBueroRechnungBySubscriptionId()` in `lib/db.ts` dient als sichere Wiederverwendungspruefung.
+  - **Parallel Owner-Ideen verdichtet**: MarketingPilot sowie Planung/Steuer wurden als Inhaber-Workstreams separat dokumentiert in `/Users/kevinpetersen/owner-dashboard-project/agents/agent-marketing-owner.md` und `/Users/kevinpetersen/owner-dashboard-project/agents/agent-planung-steuer-owner.md`.
+  - Betroffene Dateien: `lib/billing.ts`, `lib/db.ts`, `PROJECT_STATUS.md`.
+  - Tests: `npm run lint` gruen mit bekannten Warnungen (`<img>`, `useEffect`-Dependency); `npm run build` gruen.
+- **Zuletzt erledigt (2026-05-14 – Welle 2C / Qonto Adapter Start)**:
+  - **Qonto-Adapter angelegt**: neue Datei `lib/qonto.ts` kapselt Payment-Link-Erzeugung ueber Qonto Business API mit Env-basierten Zugangsdaten.
+  - **Keine feste IBAN mehr in Billing-UI**: `PaymentInstructions` liest Bank-/IBAN-Daten jetzt aus den Firmendaten statt aus statischer Pricing-Konfiguration.
+  - **Env-Vorlage ergänzt**: `.env.example` enthaelt jetzt Qonto-Variablen ohne echte Zugangsdaten.
+  - **Wichtige Folgepunkte festgehalten**: fortlaufender Rechnungsnummernkreis und schoener Petersen-KI-Rechnungsstil bleiben naechste direkte Ausbauschritte.
+  - Betroffene Dateien: `lib/qonto.ts`, `components/billing/PaymentInstructions.tsx`, `.env.example`, `PROJECT_STATUS.md`.
+  - Tests: `npm run lint` gruen mit bekannten Warnungen (`<img>`, `useEffect`-Dependency); `npm run build` gruen.
+- **Zuletzt erledigt (2026-05-14 – Welle 3 Start / Nummernkreis + Owner KPIs)**:
+  - **Fortlaufender Rechnungsnummernkreis vorbereitet**: neue DB-Funktion `pk_next_invoice_number()` plus `billing_sequences`.
+  - **Invoice-Drafts nutzen jetzt fortlaufende Nummern** statt ad-hoc Zeitstempelnummern.
+  - **Rechnungs-PDF verbessert**: sichtbare Rechnungsnummer, klarerer Petersen-KI-Abo-Text, staerkerer Markenhinweis im Zahlbereich.
+  - **Inhaber-Dashboard gestartet**: erste Owner-KPI-Kacheln fuer aktive Kunden, MRR, Freischaltungen, offene Rechnungen, Fehler-Zahlungen und ungelesene Hinweise.
+  - Betroffene Dateien: `supabase/migrations/20260514020000_add_invoice_sequence_function.sql`, `supabase/schema.sql`, `lib/db.ts`, `lib/billing.ts`, `lib/pdf.ts`, `app/dashboard/page.tsx`.
+  - Tests: `npm run lint` gruen mit bekannten Warnungen (`<img>`, `useEffect`-Dependency); `npm run build` gruen.
+- **Parallele Agenten-Notizen (2026-05-14)**:
+  - Qonto-Owner-Flow kompakt dokumentiert: `/Users/kevinpetersen/owner-dashboard-project/agents/agent-qonto-owner-flow.md`
+  - Rechnungsdesign-Regeln kompakt dokumentiert: `/Users/kevinpetersen/owner-dashboard-project/agents/agent-invoice-design.md`
 - **Zuletzt erledigt (2026-05-14 – Billing Schritt 3 / Inhaber-Setup)**:
   - **Inhaber-Account angelegt**: interner Firmen-Account `info@petersen-ki-pilot.de` in Supabase Auth erstellt; Zugangsdaten wurden bewusst nicht im Projekt abgelegt.
   - **Versteckte Rolle `Inhaber`**: neue Betreiberrolle ergänzt; nur Inhaber-Account sieht sie in der UI und bekommt die exklusive Kundensteuerung.

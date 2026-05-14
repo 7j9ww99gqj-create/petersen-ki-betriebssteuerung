@@ -2,7 +2,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
-import { getLagerArtikel, getBueroRechnungen, getBueroAuftraege, getFirmaEinstellungen, type FirmaEinstellungen } from '@/lib/db'
+import { getLagerArtikel, getBueroRechnungen, getBueroAuftraege, getFirmaEinstellungen, getOwnerDashboardSnapshot, type FirmaEinstellungen, type OwnerDashboardSnapshot } from '@/lib/db'
+import { loadRole, type AppRole } from '@/lib/roles'
 
 const pilots = [
   { id: 'lager', label: 'LagerPilot', icon: '📦', desc: 'Wareneingang, Bestände, Lagerplätze, Inventur', href: '/dashboard/lager', color: '#1684ff', status: 'AKTIV' },
@@ -35,6 +36,22 @@ const demoFirma: FirmaEinstellungen = {
   standard_mwst: 19,
   standard_waehrung: 'EUR',
   onboarding_completed: true,
+}
+
+const demoOwnerSnapshot: OwnerDashboardSnapshot = {
+  activeCustomers: 24,
+  pendingApprovals: 3,
+  pendingActivations: 4,
+  failedPayments: 1,
+  openInvoices: 6,
+  monthlyRecurringRevenue: 3890,
+  revenueTotal: 28460,
+  unreadNotifications: 5,
+  recentActivities: [
+    { id: 'owner-demo-1', source: 'stripe', severity: 'success', title: 'Zahlung eingegangen', description: 'RE-2026-00014 wurde per Stripe bezahlt.', createdAt: new Date().toISOString(), linkUrl: '/dashboard/einstellungen' },
+    { id: 'owner-demo-2', source: 'billing', severity: 'warn', title: 'Freischaltung offen', description: 'Neukunde wartet auf finale Owner-Pruefung.', createdAt: new Date(Date.now() - 1000 * 60 * 32).toISOString(), linkUrl: '/dashboard/einstellungen' },
+    { id: 'owner-demo-3', source: 'system', severity: 'info', title: 'Sync protokolliert', description: 'Stripe-Abgleich wurde erfolgreich vorbereitet.', createdAt: new Date(Date.now() - 1000 * 60 * 78).toISOString(), linkUrl: '/dashboard/einstellungen' },
+  ],
 }
 
 function useCountUp(target: number, duration = 1400, start = false) {
@@ -163,6 +180,8 @@ export default function DashboardPage() {
   const [kpi, setKpi] = useState<KpiData>(demoKpis)
   const [kpiLoaded, setKpiLoaded] = useState(false)
   const [firma, setFirma] = useState<FirmaEinstellungen | null>(null)
+  const [role, setRole] = useState<AppRole>('Admin')
+  const [ownerSnapshot, setOwnerSnapshot] = useState<OwnerDashboardSnapshot | null>(null)
 
   useEffect(() => {
     const u = localStorage.getItem('pk_user')
@@ -170,9 +189,11 @@ export default function DashboardPage() {
     setTimeout(() => setHeaderVisible(true), 80)
 
     const isDemo = hasDemoCookie()
+    loadRole().then(setRole).catch(() => setRole('Admin'))
     if (isDemo) {
       setFirma(demoFirma)
       localStorage.setItem('pk_firma_einstellungen', JSON.stringify(demoFirma))
+      setOwnerSnapshot(demoOwnerSnapshot)
     } else {
       getFirmaEinstellungen()
         .then(data => {
@@ -180,6 +201,9 @@ export default function DashboardPage() {
           if (data) localStorage.setItem('pk_firma_einstellungen', JSON.stringify(data))
         })
         .catch(() => setFirma(null))
+      getOwnerDashboardSnapshot()
+        .then(setOwnerSnapshot)
+        .catch(() => setOwnerSnapshot(null))
     }
 
     if (!isDemo) {
@@ -311,6 +335,93 @@ export default function DashboardPage() {
           </button>
         ))}
       </div>
+
+      {role === 'Inhaber' && ownerSnapshot && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>Inhaber-Cockpit</h2>
+              <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 4 }}>Kunden, Freischaltungen, offene Forderungen und Owner-Signale auf einen Blick.</div>
+            </div>
+            <button className="pk-btn-ghost" onClick={() => router.push('/dashboard/einstellungen')} style={{ fontSize: 13 }}>
+              Kundensteuerung öffnen
+            </button>
+          </div>
+          <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+            {[
+              { label: 'Aktive Kunden', value: ownerSnapshot.activeCustomers.toLocaleString('de-DE'), icon: '👥', color: '#20c8ff', href: '/dashboard/einstellungen', delta: 'Live aus Billing' },
+              { label: 'Umsatz', value: `${ownerSnapshot.revenueTotal.toLocaleString('de-DE')} €`, icon: '💶', color: '#10b981', href: '/dashboard/buero?tab=rechnungen', delta: `MRR ${ownerSnapshot.monthlyRecurringRevenue.toLocaleString('de-DE')} €` },
+              { label: 'Freischaltungen offen', value: ownerSnapshot.pendingActivations.toLocaleString('de-DE'), icon: '⏳', color: '#f59e0b', href: '/dashboard/einstellungen', delta: `${ownerSnapshot.pendingApprovals} Pending / Beleg` },
+              { label: 'Offene Rechnungen', value: ownerSnapshot.openInvoices.toLocaleString('de-DE'), icon: '🧾', color: '#f43f5e', href: '/dashboard/buero?tab=rechnungen&filter=Offen', delta: 'BüroPilot' },
+              { label: 'Fehler-Zahlungen', value: ownerSnapshot.failedPayments.toLocaleString('de-DE'), icon: '💥', color: '#ef4444', href: '/dashboard/einstellungen', delta: 'Stripe / Billing' },
+              { label: 'Ungelesen', value: ownerSnapshot.unreadNotifications.toLocaleString('de-DE'), icon: '🔔', color: '#a78bfa', href: '/dashboard/einstellungen', delta: 'Owner-Hinweise' },
+            ].map(item => (
+              <button
+                key={item.label}
+                onClick={() => router.push(item.href)}
+                style={{
+                  all: 'unset', cursor: 'pointer',
+                  background: 'linear-gradient(180deg, rgba(18,26,38,.98), rgba(10,14,22,.98))',
+                  border: `1px solid ${item.color}33`,
+                  borderRadius: 18, padding: '16px 18px',
+                  display: 'flex', gap: 12, alignItems: 'center',
+                }}
+              >
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: `${item.color}18`, border: `1px solid ${item.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{item.icon}</div>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: item.color, letterSpacing: '-.03em' }}>{item.value}</div>
+                  <div style={{ fontSize: 12, color: '#dbe4ef' }}>{item.label}</div>
+                  <div style={{ fontSize: 11, color: '#8ba0b8', marginTop: 2 }}>{item.delta}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div style={{
+            marginTop: 16,
+            border: '1px solid rgba(255,255,255,.08)',
+            borderRadius: 20,
+            background: 'linear-gradient(180deg, rgba(17,24,36,.94), rgba(10,14,22,.98))',
+            padding: 18,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900 }}>Letzte Aktivitäten</h3>
+                <div style={{ fontSize: 12, color: '#8ba0b8', marginTop: 4 }}>Billing-, Stripe- und Owner-Signale in zeitlicher Reihenfolge.</div>
+              </div>
+              <span className="badge badge-blue">{ownerSnapshot.recentActivities.length} Einträge</span>
+            </div>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {ownerSnapshot.recentActivities.map(activity => (
+                <button
+                  key={activity.id}
+                  onClick={() => activity.linkUrl ? router.push(activity.linkUrl) : undefined}
+                  style={{
+                    all: 'unset',
+                    cursor: activity.linkUrl ? 'pointer' : 'default',
+                    borderRadius: 14,
+                    border: '1px solid rgba(255,255,255,.08)',
+                    background: 'rgba(255,255,255,.03)',
+                    padding: '12px 14px',
+                    display: 'grid',
+                    gap: 4,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#f8fbff' }}>{activity.title}</div>
+                    <div style={{ fontSize: 11, color: activity.severity === 'error' ? '#fca5a5' : activity.severity === 'success' ? '#86efac' : activity.severity === 'warn' ? '#fcd34d' : '#8ba0b8', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                      {activity.source}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', lineHeight: 1.5 }}>{activity.description}</div>
+                  <div style={{ fontSize: 11, color: '#708199' }}>
+                    {new Date(activity.createdAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pilots grid */}
       <div style={{ marginBottom: 24 }}>

@@ -193,6 +193,7 @@ export function PricingSettingsPage({
             onClear={clearSelection}
           />
           <PaymentInstructions
+            isDemo={isDemo}
             subscription={subscription}
             packageId={subscription?.packageId ?? packageId}
             pilotIds={subscription?.pilotIds ?? selectedPilotIds}

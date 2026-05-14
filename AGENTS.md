@@ -6,12 +6,20 @@
 - Arbeite kompakt und token-sparend.
 - Keine unnötigen Komplettanalysen.
 - Nur relevante Dateien prüfen.
+- Keine Login-Daten, Secrets, Zugangsdaten oder Tokens ins Projekt schreiben.
+- Für Owner-/Billing-Architektur zusätzlich diese Datei als Kontext nutzen:
+  - `/Users/kevinpetersen/owner-dashboard-project/project-status.md`
 
 ## Regeln
 - Keine großen Refactorings ohne ausdrückliche Anweisung.
 - Bestehende Funktionen nicht entfernen.
 - Änderungen klein und nachvollziehbar halten.
 - `PROJECT_STATUS.md` bleibt die aktuelle Projektübersicht.
+- Owner-/Billing-Änderungen immer auch dort knapp dokumentieren:
+  - Änderungen
+  - betroffene Dateien
+  - offene Punkte
+  - Tests
 - Nach relevanten Änderungen `PROJECT_STATUS.md` aktualisieren:
   - Änderungen
   - betroffene Dateien

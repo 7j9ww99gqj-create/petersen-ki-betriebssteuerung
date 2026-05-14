@@ -24,7 +24,10 @@ const CAT_LABEL: Record<Warning['category'], string> = {
   büro: 'Büro',
   werkstatt: 'Werkstatt',
   planung: 'Planung',
+  owner: 'Owner',
 }
+
+const READ_STORAGE_KEY = 'pk_notification_read_ids'
 
 function formatTime(d: Date): string {
   const diff = Date.now() - d.getTime()
@@ -56,6 +59,23 @@ export default function NotificationBell() {
       setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = window.localStorage.getItem(READ_STORAGE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as string[]
+      if (Array.isArray(parsed)) setReadIds(new Set(parsed))
+    } catch {
+      // kaputte lokale Daten ignorieren
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(READ_STORAGE_KEY, JSON.stringify(Array.from(readIds)))
+  }, [readIds])
 
   // Initial load + auto-refresh alle 60 Sekunden
   useEffect(() => {
@@ -141,7 +161,7 @@ export default function NotificationBell() {
             justifyContent: 'space-between', gap: 8,
           }}>
             <div style={{ fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-              Systemwarnungen
+              Benachrichtigungen
               {alertCount > 0 && (
                 <span style={{
                   fontSize: 11, padding: '2px 8px', borderRadius: 999,

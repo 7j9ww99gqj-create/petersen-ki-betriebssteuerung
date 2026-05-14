@@ -55,6 +55,7 @@ type BillingSubscriptionRow = {
   user_id?: string | null
   user_key?: string | null
   user_email?: string | null
+  customer_id?: string | null
   package_id?: string | null
   pilot_ids?: string[] | null
   employee_tier?: string | null
@@ -66,9 +67,28 @@ type BillingSubscriptionRow = {
   updated_at?: string | null
 }
 
+type OwnerNotificationRow = {
+  id: string
+  source?: string | null
+  severity?: string | null
+  type?: string | null
+  title?: string | null
+  message?: string | null
+  link_url?: string | null
+  entity_type?: string | null
+  entity_id?: string | null
+  dedupe_key?: string | null
+  seen_at?: string | null
+  created_at?: string | null
+}
+
 type BueroKundeRecord = {
   id: string
+  auth_user_id?: string | null
+  source?: string | null
+  billing_subscription_id?: string | null
   name?: string | null
+  software_enabled?: boolean | null
 }
 
 type BueroAngebotRecord = {
@@ -97,12 +117,53 @@ type BueroAuftragRecord = {
 type BueroRechnungRecord = {
   id: string
   kunde_id?: string | null
+  billing_subscription_id?: string | null
   kunde?: string | null
+  nummer?: string | null
+  rechnungstyp?: string | null
   betrag?: string | null
+  summe?: number | null
+  netto?: number | null
+  steuer_satz?: number | null
+  steuerbetrag?: number | null
+  pdf_url?: string | null
+  payment_provider?: string | null
+  provider_ref?: string | null
+  payment_link_id?: string | null
+  payment_link_url?: string | null
+  payment_link_reference?: string | null
+  payment_link_status?: string | null
+  payment_link_created_at?: string | null
+  payment_link_error?: string | null
+  auto_generated?: boolean | null
+  leistungszeitraum_von?: string | null
+  leistungszeitraum_bis?: string | null
   faellig?: string | null
   erstellt?: string | null
   status?: string | null
   bezahlt_am?: string | null
+}
+
+type BillingPaymentRow = {
+  id: string
+  customer_id?: string | null
+  billing_subscription_id?: string | null
+  invoice_id?: string | null
+  provider?: string | null
+  provider_ref?: string | null
+  method?: string | null
+  status?: string | null
+  amount?: number | null
+  currency?: string | null
+  booked_at?: string | null
+  last_synced_at?: string | null
+  status_source?: string | null
+  external_reference?: string | null
+  provider_event_id?: string | null
+  failure_reason?: string | null
+  metadata?: Record<string, unknown> | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 type BueroEingangsrechnungRecord = {
@@ -202,6 +263,122 @@ function normalizeBillingSubscription(row: BillingSubscriptionRow) {
     createdAt: firstText(row.created_at),
     updatedAt: firstText(row.updated_at),
     nextPayment: firstText(row.next_payment) || undefined,
+  }
+}
+
+export type OwnerNotification = {
+  id: string
+  source: 'billing' | 'qonto' | 'stripe' | 'buero_pilot' | 'system'
+  severity: 'info' | 'warn' | 'error' | 'success'
+  type: string
+  title: string
+  message?: string
+  linkUrl?: string
+  entityType?: string
+  entityId?: string
+  dedupeKey?: string
+  seenAt?: string
+  createdAt: string
+}
+
+export type BillingPaymentRecord = {
+  id: string
+  customerId?: string
+  billingSubscriptionId?: string
+  invoiceId?: string
+  provider: string
+  providerRef?: string
+  method?: string
+  status: string
+  amount: number
+  currency: string
+  bookedAt?: string
+  lastSyncedAt?: string
+  statusSource?: string
+  externalReference?: string
+  providerEventId?: string
+  failureReason?: string
+  metadata?: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export type AuditLogRecord = {
+  id: string
+  ownerUserId?: string
+  actorUserId?: string
+  action: string
+  targetType: string
+  targetId?: string
+  payload?: Record<string, unknown>
+  createdAt: string
+}
+
+export type OwnerBillingSnapshot = {
+  activeCustomers: number
+  pendingApprovals: number
+  failedPayments: number
+  openInvoices: number
+  monthlyRecurringRevenue: number
+  unreadNotifications: number
+}
+
+export type OwnerRecentActivity = {
+  id: string
+  source: 'billing' | 'qonto' | 'stripe' | 'system'
+  severity: 'info' | 'warn' | 'error' | 'success'
+  title: string
+  description: string
+  linkUrl?: string
+  createdAt: string
+}
+
+export type OwnerDashboardSnapshot = OwnerBillingSnapshot & {
+  revenueTotal: number
+  pendingActivations: number
+  recentActivities: OwnerRecentActivity[]
+}
+
+function normalizeOwnerNotification(row: OwnerNotificationRow): OwnerNotification {
+  const source = firstText(row.source, 'system')
+  const severity = firstText(row.severity, 'info')
+  return {
+    id: row.id,
+    source: (['billing', 'qonto', 'stripe', 'buero_pilot', 'system'].includes(source) ? source : 'system') as OwnerNotification['source'],
+    severity: (['info', 'warn', 'error', 'success'].includes(severity) ? severity : 'info') as OwnerNotification['severity'],
+    type: firstText(row.type, 'system.notice'),
+    title: firstText(row.title, 'Hinweis'),
+    message: firstText(row.message) || undefined,
+    linkUrl: firstText(row.link_url) || undefined,
+    entityType: firstText(row.entity_type) || undefined,
+    entityId: firstText(row.entity_id) || undefined,
+    dedupeKey: firstText(row.dedupe_key) || undefined,
+    seenAt: firstText(row.seen_at) || undefined,
+    createdAt: firstText(row.created_at, new Date().toISOString()),
+  }
+}
+
+function normalizeBillingPayment(row: BillingPaymentRow): BillingPaymentRecord {
+  return {
+    id: row.id,
+    customerId: firstText(row.customer_id) || undefined,
+    billingSubscriptionId: firstText(row.billing_subscription_id) || undefined,
+    invoiceId: firstText(row.invoice_id) || undefined,
+    provider: firstText(row.provider, 'stripe'),
+    providerRef: firstText(row.provider_ref) || undefined,
+    method: firstText(row.method) || undefined,
+    status: firstText(row.status, 'pending'),
+    amount: typeof row.amount === 'number' ? row.amount : 0,
+    currency: firstText(row.currency, 'EUR'),
+    bookedAt: firstText(row.booked_at) || undefined,
+    lastSyncedAt: firstText(row.last_synced_at) || undefined,
+    statusSource: firstText(row.status_source, 'unknown') || undefined,
+    externalReference: firstText(row.external_reference) || undefined,
+    providerEventId: firstText(row.provider_event_id) || undefined,
+    failureReason: firstText(row.failure_reason) || undefined,
+    metadata: row.metadata ?? undefined,
+    createdAt: firstText(row.created_at, new Date().toISOString()),
+    updatedAt: firstText(row.updated_at, new Date().toISOString()),
   }
 }
 
@@ -495,6 +672,257 @@ export async function updateBillingSubscriptionControls(id: string, input: {
   return normalizeBillingSubscription(data as BillingSubscriptionRow)
 }
 
+export async function listOwnerNotifications(limit = 20) {
+  const { data, error } = await db()
+    .from('owner_notifications')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return ((data ?? []) as OwnerNotificationRow[]).map(normalizeOwnerNotification)
+}
+
+export async function upsertBillingPayment(input: {
+  id?: string
+  customer_id?: string
+  billing_subscription_id?: string
+  invoice_id?: string
+  provider?: string
+  provider_ref?: string
+  method?: string
+  status: string
+  amount: number
+  currency?: string
+  booked_at?: string
+  last_synced_at?: string
+  status_source?: string
+  external_reference?: string
+  provider_event_id?: string
+  failure_reason?: string
+  metadata?: Record<string, unknown>
+}) {
+  const payload = {
+    id: input.id ?? genId('PAY'),
+    customer_id: input.customer_id ?? null,
+    billing_subscription_id: input.billing_subscription_id ?? null,
+    invoice_id: input.invoice_id ?? null,
+    provider: input.provider ?? 'stripe',
+    provider_ref: input.provider_ref ?? null,
+    method: input.method ?? null,
+    status: input.status,
+    amount: input.amount,
+    currency: input.currency ?? 'EUR',
+    booked_at: input.booked_at ?? null,
+    last_synced_at: input.last_synced_at ?? null,
+    status_source: input.status_source ?? 'unknown',
+    external_reference: input.external_reference ?? null,
+    provider_event_id: input.provider_event_id ?? null,
+    failure_reason: input.failure_reason ?? null,
+    metadata: input.metadata ?? {},
+    updated_at: new Date().toISOString(),
+  }
+  const { data, error } = await db()
+    .from('billing_payments')
+    .upsert(payload)
+    .select('*')
+    .single()
+  if (error) throw error
+  return normalizeBillingPayment(data as BillingPaymentRow)
+}
+
+export async function listBillingPaymentsBySubscription(subscriptionId: string) {
+  const { data, error } = await db()
+    .from('billing_payments')
+    .select('*')
+    .eq('billing_subscription_id', subscriptionId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return ((data ?? []) as BillingPaymentRow[]).map(normalizeBillingPayment)
+}
+
+export async function listBillingPayments(limit = 100) {
+  const { data, error } = await db()
+    .from('billing_payments')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return ((data ?? []) as BillingPaymentRow[]).map(normalizeBillingPayment)
+}
+
+export async function appendAuditLog(input: {
+  action: string
+  targetType: string
+  targetId?: string
+  ownerUserId?: string
+  payload?: Record<string, unknown>
+}) {
+  const { data, error } = await db()
+    .from('audit_logs')
+    .insert({
+      id: genId('AUD'),
+      owner_user_id: input.ownerUserId ?? null,
+      action: input.action,
+      target_type: input.targetType,
+      target_id: input.targetId ?? null,
+      payload: input.payload ?? {},
+    })
+    .select('*')
+    .single()
+  if (error) throw error
+  const row = data as {
+    id: string
+    owner_user_id?: string | null
+    actor_user_id?: string | null
+    action?: string | null
+    target_type?: string | null
+    target_id?: string | null
+    payload?: Record<string, unknown> | null
+    created_at?: string | null
+  }
+  return {
+    id: row.id,
+    ownerUserId: firstText(row.owner_user_id) || undefined,
+    actorUserId: firstText(row.actor_user_id) || undefined,
+    action: firstText(row.action),
+    targetType: firstText(row.target_type),
+    targetId: firstText(row.target_id) || undefined,
+    payload: row.payload ?? undefined,
+    createdAt: firstText(row.created_at, new Date().toISOString()),
+  } as AuditLogRecord
+}
+
+export async function listAuditLogs(limit = 20) {
+  const { data, error } = await db()
+    .from('audit_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return ((data ?? []) as Array<{
+    id: string
+    owner_user_id?: string | null
+    actor_user_id?: string | null
+    action?: string | null
+    target_type?: string | null
+    target_id?: string | null
+    payload?: Record<string, unknown> | null
+    created_at?: string | null
+  }>).map(row => ({
+    id: row.id,
+    ownerUserId: firstText(row.owner_user_id) || undefined,
+    actorUserId: firstText(row.actor_user_id) || undefined,
+    action: firstText(row.action),
+    targetType: firstText(row.target_type),
+    targetId: firstText(row.target_id) || undefined,
+    payload: row.payload ?? undefined,
+    createdAt: firstText(row.created_at, new Date().toISOString()),
+  }))
+}
+
+export async function getNextInvoiceNumber() {
+  const { data, error } = await db().rpc('pk_next_invoice_number')
+  if (error) throw error
+  if (typeof data !== 'string' || !data.trim()) throw new Error('Rechnungsnummer konnte nicht erzeugt werden.')
+  return data.trim()
+}
+
+function describeAuditAction(item: AuditLogRecord): { title: string; description: string; source: OwnerRecentActivity['source']; severity: OwnerRecentActivity['severity']; linkUrl?: string } {
+  switch (item.action) {
+    case 'billing.invoice.created':
+      return {
+        title: 'Rechnung erzeugt',
+        description: `Neue Billing-Rechnung ${item.targetId ?? 'ohne ID'} wurde erstellt.`,
+        source: 'billing',
+        severity: 'success',
+        linkUrl: '/dashboard/buero?tab=rechnungen',
+      }
+    case 'billing.payment.recorded':
+      return {
+        title: 'Zahlungsstatus aktualisiert',
+        description: `Payment ${item.payload?.status ? String(item.payload.status) : 'aktualisiert'} fuer ${item.payload?.subscriptionId ? String(item.payload.subscriptionId) : 'ein Abo'}.`,
+        source: 'stripe',
+        severity: item.payload?.status === 'failed' ? 'error' : item.payload?.status === 'paid' ? 'success' : 'info',
+        linkUrl: '/dashboard/einstellungen',
+      }
+    case 'owner.customer.synced_from_subscription':
+      return {
+        title: 'Owner-Kunde synchronisiert',
+        description: `Kundendatensatz ${item.targetId ?? 'ohne ID'} wurde mit Billing abgeglichen.`,
+        source: 'billing',
+        severity: 'info',
+        linkUrl: '/dashboard/einstellungen',
+      }
+    default:
+      return {
+        title: item.action,
+        description: item.targetId ? `Ziel: ${item.targetId}` : 'Audit-Eintrag aktualisiert.',
+        source: item.action.includes('stripe') ? 'stripe' : item.action.includes('qonto') ? 'qonto' : item.action.includes('billing') ? 'billing' : 'system',
+        severity: 'info',
+      }
+  }
+}
+
+export async function getOwnerDashboardSnapshot(): Promise<OwnerDashboardSnapshot> {
+  const [subscriptions, invoices, notifications, payments, auditLogs] = await Promise.all([
+    listBillingSubscriptionsForOwner(),
+    getBueroRechnungen(),
+    listOwnerNotifications(50),
+    listBillingPayments(100),
+    listAuditLogs(12),
+  ])
+
+  const recentActivities = [
+    ...notifications.map(item => ({
+      id: `notif:${item.id}`,
+      source: item.source === 'buero_pilot' ? 'system' : item.source,
+      severity: item.severity,
+      title: item.title,
+      description: item.message ?? item.type,
+      linkUrl: item.linkUrl,
+      createdAt: item.createdAt,
+    }) satisfies OwnerRecentActivity),
+    ...auditLogs.map(item => {
+      const summary = describeAuditAction(item)
+      return {
+        id: `audit:${item.id}`,
+        source: summary.source,
+        severity: summary.severity,
+        title: summary.title,
+        description: summary.description,
+        linkUrl: summary.linkUrl,
+        createdAt: item.createdAt,
+      } satisfies OwnerRecentActivity
+    }),
+  ]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 6)
+
+  return {
+    activeCustomers: subscriptions.filter(item => item.softwareEnabled || item.status === 'active').length,
+    pendingApprovals: subscriptions.filter(item => item.status === 'pending_payment' || item.status === 'proof_sent').length,
+    pendingActivations: subscriptions.filter(item => !item.softwareEnabled && (item.status === 'pending_payment' || item.status === 'proof_sent' || item.status === 'active')).length,
+    failedPayments: payments.filter(item => item.status === 'failed').length,
+    openInvoices: invoices.filter(item => item.status !== 'Bezahlt').length,
+    monthlyRecurringRevenue: subscriptions.reduce((sum, item) => sum + (item.status === 'active' ? item.monthlyPrice ?? 0 : 0), 0),
+    revenueTotal: invoices.reduce((sum, item) => sum + ((item.status === 'Bezahlt' ? item.summe ?? 0 : 0)), 0),
+    unreadNotifications: notifications.filter(item => !item.seenAt).length,
+    recentActivities,
+  }
+}
+
+export async function getOwnerBillingSnapshot(): Promise<OwnerBillingSnapshot> {
+  const snapshot = await getOwnerDashboardSnapshot()
+  return {
+    activeCustomers: snapshot.activeCustomers,
+    pendingApprovals: snapshot.pendingApprovals,
+    failedPayments: snapshot.failedPayments,
+    openInvoices: snapshot.openInvoices,
+    monthlyRecurringRevenue: snapshot.monthlyRecurringRevenue,
+    unreadNotifications: snapshot.unreadNotifications,
+  }
+}
+
 // ── LAGER ────────────────────────────────────────────────────────────────────
 
 export async function getLagerArtikel() {
@@ -559,6 +987,7 @@ export async function getBueroKundeById(id: string) {
 export async function upsertBueroKunde(k: {
   id: string; name: string; typ?: string; ansprechpartner?: string
   email?: string; telefon?: string; ort?: string; umsatz?: string; status?: string
+  auth_user_id?: string; source?: string; billing_subscription_id?: string; software_enabled?: boolean
 }) {
   const { data, error } = await db()
     .from('buero_kunden')
@@ -667,7 +1096,12 @@ export async function getBueroRechnungen() {
 }
 
 export async function upsertBueroRechnung(r: {
-  id: string; kunde_id?: string; kunde?: string; betrag?: string; faellig?: string
+  id: string; kunde_id?: string; billing_subscription_id?: string; kunde?: string; nummer?: string; rechnungstyp?: string
+  betrag?: string; summe?: number; netto?: number; steuer_satz?: number; steuerbetrag?: number
+  pdf_url?: string; payment_provider?: string; provider_ref?: string
+  payment_link_id?: string; payment_link_url?: string; payment_link_reference?: string; payment_link_status?: string; payment_link_created_at?: string; payment_link_error?: string
+  auto_generated?: boolean
+  leistungszeitraum_von?: string; leistungszeitraum_bis?: string; faellig?: string
   erstellt?: string; status?: string; bezahlt_am?: string
 }) {
   const kundenIndex = await listBueroKundenIndex()
@@ -692,6 +1126,22 @@ export async function upsertBueroRechnung(r: {
 export async function getBueroRechnungById(id: string) {
   const [rechnung, kundenIndex] = await Promise.all([
     db().from('buero_rechnungen').select('*').eq('id', id).maybeSingle(),
+    listBueroKundenIndex(),
+  ])
+  if (rechnung.error) throw rechnung.error
+  if (!rechnung.data) return null
+  return normalizeBueroRechnung(rechnung.data as BueroRechnungRecord, kundenIndex.byId)
+}
+
+export async function getLatestBueroRechnungBySubscriptionId(subscriptionId: string) {
+  const [rechnung, kundenIndex] = await Promise.all([
+    db()
+      .from('buero_rechnungen')
+      .select('*')
+      .eq('billing_subscription_id', subscriptionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     listBueroKundenIndex(),
   ])
   if (rechnung.error) throw rechnung.error

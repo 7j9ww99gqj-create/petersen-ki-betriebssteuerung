@@ -4,12 +4,13 @@ import {
   getWerkstattKarten,
   getPlanungProjekte,
   getSteuerBelege,
+  listOwnerNotifications,
 } from '@/lib/db'
 
 export type Warning = {
   id: string
   type: 'error' | 'warn' | 'info' | 'success'
-  category: 'lager' | 'büro' | 'werkstatt' | 'planung'
+  category: 'lager' | 'büro' | 'werkstatt' | 'planung' | 'owner'
   title: string
   desc: string
   link?: string
@@ -219,6 +220,23 @@ export async function getAppWarnings(isDemo: boolean): Promise<Warning[]> {
     }
   } catch {
     // Steuer nicht verfügbar – ignorieren
+  }
+
+  try {
+    const ownerNotifications = await listOwnerNotifications(12)
+    for (const item of ownerNotifications) {
+      warnings.push({
+        id: `owner-${item.id}`,
+        type: item.severity,
+        category: 'owner',
+        title: item.title,
+        desc: item.message ?? item.type,
+        link: item.linkUrl,
+        timestamp: new Date(item.createdAt),
+      })
+    }
+  } catch {
+    // Kein Owner-Kontext oder Tabelle noch nicht live – ignorieren
   }
 
   return warnings

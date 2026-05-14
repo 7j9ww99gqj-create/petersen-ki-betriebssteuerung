@@ -2,6 +2,7 @@
 
 export type PDFRechnung = {
   id: string
+  nummer?: string
   kunde: string
   betrag: string
   faellig: string
@@ -137,7 +138,7 @@ export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: str
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(12)
   doc.setTextColor(80, 100, 120)
-  doc.text(`Rechnungsnummer: ${rechnung.id}`, margin, 48)
+  doc.text(`Rechnungsnummer: ${rechnung.nummer || rechnung.id}`, margin, 48)
 
   // ── Empfänger-Block ─────────────────────────────────────────────────────
   doc.setFillColor(240, 245, 250)
@@ -177,7 +178,7 @@ export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: str
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
   doc.setTextColor(40, 40, 50)
-  doc.text('wir erlauben uns, Ihnen folgende Leistungen in Rechnung zu stellen:', margin, 96)
+  doc.text('vielen Dank fuer Ihr Vertrauen. Fuer Ihr gebuchtes Petersen-KI-Paket stellen wir Ihnen folgende Leistung in Rechnung:', margin, 96)
 
   // ── Tabelle ─────────────────────────────────────────────────────────────
   const tableY = 104
@@ -200,7 +201,7 @@ export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: str
   doc.setFontSize(9)
   doc.setTextColor(40, 40, 50)
   doc.text('1', margin + 3, row1Y + 6.5)
-  doc.text('Erbrachte Leistungen gemäß Auftrag', margin + 20, row1Y + 6.5)
+  doc.text('Petersen KI Betriebssoftware - Abo / Leistungszeitraum', margin + 20, row1Y + 6.5)
   doc.text(rechnung.betrag, pageW - margin - 3, row1Y + 6.5, { align: 'right' })
 
   // Zeile 2 (MwSt)
@@ -237,11 +238,16 @@ export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: str
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(80, 100, 120)
-  doc.text(`Bitte überweisen Sie den Gesamtbetrag bis zum ${rechnung.faellig} auf unser Konto.`, margin, totalY + 26)
+  doc.text(`Bitte begleichen Sie den Gesamtbetrag bis zum ${rechnung.faellig}.`, margin, totalY + 26)
   if (company.iban && company.briefpapier_layout?.showBankdaten !== false) {
     doc.text(`${company.bankname ? company.bankname + ' · ' : ''}IBAN ${company.iban}${company.bic ? ' · BIC ' + company.bic : ''}`, margin, totalY + 31)
   }
-  doc.text('Vielen Dank für Ihren Auftrag!', margin, totalY + 34)
+  doc.setTextColor(...accent)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Petersen KI Betriebssteuerung', margin, totalY + 34)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(80, 100, 120)
+  doc.text('Digitale Betriebssteuerung fuer moderne Unternehmen.', margin, totalY + 39)
 
   // ── Footer ─────────────────────────────────────────────────────────────
   doc.setDrawColor(...accent)
