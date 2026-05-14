@@ -3,8 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
 import { createStripeInvoiceCheckoutSession, buildStripeInvoiceReference } from '@/lib/stripe'
 import { genId } from '@/lib/ids'
-import { createBillingInvoiceForSubscription } from '@/lib/billing'
-import type { SubscriptionRecord } from '@/lib/billing'
 
 export async function POST(req: NextRequest) {
   const access = await getRouteAccess(req)
@@ -16,7 +14,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null) as { invoiceId?: string; subscriptionId?: string } | null
   let invoiceId = body?.invoiceId?.trim()
 
-  // Kein Invoice vorhanden – aus Subscription auto-anlegen
+  // Kein Invoice vorhanden – direkt mit Server-Client anlegen
   if (!invoiceId && body?.subscriptionId) {
     const subResult = await access.supabase
       .from('billing_subscriptions')
@@ -27,27 +25,39 @@ export async function POST(req: NextRequest) {
     if (!subResult.data) return NextResponse.json({ error: 'Abo nicht gefunden.' }, { status: 404 })
 
     const sub = subResult.data as Record<string, unknown>
-    const subscriptionRecord: SubscriptionRecord = {
-      id: sub.id as string,
-      userId: sub.user_id as string | undefined,
-      userKey: (sub.user_key ?? sub.user_id ?? '') as string,
-      userEmail: sub.user_email as string | undefined,
-      packageId: sub.package_id as SubscriptionRecord['packageId'],
-      pilotIds: (sub.pilot_ids ?? []) as SubscriptionRecord['pilotIds'],
-      employeeTier: (sub.employee_tier ?? 'solo') as SubscriptionRecord['employeeTier'],
-      monthlyPrice: sub.monthly_price as number | null,
-      status: (sub.status ?? 'pending_payment') as SubscriptionRecord['status'],
-      softwareEnabled: Boolean(sub.software_enabled),
-      createdAt: sub.created_at as string,
-      updatedAt: sub.updated_at as string,
-    }
-    try {
-      const draft = await createBillingInvoiceForSubscription(subscriptionRecord)
-      invoiceId = draft.id
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Rechnung konnte nicht angelegt werden.'
-      return NextResponse.json({ error: msg }, { status: 500 })
-    }
+    const monthlyPrice = Number(sub.monthly_price ?? 0)
+    const taxRate = 19
+    const netto = Math.round((monthlyPrice / (1 + taxRate / 100)) * 100) / 100
+    const steuer = Math.round((monthlyPrice - netto) * 100) / 100
+
+    // Rechnungsnummer aus DB-Sequenz
+    const numResult = await access.supabase.rpc('pk_next_invoice_number')
+    const nummer = numResult.data ?? `RE-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-5)}`
+
+    const now = new Date()
+    const due = new Date(now)
+    due.setDate(due.getDate() + 14)
+    const fmt = (d: Date) => d.toISOString().slice(0, 10)
+
+    const newInvoiceId = genId('RE')
+    const insertResult = await access.supabase.from('buero_rechnungen').insert({
+      id: newInvoiceId,
+      billing_subscription_id: sub.id,
+      kunde: sub.user_email ?? sub.user_key ?? 'Kunde',
+      nummer,
+      rechnungstyp: 'subscription',
+      betrag: `${monthlyPrice.toFixed(2)} €`,
+      summe: monthlyPrice,
+      netto,
+      steuer_satz: taxRate,
+      steuerbetrag: steuer,
+      auto_generated: true,
+      faellig: fmt(due),
+      erstellt: fmt(now),
+      status: 'Offen',
+    })
+    if (insertResult.error) return NextResponse.json({ error: insertResult.error.message }, { status: 500 })
+    invoiceId = newInvoiceId
   }
 
   if (!invoiceId) {
