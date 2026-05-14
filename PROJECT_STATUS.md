@@ -59,10 +59,15 @@
   - **DB-Zugriff ergänzt**: `listOwnerNotifications()` in `lib/db.ts` ergaenzt; `lib/warnings.ts` mischt Owner-Hinweise in die bestehende Warnungslogik.
   - Betroffene Dateien: `supabase/schema.sql`, `supabase/migrations/20260514010000_add_owner_notifications_inbox.sql`, `lib/db.ts`, `lib/warnings.ts`, `components/NotificationBell.tsx`.
   - Tests: `npm run lint` gruen mit bekannten Warnungen (`<img>`, `useEffect`-Dependency); `npm run build` gruen.
+- **Zuletzt erledigt (2026-05-14 – Welle 4 / Billing UX & Owner Actions)**:
+  - **Stripe-Callback-Banner eingebaut**: `app/dashboard/einstellungen/page.tsx` liest URL-Params `?payment=success/cancelled` aus; zeigt grünes/oranges Banner im Billing-Tab und bereinigt die URL danach. `?section=kundensteuerung` öffnet direkt die Kundensteuerung.
+  - **Freischaltungs-Review-Flow**: `OwnerCustomerControlPanel` zeigt Kunden mit `proof_sent`-Status prominent oben als Quick-Action "Jetzt freischalten" (grüner Banner); Kunden mit `pending_payment` bekommen einen gelben Hinweis mit "Erneut kontaktieren" (mailto) und Stornieren-Button.
+  - **Inhaber-Dashboard Action-Banner**: Dashboard-Cockpit zeigt bei `pendingActivations > 0` einen grünen Aktions-Banner und bei `failedPayments > 0` einen roten Banner – beide mit Direktlink zur Kundensteuerung.
+  - Betroffene Dateien: `components/billing/OwnerCustomerControlPanel.tsx`, `app/dashboard/einstellungen/page.tsx`, `app/dashboard/page.tsx`.
+  - Tests: lint + build grün; bekannte Warnungen unverändert. Commit `8d76a46` auf `feature/billing-ux-improvements`.
 - **Naechster Umsetzungsschritt**:
-  - Stripe-Testmodus mit echten Checkout-/Webhook-Events gegen die neue Serverroute verifizieren
-  - Erfolg-/Abbruch-Rueckfuehrung im Billing-UI fuer Stripe noch sichtbarer machen
-  - Offene Owner-Aktionen fuer Payment-Fehler/Freischaltungen im Dashboard ergaenzen
+  - Webhook-URL in Stripe-Dashboard auf `app.petersen-ki-pilot.de/api/billing/stripe-webhook` umstellen (aktuell noch vercel.app)
+  - Branch `feature/billing-ux-improvements` nach Prüfung in main mergen und pushen
 - **Zuletzt erledigt (2026-05-14 – Welle 2A / Billing Entities)**:
   - **Billing-faehige Stammdaten erweitert**: `buero_kunden` und `buero_rechnungen` um Billing-/Abo-/Rechnungsfelder erweitert.
   - **Neue Tabellen vorbereitet**: `billing_payments` und `audit_logs` inkl. RLS/Indizes als Fundament fuer Zahlungen und Nachvollziehbarkeit.
@@ -243,6 +248,7 @@
 ## 8. Änderungsverlauf
 | Datum | Agent | Änderungen | Betroffene Dateien | Nächste Schritte |
 | --- | --- | --- | --- | --- |
+| 2026-05-14 | Claude | Billing UX: Stripe-Callback-Banner (success/cancelled), Freischaltungs-Review-Flow im Owner-Panel (proof_sent Quick-Action + pending_payment Hinweis + Stornieren), Inhaber-Dashboard Action-Banner für Freischaltungen und fehlgeschlagene Zahlungen | `components/billing/OwnerCustomerControlPanel.tsx`, `app/dashboard/einstellungen/page.tsx`, `app/dashboard/page.tsx` | Webhook-URL in Stripe umstellen; Branch in main mergen |
 | 2026-05-14 | Codex | Inhaber-Setup: internen Firmen-Account `info@petersen-ki-pilot.de` angelegt; versteckte Rolle `Inhaber`; neue exklusive Kundensteuerung; Billing-Trigger spiegelt Buchungen als `buero_kunden`; Migration `20260514002000_add_owner_billing_controls.sql` live ausgerollt | `app/dashboard/einstellungen/page.tsx`, `components/billing/OwnerCustomerControlPanel.tsx`, `lib/billing.ts`, `lib/db.ts`, `lib/roles.ts`, `lib/server-auth.ts`, `supabase/schema.sql`, `supabase/migrations/20260514002000_add_owner_billing_controls.sql`, `PROJECT_STATUS.md` | Rechnungsmodell und Qonto-/SEPA-Flow als naechsten Billing-Schritt aufbauen |
 | 2026-05-13 | Codex | Remote-Supabase-Zugriff wiederhergestellt; CLI lokal via `npx supabase` genutzt; Migration `20260513234500_add_billing_subscriptions.sql` erfolgreich auf Live-Projekt `cchmjrnzaqvowqihcdte` angewendet | `PROJECT_STATUS.md` | Einzel-Piloten als echte Buchungsart ausbauen; danach Billing/Invoice/Qonto/SEPA-Flow fachlich sauber aufsetzen |
 | 2026-05-13 | Codex | Billing Schritt 2: Live-Persistenz fuer Buchung & Abonnement via neue Tabelle `billing_subscriptions`; DB-Layer in `lib/db.ts`; Billing-UI von reinem localStorage auf Supabase umgestellt; Legacy-localStorage wird beim Laden einmalig migriert | `lib/billing.ts`, `lib/db.ts`, `components/billing/PricingSettingsPage.tsx`, `supabase/schema.sql`, `supabase/migrations/20260513234500_add_billing_subscriptions.sql`, `PROJECT_STATUS.md` | Remote-Migration anwenden; danach Einzel-Piloten als vollwertige Buchungsart und Qonto/SEPA-Fluss ausbauen |
