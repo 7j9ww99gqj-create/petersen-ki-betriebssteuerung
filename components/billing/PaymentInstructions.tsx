@@ -64,20 +64,11 @@ export function PaymentInstructions({
       try {
         if (active) setPaymentLink({ mode: 'loading' })
         const invoice = await getLatestBueroRechnungBySubscriptionId(subscription.id)
-        if (!invoice) {
-          if (active) {
-            setPaymentLink({
-              mode: 'fallback',
-              message: 'Es wurde noch keine Billing-Rechnung gefunden. Bis dahin bleibt der manuelle Banktransfer aktiv.',
-            })
-          }
-          return
-        }
 
         const response = await fetch('/api/billing/stripe-link', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ invoiceId: invoice.id }),
+          body: JSON.stringify(invoice ? { invoiceId: invoice.id } : { subscriptionId: subscription.id }),
         })
         const data = await response.json() as {
           error?: string
@@ -97,8 +88,8 @@ export function PaymentInstructions({
 
         if (!active) return
         setPaymentLink({
-          invoiceId: invoice.id,
-          invoiceNumber: data.invoiceNumber || invoice.nummer || invoice.id,
+          invoiceId: invoice?.id,
+          invoiceNumber: data.invoiceNumber || invoice?.nummer || invoice?.id,
           linkStatus: data.linkStatus,
           url: data.url,
           fallbackIban: data.fallbackIban,

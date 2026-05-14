@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
 import { createStripeInvoiceCheckoutSession, buildStripeInvoiceReference } from '@/lib/stripe'
 import { genId } from '@/lib/ids'
+import { createBillingInvoiceForSubscription } from '@/lib/billing'
+import type { SubscriptionRecord } from '@/lib/billing'
 
 export async function POST(req: NextRequest) {
   const access = await getRouteAccess(req)
@@ -11,10 +13,45 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Stripe-Checkout ist im Demo-Modus nicht verfuegbar.' }, { status: 400 })
   }
 
-  const body = await req.json().catch(() => null) as { invoiceId?: string } | null
-  const invoiceId = body?.invoiceId?.trim()
+  const body = await req.json().catch(() => null) as { invoiceId?: string; subscriptionId?: string } | null
+  let invoiceId = body?.invoiceId?.trim()
+
+  // Kein Invoice vorhanden – aus Subscription auto-anlegen
+  if (!invoiceId && body?.subscriptionId) {
+    const subResult = await access.supabase
+      .from('billing_subscriptions')
+      .select('*')
+      .eq('id', body.subscriptionId)
+      .maybeSingle()
+    if (subResult.error) return NextResponse.json({ error: subResult.error.message }, { status: 500 })
+    if (!subResult.data) return NextResponse.json({ error: 'Abo nicht gefunden.' }, { status: 404 })
+
+    const sub = subResult.data as Record<string, unknown>
+    const subscriptionRecord: SubscriptionRecord = {
+      id: sub.id as string,
+      userId: sub.user_id as string | undefined,
+      userKey: (sub.user_key ?? sub.user_id ?? '') as string,
+      userEmail: sub.user_email as string | undefined,
+      packageId: sub.package_id as SubscriptionRecord['packageId'],
+      pilotIds: (sub.pilot_ids ?? []) as SubscriptionRecord['pilotIds'],
+      employeeTier: (sub.employee_tier ?? 'solo') as SubscriptionRecord['employeeTier'],
+      monthlyPrice: sub.monthly_price as number | null,
+      status: (sub.status ?? 'pending_payment') as SubscriptionRecord['status'],
+      softwareEnabled: Boolean(sub.software_enabled),
+      createdAt: sub.created_at as string,
+      updatedAt: sub.updated_at as string,
+    }
+    try {
+      const draft = await createBillingInvoiceForSubscription(subscriptionRecord)
+      invoiceId = draft.id
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Rechnung konnte nicht angelegt werden.'
+      return NextResponse.json({ error: msg }, { status: 500 })
+    }
+  }
+
   if (!invoiceId) {
-    return NextResponse.json({ error: 'invoiceId fehlt.' }, { status: 400 })
+    return NextResponse.json({ error: 'invoiceId oder subscriptionId fehlt.' }, { status: 400 })
   }
 
   const invoiceResult = await access.supabase.from('buero_rechnungen').select('*').eq('id', invoiceId).maybeSingle()
