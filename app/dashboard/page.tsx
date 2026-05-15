@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
 import { getLagerArtikel, getBueroRechnungen, getBueroAuftraege, getFirmaEinstellungen, getOwnerDashboardSnapshot, type FirmaEinstellungen, type OwnerDashboardSnapshot } from '@/lib/db'
 import { loadRole, type AppRole } from '@/lib/roles'
+import { OwnerAiControlPanel } from '@/components/billing/OwnerAiControlPanel'
 
 const pilots = [
   { id: 'lager', label: 'LagerPilot', icon: '📦', desc: 'Wareneingang, Bestände, Lagerplätze, Inventur', href: '/dashboard/lager', color: '#1684ff', status: 'AKTIV' },
@@ -348,6 +349,9 @@ export default function DashboardPage() {
             <button className="pk-btn-ghost" onClick={() => router.push('/dashboard/einstellungen')} style={{ fontSize: 13 }}>
               Kundensteuerung öffnen
             </button>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <OwnerAiControlPanel enabled compact />
           </div>
           <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
             {[

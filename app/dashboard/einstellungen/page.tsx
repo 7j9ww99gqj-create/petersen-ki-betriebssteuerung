@@ -20,6 +20,7 @@ import {
   type FirmaEinstellungen,
 } from '@/lib/db'
 import { PricingSettingsPage } from '@/components/billing/PricingSettingsPage'
+import { OwnerAiControlPanel } from '@/components/billing/OwnerAiControlPanel'
 import { OwnerCustomerControlPanel } from '@/components/billing/OwnerCustomerControlPanel'
 
 type NotifSettings = {
@@ -304,7 +305,10 @@ export default function EinstellungenPage() {
           )}
 
           {section === 'kundensteuerung' && (
-            <OwnerCustomerControlPanel enabled={isInhaberAccount} showToast={showToast} />
+            <div style={{ display: 'grid', gap: 16 }}>
+              <OwnerAiControlPanel enabled={isInhaberAccount} showToast={showToast} />
+              <OwnerCustomerControlPanel enabled={isInhaberAccount} showToast={showToast} />
+            </div>
           )}
 
           {section === 'benachrichtigungen' && (

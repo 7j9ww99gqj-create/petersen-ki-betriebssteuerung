@@ -10,7 +10,7 @@
 
 ## 1. Kurzüberblick
 - Zweck: modulare Betriebssteuerung/ERP-ähnliche Web-App für Lager, Büro, Werkstatt, Steuer, Planung, Marketing, Dokumente und KI-gestützte Erfassung.
-- Stack: `Next.js 14 App Router`, `React 18`, `TypeScript`, `Supabase Auth/Postgres/Storage`, `OpenAI` für Dokument-KI, `Anthropic` für Lager-/Chat-KI.
+- Stack: `Next.js 14 App Router`, `React 18`, `TypeScript`, `Supabase Auth/Postgres/Storage`, `OpenAI` für Dokument-KI und Lager-/Chat-KI.
 - Hauptmodule:
   - `LagerPilot`: Bestand, Bewegungen, Ein-/Ausgang, Inventur, Bestellvorschläge, Stellplätze, Umlagerung, Pickliste, Tagesbericht.
   - `BüroPilot`: Kunden, Angebote, Aufträge, Rechnungen, Eingangsrechnungen, Dokumente, Einkauf.
@@ -22,6 +22,23 @@
 
 ## 2. Aktueller Arbeitsstand
 - Stand `2026-05-14` — Branch: `main` (Commit `dd6b046`), Vercel Production deployed und Ready.
+- **Zuletzt erledigt (2026-05-15 – Owner KI-Toggle / Testphase ohne API-Kosten)**:
+  - **Owner-KI-Steuerung eingebaut**: neues `OwnerAiControlPanel` im Inhaber-Cockpit und in `Einstellungen -> Kundensteuerung` mit Schaltern fuer `KI global`, `Lager-KI / Tagesbericht` und `Dokumenten-KI`.
+  - **Serverseitige Absicherung aktiv**: `app/api/chat/route.ts` und `app/api/document-ai/route.ts` pruefen jetzt vor jedem externen API-Call die globale Owner-Freigabe. Bei `Aus` werden Requests sauber lokal geblockt statt kostenpflichtig ausgefuehrt.
+  - **DB-/Schema-Fundament ergaenzt**: `firma_einstellungen` um `ai_enabled`, `ai_chat_enabled`, `ai_document_enabled` erweitert; neue SQL-Funktion `pk_get_ai_settings()` liefert den Status fuer alle Rollen trotz RLS sicher aus.
+  - **UI-Hinweise ergaenzt**: LagerPilot und KI-Assistent zeigen bei deaktivierter KI klare Hinweise und deaktivieren passende Aktionen/Buttons.
+  - Betroffene Dateien: `components/billing/OwnerAiControlPanel.tsx` (neu), `app/dashboard/page.tsx`, `app/dashboard/einstellungen/page.tsx`, `app/dashboard/lager/page.tsx`, `app/dashboard/ki-erkennung/page.tsx`, `app/api/chat/route.ts`, `app/api/document-ai/route.ts`, `lib/db.ts`, `lib/ai-settings.ts` (neu), `supabase/schema.sql`, `supabase/migrations/20260510213000_live_schema_updates.sql`, `supabase/migrations/20260515090000_add_owner_ai_feature_toggles.sql`.
+  - Offene Punkte:
+    - Migration `20260515090000_add_owner_ai_feature_toggles.sql` muss noch auf Remote-Supabase angewendet werden.
+    - `ANTHROPIC_API_KEY` konnte in dieser Session nicht in Vercel eingetragen werden: lokal liegt kein sicherer Key vor, und die `vercel`-CLI ist hier nicht installiert.
+  - Tests: `npm run lint` gruen (nur bekannte Warnungen); `npm run build` gruen.
+- **Zuletzt erledigt (2026-05-15 – KI-Vereinheitlichung auf OpenAI)**:
+  - `app/api/chat/route.ts` nutzt jetzt ebenfalls die OpenAI Responses API statt Anthropic.
+  - Lager-KI, Tagesbericht und Dokument-KI koennen damit ueber denselben `OPENAI_API_KEY` laufen.
+  - `ANTHROPIC_API_KEY` ist fuer die aktive KI-Schiene damit nicht mehr erforderlich.
+  - Betroffene Dateien: `app/api/chat/route.ts`, `PROJECT_STATUS.md`.
+  - Tests: `npm run lint` gruen (nur bekannte Warnungen); `npm run build` gruen.
+- Aktueller Branch: `feature/owner-ai-toggle`
 - **Zuletzt erledigt (2026-05-14 – Welle 7 / Resend Mail-Integration)**:
   - **Resend angebunden**: `lib/mail.ts` kapselt `sendDocumentMail()`, graceful fallback wenn `RESEND_API_KEY` fehlt.
   - **Server-Route** `app/api/mail/send-document/route.ts`: Auth-Guard (alle Rollen außer Lager), empfängt PDF als Base64, sendet via Resend mit Anhang, schreibt Audit-Log.
@@ -36,10 +53,10 @@
   - ✅ `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` gesetzt
   - ✅ `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` gesetzt
   - ✅ `OPENAI_API_KEY` gesetzt
-  - ❌ `ANTHROPIC_API_KEY` fehlt noch → KI-Assistent (Lager-Chat, Tagesbericht) funktioniert live nicht
+  - ℹ️ `ANTHROPIC_API_KEY` fuer die aktive KI-Schiene nicht mehr noetig, da Lager-/Chat-KI jetzt ebenfalls ueber OpenAI laeuft
 - **Naechster Schritt morgen**:
   - 🔴 Resend Domain-Verifikation: resend.com → Domains → `petersen-ki-pilot.de` hinzufuegen → 3 DNS-Eintraege beim Domain-Provider setzen. Dann kommen Mails von `rechnungen@petersen-ki-pilot.de` statt `onboarding@resend.dev`.
-  - 🟡 `ANTHROPIC_API_KEY` in Vercel eintragen (console.anthropic.com → API Keys)
+  - 🟡 Sicherstellen, dass `OPENAI_API_KEY` gesetzt bleibt; optional `OPENAI_CHAT_MODEL` definieren
   - 🟢 Mail-Versand testen: BueroPilot → Rechnung → ✉️ Mail → Test-Mail an eigene Adresse
   - 🟢 Naechste Features: Stripe Customer Portal Link, Mahnwesen/Dunning, Onboarding-Mail bei Freischaltung
 
@@ -216,7 +233,7 @@
   - Hauptnavi über [`components/Sidebar.tsx`](/Users/kevinpetersen/Documents/petersen-ki/components/Sidebar.tsx) und [`app/dashboard/layout.tsx`](/Users/kevinpetersen/Documents/petersen-ki/app/dashboard/layout.tsx).
   - Viele Detailflüsse bleiben innerhalb großer Einzelseiten via Tabs/Modals statt eigener Detailrouten.
 - Services / APIs:
-  - `app/api/chat/route.ts`: Lager-KI via Anthropic.
+- `app/api/chat/route.ts`: Lager-KI via OpenAI Responses API.
   - `app/api/document-ai/route.ts`: Dokumentklassifikation via OpenAI Responses API.
   - Supabase Browser Client in `lib/supabase.ts`; Server-seitige Nutzung ist nicht überall sauber gelöst.
 
@@ -233,7 +250,7 @@
 | [`supabase/schema.sql`](/Users/kevinpetersen/Documents/petersen-ki/supabase/schema.sql) | Soll-Schema | Migrations, UI-Felder | bei strukturellen DB-Änderungen |
 | [`supabase/migrations/`](/Users/kevinpetersen/Documents/petersen-ki/supabase/migrations) | Live-Nachzüge | Supabase Live-System | bei Deployment-relevanten Änderungen |
 | [`components/DocumentPreviewModal.tsx`](/Users/kevinpetersen/Documents/petersen-ki/components/DocumentPreviewModal.tsx) | Dokumentvorschau | `lib/documents.ts` | bei Preview-/Öffnungsproblemen |
-| [`app/api/chat/route.ts`](/Users/kevinpetersen/Documents/petersen-ki/app/api/chat/route.ts) | Lager-KI | Anthropic, `lib/db.ts` | bei KI-Kontext / Live-Datenzugriff |
+| [`app/api/chat/route.ts`](/Users/kevinpetersen/Documents/petersen-ki/app/api/chat/route.ts) | Lager-KI | OpenAI, `lib/db.ts` | bei KI-Kontext / Live-Datenzugriff |
 | [`app/api/document-ai/route.ts`](/Users/kevinpetersen/Documents/petersen-ki/app/api/document-ai/route.ts) | Dokumentanalyse | OpenAI | bei Klassifikation / Extraktion |
 
 ## 5. Bekannte Probleme

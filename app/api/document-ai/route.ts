@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
+import { getServerAiFeatureSettings } from '@/lib/ai-settings'
 
 export const runtime = 'nodejs'
 
@@ -45,6 +46,14 @@ export async function POST(req: NextRequest) {
   try {
     const access = await getRouteAccess(req, ['Admin', 'Mitarbeiter', 'Büro', 'Werkstatt', 'Lager'])
     if (access.error) return access.error
+
+    const aiSettings = await getServerAiFeatureSettings(access.supabase)
+    if (!aiSettings.enabled || !aiSettings.documentEnabled) {
+      return NextResponse.json(
+        emptyResult('Die Dokumenten-KI wurde im Inhaber-Cockpit derzeit deaktiviert.'),
+        { status: 403 },
+      )
+    }
 
     const form = await req.formData()
     const rawFile = form.get('file')

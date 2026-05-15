@@ -8,6 +8,7 @@ import {
   getLagerStellplaetze, getLagerStellplatzBestand, getLagerUmlagerungen,
   upsertLagerStellplatz, deleteLagerStellplatz,
   upsertLagerStellplatzBestand, deleteLagerStellplatzBestand, umlagerArtikel,
+  getAiFeatureSettings, type AiFeatureSettings,
 } from '@/lib/db'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
@@ -784,6 +785,7 @@ function ScannerModal({ onClose, onScan }: {
 export default function LagerPilotPage() {
   const searchParams = useSearchParams()
   const [isDemo] = useState(() => hasDemoCookie())
+  const [aiSettings, setAiSettings] = useState<AiFeatureSettings>({ enabled: true, chatEnabled: true, documentEnabled: true })
   const [tab, setTab] = useState<LagerTab>('bestand')
   const [search, setSearch] = useState('')
   const [filterKat, setFilterKat] = useState('Alle')
@@ -849,6 +851,7 @@ export default function LagerPilotPage() {
   // Daten laden
   useEffect(() => {
     if (isDemo) return
+    getAiFeatureSettings().then(setAiSettings).catch(() => {})
     setLoading(true); setLoadError('')
     Promise.all([getLagerArtikel(), getLagerBewegungen()])
       .then(([a, b]) => { setArtikel(a as Artikel[]); setBewegungen(b as Bewegung[]) })
@@ -897,6 +900,13 @@ export default function LagerPilotPage() {
   // ── KI-Tagesbericht: Funktionen auf Komponentenebene ────────────────────────
 
   async function generateLagerBrief() {
+    if (!aiSettings.enabled || !aiSettings.chatEnabled) {
+      setBriefText('Die Lager-KI ist derzeit im Inhaber-Cockpit deaktiviert. Es werden keine externen KI-Aufrufe ausgeführt.')
+      setBriefProbleme([])
+      setBriefAktionen([])
+      return
+    }
+
     setBriefLoading(true)
     setBriefText(null)
     setBriefProbleme([])
@@ -933,6 +943,12 @@ export default function LagerPilotPage() {
   }
 
   async function sendProaktivFrage(frage: string) {
+    if (!aiSettings.enabled || !aiSettings.chatEnabled) {
+      setAktiveFrage(frage)
+      setProaktivAntwort({ text: 'Die Lager-KI ist aktuell im Inhaber-Cockpit deaktiviert.', aktionen: [] })
+      return
+    }
+
     setAktiveFrage(frage)
     setProaktivLoading(true)
     setProaktivAntwort(null)
@@ -3146,12 +3162,18 @@ export default function LagerPilotPage() {
                     <button
                       className="pk-btn"
                       onClick={generateLagerBrief}
-                      disabled={briefLoading}
-                      style={{ opacity: briefLoading ? .6 : 1 }}
+                      disabled={briefLoading || !aiSettings.enabled || !aiSettings.chatEnabled}
+                      style={{ opacity: briefLoading || !aiSettings.enabled || !aiSettings.chatEnabled ? .6 : 1 }}
                     >
                       {briefLoading ? '⏳ Wird erstellt…' : briefText ? '🔄 Neu generieren' : '✨ Tagesbericht erstellen'}
                     </button>
                   </div>
+
+                  {(!aiSettings.enabled || !aiSettings.chatEnabled) && (
+                    <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.24)', color: '#fbbf24', fontSize: 12 }}>
+                      Lager-KI ist aktuell deaktiviert. Dadurch entstehen in der Testphase keine Anthropic-Kosten.
+                    </div>
+                  )}
 
                   {/* Kategorisierte Probleme */}
                   {briefProbleme.length > 0 && (
@@ -3306,8 +3328,8 @@ export default function LagerPilotPage() {
                     <div>
                       <div style={{ fontWeight: 800, fontSize: 14, color: '#f8fbff' }}>KI fragt selbst nach</div>
                       <div style={{ fontSize: 11, color: '#10b981', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                        KI-Assistent aktiv
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: aiSettings.enabled && aiSettings.chatEnabled ? '#10b981' : '#f59e0b', display: 'inline-block' }} />
+                        {aiSettings.enabled && aiSettings.chatEnabled ? 'KI-Assistent aktiv' : 'KI-Assistent deaktiviert'}
                       </div>
                     </div>
                   </div>
@@ -3318,7 +3340,9 @@ export default function LagerPilotPage() {
                     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                       <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #1684ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>🧠</div>
                       <div style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: '0 12px 12px 12px', padding: '10px 13px', fontSize: 13, color: '#f8fbff', lineHeight: 1.5 }}>
-                        Ich habe Ihren Lager-Status analysiert. Soll ich etwas für Sie erledigen?
+                        {aiSettings.enabled && aiSettings.chatEnabled
+                          ? 'Ich habe Ihren Lager-Status analysiert. Soll ich etwas für Sie erledigen?'
+                          : 'Die Lager-KI wurde im Inhaber-Cockpit deaktiviert. Fragen und Aktionen bleiben deshalb aus.'}
                       </div>
                     </div>
 
@@ -3328,14 +3352,14 @@ export default function LagerPilotPage() {
                         {proaktivFragen.map((frage, fi) => (
                           <button
                             key={fi}
-                            disabled={proaktivLoading}
+                            disabled={proaktivLoading || !aiSettings.enabled || !aiSettings.chatEnabled}
                             onClick={() => sendProaktivFrage(frage)}
                             style={{
                               textAlign: 'left', padding: '8px 13px', borderRadius: 20, cursor: 'pointer',
                               fontWeight: 500, fontSize: 12, lineHeight: 1.4,
                               background: 'rgba(22,132,255,.1)', border: '1px solid rgba(22,132,255,.3)',
                               color: '#6cb6ff', transition: 'background .15s',
-                              opacity: proaktivLoading ? .5 : 1,
+                              opacity: proaktivLoading || !aiSettings.enabled || !aiSettings.chatEnabled ? .5 : 1,
                             }}
                           >
                             💬 {frage}

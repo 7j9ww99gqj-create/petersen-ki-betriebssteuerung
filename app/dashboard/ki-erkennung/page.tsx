@@ -5,7 +5,7 @@ import {
   umlagerArtikel, getLagerStellplaetze, getLagerStellplatzBestand,
   getBueroDokumentById, getBueroDokumente, getDokumentUrl, insertBueroDokument, updateBueroDokument, uploadDokument,
   upsertBueroEingangsrechnung, upsertBueroRechnung, upsertBueroAngebot,
-  insertEinkaufWareneingang,
+  insertEinkaufWareneingang, getAiFeatureSettings, type AiFeatureSettings,
 } from '@/lib/db'
 import { hasDemoCookie } from '@/lib/auth'
 import { createSupabaseClient } from '@/lib/supabase'
@@ -213,6 +213,7 @@ export default function KiErkennungPage() {
   const router = useRouter()
   const [isDemo] = useState(() => hasDemoCookie())
   const [activeTab, setActiveTab] = useState<Tab>('tagesbrief')
+  const [aiSettings, setAiSettings] = useState<AiFeatureSettings>({ enabled: true, chatEnabled: true, documentEnabled: true })
 
   // Tab: Tagesbrief
   const [briefLoading, setBriefLoading] = useState(false)
@@ -257,6 +258,9 @@ export default function KiErkennungPage() {
 
   useEffect(() => {
     if (isDemo) return
+    getAiFeatureSettings()
+      .then(setAiSettings)
+      .catch(() => {})
     getBueroDokumente()
       .then(rows => {
         setSavedDocs((rows as Array<Record<string, unknown>>).map(row => {
@@ -333,6 +337,11 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
   // ── Dokumente analysieren ──────────────────────────────────────────────────
 
   async function analyzeDocument(file = selectedFile) {
+    if (!aiSettings.enabled || !aiSettings.documentEnabled) {
+      setDocError('Die Dokumenten-KI ist aktuell im Inhaber-Cockpit deaktiviert.')
+      return
+    }
+
     if (!file) {
       setDocError('Bitte zuerst eine PDF- oder Bilddatei auswählen.')
       return
@@ -724,6 +733,12 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
         </div>
       </div>
 
+      {!aiSettings.enabled && (
+        <div style={{ marginBottom: 18, padding: '14px 16px', borderRadius: 12, background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.28)', color: '#fbbf24', fontSize: 13 }}>
+          KI-Funktionen sind derzeit im Inhaber-Cockpit deaktiviert. Dadurch entstehen in der Testphase keine API-Kosten.
+        </div>
+      )}
+
       {/* Tab-Leiste */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,.07)', paddingBottom: 0 }}>
         <button style={tabStyle('tagesbrief')} onClick={() => setActiveTab('tagesbrief')}>🧠 Tagesbrief</button>
@@ -979,7 +994,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
                       {docError}
                     </div>
                   )}
-                  <button className="pk-btn" onClick={() => analyzeDocument()} disabled={!selectedFile} style={{ width: '100%', fontWeight: 700, opacity: selectedFile ? 1 : .55 }}>
+                  <button className="pk-btn" onClick={() => analyzeDocument()} disabled={!selectedFile || !aiSettings.enabled || !aiSettings.documentEnabled} style={{ width: '100%', fontWeight: 700, opacity: selectedFile && aiSettings.enabled && aiSettings.documentEnabled ? 1 : .55 }}>
                     🧠 Dokument mit OpenAI analysieren
                   </button>
                 </div>

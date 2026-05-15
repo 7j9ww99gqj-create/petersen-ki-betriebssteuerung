@@ -341,6 +341,26 @@ export type OwnerDashboardSnapshot = OwnerBillingSnapshot & {
   recentActivities: OwnerRecentActivity[]
 }
 
+export type AiFeatureSettings = {
+  enabled: boolean
+  chatEnabled: boolean
+  documentEnabled: boolean
+}
+
+const DEFAULT_AI_FEATURE_SETTINGS: AiFeatureSettings = {
+  enabled: true,
+  chatEnabled: true,
+  documentEnabled: true,
+}
+
+function normalizeAiFeatureSettings(data?: Record<string, unknown> | null): AiFeatureSettings {
+  return {
+    enabled: typeof data?.ai_enabled === 'boolean' ? data.ai_enabled : DEFAULT_AI_FEATURE_SETTINGS.enabled,
+    chatEnabled: typeof data?.ai_chat_enabled === 'boolean' ? data.ai_chat_enabled : DEFAULT_AI_FEATURE_SETTINGS.chatEnabled,
+    documentEnabled: typeof data?.ai_document_enabled === 'boolean' ? data.ai_document_enabled : DEFAULT_AI_FEATURE_SETTINGS.documentEnabled,
+  }
+}
+
 function normalizeOwnerNotification(row: OwnerNotificationRow): OwnerNotification {
   const source = firstText(row.source, 'system')
   const severity = firstText(row.severity, 'info')
@@ -500,6 +520,9 @@ export type FirmaEinstellungen = {
   dokument_footer?: string
   briefpapier_layout?: Record<string, unknown>
   onboarding_completed?: boolean
+  ai_enabled?: boolean
+  ai_chat_enabled?: boolean
+  ai_document_enabled?: boolean
   created_at?: string
   updated_at?: string
 }
@@ -515,6 +538,19 @@ export async function getFirmaEinstellungen() {
   return data as FirmaEinstellungen | null
 }
 
+export async function getAiFeatureSettings(): Promise<AiFeatureSettings> {
+  const { data, error } = await db()
+    .rpc('pk_get_ai_settings')
+    .single()
+
+  if (error) {
+    if (isSchemaMismatch(error)) return DEFAULT_AI_FEATURE_SETTINGS
+    throw error
+  }
+
+  return normalizeAiFeatureSettings(data as Record<string, unknown> | null)
+}
+
 export async function upsertFirmaEinstellungen(data: FirmaEinstellungen) {
   const { data: saved, error } = await db()
     .from('firma_einstellungen')
@@ -523,12 +559,35 @@ export async function upsertFirmaEinstellungen(data: FirmaEinstellungen) {
       land: data.land || 'Deutschland',
       standard_waehrung: data.standard_waehrung || 'EUR',
       onboarding_completed: data.onboarding_completed ?? true,
+      ai_enabled: data.ai_enabled ?? true,
+      ai_chat_enabled: data.ai_chat_enabled ?? true,
+      ai_document_enabled: data.ai_document_enabled ?? true,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
     .select()
     .single()
   if (error) throw error
   return saved as FirmaEinstellungen
+}
+
+export async function updateAiFeatureSettings(next: Partial<AiFeatureSettings>) {
+  const current = await getFirmaEinstellungen()
+  if (!current) throw new Error('Keine Firmeneinstellungen gefunden. Bitte zuerst die Firmendaten speichern.')
+
+  const merged = normalizeAiFeatureSettings({
+    ai_enabled: next.enabled ?? current.ai_enabled,
+    ai_chat_enabled: next.chatEnabled ?? current.ai_chat_enabled,
+    ai_document_enabled: next.documentEnabled ?? current.ai_document_enabled,
+  })
+
+  await upsertFirmaEinstellungen({
+    ...current,
+    ai_enabled: merged.enabled,
+    ai_chat_enabled: merged.chatEnabled,
+    ai_document_enabled: merged.documentEnabled,
+  })
+
+  return merged
 }
 
 export async function uploadFirmenLogo(file: File) {
