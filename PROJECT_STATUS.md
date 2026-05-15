@@ -22,6 +22,37 @@
 
 ## 2. Aktueller Arbeitsstand
 - Stand `2026-05-14` — Branch: `main` (Commit `dd6b046`), Vercel Production deployed und Ready.
+- **Zuletzt erledigt (2026-05-15 – Benutzer-Einladung/Anlage mit Abo-Limit)**:
+  - **Einladen und Anlegen erweitert**: die zentrale Live-Benutzerverwaltung kann jetzt neue Benutzer entweder per E-Mail einladen oder direkt mit temporaerem Passwort anlegen.
+  - **Abo-/Seat-Limit serverseitig erzwungen**: die Admin-Route loest zuerst den Billing-Kontext des aktuellen Accounts auf und erlaubt neue Benutzer nur bei aktivem, freigeschaltetem Abo. Ohne Abo oder ohne freie Plaetze wird serverseitig blockiert.
+  - **Mitarbeiterstaffel wird live beruecksichtigt**: `1-3` erlaubt max. `3`, `4-10` max. `10`, `11-30` max. `30`, `30+` sehr hohe Obergrenze. Gezaehlt werden der buchende Hauptaccount plus bereits angelegte/eingeladene Team-Benutzer, die an dieselbe `billing_subscription_id` gebunden sind.
+  - **Admin-/Owner-Schutz bleibt aktiv**: normale Admins duerfen weiter keine `Inhaber`-Rolle vergeben; die eigene Rolle kann nicht ueber diese Verwaltung veraendert werden.
+  - **UI erweitert**: `Einstellungen -> Rollen` zeigt jetzt Seat-Auslastung, Begruendung bei Blockierung, Invite-Form und Direktanlage-Form.
+  - Betroffene Dateien: `app/api/admin/users/route.ts`, `app/dashboard/einstellungen/page.tsx`, `PROJECT_STATUS.md`.
+  - Offene Punkte:
+    - Optional spaeter: Benutzer deaktivieren/loeschen, Invite-Resend, Such-/Filterfunktionen.
+  - Tests: `npm run lint` gruen (nur bekannte Warnungen); `npm run build` gruen.
+- **Zuletzt erledigt (2026-05-15 – Live-Benutzerverwaltung / Rollen serverseitig)**:
+  - **Zentrale Live-Benutzerverwaltung eingebaut**: neue Admin-Route `app/api/admin/users/route.ts` listet echte Supabase-Auth-Benutzer serverseitig und speichert Rollen serverseitig per Admin API statt lokal im Browser.
+  - **Rollenvergabe jetzt zentral steuerbar**: In `Einstellungen -> Rollen` gibt es fuer Inhaber/Admin eine Live-Tabelle mit Benutzerliste, Rollenwahl und Speichern pro Benutzer.
+  - **Sicherheitsleitplanken aktiv**: keine Selbst-Aenderung der eigenen Rolle, normale Admins duerfen keine `Inhaber`-Rolle vergeben oder bestehende Inhaber-Konten aendern; Rollenwechsel werden ins `audit_logs` geschrieben.
+  - **Rechte erweitert**: `canManageUsers` gilt jetzt fuer `Inhaber` und `Admin`, passend zum neuen Produktivfluss.
+  - Betroffene Dateien: `app/api/admin/users/route.ts` (neu), `app/dashboard/einstellungen/page.tsx`, `lib/roles.ts`, `PROJECT_STATUS.md`.
+  - Offene Punkte:
+    - Optional spaeter: Filter/Suche, Deaktivieren/Entfernen von Benutzern, gesonderte Owner-Ansicht fuer Einladungen.
+  - Tests: `npm run lint` gruen (nur bekannte Warnungen); `npm run build` gruen.
+- **Zuletzt erledigt (2026-05-15 – Infra-Validierung + Produktiv-Haertung)**:
+  - **Remote-Supabase geprueft**: `supabase migration list` zeigt, dass `20260514040000_add_stripe_webhook_events.sql` und `20260515090000_add_owner_ai_feature_toggles.sql` bereits remote angewendet sind; die alten "offen"-Hinweise waren veraltet.
+  - **Live-Mailversand real validiert**: `vercel curl` auf `app/api/mail/send-document` liefert produktiv sauber den Resend-Fehler `domain is not verified`; technischer Versandpfad lebt, aber `petersen-ki-pilot.de` ist in Resend noch nicht verifiziert.
+  - **Stripe-Webhook live geprueft**: `vercel curl` auf `app/api/billing/stripe-webhook` antwortet auf unsignierten Request korrekt mit `Stripe-Webhook konnte nicht verifiziert werden.`; Route ist aktiv, Signaturpruefung greift.
+  - **Rollen produktionsnah gehaertet**: Self-Service-Rollenwechsel im Live-Betrieb entfernt; Rollen koennen nur noch im Demo-Modus lokal gewechselt werden. Die Einstellungen-UI zeigt produktiv jetzt klar, dass Rollen zentral ueber Inhaber/Admin vergeben werden muessen.
+  - **Büro-Detailansichten erweitert**: Angebote, Auftraege und Rechnungen haben jetzt echte verknuepfte Detailkontexte mit Kundenbezug, Dokumenten, Folgeobjekten bzw. Zahlungsverlauf statt nur generischer Feldlisten.
+  - Betroffene Dateien: `lib/roles.ts`, `app/dashboard/einstellungen/page.tsx`, `lib/db.ts`, `app/dashboard/buero/[entity]/[id]/page.tsx`, `PROJECT_STATUS.md`.
+  - Offene Punkte:
+    - Resend-Domain `petersen-ki-pilot.de` muss in Resend verifiziert werden; erst dann funktioniert echter Versand von `rechnungen@petersen-ki-pilot.de`.
+    - Vollstaendige Stripe-Ende-zu-Ende-Zahlung konnte in dieser Session nicht simuliert werden, weil die echten Secret-Werte lokal nicht verfuegbar sind und das Deployment hinter Vercel Protection liegt.
+    - Zentrale Live-Benutzerverwaltung fuer vorhandene Auth-Benutzer ist jetzt implementiert; Einladungen/Neuanlage fehlen noch.
+  - Tests: `npm run lint` gruen (nur bekannte Warnungen); `npm run build` gruen.
 - **Zuletzt erledigt (2026-05-15 – Owner KI-Toggle / Testphase ohne API-Kosten)**:
   - **Owner-KI-Steuerung eingebaut**: neues `OwnerAiControlPanel` im Inhaber-Cockpit und in `Einstellungen -> Kundensteuerung` mit Schaltern fuer `KI global`, `Lager-KI / Tagesbericht` und `Dokumenten-KI`.
   - **Serverseitige Absicherung aktiv**: `app/api/chat/route.ts` und `app/api/document-ai/route.ts` pruefen jetzt vor jedem externen API-Call die globale Owner-Freigabe. Bei `Aus` werden Requests sauber lokal geblockt statt kostenpflichtig ausgefuehrt.
@@ -38,7 +69,7 @@
   - `ANTHROPIC_API_KEY` ist fuer die aktive KI-Schiene damit nicht mehr erforderlich.
   - Betroffene Dateien: `app/api/chat/route.ts`, `PROJECT_STATUS.md`.
   - Tests: `npm run lint` gruen (nur bekannte Warnungen); `npm run build` gruen.
-- Aktueller Branch: `feature/owner-ai-toggle`
+- Aktueller Branch: `feature/infra-validation-and-hardening`
 - **Zuletzt erledigt (2026-05-14 – Welle 7 / Resend Mail-Integration)**:
   - **Resend angebunden**: `lib/mail.ts` kapselt `sendDocumentMail()`, graceful fallback wenn `RESEND_API_KEY` fehlt.
   - **Server-Route** `app/api/mail/send-document/route.ts`: Auth-Guard (alle Rollen außer Lager), empfängt PDF als Base64, sendet via Resend mit Anhang, schreibt Audit-Log.

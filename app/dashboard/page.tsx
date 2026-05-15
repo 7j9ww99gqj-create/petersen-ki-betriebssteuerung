@@ -180,11 +180,17 @@ export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null)
   const [headerVisible, setHeaderVisible] = useState(false)
-  const [kpi, setKpi] = useState<KpiData>(demoKpis)
+  const [kpi, setKpi] = useState<KpiData>({ lagerArtikel: 0, kritischeBestände: 0, offeneRechnungen: 0, rechnungenWert: '0 €', laufendeAuftraege: 0, ueberfaelligeRechnungen: 0 })
   const [kpiLoaded, setKpiLoaded] = useState(false)
   const [firma, setFirma] = useState<FirmaEinstellungen | null>(null)
   const [role, setRole] = useState<AppRole>('Admin')
   const [ownerSnapshot, setOwnerSnapshot] = useState<OwnerDashboardSnapshot | null>(null)
+
+  const loadOwnerSnapshot = () => {
+    getOwnerDashboardSnapshot()
+      .then(setOwnerSnapshot)
+      .catch(() => setOwnerSnapshot(null))
+  }
 
   useEffect(() => {
     const u = localStorage.getItem('pk_user')
@@ -192,11 +198,11 @@ export default function DashboardPage() {
     setTimeout(() => setHeaderVisible(true), 80)
 
     const isDemo = hasDemoCookie()
-    loadRole().then(setRole).catch(() => setRole('Admin'))
     if (isDemo) {
       setFirma(demoFirma)
       localStorage.setItem('pk_firma_einstellungen', JSON.stringify(demoFirma))
       setOwnerSnapshot(demoOwnerSnapshot)
+      setRole('Inhaber')
     } else {
       getFirmaEinstellungen()
         .then(data => {
@@ -204,9 +210,12 @@ export default function DashboardPage() {
           if (data) localStorage.setItem('pk_firma_einstellungen', JSON.stringify(data))
         })
         .catch(() => setFirma(null))
-      getOwnerDashboardSnapshot()
-        .then(setOwnerSnapshot)
-        .catch(() => setOwnerSnapshot(null))
+      loadRole()
+        .then(r => {
+          setRole(r)
+          if (r === 'Inhaber') loadOwnerSnapshot()
+        })
+        .catch(() => setRole('Admin'))
     }
 
     if (!isDemo) {
@@ -232,6 +241,7 @@ export default function DashboardPage() {
         })
         .finally(() => setKpiLoaded(true))
     } else {
+      setKpi(demoKpis)
       setKpiLoaded(true)
     }
   }, [])
@@ -446,8 +456,16 @@ export default function DashboardPage() {
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900 }}>Letzte Aktivitäten</h3>
                 <div style={{ fontSize: 12, color: '#8ba0b8', marginTop: 4 }}>Billing-, Stripe- und Owner-Signale in zeitlicher Reihenfolge.</div>
               </div>
-              <span className="badge badge-blue">{ownerSnapshot.recentActivities.length} Einträge</span>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span className="badge badge-blue">{ownerSnapshot.recentActivities.length} Einträge</span>
+                <button className="pk-btn-ghost" onClick={loadOwnerSnapshot} style={{ fontSize: 12, padding: '6px 12px' }}>↻ Aktualisieren</button>
+              </div>
             </div>
+            {ownerSnapshot.recentActivities.length === 0 ? (
+              <div style={{ padding: '24px 0', textAlign: 'center', color: '#8ba0b8', fontSize: 13 }}>
+                Noch keine Aktivitäten vorhanden. Sobald Buchungen oder Zahlungen eingehen, erscheinen sie hier.
+              </div>
+            ) : null}
             <div style={{ display: 'grid', gap: 10 }}>
               {ownerSnapshot.recentActivities.map(activity => (
                 <button
