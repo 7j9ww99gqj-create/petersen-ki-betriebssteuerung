@@ -21,7 +21,22 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
-- Stand `2026-05-14` — Branch: `main` (Commit `dd6b046`), Vercel Production deployed und Ready.
+- Stand `2026-05-15` — Branch: `main` (Commit `30f0e47`), Vercel Production deployed und Ready.
+- **Zuletzt erledigt (2026-05-15 – Demo-Daten bereinigt + AnalysePilot live)**:
+  - **Dashboard Fake-KPIs entfernt**: `kpi`-Initialstate war `demoKpis` (8 Artikel, 3 kritisch…) — jetzt Nullwerte; echte User sehen keine Fake-Zahlen mehr vor dem Laden.
+  - **Owner-Snapshot nur für Inhaber**: `getOwnerDashboardSnapshot()` wird jetzt nur noch aufgerufen wenn `role === 'Inhaber'` (sequenziert nach `loadRole()`).
+  - **Inhaber-Cockpit verbessert**: Empty-State für „Letzte Aktivitäten" wenn keine Billing-Events; neuer `↻ Aktualisieren`-Button zum manuellen Reload des Snapshots.
+  - **AnalysePilot vollständig auf Live-Daten umgestellt**:
+    - KPI-Initialstate war `DEMO_KPI` → jetzt `ZERO_KPI`; Demo-Pfad explizit getrennt.
+    - KI-Tab: echte Daten aus `buero_dokumente` (letzte 7 Tage) statt statischer Beispielwerte. Erkennungen pro Wochentag, Genauigkeit aus `confidence >= 0.7`, Dokumenttypen-Verteilung als neue Tabelle. Empty-State wenn keine KI-Dokumente vorhanden.
+    - Bestandstrend: kein fake 0-Befüllen für Vorwochen mehr; zeigt nur echten aktuellen Snapshot mit ehrlichem Hinweis.
+    - Pilot-Nutzungsgrafik: Label „Indikativ – kein Session-Logging aktiv" hinzugefügt.
+  - Betroffene Dateien: `app/dashboard/page.tsx`, `app/dashboard/analyse/page.tsx`, `PROJECT_STATUS.md`.
+  - Offene Punkte:
+    - Analyse-Bestandstrend: Wochensnapshots in eigener Tabelle für echten Verlauf (optional später).
+    - Resend Domain `petersen-ki-pilot.de` muss verifiziert werden.
+    - Stripe Webhook-URL in Stripe-Dashboard prüfen.
+  - Tests: `npm run build` grün. Auf `main` gemergt + deployed.
 - **Zuletzt erledigt (2026-05-15 – Benutzer-Einladung/Anlage mit Abo-Limit)**:
   - **Einladen und Anlegen erweitert**: die zentrale Live-Benutzerverwaltung kann jetzt neue Benutzer entweder per E-Mail einladen oder direkt mit temporaerem Passwort anlegen.
   - **Abo-/Seat-Limit serverseitig erzwungen**: die Admin-Route loest zuerst den Billing-Kontext des aktuellen Accounts auf und erlaubt neue Benutzer nur bei aktivem, freigeschaltetem Abo. Ohne Abo oder ohne freie Plaetze wird serverseitig blockiert.
