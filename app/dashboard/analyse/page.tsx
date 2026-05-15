@@ -13,6 +13,7 @@ import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 
 interface UmsatzPoint { monat: string; umsatz: number; kosten: number; gewinn: number }
 interface BestandPoint { woche: string; artikel: number; niedrig: number; leer: number }
+interface KiDayPoint { tag: string; erkennungen: number; korrekt: number; fehler: number }
 interface KpiData {
   umsatzMonat: number
   gewinnMonat: number
@@ -54,6 +55,11 @@ const DEMO_KPI: KpiData = {
   offeneRechnungenSumme: 14300, offeneAngeboteSumme: 38150,
 }
 
+const ZERO_KPI: KpiData = {
+  umsatzMonat: 0, gewinnMonat: 0, artikelGesamt: 0, artikelNiedrig: 0, artikelLeer: 0,
+  aktivKunden: 0, offeneAngebote: 0, offeneRechnungen: 0, offeneRechnungenSumme: 0, offeneAngeboteSumme: 0,
+}
+
 const MONATSNAMEN = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 
 function parseEuro(v: unknown): number {
@@ -65,7 +71,7 @@ function parseEuro(v: unknown): number {
   return 0
 }
 
-// ── Pilot-Nutzungsverteilung (statisch – kein Logging vorhanden) ──────────────
+// ── Pilot-Nutzungsverteilung (indikativ – kein Session-Logging vorhanden) ─────
 
 const pilotNutzungData = [
   { name: 'LagerPilot', value: 38, color: '#1684ff' },
@@ -74,17 +80,6 @@ const pilotNutzungData = [
   { name: 'AnalysePilot', value: 10, color: '#10b981' },
   { name: 'MarketingPilot', value: 6, color: '#f59e0b' },
   { name: 'PlanungPilot', value: 4, color: '#f43f5e' },
-]
-
-// KI-Erkennungsdaten (statisch – kein Logging vorhanden)
-const kiErkennungData = [
-  { tag: 'Mo', erkennungen: 42, korrekt: 40, fehler: 2 },
-  { tag: 'Di', erkennungen: 58, korrekt: 55, fehler: 3 },
-  { tag: 'Mi', erkennungen: 51, korrekt: 49, fehler: 2 },
-  { tag: 'Do', erkennungen: 67, korrekt: 65, fehler: 2 },
-  { tag: 'Fr', erkennungen: 73, korrekt: 71, fehler: 2 },
-  { tag: 'Sa', erkennungen: 24, korrekt: 24, fehler: 0 },
-  { tag: 'So', erkennungen: 18, korrekt: 17, fehler: 1 },
 ]
 
 // ── Tooltip-Styles ─────────────────────────────────────────────────────────────
@@ -141,15 +136,29 @@ export default function AnalysePilotPage() {
   const [tab, setTab] = useState<Tab>('uebersicht')
   const [zeitraum, setZeitraum] = useState<'7T' | '30T' | '3M' | '6M' | '1J'>('6M')
   const [loading, setLoading] = useState(true)
-  const [kpi, setKpi] = useState<KpiData>(DEMO_KPI)
-  const [umsatzData, setUmsatzData] = useState<UmsatzPoint[]>(DEMO_UMSATZ)
-  const [bestandData, setBestandData] = useState<BestandPoint[]>(DEMO_BESTAND)
+  const [kpi, setKpi] = useState<KpiData>(ZERO_KPI)
+  const [umsatzData, setUmsatzData] = useState<UmsatzPoint[]>([])
+  const [bestandData, setBestandData] = useState<BestandPoint[]>([])
+  const [kiData, setKiData] = useState<KiDayPoint[]>([])
+  const [kiDocTypes, setKiDocTypes] = useState<{ type: string; count: number }[]>([])
   const [isDemo, setIsDemo] = useState(false)
 
   useEffect(() => {
     const demo = hasDemoCookie()
     setIsDemo(demo)
     if (demo || !isSupabaseConfigured()) {
+      setKpi(DEMO_KPI)
+      setUmsatzData(DEMO_UMSATZ)
+      setBestandData(DEMO_BESTAND)
+      setKiData([
+        { tag: 'Mo', erkennungen: 42, korrekt: 40, fehler: 2 },
+        { tag: 'Di', erkennungen: 58, korrekt: 55, fehler: 3 },
+        { tag: 'Mi', erkennungen: 51, korrekt: 49, fehler: 2 },
+        { tag: 'Do', erkennungen: 67, korrekt: 65, fehler: 2 },
+        { tag: 'Fr', erkennungen: 73, korrekt: 71, fehler: 2 },
+        { tag: 'Sa', erkennungen: 24, korrekt: 24, fehler: 0 },
+        { tag: 'So', erkennungen: 18, korrekt: 17, fehler: 1 },
+      ])
       setLoading(false)
       return
     }
@@ -159,12 +168,14 @@ export default function AnalysePilotPage() {
   async function loadLiveData() {
     try {
       const supabase = createSupabaseClient()
-      const [rechnungen, eingangsrechnungen, kunden, angebote, artikel] = await Promise.allSettled([
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      const [rechnungen, eingangsrechnungen, kunden, angebote, artikel, kiDocs] = await Promise.allSettled([
         supabase.from('buero_rechnungen').select('betrag,summe,datum,status').order('created_at'),
         supabase.from('buero_eingangsrechnungen').select('betrag_brutto,rechnungsdatum,status'),
         supabase.from('buero_kunden').select('status'),
         supabase.from('buero_angebote').select('betrag,datum,status'),
         supabase.from('lager_artikel').select('bestand,status,mindestbestand,created_at'),
+        supabase.from('buero_dokumente').select('document_type,confidence,created_at').gte('created_at', sevenDaysAgo),
       ])
 
       // ── Rechnungen ──
@@ -259,39 +270,60 @@ export default function AnalysePilotPage() {
           gewinn: Math.round(v.umsatz - v.kosten),
         }
       })
-      if (newUmsatz.some(p => p.umsatz > 0 || p.kosten > 0)) {
-        setUmsatzData(newUmsatz)
-      }
+      setUmsatzData(newUmsatz)
 
-      // ── Bestand-Chart: Snapshot der letzten 5 Wochen aus lager_bewegungen ──
-      // Da wir keinen Verlauf haben, zeigen wir den aktuellen Snapshot als letzten Datenpunkt
-      // und befüllen frühere Wochen mit Nullwerten.
+      // ── Bestand-Chart: nur aktuellen Snapshot zeigen (kein historisches Logging) ──
       const gesamtArtikel = artikelRows.length
       const niedrig = artikelRows.filter(a => a.status === 'niedrig').length
       const leer = artikelRows.filter(a => a.status === 'leer').length
-      if (gesamtArtikel > 0) {
-        const kw = Math.ceil((now.getDate() + new Date(now.getFullYear(), now.getMonth(), 1).getDay()) / 7)
-        const year = now.getFullYear()
-        const bestandPunkte: BestandPoint[] = Array.from({ length: 5 }, (_, i) => {
-          const weekOffset = 4 - i
-          const weekNr = kw - weekOffset
-          return {
-            woche: `KW${String(weekNr > 0 ? weekNr : weekNr + 52).padStart(2, '0')}`,
-            artikel: i < 4 ? gesamtArtikel : gesamtArtikel,
-            niedrig: i < 4 ? 0 : niedrig,
-            leer: i < 4 ? 0 : leer,
-          }
-        })
-        // Letzten Punkt immer mit echten Zahlen befüllen
-        if (bestandPunkte.length > 0) {
-          bestandPunkte[bestandPunkte.length - 1].niedrig = niedrig
-          bestandPunkte[bestandPunkte.length - 1].leer = leer
-        }
-        void year
-        setBestandData(bestandPunkte)
+      const kw = Math.ceil((now.getDate() + new Date(now.getFullYear(), now.getMonth(), 1).getDay()) / 7)
+      setBestandData([{
+        woche: `KW${String(kw).padStart(2, '0')} (aktuell)`,
+        artikel: gesamtArtikel,
+        niedrig,
+        leer,
+      }])
+
+      // ── KI-Dokumente der letzten 7 Tage ──
+      type KiDocRow = { document_type?: string | null; confidence?: number | null; created_at?: string | null }
+      const kiDokRows = kiDocs.status === 'fulfilled' && !kiDocs.value.error
+        ? (kiDocs.value.data ?? []) as KiDocRow[]
+        : []
+
+      const WOCHENTAGE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
+      const kiByDay = new Map<string, { erkennungen: number; korrekt: number }>()
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now)
+        d.setDate(d.getDate() - i)
+        kiByDay.set(WOCHENTAGE[d.getDay()], { erkennungen: 0, korrekt: 0 })
       }
+      for (const doc of kiDokRows) {
+        if (!doc.document_type || !doc.created_at) continue
+        const d = new Date(doc.created_at)
+        const tag = WOCHENTAGE[d.getDay()]
+        if (!kiByDay.has(tag)) continue
+        const entry = kiByDay.get(tag)!
+        entry.erkennungen++
+        if ((doc.confidence ?? 0) >= 0.7) entry.korrekt++
+      }
+      const newKiData: KiDayPoint[] = Array.from(kiByDay.entries()).map(([tag, v]) => ({
+        tag,
+        erkennungen: v.erkennungen,
+        korrekt: v.korrekt,
+        fehler: v.erkennungen - v.korrekt,
+      }))
+      setKiData(newKiData)
+
+      // ── KI-Dokumenttypen-Verteilung ──
+      const typeMap = new Map<string, number>()
+      for (const doc of kiDokRows) {
+        if (!doc.document_type) continue
+        typeMap.set(doc.document_type, (typeMap.get(doc.document_type) ?? 0) + 1)
+      }
+      setKiDocTypes(Array.from(typeMap.entries()).map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count))
     } catch {
-      // Fallback auf Demo-Daten
+      setUmsatzData(DEMO_UMSATZ)
+      setBestandData(DEMO_BESTAND)
     } finally {
       setLoading(false)
     }
@@ -489,8 +521,13 @@ export default function AnalysePilotPage() {
       {/* ── BESTAND ── */}
       {tab === 'bestand' && (
         <div>
+          {!isDemo && (
+            <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.2)', fontSize: 13, color: '#aeb9c8' }}>
+              ● Live – aktueller Lagerbestand. Historische Wochenvergleiche werden noch nicht automatisch gespeichert.
+            </div>
+          )}
           <div className="pk-card" style={{ marginBottom: 16 }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📦 Bestandsentwicklung – letzte 5 Wochen</h3>
+            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📦 Bestandsübersicht – aktuell</h3>
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={bestandData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <defs>
@@ -549,92 +586,106 @@ export default function AnalysePilotPage() {
       )}
 
       {/* ── KI-NUTZUNG ── */}
-      {tab === 'ki' && (
-        <div>
-          <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.2)', fontSize: 13, color: '#aeb9c8' }}>
-            KI-Erkennungsstatistiken werden noch nicht automatisch erfasst. Die Anzeige basiert auf Beispielwerten.
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
-            {[
-              { label: 'Erkennungen diese Woche', value: '333', icon: '🧠', color: '#a78bfa' },
-              { label: 'Genauigkeit', value: '97.3%', icon: '🎯', color: '#10b981' },
-              { label: 'Fehler gesamt', value: '12', icon: '⚠️', color: '#f43f5e' },
-              { label: 'Ø pro Tag', value: '47', icon: '📊', color: '#1684ff' },
-            ].map(s => (
-              <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
-                <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+      {tab === 'ki' && (() => {
+        const totalErkennungen = kiData.reduce((s, d) => s + d.erkennungen, 0)
+        const totalKorrekt = kiData.reduce((s, d) => s + d.korrekt, 0)
+        const totalFehler = kiData.reduce((s, d) => s + d.fehler, 0)
+        const genauigkeit = totalErkennungen > 0 ? ((totalKorrekt / totalErkennungen) * 100).toFixed(1) : '–'
+        const avgProTag = totalErkennungen > 0 ? Math.round(totalErkennungen / 7) : 0
+        const hasKiData = totalErkennungen > 0
+
+        return (
+          <div>
+            {!isDemo && (
+              <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: hasKiData ? 'rgba(16,185,129,.08)' : 'rgba(22,132,255,.08)', border: `1px solid ${hasKiData ? 'rgba(16,185,129,.2)' : 'rgba(22,132,255,.2)'}`, fontSize: 13, color: '#aeb9c8' }}>
+                {hasKiData
+                  ? `● Live – KI-Erkennungen aus den letzten 7 Tagen (buero_dokumente). Genauigkeit basiert auf confidence ≥ 0.7.`
+                  : `Noch keine KI-Erkennungen in den letzten 7 Tagen. Sobald Dokumente per KI analysiert werden, erscheinen hier echte Werte.`}
               </div>
-            ))}
-          </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+              {[
+                { label: 'Erkennungen diese Woche', value: String(totalErkennungen), icon: '🧠', color: '#a78bfa' },
+                { label: 'Genauigkeit', value: genauigkeit !== '–' ? `${genauigkeit}%` : '–', icon: '🎯', color: '#10b981' },
+                { label: 'Fehler gesamt', value: String(totalFehler), icon: '⚠️', color: '#f43f5e' },
+                { label: 'Ø pro Tag', value: String(avgProTag), icon: '📊', color: '#1684ff' },
+              ].map(s => (
+                <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
+                  <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
 
-          <div className="pk-card" style={{ marginBottom: 16 }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>🧠 KI-Assistenten-Auswertungen pro Tag (diese Woche)</h3>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={kiErkennungData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barGap={2}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" vertical={false} />
-                <XAxis dataKey="tag" tick={axisStyle} axisLine={false} tickLine={false} />
-                <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={36} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend wrapperStyle={{ fontSize: 12, color: '#aeb9c8', paddingTop: 8 }} />
-                <Bar dataKey="korrekt" name="Korrekt erkannt" fill="#a78bfa" radius={[4, 4, 0, 0]} maxBarSize={40} stackId="a" />
-                <Bar dataKey="fehler" name="Fehler" fill="rgba(244,63,94,.6)" radius={[4, 4, 0, 0]} maxBarSize={40} stackId="a" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+            <div className="pk-card" style={{ marginBottom: 16 }}>
+              <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>🧠 KI-Erkennungen pro Tag (letzte 7 Tage)</h3>
+              {hasKiData ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={kiData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barGap={2}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" vertical={false} />
+                    <XAxis dataKey="tag" tick={axisStyle} axisLine={false} tickLine={false} />
+                    <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={36} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: 12, color: '#aeb9c8', paddingTop: 8 }} />
+                    <Bar dataKey="korrekt" name="Korrekt erkannt" fill="#a78bfa" radius={[4, 4, 0, 0]} maxBarSize={40} stackId="a" />
+                    <Bar dataKey="fehler" name="Fehler / niedrige Confidence" fill="rgba(244,63,94,.6)" radius={[4, 4, 0, 0]} maxBarSize={40} stackId="a" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8ba0b8', fontSize: 13 }}>
+                  Keine KI-Erkennungen in den letzten 7 Tagen
+                </div>
+              )}
+            </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div className="pk-card">
-              <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>🥧 Pilot-Nutzungsverteilung</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={pilotNutzungData} cx="50%" cy="50%" outerRadius={80}
-                    dataKey="value" nameKey="name" paddingAngle={2}>
-                    {pilotNutzungData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.color} stroke="transparent" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="pk-card">
+                <h3 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 800 }}>🥧 Pilot-Nutzungsverteilung</h3>
+                <div style={{ fontSize: 11, color: '#8ba0b8', marginBottom: 12 }}>Indikativ – kein Session-Logging aktiv</div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie data={pilotNutzungData} cx="50%" cy="50%" outerRadius={70}
+                      dataKey="value" nameKey="name" paddingAngle={2}>
+                      {pilotNutzungData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} stroke="transparent" />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} formatter={((v: unknown, name: unknown) => [`${v}%`, name]) as TFmt} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginTop: 8 }}>
+                  {pilotNutzungData.map(p => (
+                    <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                      <div style={{ width: 7, height: 7, borderRadius: 2, background: p.color }} />
+                      <span style={{ color: '#aeb9c8' }}>{p.name.replace('Pilot', '')} </span>
+                      <span style={{ color: p.color, fontWeight: 700 }}>{p.value}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="pk-card">
+                <h3 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 800 }}>📋 Erkannte Dokumenttypen</h3>
+                <div style={{ fontSize: 11, color: '#8ba0b8', marginBottom: 12 }}>Letzte 7 Tage aus buero_dokumente</div>
+                {kiDocTypes.length > 0 ? (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {kiDocTypes.slice(0, 6).map(({ type, count }) => (
+                      <div key={type} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 12, color: '#dbe4ef' }}>{type}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa' }}>{count}×</span>
+                      </div>
                     ))}
-                  </Pie>
-                  <Tooltip contentStyle={tooltipStyle} formatter={((v: unknown, name: unknown) => [`${v}%`, name]) as TFmt} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginTop: 8 }}>
-                {pilotNutzungData.map(p => (
-                  <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: 2, background: p.color }} />
-                    <span style={{ color: '#aeb9c8' }}>{p.name.replace('Pilot', '')} </span>
-                    <span style={{ color: p.color, fontWeight: 700 }}>{p.value}%</span>
                   </div>
-                ))}
+                ) : (
+                  <div style={{ padding: '24px 0', textAlign: 'center', color: '#8ba0b8', fontSize: 13 }}>
+                    Noch keine KI-erkannten Dokumente
+                  </div>
+                )}
               </div>
             </div>
-            <div className="pk-card">
-              <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📊 Tagestrend Genauigkeit</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={kiErkennungData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
-                  <XAxis dataKey="tag" tick={axisStyle} axisLine={false} tickLine={false} />
-                  <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={40}
-                    domain={[90, 100]}
-                    tickFormatter={(v) => `${v}%`} />
-                  <Tooltip contentStyle={tooltipStyle}
-                    formatter={((v: unknown, _name: unknown, props: { payload?: { erkennungen: number; korrekt: number } }) => {
-                      const d = props.payload
-                      if (!d) return [String(v), 'Genauigkeit']
-                      const pct = d.erkennungen > 0 ? ((d.korrekt / d.erkennungen) * 100).toFixed(1) : '0'
-                      return [`${pct}%`, 'Genauigkeit']
-                    }) as TFmt} />
-                  <Line type="monotone" dataKey={(d: typeof kiErkennungData[0]) =>
-                    d.erkennungen > 0 ? (d.korrekt / d.erkennungen) * 100 : 0}
-                    stroke="#a78bfa" strokeWidth={2.5}
-                    dot={{ fill: '#a78bfa', r: 5, strokeWidth: 2, stroke: '#0b1420' }}
-                    name="Genauigkeit" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
