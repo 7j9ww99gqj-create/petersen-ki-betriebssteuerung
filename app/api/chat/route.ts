@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
+import { getServerAiFeatureSettings } from '@/lib/ai-settings'
 
 // ── Demo-Kontext (spiegelt die Demo-Daten aus lager/page.tsx wider) ──────────
 
@@ -100,6 +101,18 @@ ${none([...ueberlastet, ...verteilt])
 === ENDE LAGERDATEN ===`
 }
 
+function pickOutputText(data: Record<string, unknown>): string {
+  if (typeof data.output_text === 'string') return data.output_text
+  const output = Array.isArray(data.output) ? data.output as Array<Record<string, unknown>> : []
+  for (const item of output) {
+    const content = Array.isArray(item.content) ? item.content as Array<Record<string, unknown>> : []
+    for (const part of content) {
+      if (part.type === 'output_text' && typeof part.text === 'string') return part.text
+    }
+  }
+  return ''
+}
+
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -107,6 +120,14 @@ export async function POST(req: NextRequest) {
     const { messages, system, context, structuredOutput } = await req.json()
     const access = await getRouteAccess(req, ['Admin', 'Mitarbeiter', 'Lager', 'Werkstatt'])
     if (access.error) return access.error
+
+    const aiSettings = await getServerAiFeatureSettings(access.supabase)
+    if (!aiSettings.enabled || !aiSettings.chatEnabled) {
+      return NextResponse.json({
+        reply: 'Die KI-Funktion wurde im Inhaber-Cockpit derzeit deaktiviert.',
+        actions: [],
+      }, { status: 403 })
+    }
 
     // Systemkontext aufbauen
     let systemContext: typeof DEMO_CONTEXT
@@ -163,10 +184,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
       return NextResponse.json({
-        reply: 'Demo-Modus: Bitte ANTHROPIC_API_KEY in .env.local eintragen für echte KI-Antworten.',
+        reply: 'Bitte OPENAI_API_KEY serverseitig setzen, damit Lager-KI und Tagesbericht aktiv werden.',
+        actions: [],
       })
     }
 
@@ -213,28 +235,91 @@ Regeln:
       baseSystem,
     ].filter(Boolean).join('\n\n')
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const inputMessages = Array.isArray(messages)
+      ? messages.map((message: Record<string, unknown>) => ({
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content: [
+          {
+            type: 'input_text',
+            text: typeof message.content === 'string' ? message.content : JSON.stringify(message.content ?? ''),
+          },
+        ],
+      }))
+      : []
+
+    const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
-        system: fullSystem,
-        messages,
+        model: process.env.OPENAI_CHAT_MODEL || 'gpt-5.4-mini',
+        instructions: fullSystem,
+        input: inputMessages,
+        max_output_tokens: 1024,
+        ...(structuredOutput ? {
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'lager_ki_result',
+              strict: false,
+              schema: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  message: { type: 'string' },
+                  probleme: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      additionalProperties: false,
+                      properties: {
+                        level: { type: 'string', enum: ['dringend', 'wichtig', 'info'] },
+                        text: { type: 'string' },
+                      },
+                      required: ['level', 'text'],
+                    },
+                  },
+                  actions: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      additionalProperties: false,
+                      properties: {
+                        type: { type: 'string', enum: ['umlagerung', 'bestellung', 'hinweis'] },
+                        artikel: { type: 'string' },
+                        von: { type: 'string' },
+                        nach: { type: 'string' },
+                        menge: { type: 'number' },
+                        beschreibung: { type: 'string' },
+                      },
+                      required: ['type'],
+                    },
+                  },
+                },
+                required: ['message', 'probleme', 'actions'],
+              },
+            },
+          },
+        } : {}),
       }),
     })
 
-    const data = await response.json()
-    const rawText: string = data.content?.[0]?.text || 'Keine Antwort erhalten.'
+    const data = await response.json() as Record<string, unknown>
+    if (!response.ok) {
+      const message = typeof data.error === 'object' && data.error && 'message' in data.error
+        ? String((data.error as { message?: unknown }).message)
+        : 'OpenAI konnte die Lager-KI-Anfrage nicht verarbeiten.'
+      return NextResponse.json({ reply: message, actions: [] }, { status: 502 })
+    }
+
+    const rawText = pickOutputText(data) || 'Keine Antwort erhalten.'
 
     // Bei structuredOutput: JSON parsen, sonst plain text zurückgeben
     if (structuredOutput) {
       try {
-        // Claude kann JSON in Markdown-Codeblöcken einwickeln — Strip
+        // Fallback, falls das Modell JSON doch als Text kapselt.
         const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
         const parsed = JSON.parse(cleaned) as { message?: string; probleme?: unknown[]; actions?: unknown[] }
         return NextResponse.json({

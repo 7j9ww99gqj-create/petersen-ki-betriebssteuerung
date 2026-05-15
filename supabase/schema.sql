@@ -65,6 +65,9 @@ create table if not exists firma_einstellungen (
   dokument_footer       text,
   briefpapier_layout    jsonb default '{}'::jsonb,
   onboarding_completed  boolean default false,
+  ai_enabled            boolean default true,
+  ai_chat_enabled       boolean default true,
+  ai_document_enabled   boolean default true,
   created_at            timestamptz default now(),
   updated_at            timestamptz default now(),
   unique(user_id)
@@ -74,6 +77,32 @@ alter table firma_einstellungen enable row level security;
 
 create policy "firma_einstellungen_user" on firma_einstellungen
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create or replace function pk_get_ai_settings()
+returns table (
+  ai_enabled boolean,
+  ai_chat_enabled boolean,
+  ai_document_enabled boolean
+)
+language sql
+stable
+security definer
+set search_path = public, auth
+as $$
+  select
+    coalesce(f.ai_enabled, true) as ai_enabled,
+    coalesce(f.ai_chat_enabled, true) as ai_chat_enabled,
+    coalesce(f.ai_document_enabled, true) as ai_document_enabled
+  from (
+    select ai_enabled, ai_chat_enabled, ai_document_enabled
+    from firma_einstellungen
+    order by updated_at desc nulls last
+    limit 1
+  ) f
+  union all
+  select true, true, true
+  where not exists (select 1 from firma_einstellungen);
+$$;
 
 -- ── Billing / Abonnement ───────────────────────────────────
 
