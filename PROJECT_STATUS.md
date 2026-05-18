@@ -27,7 +27,7 @@
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
 - Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, 7-Task-Sprint abgeschlossen.
-- Letzter Commit: `b9185eb` — einkaufspreis-Spalte in lager_artikel + Modal-Feld im LagerPilot.
+- Letzter Commit: `ef0d045` — BüroPilot in Tab-Komponenten aufgeteilt (Refactoring).
 - Jüngste Fortschritte (2026-05-19 – Sprint):
   - Aufgabe 2: cron push-alerts Spaltenfehler behoben (summe statt gesamtbetrag) + early-return ohne Subscriptions — Commit `ef5c142`
   - Aufgabe 3: Zod-Validierung für /api/chat — 400 Bad Request bei malformed Body — Commit `2ab7b25`
@@ -36,6 +36,9 @@
   - Aufgabe 11: SkeletonCard-Komponente + Loading-Skeletons in Dashboard/Analyse/Lager/Werkstatt/Büro — Commit `8ef5305`
   - Aufgabe 12: EmptyState-Komponente + leere Zustände in Kunden/Karten/Projekte/Kampagnen/Bestand — Commit `69d85ad`
   - Aufgabe 13: einkaufspreis-Spalte in lager_artikel (Migration eingespielt) + Modal-Feld + upsertLagerArtikel erweitert — Commit `b9185eb`
+  - ✅ Aufgabe 4 (Refactoring): BüroPilot `page.tsx` (4243 Zeilen) in separate Tab-Komponenten aufgeteilt — Commit `ef0d045`
+    - `types/buero.ts`, `components/buero/shared.tsx`, `KundenTab`, `AngeboteTab`, `AuftraegeTab`, `RechnungenTab`, `EingangsrechnungenTab`, `DokumenteTab`, `PipelineKanbanTab`, `AlertsTab`, `EinkaufTab`
+    - `app/dashboard/buero/page.tsx` auf ~145 Zeilen reduziert (nur noch BueroPilotPage)
 - Infrastruktur: PreToolUse-Hook konfiguriert — `npx tsc --noEmit` blockiert Push bei TypeScript-Fehlern.
 - ⚠️ Ausstehend: Messaging SQL-Schema manuell im Supabase SQL-Editor ausführen (Tabellen `user_messages`, `broadcast_messages`).
 - ⚠️ Ausstehend: Neue SQL-Schemas ausführen (pilot_documents, tax_receipts, push_subscriptions) — Migration `20260518210000_pilot_documents.sql`.
