@@ -33,27 +33,42 @@ export default function BueroPilotPage() {
   const [sharedMailTarget, setSharedMailTarget] = useState<{ id: string; email: string; typ: 'rechnung' } | null>(null)
   const [loading, setLoading] = useState(!isDemo)
   const [errorMsg, setErrorMsg] = useState('')
+  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set())
 
   const loadData = () => {
     if (isDemo) return
     setLoading(true)
     setErrorMsg('')
-    Promise.all([getBueroKunden(), getBueroAngebote(), getBueroAuftraege(), getBueroRechnungen()])
-      .then(([k, a, au, r]) => {
+    // Beim Start nur Kunden + Rechnungen laden (Basis-Daten)
+    Promise.all([getBueroKunden(), getBueroRechnungen()])
+      .then(([k, r]) => {
         setKunden(k as Kunde[])
-        setAngebote(a as Angebot[])
-        setAuftraege(au as Auftrag[])
         setSharedRechnungen(r as Rechnung[])
       })
       .catch((err) => setErrorMsg(err instanceof Error ? err.message : 'Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
   }
 
-  // Shared data laden (Kunden + Angebote + Aufträge + Rechnungen für Cross-Tab-Referenzen)
+  // Shared data laden (Kunden + Rechnungen initial)
   useEffect(() => {
     loadData()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDemo])
+
+  // Lazy Loading: Angebote + Aufträge erst bei Tab-Wechsel
+  useEffect(() => {
+    if (isDemo) return
+    if ((tab === 'angebote' || tab === 'auftraege' || tab === 'pipeline' || tab === 'alerts') && !loadedTabs.has('angebote')) {
+      Promise.all([getBueroAngebote(), getBueroAuftraege()])
+        .then(([a, au]) => {
+          setAngebote(a as Angebot[])
+          setAuftraege(au as Auftrag[])
+        })
+        .catch(() => {})
+      setLoadedTabs(prev => new Set(Array.from(prev).concat('angebote')))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, isDemo])
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab')

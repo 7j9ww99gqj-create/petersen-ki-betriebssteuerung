@@ -878,8 +878,9 @@ export default function LagerPilotPage() {
 
   // Bestand-Snapshot State (Aufgabe 25)
   const [snapshotLoading, setSnapshotLoading] = useState(false)
+  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set())
 
-  // Daten laden
+  // Daten laden (Basis: Artikel + Bewegungen)
   useEffect(() => {
     if (isDemo) return
     getAiFeatureSettings().then(setAiSettings).catch(() => {})
@@ -902,16 +903,32 @@ export default function LagerPilotPage() {
     }
   }, [searchParams])
 
+  // Lazy Loading: Stellplätze + Bestand erst bei Tab-Wechsel
   useEffect(() => {
     if (isDemo) return
-    Promise.all([getLagerStellplaetze(), getLagerStellplatzBestand(), getLagerUmlagerungen()])
-      .then(([sp, sb, uml]) => {
-        setStellplaetze(sp as Stellplatz[])
-        setStellplatzBestand(sb as StellplatzBestand[])
-        setUmlagerungen(uml as Umlagerung[])
-      })
-      .catch(() => {})
-  }, [isDemo])
+    if (tab === 'stellplaetze' || tab === 'lagerbelegung') {
+      if (!loadedTabs.has('stellplaetze')) {
+        Promise.all([getLagerStellplaetze(), getLagerStellplatzBestand()])
+          .then(([sp, sb]) => {
+            setStellplaetze(sp as Stellplatz[])
+            setStellplatzBestand(sb as StellplatzBestand[])
+          })
+          .catch(() => {})
+        setLoadedTabs(prev => new Set(Array.from(prev).concat('stellplaetze')))
+      }
+    }
+    if (tab === 'umlagerung' && !loadedTabs.has('umlagerung')) {
+      Promise.all([getLagerStellplaetze(), getLagerStellplatzBestand(), getLagerUmlagerungen()])
+        .then(([sp, sb, uml]) => {
+          setStellplaetze(sp as Stellplatz[])
+          setStellplatzBestand(sb as StellplatzBestand[])
+          setUmlagerungen(uml as Umlagerung[])
+        })
+        .catch(() => {})
+      setLoadedTabs(prev => new Set(Array.from(prev).concat('umlagerung')))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, isDemo])
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok })
