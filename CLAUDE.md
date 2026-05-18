@@ -450,6 +450,26 @@ const { role, setRole, permissions } = useRole()
 
 ---
 
+## Supabase SQL direkt ausführen (exec_sql)
+
+Im Projekt ist eine `exec_sql` RPC-Funktion hinterlegt. Damit können Migrationen direkt per curl ausgeführt werden — kein manueller SQL-Editor mehr nötig:
+
+```bash
+curl -s -X POST "https://cchmjrnzaqvowqihcdte.supabase.co/rest/v1/rpc/exec_sql" \
+  -H "Authorization: Bearer SUPABASE_SERVICE_ROLE_KEY" \
+  -H "apikey: SUPABASE_SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sql": "DEIN SQL HIER"}'
+```
+
+**Service Role Key:** `SUPABASE_SERVICE_ROLE_KEY_REMOVED`
+
+- Kein Rückgabewert bei Erfolg (leere Antwort = OK)
+- Bei Fehler kommt JSON mit `message`-Feld
+- Migrations-SQL-Dateien weiterhin unter `supabase/migrations/` speichern
+
+---
+
 ## Vercel Deployment
 
 - Auto-Deploy bei Push auf `main`
