@@ -210,6 +210,8 @@ export default function SteuerPilotPage() {
   const [uploadSaving, setUploadSaving] = useState(false)
   const [dauerfristVerlaengerung, setDauerfristVerlaengerung] = useState(false)
   const [stripeZahlungen, setStripeZahlungen] = useState<StripeZahlung[]>([])
+  const [skrLoading, setSkrLoading] = useState(false)
+  const [skrVorschlag, setSkrVorschlag] = useState<{ konto: string; bezeichnung: string; begruendung: string } | null>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast(msg); setToastType(type)
@@ -283,6 +285,54 @@ export default function SteuerPilotPage() {
   }
 
   // ── CRUD Belege ───────────────────────────────────────────────────────────────
+
+  const handleSkrVorschlag = async () => {
+    const lieferant = editBeleg?.lieferant ?? ''
+    const notiz = editBeleg?.notiz ?? ''
+    if (!lieferant) { showToast('Bitte zuerst Lieferant eingeben', 'error'); return }
+    setSkrLoading(true); setSkrVorschlag(null)
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{
+            role: 'user',
+            content: `Schlage einen SKR 04 Buchungsvorschlag für folgende Eingangsrechnung vor:
+Lieferant: ${lieferant}
+${notiz ? `Notiz: ${notiz}` : ''}
+
+Antworte NUR mit einem validen JSON-Objekt in diesem Format (kein Markdown, kein Text davor oder danach):
+{"konto": "6300", "bezeichnung": "Bürobedarf", "begruendung": "Kurze Begründung"}
+
+Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
+- 6300: Bürobedarf
+- 6310: Zeitungen, Zeitschriften, Bücher
+- 6320: Telefon/Internet
+- 6330: Kfz-Kosten
+- 6410: Reparatur/Instandhaltung
+- 6420: Werkzeug/Geringwertige Wirtschaftsgüter
+- 6460: Versicherungen
+- 6500: Personalkosten
+- 6600: Abschreibungen
+- 6820: Beratungskosten/Rechtskosten
+- 6835: Buchführungskosten
+- 6840: Reisekosten`,
+          }],
+        }),
+      })
+      const data = await res.json()
+      const text = data.reply ?? ''
+      const jsonMatch = text.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0])
+        setSkrVorschlag({ konto: parsed.konto ?? '6300', bezeichnung: parsed.bezeichnung ?? '', begruendung: parsed.begruendung ?? '' })
+      } else {
+        showToast('Kein SKR-Vorschlag erhalten', 'error')
+      }
+    } catch { showToast('Fehler bei SKR-Anfrage', 'error') }
+    finally { setSkrLoading(false) }
+  }
 
   const handleSaveBeleg = async () => {
     if (!editBeleg?.lieferant || editBeleg.betrag == null || !Number.isFinite(Number(editBeleg.betrag))) {
@@ -1384,6 +1434,28 @@ export default function SteuerPilotPage() {
                 <span style={{ color: '#aeb9c8' }}>Vorsteuer: <strong style={{ color: '#4ddb7e' }}>{fmt(editBeleg.steuerbetrag ?? 0)}</strong></span>
               </div>
             )}
+            {/* SKR 04 Buchungsvorschlag */}
+            <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: skrVorschlag ? 10 : 0 }}>
+                <button
+                  onClick={handleSkrVorschlag}
+                  disabled={skrLoading}
+                  style={{ padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(245,158,11,.4)', background: 'rgba(245,158,11,.1)', color: STEUER_COLOR, fontSize: 12, fontWeight: 700, cursor: skrLoading ? 'wait' : 'pointer' }}
+                >
+                  {skrLoading ? '⏳ Analysiere…' : '🧾 SKR 04 Vorschlag'}
+                </button>
+                <span style={{ fontSize: 11, color: '#aeb9c8' }}>KI schlägt Buchungskonto vor</span>
+              </div>
+              {skrVorschlag && (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                  <div style={{ padding: '8px 14px', borderRadius: 8, background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.3)' }}>
+                    <div style={{ fontSize: 18, fontWeight: 900, color: STEUER_COLOR, fontFamily: 'monospace' }}>{skrVorschlag.konto}</div>
+                    <div style={{ fontSize: 12, color: '#f8fbff', fontWeight: 700 }}>{skrVorschlag.bezeichnung}</div>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', flex: 1, paddingTop: 4 }}>{skrVorschlag.begruendung}</div>
+                </div>
+              )}
+            </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
               <button className="pk-btn-ghost" onClick={() => setEditBeleg(null)} style={{ fontSize: 13 }}>Abbrechen</button>
               <button className="pk-btn" onClick={handleSaveBeleg} disabled={saving} style={{ fontSize: 13 }}>
