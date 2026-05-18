@@ -1816,7 +1816,8 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
   }
 
   const handleNeu = async () => {
-    if (!form.kunde || !form.betrag) return
+    const berechneterBetrag = formPositionen.length > 0 ? berechneBetragAusPositionen(formPositionen) : form.betrag
+    if (!form.kunde || !berechneterBetrag) return
     const today = new Date()
     const firmaDefaults = getLocalFirmaDefaults()
     const kunde = kunden.find(entry => entry.name === form.kunde)
@@ -1830,25 +1831,28 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
       nummer,
       kunde_id: kunde?.id,
       kunde: form.kunde,
-      betrag: form.betrag.includes('€') ? form.betrag : `${form.betrag} €`,
+      betrag: formPositionen.length > 0 ? berechneterBetrag : (form.betrag.includes('€') ? form.betrag : `${form.betrag} €`),
       faellig: form.faellig || fmt(new Date(today.getTime() + firmaDefaults.zahlungsziel_tage * 86400000)),
       erstellt: fmt(today),
       status: 'Offen',
+      positionen: formPositionen.length > 0 ? formPositionen : undefined,
     }
     if (!isDemo) {
       try {
-        await upsertBueroRechnung(newRe)
+        await upsertBueroRechnung({ ...newRe, positionen: newRe.positionen })
         await syncDokumentVerknuepfung(newRe, form.dokumentId)
       } catch { showToast('Fehler beim Speichern', true); return }
     }
     setRechnungen(prev => [newRe, ...prev])
     setForm({ kunde: '', betrag: '', faellig: '', dokumentId: '' })
+    setFormPositionen([])
     setShowForm(false)
     showToast(`✅ Rechnung ${newRe.id} wurde erstellt`)
   }
 
   const openEdit = (r: Rechnung) => {
     setEditRechnung(r)
+    setEditPositionen(r.positionen ?? [])
     setEditForm({
       kunde: r.kunde,
       betrag: r.betrag,
@@ -1861,10 +1865,11 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
   const handleEditSave = async () => {
     if (!editRechnung) return
     const previousDokumentId = getLinkedDokument(dokumente, 'rechnung_id', editRechnung.id)?.id
-    const updated: Rechnung = { ...editRechnung, ...editForm, betrag: editForm.betrag.includes('€') ? editForm.betrag : `${editForm.betrag} €` }
+    const berechneterBetrag = editPositionen.length > 0 ? berechneBetragAusPositionen(editPositionen) : (editForm.betrag.includes('€') ? editForm.betrag : `${editForm.betrag} €`)
+    const updated: Rechnung = { ...editRechnung, ...editForm, betrag: berechneterBetrag, positionen: editPositionen.length > 0 ? editPositionen : undefined }
     if (!isDemo) {
       try {
-        await upsertBueroRechnung(updated)
+        await upsertBueroRechnung({ ...updated, positionen: updated.positionen })
         await syncDokumentVerknuepfung(updated, editForm.dokumentId, previousDokumentId)
       } catch { showToast('Fehler beim Speichern', true); return }
     }
@@ -1913,8 +1918,11 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Betrag (€)</label>
-              <input className="pk-input" value={editForm.betrag} onChange={e => setEditForm(p => ({ ...p, betrag: e.target.value }))} />
+              <label style={labelStyle}>Betrag (€) {editPositionen.length > 0 ? '(automatisch)' : ''}</label>
+              <input className="pk-input" value={editPositionen.length > 0 ? berechneBetragAusPositionen(editPositionen) : editForm.betrag} onChange={e => { if (editPositionen.length === 0) setEditForm(p => ({ ...p, betrag: e.target.value })) }} readOnly={editPositionen.length > 0} style={editPositionen.length > 0 ? { opacity: 0.6 } : {}} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <PositionenEditor positionen={editPositionen} onChange={setEditPositionen} />
             </div>
             <div>
               <label style={labelStyle}>Fällig am</label>
@@ -1997,12 +2005,15 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Betrag (€) *</label>
-              <input className="pk-input" placeholder="z.B. 2.400,00" value={form.betrag} onChange={e => setForm(p => ({ ...p, betrag: e.target.value }))} />
+              <label style={labelStyle}>Betrag (€) {formPositionen.length > 0 ? '(automatisch)' : '*'}</label>
+              <input className="pk-input" placeholder="z.B. 2.400,00" value={formPositionen.length > 0 ? berechneBetragAusPositionen(formPositionen) : form.betrag} onChange={e => { if (formPositionen.length === 0) setForm(p => ({ ...p, betrag: e.target.value })) }} readOnly={formPositionen.length > 0} style={formPositionen.length > 0 ? { opacity: 0.6 } : {}} />
             </div>
             <div>
               <label style={labelStyle}>Fällig am</label>
               <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.faellig} onChange={e => setForm(p => ({ ...p, faellig: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <PositionenEditor positionen={formPositionen} onChange={setFormPositionen} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Verknüpftes Dokument</label>
@@ -3284,17 +3295,23 @@ export default function BueroPilotPage() {
   const isOwner = isDemo ? true : role === 'Admin'
   const [tab, setTab] = useState<Tab>('kunden')
   const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
+  const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
   const [auftraege, setAuftraege] = useState<Auftrag[]>(isDemo ? demoAuftraege : [])
   const [sharedRechnungen, setSharedRechnungen] = useState<Rechnung[]>(isDemo ? demoRechnungen : [])
   const [sharedMailTarget, setSharedMailTarget] = useState<{ id: string; email: string; typ: 'rechnung' } | null>(null)
   const [loading, setLoading] = useState(!isDemo)
   const [errorMsg, setErrorMsg] = useState('')
 
-  // Shared data laden (Kunden + Aufträge für Cross-Tab-Referenzen)
+  // Shared data laden (Kunden + Angebote + Aufträge + Rechnungen für Cross-Tab-Referenzen)
   useEffect(() => {
     if (isDemo) return
-    Promise.all([getBueroKunden(), getBueroAuftraege()])
-      .then(([k, a]) => { setKunden(k as Kunde[]); setAuftraege(a as Auftrag[]) })
+    Promise.all([getBueroKunden(), getBueroAngebote(), getBueroAuftraege(), getBueroRechnungen()])
+      .then(([k, a, au, r]) => {
+        setKunden(k as Kunde[])
+        setAngebote(a as Angebot[])
+        setAuftraege(au as Auftrag[])
+        setSharedRechnungen(r as Rechnung[])
+      })
       .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
   }, [isDemo])
@@ -3306,9 +3323,10 @@ export default function BueroPilotPage() {
     }
   }, [searchParams])
 
-  const offeneAngebote = isDemo ? demoAngebote.filter(a => a.status === 'Versendet' || a.status === 'Entwurf').length : 0
-  const offeneRechnungen = isDemo ? demoRechnungen.filter(r => r.status !== 'Bezahlt').length : 0
+  // KPI-Berechnungen für Pipeline-Widget
+  const offeneAngebote = angebote.filter(a => a.status === 'Versendet' || a.status === 'Entwurf').length
   const laufendeAuftraege = auftraege.filter(a => a.status === 'In Bearbeitung').length
+  const offeneRechnungen = sharedRechnungen.filter(r => r.status !== 'Bezahlt').length
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
