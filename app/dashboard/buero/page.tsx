@@ -1113,7 +1113,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
 
 // ── Aufträge-Tab ────────────────────────────────────────────────────────────
 
-function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isDemo: boolean; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; kunden: Kunde[]; setTab: (tab: string) => void }) {
+function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isDemo: boolean; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; kunden: Kunde[]; setTab: React.Dispatch<React.SetStateAction<Tab>> }) {
   const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [toast, setToast] = useState('')
@@ -1250,7 +1250,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isD
       try { await upsertBueroRechnung(newRe) } catch { showToast('Fehler beim Erstellen der Rechnung', true); return }
     }
     showToast(`✅ Rechnung ${newRe.nummer || newRe.id} erstellt`)
-    setTab('rechnungen')
+    setTab('rechnungen' as Tab)
   }
 
   const handleNeuSave = async () => {
@@ -3170,7 +3170,7 @@ export default function BueroPilotPage() {
 
       {tab === 'kunden' && <KundenTab isDemo={isDemo} auftraege={auftraege} rechnungen={isDemo ? demoRechnungen : []} />}
       {tab === 'angebote' && <AngeboteTab isDemo={isDemo} kunden={kunden} auftraege={auftraege} setAuftraege={setAuftraege} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
-      {tab === 'auftraege' && <AuftraegeTab isDemo={isDemo} auftraege={auftraege} setAuftraege={setAuftraege} kunden={kunden} />}
+      {tab === 'auftraege' && <AuftraegeTab isDemo={isDemo} auftraege={auftraege} setAuftraege={setAuftraege} kunden={kunden} setTab={setTab} />}
       {tab === 'rechnungen' && <RechnungenTab isDemo={isDemo} kunden={kunden} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
       {tab === 'eingangsrechnungen' && <EingangRechnungenTab isDemo={isDemo} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
       {tab === 'dokumente' && <DokumenteTab isDemo={isDemo} />}
