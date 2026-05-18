@@ -7,6 +7,7 @@ import {
   getPlanungAufgaben, upsertPlanungAufgabe, deletePlanungAufgabe,
   getPlanungTermine, upsertPlanungTermin, deletePlanungTermin,
   getPlanungRessourcen, upsertPlanungRessource, deletePlanungRessource,
+  getBueroAuftraege,
 } from '@/lib/db'
 
 // ── Typen ─────────────────────────────────────────────────────────────────────
@@ -22,6 +23,7 @@ type Projekt = {
   start: string; ende: string; budget: string; fortschritt: number
   beschreibung: string; verantwortlich: string
   meilensteine: Meilenstein[]
+  auftrag_id?: string | null
 }
 
 type Aufgabe = {
@@ -224,10 +226,11 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 type ProjektFormState = {
   name: string; kunde: string; verantwortlich: string; start: string
   ende: string; budget: string; beschreibung: string; status: ProjektStatus
+  auftrag_id: string
 }
 
 const emptyProjektForm: ProjektFormState = {
-  name: '', kunde: '', verantwortlich: '', start: '', ende: '', budget: '', beschreibung: '', status: 'Planung',
+  name: '', kunde: '', verantwortlich: '', start: '', ende: '', budget: '', beschreibung: '', status: 'Planung', auftrag_id: '',
 }
 
 function ProjekteTab({ isDemo }: { isDemo: boolean }) {
@@ -244,13 +247,18 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
   const [editForm, setEditForm] = useState<ProjektFormState>(emptyProjektForm)
   // Meilenstein add
   const [msForm, setMsForm] = useState<Record<string, { name: string; datum: string }>>({})
+  const [auftraege, setAuftraege] = useState<{ id: string; kunde: string; beschreibung: string }[]>([])
 
   useEffect(() => {
     if (isDemo) return
-    getPlanungProjekte()
-      .then(data => setProjekte(data as Projekt[]))
+    Promise.all([getPlanungProjekte(), getBueroAuftraege()])
+      .then(([projData, auftragData]) => {
+        setProjekte(projData as Projekt[])
+        setAuftraege((auftragData as { id: string; kunde: string; beschreibung: string }[]) ?? [])
+      })
       .catch(() => showToast('Fehler beim Laden der Projekte', true))
       .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDemo])
 
   const showToast = useCallback((msg: string, error = false) => {
@@ -271,7 +279,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
       status: createForm.status, start: createForm.start || '—', ende: createForm.ende || '—',
       budget: createForm.budget ? `${createForm.budget} €` : '—', fortschritt: 0,
       beschreibung: createForm.beschreibung, verantwortlich: createForm.verantwortlich,
-      meilensteine: [],
+      meilensteine: [], auftrag_id: createForm.auftrag_id || null,
     }
     if (!isDemo) {
       try { await upsertPlanungProjekt(newP) } catch { showToast('Fehler beim Speichern', true); return }
@@ -288,6 +296,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
       name: p.name, kunde: p.kunde, verantwortlich: p.verantwortlich,
       start: p.start === '—' ? '' : p.start, ende: p.ende === '—' ? '' : p.ende,
       budget: p.budget.replace(' €', ''), beschreibung: p.beschreibung, status: p.status,
+      auftrag_id: p.auftrag_id ?? '',
     })
     setEditProjekt(p)
   }
@@ -300,6 +309,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
       start: editForm.start || '—', ende: editForm.ende || '—',
       budget: editForm.budget ? `${editForm.budget} €` : '—',
       beschreibung: editForm.beschreibung, status: editForm.status,
+      auftrag_id: editForm.auftrag_id || null,
     }
     if (!isDemo) {
       try { await upsertPlanungProjekt(updated) } catch { showToast('Fehler beim Speichern', true); return }
@@ -406,6 +416,15 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Beschreibung</label>
               <input className="pk-input" placeholder={PLACEHOLDER.beschreibung} value={createForm.beschreibung} onChange={e => setCreateForm(p => ({ ...p, beschreibung: e.target.value }))} />
             </div>
+            {auftraege.length > 0 && (
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Verknüpfter Auftrag (Büro)</label>
+                <select className="pk-input" value={createForm.auftrag_id} onChange={e => setCreateForm(p => ({ ...p, auftrag_id: e.target.value }))} style={{ cursor: 'pointer' }}>
+                  <option value="">— Kein Auftrag —</option>
+                  {auftraege.map(a => <option key={a.id} value={a.id}>{a.id} – {a.kunde} – {a.beschreibung}</option>)}
+                </select>
+              </div>
+            )}
           </div>
           <button className="pk-btn" style={{ marginTop: 16, background: 'linear-gradient(135deg, #e11d48, #9f1239)' }} onClick={handleCreate}>Projekt anlegen</button>
         </div>
@@ -426,6 +445,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
                 <div style={{ fontWeight: 800, fontSize: 16 }}>{p.name}</div>
                 <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2, flexWrap: 'wrap' }}>
                   🏢 {p.kunde} · 👤 {p.verantwortlich} · 📅 {p.start} – {p.ende} · 💶 {p.budget}
+                  {p.auftrag_id && <span style={{ marginLeft: 8, color: '#20c8ff' }}>🔗 {p.auftrag_id}</span>}
                 </div>
               </div>
               {/* Aktionen */}
@@ -527,6 +547,15 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Beschreibung</label>
               <input className="pk-input" placeholder={PLACEHOLDER.beschreibung} value={editForm.beschreibung} onChange={e => setEditForm(p => ({ ...p, beschreibung: e.target.value }))} />
             </div>
+            {auftraege.length > 0 && (
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Verknüpfter Auftrag (Büro)</label>
+                <select className="pk-input" value={editForm.auftrag_id} onChange={e => setEditForm(p => ({ ...p, auftrag_id: e.target.value }))} style={{ cursor: 'pointer' }}>
+                  <option value="">— Kein Auftrag —</option>
+                  {auftraege.map(a => <option key={a.id} value={a.id}>{a.id} – {a.kunde} – {a.beschreibung}</option>)}
+                </select>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
             <button className="pk-btn" style={{ background: 'linear-gradient(135deg, #e11d48, #9f1239)' }} onClick={handleUpdate}>Änderungen speichern</button>

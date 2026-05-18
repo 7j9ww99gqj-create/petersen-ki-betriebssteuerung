@@ -2158,7 +2158,7 @@ export async function getPlanungProjekte() {
 export async function upsertPlanungProjekt(p: {
   id: string; name: string; kunde?: string; status?: string; start?: string
   ende?: string; budget?: string; fortschritt?: number; beschreibung?: string
-  verantwortlich?: string; meilensteine?: object[]
+  verantwortlich?: string; meilensteine?: object[]; auftrag_id?: string | null
 }) {
   const { data, error } = await db()
     .from('planung_projekte')

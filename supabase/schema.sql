@@ -1424,3 +1424,7 @@ alter table lager_artikel add column if not exists lieferant_id text references 
 -- Positionen als JSONB-Array in buero_angebote speichern
 alter table buero_angebote add column if not exists positionen jsonb default '[]'::jsonb;
 alter table buero_rechnungen add column if not exists positionen jsonb default '[]'::jsonb;
+
+-- ── Aufgabe 30: PlanungPilot auftrag_id FK ─────────────────────────────────────
+-- Verknüpft ein Planungsprojekt mit einem Büroauftrag
+alter table planung_projekte add column if not exists auftrag_id text references buero_auftraege(id) on delete set null;
