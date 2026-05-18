@@ -1096,10 +1096,15 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
       positionen: a.positionen,
     }
     if (!isDemo) {
-      try { await upsertBueroAuftrag(newAuftrag) } catch { showToast('Fehler beim Erstellen des Auftrags', true); return }
+      try {
+        await upsertBueroAuftrag(newAuftrag)
+        await upsertBueroAngebot({ ...a, status: 'Akzeptiert' })
+      } catch { showToast('Fehler beim Erstellen des Auftrags', true); return }
     }
     setAuftraege(prev => [newAuftrag, ...prev])
+    setAngebote(prev => prev.map(ang => ang.id === a.id ? { ...ang, status: 'Akzeptiert' } : ang))
     showToast(`✅ Auftrag ${newAuftrag.id} aus Angebot ${a.id} erstellt`)
+    if (setParentTab) setParentTab('auftraege' as Tab)
   }
 
   const handleAngebotZuRechnung = async (a: Angebot) => {
