@@ -3369,6 +3369,30 @@ export default function BueroPilotPage() {
   const laufendeAuftraege = auftraege.filter(a => a.status === 'In Bearbeitung').length
   const offeneRechnungen = sharedRechnungen.filter(r => r.status !== 'Bezahlt').length
 
+  // MTD/YTD Umsatz aus bezahlten Rechnungen
+  const now = new Date()
+  const curMonth = now.getMonth()
+  const curYear = now.getFullYear()
+  function parseDeDate(s?: string): Date | null {
+    if (!s) return null
+    const p = s.split('.')
+    if (p.length !== 3) return null
+    return new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0]))
+  }
+  const bezahltRechnungen = sharedRechnungen.filter(r => r.status === 'Bezahlt')
+  const umsatzMTD = bezahltRechnungen.reduce((sum, r) => {
+    const d = parseDeDate(r.bezahltAm)
+    if (!d || d.getMonth() !== curMonth || d.getFullYear() !== curYear) return sum
+    return sum + parseBetrag(r.betrag)
+  }, 0)
+  const umsatzYTD = bezahltRechnungen.reduce((sum, r) => {
+    const d = parseDeDate(r.bezahltAm)
+    if (!d || d.getFullYear() !== curYear) return sum
+    return sum + parseBetrag(r.betrag)
+  }, 0)
+  const ueberfaelligCount = sharedRechnungen.filter(r => r.status === 'Überfällig' || r.status === 'Mahnung').length
+  function fmtEuro(v: number) { return v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €' }
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
       <div style={{ textAlign: 'center' }}>
@@ -3417,6 +3441,22 @@ export default function BueroPilotPage() {
           >
             <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Finanzkennzahlen */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 18 }}>
+        {[
+          { label: 'Umsatz MTD', value: fmtEuro(umsatzMTD), icon: '📅', color: '#20c8ff', tab: 'rechnungen' as Tab },
+          { label: 'Umsatz YTD', value: fmtEuro(umsatzYTD), icon: '📆', color: '#25d366', tab: 'rechnungen' as Tab },
+          { label: 'Überfällig / Mahnung', value: String(ueberfaelligCount), icon: '⚠️', color: ueberfaelligCount > 0 ? '#f59e0b' : '#aeb9c8', tab: 'rechnungen' as Tab },
+        ].map(s => (
+          <button key={s.label} className="pk-card" onClick={() => setTab(s.tab)}
+            style={{ textAlign: 'center', padding: '12px 10px', cursor: 'pointer', color: 'inherit' }}>
+            <div style={{ fontSize: 18, marginBottom: 3 }}>{s.icon}</div>
+            <div style={{ fontSize: 15, fontWeight: 900, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
           </button>
         ))}
