@@ -18,7 +18,7 @@
   - `/Users/kevinpetersen/owner-dashboard-project/project-status.md`
 
 ## Status-Anfrage-Routine (Standard-Prompt)
-**Kommando:** `claude, Status?`  
+**Kommando:** `Claude, Status?`  
 **Modell:** Sonnet 4.6 (token-optimal)  
 **Workflow:**
 1. Lies AGENTS.md vollständig
@@ -31,6 +31,33 @@
 - 📍 Aktueller Status (1–2 Sätze)
 - 📋 Aufgaben-Tabelle (Priorität | Aufgabe | Modell | Tokens | Grund)
 - 🎯 Empfehlung für nächste Session
+
+---
+
+## Feature-Implementierungs-Routine (Pilot-Arbeiten)
+**Kommando:** `Claude, BüroPilot – [Aufgabe]` / `Lager – [Aufgabe]` / etc.  
+**Modell:** Sonnet 4.6 (Standard) oder Opus 4.7 (komplexe Features)  
+**Workflow:**
+1. Lies AGENTS.md vollständig
+2. Lies PROJECT_STATUS.md nur `0`, `2`, `5`, `6`, `15`
+3. Implementiere die Aufgabe kompakt (nur nötige Änderungen)
+4. `npm run lint` + `npm run build` (grün!)
+5. `git commit` (noch NICHT pushen)
+6. **FINALE SCHRITTE (IMMER durchführen):**
+   - `git push` → GitHub
+   - Warte auf Vercel-Deploy
+   - `PROJECT_STATUS.md` aktualisieren:
+     * Abschnitt `2`: neue Zeile mit Datum, Aufgabe, betroffene Dateien, Tests, Commit
+     * Abschnitt `0.2`: diese Aufgabe abhaken/entfernen
+     * Abschnitt `0.4 Quick Status Summary`: aktualisieren
+   - `git add PROJECT_STATUS.md` + `git commit` + `git push`
+7. Kurz sagen: "Erledigt, deployed zu [vercel-URL], Commit [HASH]"
+
+**Token-Sparen:**
+- Keine ausschweifenden Erklärungen
+- Nur relevante Code-Teile prüfen
+- Keine Komplettanalysen
+- Schnell implementieren, schnell deployen
 
 ## Regeln
 - Keine großen Refactorings ohne ausdrückliche Anweisung.
