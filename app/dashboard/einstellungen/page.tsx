@@ -65,9 +65,9 @@ type ManagedUsersEntitlement = {
   reason: string
 }
 
-type SettingsSection = 'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'registrierungen' | 'kunden-eingerichtet' | 'aktivitaetslog' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'
+type SettingsSection = 'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'registrierungen' | 'kunden-eingerichtet' | 'aktivitaetslog' | 'postfach' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'
 
-const SETTINGS_SECTIONS: SettingsSection[] = ['profil', 'firma', 'billing', 'kundensteuerung', 'registrierungen', 'kunden-eingerichtet', 'aktivitaetslog', 'benachrichtigungen', 'rollen', 'info', 'import']
+const SETTINGS_SECTIONS: SettingsSection[] = ['profil', 'firma', 'billing', 'kundensteuerung', 'registrierungen', 'kunden-eingerichtet', 'aktivitaetslog', 'postfach', 'benachrichtigungen', 'rollen', 'info', 'import']
 
 const ACCESS_STATUS_OPTIONS: AccessStatus[] = ['pending', 'active', 'suspended']
 const ACCESS_MODE_OPTIONS: AccessMode[] = ['standard', 'demo']
@@ -157,6 +157,16 @@ export default function EinstellungenPage() {
     rechnungen: true, cloudSync: false, kiErkennungen: false,
   })
 
+  // Messaging & Postfach
+  const [userMessages, setUserMessages] = useState<{ id: string; subject: string; body: string; is_read: boolean; created_at: string }[]>([])
+  const [ownerInbox, setOwnerInbox] = useState<{ id: string; user_id: string; subject: string; body: string; is_read: boolean; created_at: string }[]>([])
+  const [ownerSentMessages, setOwnerSentMessages] = useState<{ id: string; owner_user_id: string; subject: string; body: string; recipient_type: string; recipient_user_id?: string; created_at: string }[]>([])
+  const [loadingMessages, setLoadingMessages] = useState(false)
+  const [messageForm, setMessageForm] = useState({ subject: '', body: '' })
+  const [broadcastForm, setBroadcastForm] = useState({ subject: '', body: '', recipient_user_id: '' })
+  const [sendingMessage, setSendingMessage] = useState(false)
+  const [postfachTab, setPostfachTab] = useState<'inbox' | 'sent'>('inbox')
+
   useEffect(() => {
     const supabase = createSupabaseClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -177,6 +187,39 @@ export default function EinstellungenPage() {
   }, [])
 
   const isInhaberAccount = profil.email.toLowerCase() === INHABER_EMAIL || currentRole === 'Inhaber'
+
+  // Load messages when postfach section is opened
+  useEffect(() => {
+    if (section !== 'postfach' || isDemo) return
+    setLoadingMessages(true)
+    const loadMessages = async () => {
+      try {
+        if (isInhaberAccount) {
+          const res = await fetch('/api/messages?action=inbox')
+          if (res.ok) {
+            const data = await res.json()
+            setOwnerInbox(data.messages ?? [])
+          }
+          const sentRes = await fetch('/api/messages?action=sent')
+          if (sentRes.ok) {
+            const sentData = await sentRes.json()
+            setOwnerSentMessages(sentData.messages ?? [])
+          }
+        } else {
+          const res = await fetch('/api/messages')
+          if (res.ok) {
+            const data = await res.json()
+            setUserMessages(data.messages ?? [])
+          }
+        }
+      } catch (err) {
+        console.error('Fehler beim Laden von Nachrichten:', err)
+      } finally {
+        setLoadingMessages(false)
+      }
+    }
+    loadMessages()
+  }, [section, isInhaberAccount, isDemo])
   const canManageLiveUsers = !isDemo && PERMISSIONS.canManageUsers(currentRole)
 
   const loadManagedUsers = useCallback(async () => {
@@ -530,6 +573,7 @@ export default function EinstellungenPage() {
           {isInhaberAccount && <NavItem id="registrierungen" icon="🆕" label="Offene Registrierungen" />}
           {isInhaberAccount && <NavItem id="kunden-eingerichtet" icon="✅" label="Kunden eingerichtet" />}
           {isInhaberAccount && <NavItem id="aktivitaetslog" icon="📋" label="Aktivitätslog" />}
+          <NavItem id="postfach" icon="📬" label="Postfach" />
           <NavItem id="benachrichtigungen" icon="🔔" label="Benachricht." />
           <NavItem id="rollen" icon="🔑" label="Rollen" />
           <NavItem id="import" icon="📥" label="Import" />
@@ -1010,6 +1054,293 @@ export default function EinstellungenPage() {
               </div>
             </div>
           )}
+
+          {section === 'postfach' && (() => {
+            if (isInhaberAccount) {
+              return (
+                <div>
+                  <h2 style={{ fontSize: 20, fontWeight: 900, marginBottom: 20 }}>📬 Postfach & Support</h2>
+
+                  {/* Tabs */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.1)', paddingBottom: 12 }}>
+                    <button
+                      onClick={() => setPostfachTab('inbox')}
+                      style={{
+                        padding: '6px 12px', borderRadius: 6,
+                        background: postfachTab === 'inbox' ? 'rgba(22,132,255,.1)' : 'rgba(255,255,255,.05)',
+                        color: postfachTab === 'inbox' ? '#20c8ff' : '#aeb9c8',
+                        border: `1px solid ${postfachTab === 'inbox' ? 'rgba(22,132,255,.3)' : 'rgba(255,255,255,.1)'}`,
+                        cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                        transition: 'all .15s',
+                      }}
+                    >
+                      📥 Eingang ({ownerInbox.length})
+                    </button>
+                    <button
+                      onClick={() => setPostfachTab('sent')}
+                      style={{
+                        padding: '6px 12px', borderRadius: 6,
+                        background: postfachTab === 'sent' ? 'rgba(22,132,255,.1)' : 'rgba(255,255,255,.05)',
+                        color: postfachTab === 'sent' ? '#20c8ff' : '#aeb9c8',
+                        border: `1px solid ${postfachTab === 'sent' ? 'rgba(22,132,255,.3)' : 'rgba(255,255,255,.1)'}`,
+                        cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                        transition: 'all .15s',
+                      }}
+                    >
+                      📤 Versendete ({ownerSentMessages.length})
+                    </button>
+                  </div>
+
+                  {postfachTab === 'inbox' && (
+                    <div className="pk-card" style={{ padding: 16 }}>
+                      <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800 }}>📥 Support-Anfragen von Nutzern</h3>
+                      {loadingMessages ? (
+                        <div style={{ color: '#aeb9c8' }}>Laden…</div>
+                      ) : ownerInbox.length === 0 ? (
+                        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine neuen Nachrichten</div>
+                      ) : (
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          {ownerInbox.map((msg) => (
+                            <div
+                              key={msg.id}
+                              style={{
+                                padding: 12, borderRadius: 8,
+                                background: msg.is_read ? 'rgba(255,255,255,.02)' : 'rgba(22,132,255,.08)',
+                                border: `1px solid ${msg.is_read ? 'rgba(255,255,255,.05)' : 'rgba(22,132,255,.3)'}`,
+                                cursor: 'pointer',
+                                transition: 'all .15s',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = msg.is_read ? 'rgba(255,255,255,.04)' : 'rgba(22,132,255,.12)'
+                                e.currentTarget.style.borderColor = 'rgba(22,132,255,.5)'
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = msg.is_read ? 'rgba(255,255,255,.02)' : 'rgba(22,132,255,.08)'
+                                e.currentTarget.style.borderColor = msg.is_read ? 'rgba(255,255,255,.05)' : 'rgba(22,132,255,.3)'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6, alignItems: 'flex-start' }}>
+                                <div style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{msg.subject}</div>
+                                {!msg.is_read && (
+                                  <span style={{ fontSize: 11, padding: '2px 6px', background: '#1684ff', borderRadius: 4, color: 'white', whiteSpace: 'nowrap' }}>
+                                    Ungelesen
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 8 }}>{msg.body}</div>
+                              <div style={{ fontSize: 11, color: '#6cb6ff' }}>
+                                {new Date(msg.created_at).toLocaleDateString('de-DE')} {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {postfachTab === 'sent' && (
+                    <div>
+                      <div className="pk-card" style={{ marginBottom: 24, padding: 16 }}>
+                        <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800 }}>An Nutzer senden</h3>
+                        <label style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+                          <span style={{ fontSize: 12, color: '#aeb9c8' }}>Betreff *</span>
+                          <input
+                            className="pk-input"
+                            value={broadcastForm.subject}
+                            onChange={(e) => setBroadcastForm(prev => ({ ...prev, subject: e.target.value }))}
+                            placeholder="z.B. Wichtige Benachrichtigung"
+                          />
+                        </label>
+                        <label style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+                          <span style={{ fontSize: 12, color: '#aeb9c8' }}>Nachrichtentext *</span>
+                          <textarea
+                            className="pk-input"
+                            style={{ minHeight: 100, resize: 'vertical' }}
+                            value={broadcastForm.body}
+                            onChange={(e) => setBroadcastForm(prev => ({ ...prev, body: e.target.value }))}
+                            placeholder="Nachricht eingeben…"
+                          />
+                        </label>
+                        <button
+                          className="pk-btn"
+                          onClick={async () => {
+                            if (!broadcastForm.subject.trim() || !broadcastForm.body.trim()) {
+                              setToast('Betreff und Text erforderlich')
+                              setToastType('error')
+                              return
+                            }
+                            setSendingMessage(true)
+                            try {
+                              const res = await fetch('/api/messages', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  action: 'broadcast',
+                                  subject: broadcastForm.subject,
+                                  body: broadcastForm.body,
+                                }),
+                              })
+                              if (!res.ok) throw new Error('Versand fehlgeschlagen')
+                              setToast('Nachricht an alle Nutzer versendete')
+                              setToastType('success')
+                              setBroadcastForm({ subject: '', body: '', recipient_user_id: '' })
+                              // Reload sent messages
+                              const sentRes = await fetch('/api/messages?action=sent')
+                              if (sentRes.ok) {
+                                const sentData = await sentRes.json()
+                                setOwnerSentMessages(sentData.messages ?? [])
+                              }
+                            } catch (err) {
+                              setToast(err instanceof Error ? err.message : 'Fehler beim Versand')
+                              setToastType('error')
+                            } finally {
+                              setSendingMessage(false)
+                            }
+                          }}
+                          disabled={sendingMessage}
+                        >
+                          {sendingMessage ? '⏳ Wird versendete…' : '📤 Versenden an alle'}
+                        </button>
+                      </div>
+
+                      <div className="pk-card" style={{ padding: 16 }}>
+                        <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800 }}>📤 Versendete Nachrichten</h3>
+                        {loadingMessages ? (
+                          <div style={{ color: '#aeb9c8' }}>Laden…</div>
+                        ) : ownerSentMessages.length === 0 ? (
+                          <div style={{ color: '#aeb9c8', fontSize: 13 }}>Noch keine Nachrichten versendete</div>
+                        ) : (
+                          <div style={{ display: 'grid', gap: 10 }}>
+                            {ownerSentMessages.map((msg) => (
+                              <div
+                                key={msg.id}
+                                style={{
+                                  padding: 12, borderRadius: 8,
+                                  background: 'rgba(255,255,255,.02)',
+                                  border: '1px solid rgba(255,255,255,.05)',
+                                }}
+                              >
+                                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{msg.subject}</div>
+                                <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 8 }}>{msg.body}</div>
+                                <div style={{ fontSize: 11, color: '#6cb6ff' }}>
+                                  {new Date(msg.created_at).toLocaleDateString('de-DE')} {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            } else {
+              // Member view
+              return (
+                <div>
+                  <h2 style={{ fontSize: 20, fontWeight: 900, marginBottom: 20 }}>📬 Postfach</h2>
+
+                  <div className="pk-card" style={{ marginBottom: 24, padding: 16 }}>
+                    <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800 }}>Nachricht an Support</h3>
+                    <label style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+                      <span style={{ fontSize: 12, color: '#aeb9c8' }}>Betreff *</span>
+                      <input
+                        className="pk-input"
+                        value={messageForm.subject}
+                        onChange={(e) => setMessageForm(prev => ({ ...prev, subject: e.target.value }))}
+                        placeholder="Beispiel: Frage zu LagerPilot"
+                      />
+                    </label>
+                    <label style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+                      <span style={{ fontSize: 12, color: '#aeb9c8' }}>Nachrichtentext *</span>
+                      <textarea
+                        className="pk-input"
+                        style={{ minHeight: 120, resize: 'vertical' }}
+                        value={messageForm.body}
+                        onChange={(e) => setMessageForm(prev => ({ ...prev, body: e.target.value }))}
+                        placeholder="Ihre Nachricht…"
+                      />
+                    </label>
+                    <button
+                      className="pk-btn"
+                      onClick={async () => {
+                        if (!messageForm.subject.trim() || !messageForm.body.trim()) {
+                          setToast('Betreff und Text erforderlich')
+                          setToastType('error')
+                          return
+                        }
+                        setSendingMessage(true)
+                        try {
+                          const res = await fetch('/api/messages', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              action: 'send',
+                              subject: messageForm.subject,
+                              body: messageForm.body,
+                            }),
+                          })
+                          if (!res.ok) throw new Error('Versand fehlgeschlagen')
+                          setToast('Nachricht versendete! Der Support antwortet in Kürze.')
+                          setToastType('success')
+                          setMessageForm({ subject: '', body: '' })
+                          // Reload messages
+                          const reloadRes = await fetch('/api/messages')
+                          if (reloadRes.ok) {
+                            const reloadData = await reloadRes.json()
+                            setUserMessages(reloadData.messages ?? [])
+                          }
+                        } catch (err) {
+                          setToast(err instanceof Error ? err.message : 'Fehler beim Versand')
+                          setToastType('error')
+                        } finally {
+                          setSendingMessage(false)
+                        }
+                      }}
+                      disabled={sendingMessage}
+                    >
+                      {sendingMessage ? '⏳ Wird versendete…' : '📬 Versenden'}
+                    </button>
+                  </div>
+
+                  <div className="pk-card" style={{ padding: 16 }}>
+                    <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800 }}>📜 Versendete Nachrichten</h3>
+                    {loadingMessages ? (
+                      <div style={{ color: '#aeb9c8' }}>Laden…</div>
+                    ) : userMessages.length === 0 ? (
+                      <div style={{ color: '#aeb9c8', fontSize: 13 }}>Noch keine Nachrichten versendete</div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: 10 }}>
+                        {userMessages.map((msg) => (
+                          <div
+                            key={msg.id}
+                            style={{
+                              padding: 12, borderRadius: 8,
+                              background: 'rgba(255,255,255,.02)',
+                              border: '1px solid rgba(255,255,255,.05)',
+                            }}
+                          >
+                            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{msg.subject}</div>
+                            <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 8 }}>{msg.body}</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6cb6ff' }}>
+                              <span>
+                                {new Date(msg.created_at).toLocaleDateString('de-DE')} {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {msg.is_read ? (
+                                <span style={{ color: '#25d366' }}>✓ Gelesen</span>
+                              ) : (
+                                <span style={{ color: '#f59e0b' }}>⏱️ Ungelesen</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            }
+          })()}
 
           {section === 'rollen' && (() => {
             const roleDescriptions: Record<AppRole, string> = {

@@ -2939,3 +2939,115 @@ export async function uploadSteuerBelegFile(file: File, userId: string): Promise
   const { data } = supabase.storage.from('steuer-belege').getPublicUrl(path)
   return data.publicUrl
 }
+
+// ── MESSAGING & POSTFACH ──────────────────────────────────────────────────────
+
+export type UserMessage = {
+  id: string
+  user_id: string
+  message_type: 'support_request' | 'broadcast'
+  subject: string
+  body: string
+  is_read: boolean
+  read_at?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type BroadcastMessage = {
+  id: string
+  owner_user_id: string
+  subject: string
+  body: string
+  recipient_type: 'all' | 'single'
+  recipient_user_id?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+// User Messages: Normal user support requests
+export async function getUserMessages() {
+  const { data, error } = await db()
+    .from('user_messages')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (isSchemaMismatch(error)) return []
+  if (error) throw error
+  return (data ?? []) as UserMessage[]
+}
+
+export async function insertUserMessage(input: {
+  subject: string
+  body: string
+}) {
+  const user = await db().auth.getUser()
+  const { data, error } = await db()
+    .from('user_messages')
+    .insert({
+      user_id: user.data.user?.id,
+      message_type: 'support_request',
+      subject: input.subject,
+      body: input.body,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data as UserMessage
+}
+
+export async function markUserMessageAsRead(messageId: string) {
+  const { data, error } = await db()
+    .from('user_messages')
+    .update({ is_read: true, read_at: new Date().toISOString() })
+    .eq('id', messageId)
+    .select()
+    .single()
+  if (error) throw error
+  return data as UserMessage
+}
+
+// Owner Inbox: All support requests from users
+export async function getOwnerInbox() {
+  const { data, error } = await db()
+    .from('user_messages')
+    .select('id, user_id, message_type, subject, body, is_read, created_at')
+    .order('created_at', { ascending: false })
+  if (isSchemaMismatch(error)) return []
+  if (error) throw error
+  return (data ?? []) as Omit<UserMessage, 'updated_at'>[]
+}
+
+// Broadcast Messages: Owner to all/single users
+export async function insertBroadcastMessage(input: {
+  subject: string
+  body: string
+  recipient_type: 'all' | 'single'
+  recipient_user_id?: string
+}) {
+  const user = await db().auth.getUser()
+  const { data, error } = await db()
+    .from('broadcast_messages')
+    .insert({
+      owner_user_id: user.data.user?.id,
+      subject: input.subject,
+      body: input.body,
+      recipient_type: input.recipient_type,
+      recipient_user_id: input.recipient_user_id || null,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data as BroadcastMessage
+}
+
+export async function getOwnerSentMessages() {
+  const user = await db().auth.getUser()
+  const { data, error } = await db()
+    .from('broadcast_messages')
+    .select('*')
+    .eq('owner_user_id', user.data.user?.id)
+    .order('created_at', { ascending: false })
+  if (isSchemaMismatch(error)) return []
+  if (error) throw error
+  return (data ?? []) as BroadcastMessage[]
+}

@@ -238,6 +238,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <NotificationBell />
+            <button
+              onClick={() => router.push('/dashboard/einstellungen')}
+              style={{
+                width: 38, height: 38, borderRadius: 10,
+                background: 'rgba(255,255,255,.05)',
+                border: '1px solid rgba(255,255,255,.1)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 18, transition: 'all .15s',
+                touchAction: 'manipulation',
+              }}
+              title="Einstellungen"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(22,132,255,.15)'
+                e.currentTarget.style.border = '1px solid rgba(22,132,255,.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,.05)'
+                e.currentTarget.style.border = '1px solid rgba(255,255,255,.1)'
+              }}
+            >
+              ⚙️
+            </button>
             {/* Role badge – hide on very small screens via inline media */}
             <span
               className="role-badge-desktop"
@@ -249,21 +271,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               {ROLE_LABELS[role]}
             </span>
-            <button
-              onClick={() => router.push('/dashboard/einstellungen')}
-              style={{
-                width: 38, height: 38, borderRadius: 10,
-                background: 'linear-gradient(135deg, #1684ff22, #20c8ff22)',
-                border: '1px solid rgba(22,132,255,.3)',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 900, fontSize: 15, color: '#6cb6ff',
-                transition: 'border-color .15s, background .15s',
-                touchAction: 'manipulation',
-              }}
-              title="Einstellungen"
-            >
-              {userName ? userName.charAt(0).toUpperCase() : '?'}
-            </button>
           </div>
         </div>
 
