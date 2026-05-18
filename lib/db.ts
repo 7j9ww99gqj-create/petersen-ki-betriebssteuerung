@@ -1114,6 +1114,15 @@ export async function deleteBueroKunde(id: string) {
   if (error) throw error
 }
 
+export async function checkBueroKundeDuplicate(email: string, excludeId?: string) {
+  if (!email) return null
+  let q = db().from('buero_kunden').select('id, name, email').ilike('email', email)
+  if (excludeId) q = q.neq('id', excludeId)
+  const { data, error } = await q.maybeSingle()
+  if (error) return null
+  return data as { id: string; name: string; email: string } | null
+}
+
 export async function anonymisiereBueroKunde(id: string) {
   const { error } = await db()
     .from('buero_kunden')

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
 import {
-  getBueroKunden, upsertBueroKunde, deleteBueroKunde, anonymisiereBueroKunde,
+  getBueroKunden, upsertBueroKunde, deleteBueroKunde, anonymisiereBueroKunde, checkBueroKundeDuplicate,
   getBueroAngebote, upsertBueroAngebot, deleteBueroAngebot,
   getBueroAuftraege, upsertBueroAuftrag, deleteBueroAuftrag,
   getBueroRechnungen, upsertBueroRechnung, deleteBueroRechnung, getNextInvoiceNumber, getNextAngebotNumber,
@@ -418,6 +418,7 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
   const [form, setForm] = useState({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '' })
   const [cockpitTab, setCockpitTab] = useState<'angebote' | 'auftraege' | 'rechnungen'>('auftraege')
   const [anonConfirm, setAnonConfirm] = useState<string | null>(null)
+  const [duplikatWarnung, setDuplikatWarnung] = useState<string | null>(null)
   const { role } = useRole()
 
   useEffect(() => {
@@ -440,6 +441,16 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
     setTimeout(() => setToast(''), 4000)
   }
 
+  const handleEmailChange = async (email: string) => {
+    setForm(p => ({ ...p, email }))
+    setDuplikatWarnung(null)
+    if (!email || isDemo) return
+    try {
+      const dup = await checkBueroKundeDuplicate(email)
+      if (dup) setDuplikatWarnung(`⚠️ Kunde mit dieser E-Mail existiert bereits: ${dup.name}`)
+    } catch { /* ignorieren */ }
+  }
+
   const handleSave = async () => {
     if (!form.name || !form.email) return
     const newKunde: Kunde = {
@@ -454,6 +465,7 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
     }
     setKunden(prev => [newKunde, ...prev])
     setForm({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '' })
+    setDuplikatWarnung(null)
     setShowForm(false)
     showToast(`✅ Kunde "${newKunde.name}" wurde erfolgreich angelegt (${newKunde.id})`)
   }
@@ -653,7 +665,10 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
             </div>
             <div>
               <label style={labelStyle}>E-Mail *</label>
-              <input className="pk-input" placeholder="email@beispiel.de" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
+              <input className="pk-input" placeholder="email@beispiel.de" type="email" value={form.email} onChange={e => handleEmailChange(e.target.value)} />
+              {duplikatWarnung && (
+                <div style={{ marginTop: 4, padding: '6px 10px', borderRadius: 8, background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.35)', color: '#f59e0b', fontSize: 12 }}>{duplikatWarnung}</div>
+              )}
             </div>
             <div>
               <label style={labelStyle}>Telefon</label>
