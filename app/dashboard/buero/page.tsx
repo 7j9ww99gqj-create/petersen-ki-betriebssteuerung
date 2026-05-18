@@ -42,7 +42,7 @@ type Auftrag = {
 type Rechnung = {
   id: string; nummer?: string; kunde_id?: string; kunde: string; betrag: string; faellig: string
   erstellt: string; status: 'Erstellt' | 'Offen' | 'Bezahlt' | 'Überfällig' | 'Mahnung'
-  bezahltAm?: string
+  bezahltAm?: string; mahnung_count?: number
 }
 
 type Dokument = {
@@ -929,6 +929,35 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
         </Modal>
       )}
 
+      {(() => {
+        const today = new Date()
+        const expiredOffers = angebote.filter(a => {
+          if (a.status === 'Akzeptiert' || a.status === 'Abgelehnt') return false
+          try {
+            const [d, m, y] = a.gueltig.split('.').map(Number)
+            const gueltigDate = new Date(y, m - 1, d)
+            return gueltigDate < today
+          } catch { return false }
+        })
+        const reminderOffers = angebote.filter(a => needsReminder(a))
+        if (expiredOffers.length === 0 && reminderOffers.length === 0) return null
+        return (
+          <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 12, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', color: '#fbbf24' }}>
+            <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 6 }}>⏰ Angebots-Hinweise</div>
+            {expiredOffers.length > 0 && (
+              <div style={{ fontSize: 13, marginBottom: 4 }}>
+                <strong>{expiredOffers.length}</strong> Angebot{expiredOffers.length > 1 ? 'e' : ''} abgelaufen (Gültigkeitsdatum überschritten)
+              </div>
+            )}
+            {reminderOffers.length > 0 && (
+              <div style={{ fontSize: 13 }}>
+                <strong>{reminderOffers.length}</strong> Angebot{reminderOffers.length > 1 ? 'e' : ''} seit 10+ Tagen ohne Rückmeldung
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 6 }}>
           {(['Alle', 'Entwurf', 'Erstellt', 'Versendet', 'Akzeptiert', 'Abgelehnt'] as const).map(s => (
@@ -1027,6 +1056,16 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                           ✉️ Verschicken
                         </button>
                       )}
+                      {(() => {
+                        try {
+                          const [d, m, y] = a.gueltig.split('.').map(Number)
+                          const gueltigDate = new Date(y, m - 1, d)
+                          if (gueltigDate < new Date() && a.status !== 'Akzeptiert' && a.status !== 'Abgelehnt') {
+                            return <span className="badge badge-red" style={{ fontSize: 10 }}>Abgelaufen</span>
+                          }
+                        } catch { /* */ }
+                        return null
+                      })()}
                       {a.status === 'Versendet' && (
                         <>
                           {needsReminder(a) && (
@@ -1667,31 +1706,39 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
   const handleMahnung = async (id: string) => {
     const rechnung = rechnungen.find(r => r.id === id)
     if (!rechnung) return
+    const newCount = (rechnung.mahnung_count ?? 0) + 1
     if (!isDemo) {
-      try { await upsertBueroRechnung({ ...rechnung, status: 'Mahnung' }) } catch { showToast('Fehler beim Speichern', true); return }
+      try { await upsertBueroRechnung({ ...rechnung, status: 'Mahnung', mahnung_count: newCount }) } catch { showToast('Fehler beim Speichern', true); return }
     }
-    setRechnungen(prev => prev.map(r => r.id === id ? { ...r, status: 'Mahnung' } : r))
-    const subject = `Zahlungserinnerung: Rechnung ${rechnung.nummer || rechnung.id}`
+    setRechnungen(prev => prev.map(r => r.id === id ? { ...r, status: 'Mahnung', mahnung_count: newCount } : r))
+    const stufe = newCount === 1 ? '1. Mahnung' : newCount === 2 ? '2. Mahnung' : `${newCount}. Mahnung`
+    const subject = `${stufe}: Rechnung ${rechnung.nummer || rechnung.id}`
     const body = [
       `Guten Tag ${rechnung.kunde},`,
       '',
-      `hiermit möchten wir Sie freundlich an die offene Zahlung folgender Rechnung erinnern:`,
+      newCount === 1
+        ? 'hiermit möchten wir Sie freundlich an die offene Zahlung folgender Rechnung erinnern:'
+        : newCount === 2
+          ? 'trotz unserer ersten Zahlungserinnerung haben wir noch keinen Zahlungseingang verzeichnen können. Wir bitten Sie dringend, folgenden Betrag zu begleichen:'
+          : 'wir müssen Sie letztmalig zur Zahlung auffordern, da trotz mehrfacher Erinnerung noch kein Zahlungseingang erfolgt ist:',
       '',
       `Rechnungsnummer: ${rechnung.nummer || rechnung.id}`,
       `Betrag: ${rechnung.betrag}`,
       `Fälligkeitsdatum: ${rechnung.faellig}`,
       '',
-      `Bitte überweisen Sie den ausstehenden Betrag innerhalb von 7 Werktagen auf unser Konto.`,
+      newCount >= 3
+        ? 'Bitte überweisen Sie den ausstehenden Betrag innerhalb von 5 Werktagen. Bei weiterer Nichtzahlung behalten wir uns rechtliche Schritte vor.'
+        : 'Bitte überweisen Sie den ausstehenden Betrag innerhalb von 7 Werktagen auf unser Konto.',
       '',
-      `Bei Rückfragen stehen wir Ihnen gerne zur Verfügung.`,
+      'Bei Rückfragen stehen wir Ihnen gerne zur Verfügung.',
       '',
-      `Mit freundlichen Grüßen`,
+      'Mit freundlichen Grüßen',
     ].join('\n')
     const k = kunden.find(k => k.id === rechnung.kunde_id || k.name === rechnung.kunde)
     if (k?.email) {
       window.location.href = `mailto:${encodeURIComponent(k.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
     }
-    showToast(`📮 Mahnung für ${rechnung.nummer || id} erstellt – Mail-Entwurf vorbereitet`)
+    showToast(`📮 ${stufe} für ${rechnung.nummer || id} erstellt – Mail-Entwurf vorbereitet`)
   }
 
   const handleNeu = async () => {
@@ -1928,7 +1975,14 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
                   {r.bezahltAm ? `Bezahlt: ${r.bezahltAm}` : r.faellig}
                 </td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{linkedDokument?.name ?? '—'}</td>
-                <td><StatusBadgeRechnung status={r.status} /></td>
+                <td>
+                  <StatusBadgeRechnung status={r.status} />
+                  {r.status === 'Mahnung' && (r.mahnung_count ?? 0) > 0 && (
+                    <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 999, background: 'rgba(255,165,0,.15)', color: '#ffb347', fontWeight: 700 }}>
+                      {r.mahnung_count}. Mahnung
+                    </span>
+                  )}
+                </td>
                 <td>
                   {deleteId === r.id ? (
                     <DeleteConfirm label={r.id} onConfirm={() => handleDelete(r.id)} onCancel={() => setDeleteId(null)} />
@@ -1950,7 +2004,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
                             ✅ Bezahlt
                           </button>
                           <button onClick={e => { e.stopPropagation(); handleMahnung(r.id) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,165,0,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>
-                            📮 2. Mahnung
+                            📮 {(r.mahnung_count ?? 1) + 1}. Mahnung
                           </button>
                         </>
                       )}
@@ -2008,6 +2062,16 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
                 placeholder="kunde@beispiel.de"
                 style={{ width: '100%', marginBottom: 16 }}
               />
+              <button
+                className="pk-btn-ghost"
+                style={{ fontWeight: 700, marginBottom: 10, width: '100%' }}
+                onClick={() => {
+                  const r = rechnungen.find(r => r.id === mailTarget.id)
+                  if (r) generateRechnungPDF(r, r.kunde)
+                }}
+              >
+                📄 PDF erstellen & herunterladen
+              </button>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                 <button className="pk-btn-ghost" onClick={() => setMailTarget(null)} disabled={mailSending}>Abbrechen</button>
                 <button

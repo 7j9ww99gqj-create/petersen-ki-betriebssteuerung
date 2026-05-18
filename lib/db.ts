@@ -148,6 +148,7 @@ type BueroRechnungRecord = {
   erstellt?: string | null
   status?: string | null
   bezahlt_am?: string | null
+  mahnung_count?: number | null
 }
 
 type BillingPaymentRow = {
@@ -490,6 +491,7 @@ function normalizeBueroRechnung(
     ...row,
     kunde_id: row.kunde_id ?? undefined,
     kunde: firstText(row.kunde, row.kunde_id ? kundenById.get(row.kunde_id)?.name ?? '' : ''),
+    mahnung_count: typeof row.mahnung_count === 'number' ? row.mahnung_count : 0,
   }
 }
 
@@ -1212,7 +1214,7 @@ export async function upsertBueroRechnung(r: {
   payment_link_id?: string; payment_link_url?: string; payment_link_reference?: string; payment_link_status?: string; payment_link_created_at?: string; payment_link_error?: string
   auto_generated?: boolean
   leistungszeitraum_von?: string; leistungszeitraum_bis?: string; faellig?: string
-  erstellt?: string; status?: string; bezahlt_am?: string
+  erstellt?: string; status?: string; bezahlt_am?: string; mahnung_count?: number
 }) {
   const kundenIndex = await listBueroKundenIndex()
   const kundeRecord = r.kunde_id
