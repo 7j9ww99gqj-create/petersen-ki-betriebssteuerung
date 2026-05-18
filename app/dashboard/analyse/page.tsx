@@ -24,6 +24,8 @@ interface KpiData {
   offeneRechnungen: number
   offeneRechnungenSumme: number
   offeneAngeboteSumme: number
+  lagerwert: number
+  lagerwertHinweis: string
 }
 
 // ── Demo-Fallback ──────────────────────────────────────────────────────────────
@@ -52,11 +54,13 @@ const DEMO_KPI: KpiData = {
   artikelGesamt: 1248, artikelNiedrig: 3, artikelLeer: 1,
   aktivKunden: 5, offeneAngebote: 4, offeneRechnungen: 4,
   offeneRechnungenSumme: 14300, offeneAngeboteSumme: 38150,
+  lagerwert: 1245000, lagerwertHinweis: '',
 }
 
 const ZERO_KPI: KpiData = {
   umsatzMonat: 0, gewinnMonat: 0, artikelGesamt: 0, artikelNiedrig: 0, artikelLeer: 0,
   aktivKunden: 0, offeneAngebote: 0, offeneRechnungen: 0, offeneRechnungenSumme: 0, offeneAngeboteSumme: 0,
+  lagerwert: 0, lagerwertHinweis: '',
 }
 
 const MONATSNAMEN = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
@@ -176,7 +180,7 @@ export default function AnalysePilotPage() {
         supabase.from('buero_eingangsrechnungen').select('betrag_brutto,rechnungsdatum,status'),
         supabase.from('buero_kunden').select('status'),
         supabase.from('buero_angebote').select('betrag,datum,status'),
-        supabase.from('lager_artikel').select('bestand,status,mindestbestand,created_at'),
+        supabase.from('lager_artikel').select('bestand,status,mindestbestand,created_at,einkaufspreis'),
         supabase.from('buero_dokumente').select('document_type,confidence,created_at').gte('created_at', sevenDaysAgo),
       ])
 
@@ -204,10 +208,21 @@ export default function AnalysePilotPage() {
         : []
 
       // ── Artikel ──
-      type ArtikelRow = { bestand?: number | null; status?: string | null; mindestbestand?: number | null; created_at?: string | null }
+      type ArtikelRow = { bestand?: number | null; status?: string | null; mindestbestand?: number | null; created_at?: string | null; einkaufspreis?: number | null }
       const artikelRows = artikel.status === 'fulfilled' && !artikel.value.error
         ? (artikel.value.data ?? []) as ArtikelRow[]
         : []
+
+      // ── Lagerwert berechnen ──
+      const hasEinkaufspreise = artikelRows.some(a => (a.einkaufspreis ?? 0) > 0)
+      let lagerwert = 0
+      let lagerwertHinweis = ''
+      if (hasEinkaufspreise) {
+        lagerwert = artikelRows.reduce((s, a) => s + (a.bestand ?? 0) * (a.einkaufspreis ?? 0), 0)
+      } else {
+        lagerwert = artikelRows.reduce((s, a) => s + (a.bestand ?? 0), 0)
+        lagerwertHinweis = 'Einkaufspreise nicht hinterlegt'
+      }
 
       // ── KPI berechnen ──
       const now = new Date()
@@ -237,6 +252,8 @@ export default function AnalysePilotPage() {
         offeneRechnungen: offeneRechnungenList.length,
         offeneRechnungenSumme: Math.round(offeneRechnungenSumme),
         offeneAngeboteSumme: Math.round(offeneAngeboteSumme),
+        lagerwert: Math.round(lagerwert),
+        lagerwertHinweis,
       })
 
       // ── Umsatz-Chart: Fenster nach Zeitraum ──
@@ -395,6 +412,8 @@ export default function AnalysePilotPage() {
               sub={kpi.offeneRechnungenSumme > 0 ? `Gesamt: ${fmtK(kpi.offeneRechnungenSumme)}` : undefined} />
             <KPICard icon="⚠️" label="Kritische Artikel" value={String(kpi.artikelNiedrig + kpi.artikelLeer)} color="#f59e0b"
               sub={`${kpi.artikelLeer} leer · ${kpi.artikelNiedrig} niedrig`} />
+            <KPICard icon="💰" label="Lagerwert" value={kpi.lagerwertHinweis ? `${kpi.lagerwert.toLocaleString('de-DE')} Stk` : `${kpi.lagerwert.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`} color="#f59e0b"
+              sub={kpi.lagerwertHinweis || 'Bestand × Einkaufspreis'} />
           </div>
 
           {/* Sparkline Umsatz */}
