@@ -654,6 +654,7 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* Betriebsübersicht für Owner */}
           <div style={{
             marginTop: 16,
             border: '1px solid rgba(255,255,255,.08)',
@@ -661,46 +662,38 @@ export default function DashboardPage() {
             background: 'linear-gradient(180deg, rgba(17,24,36,.94), rgba(10,14,22,.98))',
             padding: 18,
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900 }}>Letzte Aktivitäten</h3>
-                <div style={{ fontSize: 12, color: '#8ba0b8', marginTop: 4 }}>Billing-, Stripe- und Owner-Signale in zeitlicher Reihenfolge.</div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900 }}>Betriebsübersicht</h3>
+                <div style={{ fontSize: 12, color: '#8ba0b8', marginTop: 4 }}>Wichtige Kennzahlen auf einen Blick</div>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span className="badge badge-blue">{ownerSnapshot.recentActivities.length} Einträge</span>
-                <button className="pk-btn-ghost" onClick={loadOwnerSnapshot} style={{ fontSize: 12, padding: '6px 12px' }}>↻ Aktualisieren</button>
-              </div>
+              <button className="pk-btn-ghost" onClick={loadOwnerSnapshot} style={{ fontSize: 12, padding: '6px 12px' }}>↻ Aktualisieren</button>
             </div>
-            {ownerSnapshot.recentActivities.length === 0 ? (
-              <div style={{ padding: '24px 0', textAlign: 'center', color: '#8ba0b8', fontSize: 13 }}>
-                Noch keine Aktivitäten vorhanden. Sobald Buchungen oder Zahlungen eingehen, erscheinen sie hier.
-              </div>
-            ) : null}
-            <div style={{ display: 'grid', gap: 10 }}>
-              {ownerSnapshot.recentActivities.map(activity => (
+            <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+              {[
+                { label: 'Aktive Kunden', value: ownerSnapshot.activeCustomers.toLocaleString('de-DE'), icon: '👥', color: '#20c8ff', href: '/dashboard/einstellungen?section=kundensteuerung', hint: 'Alle Kunden verwalten' },
+                { label: 'Monatsumsatz', value: `${ownerSnapshot.monthlyRecurringRevenue.toLocaleString('de-DE')} €`, icon: '💶', color: '#10b981', href: '/dashboard/buero?tab=rechnungen', hint: 'Rechnungen öffnen' },
+                { label: 'Offene Rechnungen', value: ownerSnapshot.openInvoices.toLocaleString('de-DE'), icon: '🧾', color: ownerSnapshot.openInvoices > 0 ? '#f59e0b' : '#10b981', href: '/dashboard/buero?tab=rechnungen&filter=Offen', hint: 'Offene Positionen prüfen' },
+                { label: 'Freischaltungen', value: ownerSnapshot.pendingActivations.toLocaleString('de-DE'), icon: '⏳', color: ownerSnapshot.pendingActivations > 0 ? '#f59e0b' : '#10b981', href: '/dashboard/einstellungen?section=kundensteuerung', hint: 'Kunden freischalten' },
+              ].map(item => (
                 <button
-                  key={activity.id}
-                  onClick={() => activity.linkUrl ? router.push(activity.linkUrl) : undefined}
+                  key={item.label}
+                  onClick={() => router.push(item.href)}
                   style={{
-                    all: 'unset',
-                    cursor: activity.linkUrl ? 'pointer' : 'default',
-                    borderRadius: 14,
-                    border: '1px solid rgba(255,255,255,.08)',
-                    background: 'rgba(255,255,255,.03)',
-                    padding: '12px 14px',
-                    display: 'grid',
-                    gap: 4,
+                    all: 'unset', cursor: 'pointer',
+                    padding: '14px 16px', borderRadius: 14,
+                    background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)',
+                    display: 'flex', gap: 12, alignItems: 'center',
+                    transition: 'background .15s, border-color .15s',
                   }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.06)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,.15)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.03)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,.07)' }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: '#f8fbff' }}>{activity.title}</div>
-                    <div style={{ fontSize: 11, color: activity.severity === 'error' ? '#fca5a5' : activity.severity === 'success' ? '#86efac' : activity.severity === 'warn' ? '#fcd34d' : '#8ba0b8', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                      {activity.source}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#aeb9c8', lineHeight: 1.5 }}>{activity.description}</div>
-                  <div style={{ fontSize: 11, color: '#708199' }}>
-                    {new Date(activity.createdAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}
+                  <span style={{ fontSize: 22, flexShrink: 0 }}>{item.icon}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 18, fontWeight: 900, color: item.color }}>{item.value}</div>
+                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>{item.label}</div>
+                    <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{item.hint} →</div>
                   </div>
                 </button>
               ))}
