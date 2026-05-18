@@ -107,10 +107,10 @@
 - ✅ **SteuerPilot 3-stufiges Beleg-Modal** — Commit `e63cf8b`: Fixkosten/Betriebsausgaben/Anschaffungen + Kategorie + Details, Belege-Tab read-only.
 - ✅ **Bottom-Nav Steuer** — Commit `f4378a6`: SteuerPilot in Bottom-Navigation hinzugefügt.
 - ✅ **PWA Push-Benachrichtigungen** — Commit `02e91a0`: sw.js, lib/push.ts, API-Routen, Einstellungen-UI.
-- 🔴 **Supabase SQL ausführen** — Migration `20260518210000_pilot_documents.sql` (pilot_documents + tax_receipts + push_subscriptions).
-- 🔴 **VAPID Keys setzen** — Vercel Env-Vars: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL, NEXT_PUBLIC_VAPID_PUBLIC_KEY. Generieren mit `npx web-push generate-vapid-keys`.
-- 🔴 **Supabase Storage Bucket** — `pilot-documents` manuell im Supabase Dashboard erstellen (authenticated read/write, owner delete).
-- 🔴 **Messaging SQL-Schema ausführen** — Tabellen `user_messages` + `broadcast_messages` müssen einmalig manuell im Supabase SQL-Editor eingespielt werden. Bis dahin ist das Postfach nicht funktionsfähig.
+- ✅ ~~**Supabase SQL ausführen**~~ — Migration `20260518210000_pilot_documents.sql` (pilot_documents + tax_receipts + push_subscriptions) **eingespielt 2026-05-18**.
+- ✅ ~~**VAPID Keys setzen**~~ — Vercel Env-Vars: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL, NEXT_PUBLIC_VAPID_PUBLIC_KEY **gesetzt 2026-05-18**.
+- ✅ ~~**Supabase Storage Bucket**~~ — `pilot-documents` **erstellt 2026-05-18** (authenticated read/write, owner delete).
+- ✅ ~~**Messaging SQL-Schema ausführen**~~ — Tabellen `user_messages` + `broadcast_messages` + RLS-Policies **eingespielt 2026-05-18**.
 - ✅ ~~**LagerPilot: Umlagerung atomarisieren**~~ — RPC `umlager_artikel` in `20260519020000_umlager_artikel_rpc.sql` erstellt; `lib/db.ts` nutzt `supabase.rpc()`.
 - ✅ ~~**LagerPilot: Dual-Layer-Bestandssync**~~ — Trigger `trg_sync_bestand` in `20260519030000_bestand_sync_trigger.sql` erstellt; `lager_artikel.bestand` wird automatisch bei jedem Stellplatz-Update aktualisiert.
 - ✅ ~~**WerkstattPilot: FK `buero_auftrag_id`**~~ — Migration `20260519040000_werkstatt_karte_buero_auftrag_fk.sql` erstellt; `werkstatt_karten.buero_auftrag_id` referenziert `buero_auftraege.id`; UI-Dropdown im Formular.
@@ -120,7 +120,7 @@
 - 🟡 **Mailchimp API** (5h) — Echtzeit-Öffnungsraten + Lead→Subscriber-Automatisierung.
 
 ### 0.3 Aktuelle Blocker
-- Keine kritischen Blocker. Stripe E2E validiert.
+- **Keine Blocker.** Alle SQL-Schemas eingespielt, alle Env-Vars gesetzt, Storage Bucket erstellt.
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
