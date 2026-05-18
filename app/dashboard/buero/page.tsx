@@ -730,6 +730,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
   const [toastError, setToastError] = useState(false)
   const [loading, setLoading] = useState(!isDemo)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
+  const [filterErinnerung, setFilterErinnerung] = useState(false)
   const [form, setForm] = useState({ kunde: '', titel: '', betrag: '', gueltig: '', dokumentId: '', paketId: '' as PackageId | '', tier: '' as EmployeeTierId | '' })
 
   // Edit-Modal
@@ -795,7 +796,10 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
     }
   }
 
-  const filtered = angebote.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
+  const filtered = angebote.filter(a => {
+    if (filterErinnerung) return needsReminder(a)
+    return filterStatus === 'Alle' || a.status === filterStatus
+  })
   const dokumentOptionen = dokumente.filter(doc => isDokumentAvailableForRelation(doc, 'angebot_id', editAngebot?.id))
 
   const syncDokumentVerknuepfung = async (angebot: Angebot, dokumentId: string, previousDokumentId?: string) => {
@@ -965,7 +969,22 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
   const needsReminder = (a: Angebot): boolean => {
     if (a.status !== 'Versendet' || !a.verschickt_am) return false
     const days = (Date.now() - new Date(a.verschickt_am).getTime()) / (1000 * 60 * 60 * 24)
-    return days >= 10
+    return days >= 7
+  }
+
+  const angebotAgingDays = (a: Angebot): number | null => {
+    if (a.status === 'Akzeptiert' || a.status === 'Abgelehnt') return null
+    const ref = a.verschickt_am ?? a.datum
+    if (!ref) return null
+    let refDate: Date
+    if (ref.includes('.')) {
+      const [d, m, y] = ref.split('.').map(Number)
+      refDate = new Date(y, m - 1, d)
+    } else {
+      refDate = new Date(ref)
+    }
+    if (isNaN(refDate.getTime())) return null
+    return Math.floor((Date.now() - refDate.getTime()) / (1000 * 60 * 60 * 24))
   }
 
   const statusCounts: Record<string, number> = { Alle: angebote.length, Entwurf: 0, Erstellt: 0, Versendet: 0, Akzeptiert: 0, Abgelehnt: 0 }
@@ -1065,16 +1084,29 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
       })()}
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(['Alle', 'Entwurf', 'Erstellt', 'Versendet', 'Akzeptiert', 'Abgelehnt'] as const).map(s => (
-            <button key={s} onClick={() => setFilterStatus(s)} style={{
+            <button key={s} onClick={() => { setFilterStatus(s); setFilterErinnerung(false) }} style={{
               padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)',
-              background: filterStatus === s ? 'rgba(32,200,255,.15)' : 'transparent',
-              color: filterStatus === s ? '#20c8ff' : '#aeb9c8', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              background: !filterErinnerung && filterStatus === s ? 'rgba(32,200,255,.15)' : 'transparent',
+              color: !filterErinnerung && filterStatus === s ? '#20c8ff' : '#aeb9c8', fontSize: 12, fontWeight: 700, cursor: 'pointer',
             }}>
               {s} <span style={{ opacity: .7 }}>({statusCounts[s] ?? angebote.length})</span>
             </button>
           ))}
+          {(() => {
+            const erinnerungCount = angebote.filter(needsReminder).length
+            if (erinnerungCount === 0) return null
+            return (
+              <button onClick={() => setFilterErinnerung(f => !f)} style={{
+                padding: '6px 14px', borderRadius: 999, border: `1px solid ${filterErinnerung ? 'rgba(245,158,11,.6)' : 'rgba(245,158,11,.3)'}`,
+                background: filterErinnerung ? 'rgba(245,158,11,.2)' : 'rgba(245,158,11,.06)',
+                color: '#f59e0b', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}>
+                ⏰ Erinnerung fällig ({erinnerungCount})
+              </button>
+            )
+          })()}
         </div>
         <button className="pk-btn" style={{ fontSize: 13, marginLeft: 'auto' }} onClick={() => setShowForm(f => !f)}>
           {showForm ? '✕ Abbrechen' : '+ Neues Angebot'}
@@ -1226,11 +1258,20 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                       })()}
                       {a.status === 'Versendet' && (
                         <>
-                          {needsReminder(a) && (
-                            <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 999, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.4)', color: '#f59e0b', fontWeight: 700 }}>
-                              ⏰ Nachfragen
-                            </span>
-                          )}
+                          {(() => {
+                            const days = angebotAgingDays(a)
+                            if (days === null || days < 7) return null
+                            if (days >= 14) return (
+                              <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 999, background: 'rgba(244,63,94,.12)', border: '1px solid rgba(244,63,94,.4)', color: '#fb7185', fontWeight: 700 }}>
+                                ⚠️ {days}T offen
+                              </span>
+                            )
+                            return (
+                              <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 999, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.4)', color: '#f59e0b', fontWeight: 700 }}>
+                                ⏰ {days}T offen
+                              </span>
+                            )
+                          })()}
                           <button onClick={e => { e.stopPropagation(); handleStatusChange(a.id, 'Akzeptiert') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>✅ Angenommen</button>
                           <button onClick={e => { e.stopPropagation(); handleStatusChange(a.id, 'Abgelehnt') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,165,0,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>✕ Abgelehnt</button>
                         </>
