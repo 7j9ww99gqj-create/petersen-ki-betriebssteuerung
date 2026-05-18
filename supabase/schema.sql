@@ -63,6 +63,7 @@ create table if not exists firma_einstellungen (
   standard_mwst         numeric default 19,
   standard_waehrung     text default 'EUR',
   dokument_footer       text,
+  briefpapier_url       text,
   briefpapier_layout    jsonb default '{}'::jsonb,
   onboarding_completed  boolean default false,
   ai_enabled            boolean default true,
@@ -1154,9 +1155,12 @@ create table if not exists planung_aufgaben (
   status          text default 'Offen',
   faellig         text,
   erstellt        text,
+  stunden_soll    numeric,
+  stunden_ist     numeric default 0,
   created_at      timestamptz default now(),
   updated_at      timestamptz default now()
 );
+-- Migration (run if table exists): ALTER TABLE planung_aufgaben ADD COLUMN IF NOT EXISTS stunden_soll numeric; ALTER TABLE planung_aufgaben ADD COLUMN IF NOT EXISTS stunden_ist numeric default 0;
 
 create table if not exists planung_termine (
   id          text primary key,

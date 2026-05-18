@@ -27,6 +27,7 @@ type Projekt = {
 type Aufgabe = {
   id: string; titel: string; projekt: string; verantwortlich: string
   prioritaet: Prioritaet; status: AufgabeStatus; faellig: string; erstellt: string
+  stunden_soll?: number; stunden_ist?: number
 }
 
 type Termin = {
@@ -947,8 +948,8 @@ function RessourcenTab({ isDemo }: { isDemo: boolean }) {
 
 // ── Aufgaben-Tab ──────────────────────────────────────────────────────────────
 
-type AufgabeFormState = { titel: string; projekt: string; verantwortlich: string; prioritaet: string; faellig: string }
-const emptyAufgabeForm: AufgabeFormState = { titel: '', projekt: '', verantwortlich: '', prioritaet: 'Mittel', faellig: '' }
+type AufgabeFormState = { titel: string; projekt: string; verantwortlich: string; prioritaet: string; faellig: string; stunden_soll: string; stunden_ist: string }
+const emptyAufgabeForm: AufgabeFormState = { titel: '', projekt: '', verantwortlich: '', prioritaet: 'Mittel', faellig: '', stunden_soll: '', stunden_ist: '' }
 
 function AufgabenTab({ isDemo }: { isDemo: boolean }) {
   const [aufgaben, setAufgaben] = useState<Aufgabe[]>(isDemo ? demoAufgaben : [])
@@ -993,6 +994,8 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
       projekt: form.projekt || '—', verantwortlich: form.verantwortlich || '—',
       prioritaet: form.prioritaet as Prioritaet, status: 'Offen',
       faellig: form.faellig || '—', erstellt: todayDE(),
+      stunden_soll: form.stunden_soll ? parseFloat(form.stunden_soll) : undefined,
+      stunden_ist: form.stunden_ist ? parseFloat(form.stunden_ist) : undefined,
     }
     if (!isDemo) {
       try { await upsertPlanungAufgabe(newA) } catch { showToast('Fehler beim Speichern', true); return }
@@ -1004,7 +1007,7 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
   }
 
   const openEdit = (a: Aufgabe) => {
-    setEditForm({ titel: a.titel, projekt: a.projekt === '—' ? '' : a.projekt, verantwortlich: a.verantwortlich === '—' ? '' : a.verantwortlich, prioritaet: a.prioritaet, faellig: a.faellig === '—' ? '' : a.faellig, status: a.status })
+    setEditForm({ titel: a.titel, projekt: a.projekt === '—' ? '' : a.projekt, verantwortlich: a.verantwortlich === '—' ? '' : a.verantwortlich, prioritaet: a.prioritaet, faellig: a.faellig === '—' ? '' : a.faellig, status: a.status, stunden_soll: a.stunden_soll != null ? String(a.stunden_soll) : '', stunden_ist: a.stunden_ist != null ? String(a.stunden_ist) : '' })
     setEditAufgabe(a)
   }
 
@@ -1034,6 +1037,8 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
       projekt: editForm.projekt || '—', verantwortlich: editForm.verantwortlich || '—',
       prioritaet: editForm.prioritaet as Prioritaet, status: editForm.status,
       faellig: editForm.faellig || '—',
+      stunden_soll: editForm.stunden_soll ? parseFloat(editForm.stunden_soll) : undefined,
+      stunden_ist: editForm.stunden_ist ? parseFloat(editForm.stunden_ist) : undefined,
     }
     if (!isDemo) {
       try { await upsertPlanungAufgabe(updated) } catch { showToast('Fehler beim Speichern', true); return }
@@ -1121,6 +1126,14 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
                 {['Niedrig', 'Mittel', 'Hoch', 'Kritisch'].map(p => <option key={p}>{p}</option>)}
               </select>
             </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Std. Soll</label>
+              <input className="pk-input" type="number" min="0" step="0.5" placeholder="z.B. 8" value={form.stunden_soll} onChange={e => setForm(p => ({ ...p, stunden_soll: e.target.value }))} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Std. Ist</label>
+              <input className="pk-input" type="number" min="0" step="0.5" placeholder="z.B. 4" value={form.stunden_ist} onChange={e => setForm(p => ({ ...p, stunden_ist: e.target.value }))} />
+            </div>
           </div>
           <button className="pk-btn" style={{ marginTop: 16, background: 'linear-gradient(135deg, #e11d48, #9f1239)' }} onClick={handleCreate}>Aufgabe erstellen</button>
         </div>
@@ -1134,6 +1147,7 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
               <th>Projekt</th>
               <th>Priorität</th>
               <th>Status</th>
+              <th>Zeiterfassung</th>
               <th>Verantwortlich</th>
               <th>Fällig</th>
               <th style={{ minWidth: 120 }}>Aktionen</th>
@@ -1142,7 +1156,7 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ padding: 0 }}>
+                <td colSpan={8} style={{ padding: 0 }}>
                   <div style={{ textAlign: 'center', padding: '32px 20px' }}>
                     <div style={{ fontSize: 36, marginBottom: 10 }}>✅</div>
                     <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>Keine Aufgaben vorhanden</div>
@@ -1160,6 +1174,22 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
                 <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#a78bfa' }}>{a.projekt}</td>
                 <td><span className={`badge ${prioBadge[a.prioritaet]}`} style={{ color: prioColor[a.prioritaet] }}>{a.prioritaet}</span></td>
                 <td><span className={`badge ${aufgabeStatusBadge[a.status]}`}>{a.status}</span></td>
+                <td style={{ minWidth: 110 }}>
+                  {a.stunden_soll != null ? (() => {
+                    const soll = a.stunden_soll ?? 0
+                    const ist = a.stunden_ist ?? 0
+                    const pct = soll > 0 ? Math.min(100, Math.round(ist / soll * 100)) : 0
+                    const color = pct > 100 ? '#f43f5e' : pct >= 80 ? '#f59e0b' : '#4ddb7e'
+                    return (
+                      <div style={{ fontSize: 12 }}>
+                        <div style={{ color: '#aeb9c8', marginBottom: 3 }}>{ist}h / {soll}h</div>
+                        <div style={{ height: 5, borderRadius: 4, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width .3s' }} />
+                        </div>
+                      </div>
+                    )
+                  })() : <span style={{ color: '#4a5568', fontSize: 12 }}>—</span>}
+                </td>
                 <td style={{ color: '#aeb9c8', fontSize: 13 }}>{a.verantwortlich}</td>
                 <td style={{ color: a.status !== 'Erledigt' ? '#ffb347' : '#aeb9c8', fontSize: 13, fontWeight: a.status !== 'Erledigt' ? 600 : 400 }}>{a.faellig}</td>
                 <td>
@@ -1218,7 +1248,37 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
                 {(['Offen', 'In Arbeit', 'Blockiert', 'Erledigt'] as const).map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Std. Soll</label>
+              <input className="pk-input" type="number" min="0" step="0.5" placeholder="z.B. 8" value={editForm.stunden_soll} onChange={e => setEditForm(p => ({ ...p, stunden_soll: e.target.value }))} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Std. Ist</label>
+              <input className="pk-input" type="number" min="0" step="0.5" placeholder="z.B. 4" value={editForm.stunden_ist} onChange={e => setEditForm(p => ({ ...p, stunden_ist: e.target.value }))} />
+            </div>
           </div>
+          {editForm.stunden_soll && parseFloat(editForm.stunden_soll) > 0 && (
+            <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'rgba(244,63,94,.06)', border: '1px solid rgba(244,63,94,.15)' }}>
+              {(() => {
+                const soll = parseFloat(editForm.stunden_soll) || 0
+                const ist = parseFloat(editForm.stunden_ist || '0') || 0
+                const pct = soll > 0 ? Math.min(100, Math.round(ist / soll * 100)) : 0
+                const color = pct > 100 ? '#f43f5e' : pct >= 80 ? '#f59e0b' : '#4ddb7e'
+                return (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#aeb9c8', marginBottom: 6 }}>
+                      <span>⏱ Zeiterfassung</span>
+                      <span style={{ color, fontWeight: 700 }}>{ist}h / {soll}h ({pct}%)</span>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 6, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 6, transition: 'width .3s' }} />
+                    </div>
+                    {pct > 100 && <div style={{ fontSize: 11, color: '#fb7185', marginTop: 4 }}>⚠️ Stundenbudget überschritten</div>}
+                  </>
+                )
+              })()}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
             <button className="pk-btn" style={{ background: 'linear-gradient(135deg, #e11d48, #9f1239)' }} onClick={handleUpdate}>Speichern</button>
             <button className="pk-btn-ghost" onClick={() => setEditAufgabe(null)}>Abbrechen</button>
