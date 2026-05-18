@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from '@/lib/supabase-admin'
 import { isStripeWebhookConfigured, verifyStripeWebhookSignature } from '@/lib/stripe'
 import { syncStripeInvoiceState } from '@/lib/stripe-sync'
+import { genId } from '@/lib/ids'
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text()
@@ -74,6 +75,51 @@ export async function POST(req: NextRequest) {
     session,
     eventType: event.type,
   })
+
+  // Owner-Rechnung anlegen wenn Zahlung bestätigt (Status 'Erstellt', kein automatischer Versand)
+  if (result.paymentStatus === 'paid') {
+    try {
+      const ownerLookup = await admin.auth.admin.listUsers({ page: 1, perPage: 200 })
+      const ownerUserId = ownerLookup.data?.users.find(
+        (u: { email?: string; id: string }) => u.email?.toLowerCase() === 'info@petersen-ki-pilot.de'
+      )?.id
+      if (ownerUserId) {
+        const existingOwnerRe = await admin
+          .from('buero_rechnungen')
+          .select('id')
+          .eq('user_id', ownerUserId)
+          .eq('payment_link_id', session.id)
+          .maybeSingle()
+        if (!existingOwnerRe.data) {
+          const numResult = await admin.rpc('pk_next_invoice_number')
+          const now = new Date()
+          const due = new Date(now)
+          due.setDate(due.getDate() + 14)
+          const fmt = (d: Date) => d.toISOString().slice(0, 10)
+          const reId = genId('RE')
+          const inv = invoiceResult.data as { billing_subscription_id?: string | null; kunde?: string | null; summe?: number | null }
+          await admin.from('buero_rechnungen').insert({
+            id: reId,
+            user_id: ownerUserId,
+            billing_subscription_id: inv.billing_subscription_id ?? null,
+            payment_link_id: session.id,
+            kunde: inv.kunde ?? 'Kunde',
+            nummer: numResult.data ?? reId,
+            rechnungstyp: 'subscription',
+            betrag: inv.summe != null ? `${Number(inv.summe).toFixed(2)} €` : null,
+            summe: inv.summe ?? null,
+            auto_generated: true,
+            faellig: fmt(due),
+            erstellt: fmt(now),
+            bezahlt_am: fmt(now),
+            status: 'Erstellt',
+          })
+        }
+      }
+    } catch {
+      // Owner-Rechnung-Fehler soll Webhook nicht blockieren
+    }
+  }
 
   return NextResponse.json({ ok: true, result })
 }

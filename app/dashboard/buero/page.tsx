@@ -1305,11 +1305,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
     if (setSharedRechnungen) {
       setSharedRechnungen(prev => [{ ...newRe, kunde_id: newRe.kunde_id ?? undefined }, ...prev])
     }
-    if (setSharedMailTarget) {
-      const k = kunden.find(k => k.id === auftrag.kunde_id || k.name === auftrag.kunde)
-      setSharedMailTarget({ id: newRe.id, email: k?.email || '', typ: 'rechnung' })
-    }
-    showToast(`✅ Rechnung ${newRe.nummer || newRe.id} erstellt`)
+    showToast(`✅ Rechnung ${newRe.nummer || newRe.id} erstellt – jetzt im Tab "Rechnungen" sichtbar`)
     setTab('rechnungen' as Tab)
   }
 

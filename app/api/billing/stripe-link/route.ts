@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
 import { createStripeInvoiceCheckoutSession, buildStripeInvoiceReference } from '@/lib/stripe'
 import { genId } from '@/lib/ids'
+import { createSupabaseAdminClient, isSupabaseAdminConfigured } from '@/lib/supabase-admin'
 
 export async function POST(req: NextRequest) {
   const access = await getRouteAccess(req)
@@ -58,6 +59,36 @@ export async function POST(req: NextRequest) {
     })
     if (insertResult.error) return NextResponse.json({ error: insertResult.error.message }, { status: 500 })
     invoiceId = newInvoiceId
+
+    // Owner-Auftrag anlegen wenn Kunde bucht (kein automatischer Versand)
+    if (isSupabaseAdminConfigured()) {
+      try {
+        const adminCl = createSupabaseAdminClient()
+        const ownerLookup = await adminCl.auth.admin.listUsers({ page: 1, perPage: 200 })
+        const ownerUserId = ownerLookup.data?.users.find(
+          (u: { email?: string; id: string }) => u.email?.toLowerCase() === 'info@petersen-ki-pilot.de'
+        )?.id
+        if (ownerUserId) {
+          const orderId = `AUF-${String(sub.id ?? newInvoiceId)}`
+          const pilotSummary = Array.isArray(sub.pilot_ids) ? (sub.pilot_ids as string[]).join(', ') : ''
+          const buchungLabel = String(sub.package_id ?? (pilotSummary || 'Module'))
+          await adminCl.from('buero_auftraege').upsert({
+            id: orderId,
+            user_id: ownerUserId,
+            billing_subscription_id: String(sub.id ?? ''),
+            kunde: String(sub.user_email ?? sub.user_key ?? 'Kunde'),
+            beschreibung: `Abo-Buchung ${buchungLabel}`,
+            wert: `${Number(sub.monthly_price ?? 0).toFixed(2)} € / Monat`,
+            start: new Date().toISOString().slice(0, 10),
+            status: 'Geplant',
+            fortschritt: 0,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'id' })
+        }
+      } catch {
+        // Owner-Auftrag-Fehler soll Buchung nicht blockieren
+      }
+    }
   }
 
   if (!invoiceId) {
