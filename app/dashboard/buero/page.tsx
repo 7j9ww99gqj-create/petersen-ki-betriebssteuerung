@@ -18,6 +18,8 @@ import { generateRechnungPDF, generateAngebotPDF } from '@/lib/pdf'
 import { createSupabaseClient } from '@/lib/supabase'
 import { normalizeDocumentStoragePath, type StoredDocumentLink } from '@/lib/documents'
 import { genId } from '@/lib/ids'
+import { useRole } from '@/lib/roles'
+import { PACKAGE_PRICING, EMPLOYEE_TIERS, type PackageId, type EmployeeTierId } from '@/lib/pricingConfig'
 import DocumentPreviewModal from '@/components/DocumentPreviewModal'
 
 // ── Typen ───────────────────────────────────────────────────────────────────
@@ -638,7 +640,7 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
 
 // ── Angebote-Tab ────────────────────────────────────────────────────────────
 
-function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterStatus }: { isDemo: boolean; kunden: Kunde[]; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; initialFilterStatus?: string }) {
+function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterStatus, isOwner, setTab: setParentTab, setRechnungen }: { isDemo: boolean; kunden: Kunde[]; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; initialFilterStatus?: string; isOwner?: boolean; setTab?: React.Dispatch<React.SetStateAction<Tab>>; setRechnungen?: React.Dispatch<React.SetStateAction<Rechnung[]>> }) {
   const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
   const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [showForm, setShowForm] = useState(false)
@@ -646,7 +648,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
   const [toastError, setToastError] = useState(false)
   const [loading, setLoading] = useState(!isDemo)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
-  const [form, setForm] = useState({ kunde: '', titel: '', betrag: '', gueltig: '', dokumentId: '' })
+  const [form, setForm] = useState({ kunde: '', titel: '', betrag: '', gueltig: '', dokumentId: '', paketId: '' as PackageId | '', tier: '' as EmployeeTierId | '' })
 
   // Edit-Modal
   const [editAngebot, setEditAngebot] = useState<Angebot | null>(null)
@@ -760,7 +762,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
       } catch { showToast('Fehler beim Speichern', true); return }
     }
     setAngebote(prev => [newAng, ...prev])
-    setForm({ kunde: '', titel: '', betrag: '', gueltig: '', dokumentId: '' })
+    setForm({ kunde: '', titel: '', betrag: '', gueltig: '', dokumentId: '', paketId: '', tier: '' })
     setShowForm(false)
     showToast(`✅ Angebot "${newAng.id}" wurde als Entwurf erstellt`)
   }
@@ -849,6 +851,33 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
     }
     setAuftraege(prev => [newAuftrag, ...prev])
     showToast(`✅ Auftrag ${newAuftrag.id} aus Angebot ${a.id} erstellt`)
+  }
+
+  const handleAngebotZuRechnung = async (a: Angebot) => {
+    const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const today = new Date()
+    const firmaDefaults = getLocalFirmaDefaults()
+    const reId = genId('RE')
+    const nummer = isDemo
+      ? `RE-${today.getFullYear()}-DEMO`
+      : await getNextInvoiceNumber().catch(() => reId)
+    const newRe = {
+      id: reId, nummer,
+      kunde_id: a.kunde_id,
+      kunde: a.kunde,
+      betrag: a.betrag,
+      faellig: fmt(new Date(today.getTime() + firmaDefaults.zahlungsziel_tage * 86400000)),
+      erstellt: fmt(today),
+      status: 'Erstellt' as const,
+    }
+    if (!isDemo) {
+      try { await upsertBueroRechnung(newRe) } catch { showToast('Fehler beim Erstellen der Rechnung', true); return }
+    }
+    if (setRechnungen) {
+      setRechnungen(prev => [{ ...newRe, kunde_id: newRe.kunde_id ?? undefined }, ...prev])
+    }
+    showToast(`✅ Rechnung ${newRe.nummer || newRe.id} erstellt – jetzt im Tab "Rechnungen" sichtbar`)
+    if (setParentTab) setParentTab('rechnungen' as Tab)
   }
 
   const needsReminder = (a: Angebot): boolean => {
@@ -981,6 +1010,58 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                 {kunden.map(k => <option key={k.id}>{k.name}</option>)}
               </select>
             </div>
+            {isOwner && form.kunde && (
+              <div style={{ gridColumn: '1 / -1', padding: '12px 14px', borderRadius: 10, background: 'rgba(32,200,255,.06)', border: '1px solid rgba(32,200,255,.18)' }}>
+                <div style={{ fontSize: 12, color: '#20c8ff', fontWeight: 700, marginBottom: 10 }}>📦 Paket / Piloten auto-befüllen</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={labelStyle}>Paket</label>
+                    <select className="pk-input" value={form.paketId} style={{ cursor: 'pointer' }} onChange={e => {
+                      const newPaketId = e.target.value as PackageId | ''
+                      const pkg = newPaketId ? PACKAGE_PRICING[newPaketId] : null
+                      const price = pkg && form.tier ? pkg.prices[form.tier as EmployeeTierId] : null
+                      const tierLabel = EMPLOYEE_TIERS.find(t => t.id === form.tier)?.label ?? form.tier
+                      setForm(p => ({
+                        ...p,
+                        paketId: newPaketId,
+                        titel: pkg && price && price !== 'request' ? `${pkg.name} Paket (${tierLabel})` : p.titel,
+                        betrag: pkg && price && typeof price === 'number' ? `${price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : p.betrag,
+                      }))
+                    }}>
+                      <option value="">— Manuell eingeben —</option>
+                      {Object.values(PACKAGE_PRICING).map(pkg => (
+                        <option key={pkg.id} value={pkg.id}>{pkg.icon} {pkg.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Mitarbeiterstaffel</label>
+                    <select className="pk-input" value={form.tier} style={{ cursor: 'pointer' }} onChange={e => {
+                      const newTier = e.target.value as EmployeeTierId | ''
+                      const pkg = form.paketId ? PACKAGE_PRICING[form.paketId as PackageId] : null
+                      const price = pkg && newTier ? pkg.prices[newTier] : null
+                      const tierLabel = EMPLOYEE_TIERS.find(t => t.id === newTier)?.label ?? newTier
+                      setForm(p => ({
+                        ...p,
+                        tier: newTier,
+                        titel: pkg && price && price !== 'request' ? `${pkg.name} Paket (${tierLabel})` : p.titel,
+                        betrag: pkg && price && typeof price === 'number' ? `${price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : p.betrag,
+                      }))
+                    }}>
+                      <option value="">— wählen —</option>
+                      {EMPLOYEE_TIERS.map(t => (
+                        <option key={t.id} value={t.id}>{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {form.paketId && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#aeb9c8' }}>
+                    Enthält: {PACKAGE_PRICING[form.paketId as PackageId]?.included.join(', ')}
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               <label style={labelStyle}>Titel / Leistung *</label>
               <input className="pk-input" placeholder="z.B. Wartungsvertrag 2025" value={form.titel} onChange={e => setForm(p => ({ ...p, titel: e.target.value }))} />
@@ -1073,9 +1154,14 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                         </>
                       )}
                       {a.status === 'Akzeptiert' && (
-                        <button onClick={e => { e.stopPropagation(); handleKonvertieren(a) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'rgba(37,211,102,.08)', color: '#4ddb7e', cursor: 'pointer', fontWeight: 700 }}>
-                          → Auftrag erstellen
-                        </button>
+                        <>
+                          <button onClick={e => { e.stopPropagation(); handleKonvertieren(a) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'rgba(37,211,102,.08)', color: '#4ddb7e', cursor: 'pointer', fontWeight: 700 }}>
+                            🔄 Auftrag erstellen
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); handleAngebotZuRechnung(a) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(245,158,11,.3)', background: 'rgba(245,158,11,.08)', color: '#f59e0b', cursor: 'pointer', fontWeight: 700 }}>
+                            📄 Rechnung erstellen
+                          </button>
+                        </>
                       )}
                       <button onClick={e => { e.stopPropagation(); generateAngebotPDF(a, a.kunde) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
                         📄 PDF
@@ -3194,6 +3280,8 @@ export default function BueroPilotPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isDemo] = useState(() => hasDemoCookie())
+  const { role } = useRole()
+  const isOwner = isDemo ? true : role === 'Admin'
   const [tab, setTab] = useState<Tab>('kunden')
   const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
   const [auftraege, setAuftraege] = useState<Auftrag[]>(isDemo ? demoAuftraege : [])
@@ -3278,7 +3366,7 @@ export default function BueroPilotPage() {
       <TabBar tab={tab} setTab={setTab} />
 
       {tab === 'kunden' && <KundenTab isDemo={isDemo} auftraege={auftraege} rechnungen={sharedRechnungen} />}
-      {tab === 'angebote' && <AngeboteTab isDemo={isDemo} kunden={kunden} auftraege={auftraege} setAuftraege={setAuftraege} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
+      {tab === 'angebote' && <AngeboteTab isDemo={isDemo} kunden={kunden} auftraege={auftraege} setAuftraege={setAuftraege} initialFilterStatus={searchParams.get('filter') ?? undefined} isOwner={isOwner} setTab={setTab} setRechnungen={setSharedRechnungen} />}
       {tab === 'auftraege' && <AuftraegeTab isDemo={isDemo} auftraege={auftraege} setAuftraege={setAuftraege} kunden={kunden} setTab={setTab} setRechnungen={setSharedRechnungen} setMailTarget={setSharedMailTarget} />}
       {tab === 'rechnungen' && <RechnungenTab isDemo={isDemo} kunden={kunden} initialFilterStatus={searchParams.get('filter') ?? undefined} sharedRechnungen={sharedRechnungen} setSharedRechnungen={setSharedRechnungen} sharedMailTarget={sharedMailTarget} setSharedMailTarget={setSharedMailTarget} />}
       {tab === 'eingangsrechnungen' && <EingangRechnungenTab isDemo={isDemo} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
