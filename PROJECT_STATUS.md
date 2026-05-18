@@ -32,7 +32,8 @@
 - Produktivlage: Kernsystem nutzbar, aber noch nicht voll marktreif; Rechte, Integrationen und einige Prozessketten bleiben offene Themen.
 
 ### 0.2 Top-Offene Aufgaben (Priorisiert)
-- ✅ ~~**Stripe Webhook-URL** im Stripe-Dashboard prüfen und echten End-to-End-Test validieren.~~ **Erledigt 2026-05-18**: Webhook live + E2E-Test (Test-Modus) erfolgreich.
+- ✅ ~~**Stripe Webhook-URL** im Stripe-Dashboard prüfen und echten End-to-End-Test validieren.~~ **Erledigt 2026-05-18**.
+- ✅ ~~**BüroPilot: Paketauswahl + 1-Klick-Konvertierung**~~ **Erledigt 2026-05-18**: Inhaber-Paketauswahl in Angebots-Formular + `📄 Rechnung erstellen` direkt aus Angebot.
 - 🟡 **Multi-Positions-Rechnungen/-Angebote** im BüroPilot (aktuell nur 1 Pos. hardcoded).
 - 🟡 **SteuerPilot A13: ELSTER-XML-Export** vorbereiten (Formular-Mapping §§ 81/83 UStVA).
 - 🟢 Benutzerverwaltung erweitern: Deaktivieren/Löschen, Einladung erneut öffnen, Suche/Filter.
@@ -44,8 +45,8 @@
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-18, Stripe E2E-Test erfolgreich (kein Code-Commit)  
-**Letzte Session:** Stripe Webhook konfiguriert + E2E-Test im Test-Modus validiert  
+**Letzter Stand:** 2026-05-18, Commit `de33bc3`  
+**Letzte Session:** BüroPilot Paketauswahl (Inhaber) + 1-Klick Angebot→Rechnung  
 **Nächster Focus:** Multi-Positionen Rechnungen/Angebote → ELSTER-Export  
 **Blocker:** Keine  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
@@ -63,6 +64,12 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – BüroPilot Paketauswahl + Konvertierung, Commit `de33bc3`)**:
+  - **Inhaber-Paketauswahl im Angebots-Formular**: Nach Kundenauswahl erscheint (nur für Admin/Inhaber-Rolle) ein Paket-Selector (Starter/Business/Enterprise + Mitarbeiterstaffel). Wahl befüllt Titel und Betrag automatisch aus `pricingConfig`.
+  - **1-Klick Angebot → Rechnung**: Neuer Button „📄 Rechnung erstellen" für akzeptierte Angebote — direkte Konvertierung ohne Auftrag-Zwischenschritt. Bestehender Button „🔄 Auftrag erstellen" bleibt erhalten.
+  - **Beide Konvertierungen existieren jetzt vollständig**: Angebot→Auftrag (vorher) + Auftrag→Rechnung (vorher) + Angebot→Rechnung direkt (neu).
+  - Betroffene Dateien: `app/dashboard/buero/page.tsx`.
+  - Tests: lint + build grün.
 - **Zuletzt erledigt (2026-05-18 – Stripe E2E)**:
   - **Stripe Webhook live**: Webhook `we_1TYSV1Ih98MCn5G32jwWGWQk` angelegt; `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` in Vercel gesetzt; E2E-Test im Test-Modus erfolgreich (Checkout-Session → Zahlung → Webhook empfangen).
   - Kein Code-Commit (nur Infrastruktur/Konfiguration).
