@@ -26,8 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-15`, `main`, Commit `30f0e47`, deployed.
-- Jüngste Fortschritte: AnalysePilot auf Live-Daten umgestellt, zentrale Benutzerverwaltung inkl. Einladen/Anlegen mit Abo-/Seat-Limit ergänzt.
+- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `23ec7d6`, deployed.
+- Jüngste Fortschritte: 3 PDF-Briefpapier-Vorlagen (Modern Dark / Classic Professional / Elegant Minimal) mit visueller Vorlage-Auswahl in Firmendaten; Inhaber-Rechte-Fix; AB-Nummern/Mahnungsstufen/BüroPilot-Vollprozess; Datenbankbereinigung.
 - Wichtigste externe Restpunkte: Stripe-Webhook-URL/Ende-zu-Ende prüfen; E-Mail-Versand bleibt bewusst manuell über das lokale Mailprogramm.
 - Produktivlage: Kernsystem nutzbar, aber noch nicht voll marktreif; Rechte, Integrationen und einige Prozessketten bleiben offene Themen.
 
@@ -37,6 +37,7 @@
 - Benutzerverwaltung weiter ausbauen: optional Deaktivieren/Löschen, Einladung erneut öffnen, Suche/Filter.
 - Analyse-Bestandstrend auf echte Wochensnapshots umstellen.
 - Weitere produktionsreife Härtung bei Rollen/Rechten, Datenkonsistenz und Integrationen.
+- BüroPilot: Positions-/Leistungsliste in Rechnungen/Angeboten (aktuell nur 1 Pos. hardcoded).
 
 ### 0.3 Aktuelle Blocker
 - Stripe-Ende-zu-Ende-Validierung ist noch nicht vollständig abgeschlossen.
@@ -55,6 +56,17 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – 3 Briefpapier-Vorlagen + Template-Auswahl in Firmendaten)**:
+  - **lib/pdf.ts vollständig überarbeitet**: Neuer Typ `PDFTemplate = 'modern-dark' | 'classic-light' | 'elegant-minimal'`; `briefpapier_layout.template` steuert welches Template genutzt wird.
+  - **Template 1 – Modern Dark**: bisheriger Stil verfeinert (dunkler Navy-Header `(10,18,30)`, Akzentlinie, Firmenname in Akzentfarbe, dunkler Footer); Hint-Boxes dunkel mit Akzentborder.
+  - **Template 2 – Classic Professional**: Deep-Navy-Header `(22,42,88)` mit weißem Firmenname + hellblauem Kontakt, Akzentlinie als Trennstreifen, hellgrauer Footer `(242,246,252)`; Hint-Boxes in Hellblau `(230,241,255)` mit marineblauem Text.
+  - **Template 3 – Elegant Minimal**: kein Hintergrundfill, nur 2.5mm Akzentlinie am Seitenanfang, dunkler Ink-Firmenname, dünne graue Trennlinie; Footer nur Akzentlinie + helles Grau; Hint-Boxes mit Akzentborder auf fast-weißem Grund.
+  - **Alle 3 Templates**: passen sich automatisch an Logo, Firmenname, Adresse, Steuer-IDs und Akzentfarbe des Nutzers an; werden für Rechnungen und Angebote gleichermaßen genutzt.
+  - **Template-Auswahl-UI in Einstellungen → Firmendaten → Briefpapier**: 3 visuelle Mini-Vorschaukarten (proportional A4, 1:√2); ausgewähltes Template mit Akzentborder hervorgehoben; Dot-Indikator + Name + Beschreibung; Preview reagiert live auf gewählte Akzentfarbe.
+  - **emptyFirma**: `briefpapier_layout.template` Default auf `'modern-dark'` gesetzt.
+  - Betroffene Dateien: `lib/pdf.ts`, `app/dashboard/einstellungen/page.tsx`.
+  - Tests: `npx tsc --noEmit` grün; `npm run build` grün.
+  - Branch: `main` (Commit `23ec7d6`), Vercel deployed.
 - **Zuletzt erledigt (2026-05-18 – Großes Feature-Paket: Inhaber-Dashboard + BüroPilot vollständig ausgebaut)**:
   - **Inhaber-Dashboard → Kunden eingerichtet**: Inhaber-User herausgefiltert (`!isOwnerAccount`); "🚫 Kunden sperren"-Button mit 2-Klick-Bestätigung (setzt `suspended`, löscht Pilot-Zuteilung); "📄 Rechnungen anzeigen"-Klapppanel pro Kunde (liest `buero_rechnungen` gefiltert nach `user_id`).
   - **Inhaber-Dashboard → Aktivitätslog**: Neue Sektion `aktivitaetslog` (nur Inhaber) mit `AuditLogSection`-Komponente, die `audit_logs` Tabelle ausließt (Zeitpunkt, Aktion, Durchgeführt von, Betrifft, Details).
