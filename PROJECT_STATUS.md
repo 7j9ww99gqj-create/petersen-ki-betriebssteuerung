@@ -26,8 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, Marketing-KI Sprint abgeschlossen.
-- Letzter Commit: siehe unten — Marketing-KI Module + Feature-Flags eingebaut.
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, Commit `7c77673`.
+- Letzter Commit: OpenAI Kostenübersicht im Inhaber-Kundensteuerung-Bereich.
 - Jüngste Fortschritte (2026-05-19 – Marketing-KI Sprint):
   - **Marketing-KI Module (offline by default):** 3 neue OpenAI-gestützte KI-Suite-Kacheln live eingebaut
     - `📊 Was soll ich morgen posten?` → `/api/marketing/content-daily`
@@ -37,6 +37,11 @@
   - **Owner-Dashboard:** `OwnerAiControlPanel` um „Marketing-KI Module" Sektion erweitert (3 Toggles)
   - **MarketingPilot KI-Suite:** `DemoLabTab` zeigt „✨ KI jetzt ausführen" Button für die 3 aktiven Module mit strukturierter Ergebnis-Anzeige
   - **Sicherheit:** Alle Routen prüfen Auth + Feature-Flag vor OpenAI-Aufruf — kein API-Kosten ohne Aktivierung
+  - **OpenAI Kostenübersicht (2026-05-19):** Live-Kostenanzeige im Inhaber-Kundensteuerung-Bereich — Commit `7c77673`
+    - `app/api/owner/openai-usage/route.ts`: fetcht tagesweise Usage-Daten von OpenAI API, berechnet EUR-Kosten
+    - `components/billing/OwnerOpenAiCostsPanel.tsx`: Gesamtkosten, Tokens, Balkendiagramm, ausklappbare Preistabelle
+    - Preistabelle listet alle 7 KI-Tools mit Richtwertkosten pro Aufruf
+    - Link zu platform.openai.com/usage direkt in der Ansicht
   - Aufgabe 2: cron push-alerts Spaltenfehler behoben (summe statt gesamtbetrag) + early-return ohne Subscriptions — Commit `ef5c142`
   - Aufgabe 3: Zod-Validierung für /api/chat — 400 Bad Request bei malformed Body — Commit `2ab7b25`
   - Aufgabe 6: DB-Indexes für Status/Faellig/MHD-Spalten (8 Indexes) + Migration eingespielt — Commit `01ebdce`
