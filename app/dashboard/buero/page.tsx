@@ -8,7 +8,7 @@ import {
   getBueroAuftraege, upsertBueroAuftrag, deleteBueroAuftrag,
   getBueroRechnungen, upsertBueroRechnung, deleteBueroRechnung, getNextInvoiceNumber, getNextAngebotNumber,
   getBueroEingangsrechnungen, upsertBueroEingangsrechnung, deleteBueroEingangsrechnung,
-  markEingangsrechnungBezahlt, updateEingangsrechnungStatus,
+  markEingangsrechnungBezahlt, updateEingangsrechnungStatus, upsertSteuerBeleg,
   getBueroDokumente, getBueroDokumentById, getDokumentUrl, insertBueroDokument, updateBueroDokument, deleteBueroDokument, uploadDokument,
   getEinkaufLieferanten, upsertEinkaufLieferant, deleteEinkaufLieferant,
   getEinkaufBestellungen, upsertEinkaufBestellung,
@@ -2588,12 +2588,32 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
 
   const markPaid = async (id: string) => {
     if (confirmPayId !== id) { setConfirmPayId(id); return }
+    const rechnung = rechnungen.find(r => r.id === id)
     if (!isDemo) {
-      try { await markEingangsrechnungBezahlt(id, today) } catch { showToast('Fehler beim Speichern', true); return }
+      try {
+        await markEingangsrechnungBezahlt(id, today)
+        // Sync zu SteuerPilot: Beleg anlegen
+        if (rechnung) {
+          const steuersatz = rechnung.betrag_netto && rechnung.betrag_brutto && rechnung.betrag_brutto > rechnung.betrag_netto
+            ? Math.round((rechnung.betrag_brutto / rechnung.betrag_netto - 1) * 100)
+            : 19
+          const steuerbetrag = rechnung.mwst ?? (rechnung.betrag_brutto ?? 0) - (rechnung.betrag_netto ?? 0)
+          await upsertSteuerBeleg({
+            id: `BLG-ER-${id}`,
+            lieferant: rechnung.lieferant,
+            betrag: rechnung.betrag_brutto ?? 0,
+            steuerbetrag: steuerbetrag,
+            steuersatz: [0, 7, 19].includes(steuersatz) ? steuersatz : 19,
+            datum: rechnung.rechnungsdatum ?? today,
+            status: 'geprüft',
+            notiz: `Aus Eingangsrechnung ${rechnung.rechnungsnummer ?? id} (auto-sync)`,
+          })
+        }
+      } catch { showToast('Fehler beim Speichern', true); return }
     }
     setRechnungen(prev => prev.map(r => r.id === id ? { ...r, status: 'bezahlt', bezahlt_am: today } : r))
     setConfirmPayId(null)
-    showToast('💚 Eingangsrechnung als bezahlt markiert')
+    showToast('💚 Eingangsrechnung als bezahlt markiert — Beleg in SteuerPilot angelegt')
   }
 
   const changeStatus = async (id: string, status: EingangsrechnungStatus) => {
