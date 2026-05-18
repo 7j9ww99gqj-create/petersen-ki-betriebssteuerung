@@ -43,8 +43,10 @@
 - 🔴 **Supabase-Migration ausführen**: `20260518200000_steuer_belege_uploads.sql` im SQL-Editor einspielen (neue Tabelle + Storage-Bucket).
 - 🔴 **BüroPilot: PositionenEditor in Angeboten** — Typ `Angebot` hat kein `positionen`-Feld; Angebot→Rechnung-Konvertierung verliert Positionsdaten (siehe 6. Offene Aufgaben → BüroPilot).
 - 🔴 **BüroPilot: EinkaufTab live schalten** — Demo-Guards entfernen, `lib/db.ts`-Funktionen sind fertig.
+- 🔴 **LagerPilot: Umlagerung atomarisieren** — Datenverlust-Risiko bei Teil-Fehlern (4 Awaits ohne Rollback). Supabase-RPC nötig (siehe 6. → LagerPilot).
+- 🔴 **LagerPilot: Dual-Layer-Bestandssync** — `lager_artikel.bestand` und `lager_stellplatz_bestand` laufen auseinander; KI-Kontext inkonsistent.
 - 🟡 **EinkaufTab**: Demo-State auf echte Supabase-Calls umstellen.
-- 🟡 **KI-Aktion "Bestellung"** ausführbar machen (analog zu Umlagerung).
+- 🟡 **KI-Aktion "Bestellung"** ausführbar machen — aktuell nur Toast, kein DB-Insert.
 - 🟡 **Stripe Analytics Integration** (4 h, einfach) — MRR-Verlauf im Marketing-Auswertungs-Tab.
 - 🟡 **Mailchimp API** (5 h, einfach) — Echtzeit-Öffnungsraten + Lead→Subscriber-Automatisierung.
 - 🟢 Analyse-Bestandstrend auf echte Wochensnapshots umstellen.
@@ -520,6 +522,18 @@
 - [ ] MarketingPilot Edit + Delete für Kampagnen, Leads, Newsletter ergänzen.
 - [ ] AnalysePilot auf echte Supabase-Daten umstellen (Charts laufen bereits, nur Demo-Daten ersetzen).
 - [ ] `deleteBueroAngebot`/`Auftrag`/`Rechnung` in `buero/page.tsx` verdrahten (Funktionen existieren seit Runde 3).
+
+### LagerPilot – Offene Optimierungen (Analyse 2026-05-18)
+
+- [ ] 🔴 **Umlagerung atomarisieren**: Supabase-RPC `pk_umlager_artikel` (PL/pgSQL) statt 4 sequentieller Awaits — verhindert Datenverlust bei Teil-Fehlern. Dateien: Migration, `lib/db.ts`.
+- [ ] 🔴 **Dual-Layer-Bestandssync**: `handleEingang`/`handleAusgang` schreiben nur `lager_artikel.bestand`, `umlagerArtikel` nur `lager_stellplatz_bestand` — beide Schichten laufen auseinander. Fix: Eingang/Ausgang auch in `lager_stellplatz_bestand` spiegeln. Datei: `lager/page.tsx`.
+- [ ] 🔴 **KI-Aktion "Bestellung" wirklich verdrahten**: `handleBestellungBestaetigen` ist aktuell nur `setBestelltIds` + Toast — kein `insertEinkaufBestellung()`. Datei: `lager/page.tsx`.
+- [ ] 🟡 **EinkaufTab LagerPilot live schalten**: Demo-Guards entfernen, `lib/db.ts`-Funktionen für `einkauf_bestellungen` bereits fertig. Datei: `lager/page.tsx`.
+- [ ] 🟡 **`lieferant_id` FK auf `lager_artikel`**: Artikel mit Lieferant verknüpfen → KI kann konkrete Lieferanten in Bestellvorschlägen nennen. Dateien: Migration, `lib/db.ts`, `lager/page.tsx`.
+- [ ] 🟡 **Wareneingänge in KI-Kontext aufnehmen**: `buildContextBlock` liest `einkauf_wareneingaenge` nicht — KI weiß nicht ob Lieferungen ausstehen. Datei: `app/api/chat/route.ts`.
+- [ ] 🟡 **Bestandstrend-Snapshots**: Tabelle `lager_bestand_snapshots` + täglicher Insert via API-Route. Dateien: Migration, neue Route.
+- [ ] 🟢 **FIFO-Hinweis beim Ausgang**: älteste Charge (nach MHD/`eingelagert_am`) beim Ausgang vorschlagen. Datei: `lager/page.tsx`.
+- [ ] 🟢 **WerkstattPilot → Lager-Reservierung**: FK `werkstatt_material.artikel_id` → `lager_artikel`. Dateien: Migration, `lib/db.ts`.
 
 - [x] ~~Datenmodell für Kunde/Lieferant/Auftrag/Rechnung/Dokument sauber relationalisieren.~~ **Erledigt 2026-05-13**: FK-Spalten existieren und werden korrekt beschrieben; `handleKonvertieren`-Bug behoben.
 - [x] ~~Einkaufsmigration auf Live-Datenbank anwenden und Bestellungen/Wareneingänge mit Echtdaten gegen Alt- und Neuschema validieren.~~ **Erledigt 2026-05-13**: Alle 12 Migrationen Local = Remote, dual-write validiert.
