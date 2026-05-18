@@ -2301,6 +2301,11 @@ export async function upsertPlanungRessource(r: {
   return data
 }
 
+export async function deletePlanungRessource(id: string) {
+  const { error } = await db().from('planung_ressourcen').delete().eq('id', id)
+  if (error) throw error
+}
+
 // ── STEUER ────────────────────────────────────────────────────────────────────
 
 export async function getSteuerBelege() {

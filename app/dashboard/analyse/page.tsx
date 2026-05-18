@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   LineChart, Line,
-  PieChart, Pie, Cell,
   AreaChart, Area,
 } from 'recharts'
 import { hasDemoCookie } from '@/lib/auth'
@@ -73,14 +72,6 @@ function parseEuro(v: unknown): number {
 
 // ── Pilot-Nutzungsverteilung (indikativ – kein Session-Logging vorhanden) ─────
 
-const pilotNutzungData = [
-  { name: 'LagerPilot', value: 38, color: '#1684ff' },
-  { name: 'BüroPilot', value: 24, color: '#20c8ff' },
-  { name: 'WerkstattPilot', value: 18, color: '#a78bfa' },
-  { name: 'AnalysePilot', value: 10, color: '#10b981' },
-  { name: 'MarketingPilot', value: 6, color: '#f59e0b' },
-  { name: 'PlanungPilot', value: 4, color: '#f43f5e' },
-]
 
 // ── Tooltip-Styles ─────────────────────────────────────────────────────────────
 
@@ -98,7 +89,6 @@ type TFmt = (...args: any[]) => any
 
 function formatEuro(v: number) { return `${(v / 1000).toFixed(0)}k €` }
 const fmtEuro: TFmt = (v) => [`${Number(v).toLocaleString('de-DE')} €`]
-const fmtPct: TFmt = (v) => [`${v}%`, 'Anteil']
 
 // ── KPI Card ───────────────────────────────────────────────────────────────────
 
@@ -233,7 +223,7 @@ export default function AnalysePilotPage() {
       const offeneRechnungenList = rechnungenRows.filter(r => r.status === 'Offen' || r.status === 'Fällig')
       const offeneRechnungenSumme = offeneRechnungenList.reduce((s, r) => s + (r.summe ?? parseEuro(r.betrag)), 0)
 
-      const offeneAngeboteList = angeboteRows.filter(a => a.status === 'Entwurf' || a.status === 'Gesendet')
+      const offeneAngeboteList = angeboteRows.filter(a => a.status === 'Erstellt' || a.status === 'Versendet' || a.status === 'Akzeptiert')
       const offeneAngeboteSumme = offeneAngeboteList.reduce((s, a) => s + parseEuro(a.betrag), 0)
 
       setKpi({
@@ -440,31 +430,8 @@ export default function AnalysePilotPage() {
             </ResponsiveContainer>
           </div>
 
-          {/* Pilot-Nutzung + Bestand nebeneinander */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div className="pk-card">
-              <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>🥧 Pilot-Nutzung (Sitzungen)</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={pilotNutzungData} cx="50%" cy="50%" innerRadius={50} outerRadius={85}
-                    dataKey="value" nameKey="name" paddingAngle={3}>
-                    {pilotNutzungData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.color} stroke="transparent" />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={tooltipStyle} formatter={fmtPct} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginTop: 8 }}>
-                {pilotNutzungData.map(p => (
-                  <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} />
-                    <span style={{ color: '#aeb9c8' }}>{p.name}</span>
-                    <span style={{ color: p.color, fontWeight: 700 }}>{p.value}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* Bestand */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
             <div className="pk-card">
               <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📦 Bestandstrend</h3>
               <ResponsiveContainer width="100%" height={200}>
@@ -663,26 +630,8 @@ export default function AnalysePilotPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div className="pk-card">
                 <h3 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 800 }}>🥧 Pilot-Nutzungsverteilung</h3>
-                <div style={{ fontSize: 11, color: '#8ba0b8', marginBottom: 12 }}>Indikativ – kein Session-Logging aktiv</div>
-                <ResponsiveContainer width="100%" height={180}>
-                  <PieChart>
-                    <Pie data={pilotNutzungData} cx="50%" cy="50%" outerRadius={70}
-                      dataKey="value" nameKey="name" paddingAngle={2}>
-                      {pilotNutzungData.map((entry) => (
-                        <Cell key={entry.name} fill={entry.color} stroke="transparent" />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={tooltipStyle} formatter={((v: unknown, name: unknown) => [`${v}%`, name]) as TFmt} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginTop: 8 }}>
-                  {pilotNutzungData.map(p => (
-                    <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                      <div style={{ width: 7, height: 7, borderRadius: 2, background: p.color }} />
-                      <span style={{ color: '#aeb9c8' }}>{p.name.replace('Pilot', '')} </span>
-                      <span style={{ color: p.color, fontWeight: 700 }}>{p.value}%</span>
-                    </div>
-                  ))}
+                <div style={{ fontSize: 12, color: '#8ba0b8', padding: '24px 0', textAlign: 'center' }}>
+                  Kein Session-Logging aktiv — Daten folgen in einer späteren Version.
                 </div>
               </div>
               <div className="pk-card">

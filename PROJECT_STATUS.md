@@ -26,8 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `9a9b0ad`.
-- Jüngste Fortschritte (2026-05-18 Owner-Dashboard-Sprint): MTD/YTD-KPIs, Kunden-Cockpit, Alerts-Tab, AnalysePilot Zeitraum-Filter live — alle 5 geplanten Tasks deployed.
+- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Quick-Win-Sprint.
+- Jüngste Fortschritte (2026-05-18 Quick-Win-Sprint): 7 schnelle Fixes deployed — deletePlanungRessource, AnalysePilot-Status-Filter, PieChart-Bereinigung, LagerPilot Bestellung→DB, Wareneingänge im KI-Kontext.
 - Wichtigste externe Restpunkte: Alle Migrations sind eingespielt (`Remote database is up to date`). Keine ausstehenden SQL-Migrationen mehr.
 - Produktivlage: Kernsystem weitgehend vollständig; Hauptmodule produktionsreif.
 
@@ -40,22 +40,23 @@
 - ✅ ~~**Task 5: AnalysePilot Live-Daten**~~ **Erledigt 2026-05-18** (Commit `234fcc2`).
 - ✅ ~~**SteuerPilot: Betrag-Input Bug + Beleg-Upload mit Kategorie/Filter/Inline-Delete**~~ **Erledigt 2026-05-18** (Commit `ec0b705`).
 - ✅ ~~**MarketingPilot: Demo→Live-Calls + Edit/Delete verdrahtet**~~ **Erledigt 2026-05-18** (Commit `9c24845`).
-- 🔴 **Supabase-Migration ausführen**: `20260518200000_steuer_belege_uploads.sql` im SQL-Editor einspielen (neue Tabelle + Storage-Bucket).
+- ✅ ~~**Supabase-Migration ausführen**: `20260518200000_steuer_belege_uploads.sql`~~ **Erledigt 2026-05-18** (manuell im SQL-Editor eingespielt).
+- ✅ ~~**PlanungPilot: `deletePlanungRessource` fehlt**~~ **Erledigt 2026-05-18** — Funktion in `lib/db.ts` ergänzt + in `planung/page.tsx` importiert + `handleDelete` verdrahtet.
+- ✅ ~~**AnalysePilot: Offene-Angebote-Status-Filter falsch**~~ **Erledigt 2026-05-18** — `'Entwurf'/'Gesendet'` → `'Erstellt'/'Versendet'/'Akzeptiert'` in `analyse/page.tsx:236`.
+- ✅ ~~**AnalysePilot: Pilot-Nutzungs-PieChart hardcoded**~~ **Erledigt 2026-05-18** — hardcoded Werte + Chart entfernt, Placeholder-Text eingefügt; Import `PieChart/Pie/Cell` + `fmtPct` bereinigt.
+- ✅ ~~**LagerPilot: EinkaufTab / Bestellung nur Toast**~~ **Erledigt 2026-05-18** — `handleBestellungBestaetigen` ruft jetzt `upsertEinkaufBestellung()` auf; `genId` importiert.
+- ✅ ~~**LagerPilot: Wareneingänge nicht im KI-Kontext**~~ **Erledigt 2026-05-18** — `einkauf_wareneingaenge` in `buildContextBlock` + Live-Query in `app/api/chat/route.ts` ergänzt.
 - 🔴 **BüroPilot: PositionenEditor in Angeboten** — Typ `Angebot` hat kein `positionen`-Feld; Angebot→Rechnung-Konvertierung verliert Positionsdaten (siehe 6. Offene Aufgaben → BüroPilot).
-- 🔴 **BüroPilot: EinkaufTab live schalten** — Demo-Guards entfernen, `lib/db.ts`-Funktionen sind fertig.
 - 🔴 **LagerPilot: Umlagerung atomarisieren** — Datenverlust-Risiko bei Teil-Fehlern (4 Awaits ohne Rollback). Supabase-RPC nötig (siehe 6. → LagerPilot).
 - 🔴 **LagerPilot: Dual-Layer-Bestandssync** — `lager_artikel.bestand` und `lager_stellplatz_bestand` laufen auseinander; KI-Kontext inkonsistent.
-- 🔴 **PlanungPilot: `deletePlanungRessource` fehlt** — Ressourcen-Delete in `lib/db.ts` nicht implementiert; UI-Button läuft ins Leere (siehe 6. → PlanungPilot).
 - 🔴 **PlanungPilot: FK `auftrag_id`** — `planung_projekte` hat keine Verknüpfung zu `buero_auftraege`; BüroPilot ↔ PlanungPilot völlig isoliert (Migration + Button nötig).
 - 🔴 **WerkstattPilot: FK `buero_auftrag_id`** — `auftragsnr` ist freier Text ohne Referenzintegrität; keine echte Karte↔Auftrag-Verknüpfung (Migration + `lib/db.ts`).
 - 🔴 **WerkstattPilot: Material → LagerPilot-Sync** — Materialentnahme reduziert nicht `lager_artikel.bestand`; Lagersaldo nach Werkstatt-Verbrauch falsch.
 - 🔴 **WerkstattPilot: Ist vs. Soll Zeitanzeige** — Zeitbuchungen werden nicht gegen Karten-Soll aggregiert; kein operativer Steuerungswert sichtbar.
-- 🟡 **EinkaufTab**: Demo-State auf echte Supabase-Calls umstellen.
-- 🟡 **KI-Aktion "Bestellung"** ausführbar machen — aktuell nur Toast, kein DB-Insert.
 - 🟡 **Stripe Analytics Integration** (4 h, einfach) — MRR-Verlauf im Marketing-Auswertungs-Tab.
 - 🟡 **Mailchimp API** (5 h, einfach) — Echtzeit-Öffnungsraten + Lead→Subscriber-Automatisierung.
-- 🔴 **AnalysePilot: Zeitraum-Filter verdrahten** — UI-Buttons (7T/30T/3M/6M/1J) sind funktionslos; DB-Queries ignorieren den State (Analyse 2026-05-18).
-- 🔴 **AnalysePilot: Gewinn-KPI korrigieren** — steuer_fixkosten/betriebsausgaben nicht einbezogen; Gewinn strukturell falsch (Analyse 2026-05-18).
+- 🔴 **AnalysePilot: Zeitraum-Filter verdrahten** — UI-Buttons (7T/30T/3M/6M/1J) sind funktionslos; DB-Queries ignorieren den State.
+- 🔴 **AnalysePilot: Gewinn-KPI korrigieren** — steuer_fixkosten/betriebsausgaben nicht einbezogen; Gewinn strukturell falsch.
 - 🟢 Analyse-Bestandstrend auf echte Wochensnapshots umstellen.
 - ✅ ~~**Task 6: Benutzerverwaltung Deaktivieren/Löschen/Suche**~~ **Erledigt 2026-05-18** (Commit `80e0f8c`).
 - ✅ ~~**Task 7: RLS-Policies vollständig**~~ **Erledigt 2026-05-18** (Commit `7aee934`).
@@ -94,6 +95,14 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – Quick-Win-Sprint, 7 Fixes)**:
+  - **PlanungPilot: `deletePlanungRessource`** — Funktion in `lib/db.ts` ergänzt (analog `deletePlanungTermin`); Import + `handleDelete`-Verdrahtung in `planung/page.tsx`. UI-Delete-Button läuft jetzt echte DB-Löschung.
+  - **AnalysePilot: Status-Filter** — `analyse/page.tsx:236` von `'Entwurf'/'Gesendet'` auf `'Erstellt'/'Versendet'/'Akzeptiert'` korrigiert (BüroPilot-Workflow-Abgleich).
+  - **AnalysePilot: PieChart entfernt** — hardcoded `pilotNutzungData` (38/24/18/10/6/4%) + beide Pie-Renderer entfernt; Import `PieChart/Pie/Cell` + `fmtPct` bereinigt; Placeholder-Text eingefügt.
+  - **LagerPilot: Bestellung verdrahtet** — `handleBestellungBestaetigen` in `lager/page.tsx` ruft jetzt `upsertEinkaufBestellung()` auf (mit `genId('BS')`, Datum, Status `'Offen'`); kein Datenverlust bei Demo-Mode.
+  - **LagerPilot: Wareneingänge im KI-Kontext** — `einkauf_wareneingaenge` wird in `app/api/chat/route.ts` per `Promise.allSettled` geladen; `buildContextBlock` gibt "OFFENE WARENEINGÄNGE"-Block aus; Demo-Daten + Fallback ergänzt.
+  - **BüroPilot/PlanungPilot EinkaufTab**: Bestätigt bereits korrekt live-verdrahtet (`!isDemo`-Guards OK, `hasDemoCookie()`-Pattern korrekt).
+  - Lint: nur bekannte Warnungen, keine neuen Fehler.
 - **Zuletzt erledigt (2026-05-18 – Owner-Dashboard-Sprint, Commits `03ea362`–`9a9b0ad`)**:
   - **Task #1 — Einkauf-Tab live**: Analyse ergab, Code ist bereits live-fähig (`!isDemo`-Guards korrekt, db.ts-Funktionen fertig). Kein Code-Commit nötig. Fehlende Supabase-Tabellen müssen noch ausgeführt werden.
   - **Task #2 — MTD/YTD Umsatz-KPIs** (`03ea362`): Neue Finanzkennzahlen-Zeile im BüroPilot-Header — Umsatz MTD, Umsatz YTD (aus bezahlten Rechnungen), Überfällig/Mahnung-Counter klickbar. Datei: `buero/page.tsx`.
@@ -550,10 +559,10 @@
 
 - [ ] 🔴 **Umlagerung atomarisieren**: Supabase-RPC `pk_umlager_artikel` (PL/pgSQL) statt 4 sequentieller Awaits — verhindert Datenverlust bei Teil-Fehlern. Dateien: Migration, `lib/db.ts`.
 - [ ] 🔴 **Dual-Layer-Bestandssync**: `handleEingang`/`handleAusgang` schreiben nur `lager_artikel.bestand`, `umlagerArtikel` nur `lager_stellplatz_bestand` — beide Schichten laufen auseinander. Fix: Eingang/Ausgang auch in `lager_stellplatz_bestand` spiegeln. Datei: `lager/page.tsx`.
-- [ ] 🔴 **KI-Aktion "Bestellung" wirklich verdrahten**: `handleBestellungBestaetigen` ist aktuell nur `setBestelltIds` + Toast — kein `insertEinkaufBestellung()`. Datei: `lager/page.tsx`.
-- [ ] 🟡 **EinkaufTab LagerPilot live schalten**: Demo-Guards entfernen, `lib/db.ts`-Funktionen für `einkauf_bestellungen` bereits fertig. Datei: `lager/page.tsx`.
+- [x] ~~🔴 **KI-Aktion "Bestellung" verdrahten**~~ **Erledigt 2026-05-18** — `handleBestellungBestaetigen` ruft `upsertEinkaufBestellung()` auf.
+- [x] ~~🟡 **EinkaufTab LagerPilot live schalten**~~ **Erledigt 2026-05-18** — bereits korrekt verdrahtet (`!isDemo`-Guard OK).
 - [ ] 🟡 **`lieferant_id` FK auf `lager_artikel`**: Artikel mit Lieferant verknüpfen → KI kann konkrete Lieferanten in Bestellvorschlägen nennen. Dateien: Migration, `lib/db.ts`, `lager/page.tsx`.
-- [ ] 🟡 **Wareneingänge in KI-Kontext aufnehmen**: `buildContextBlock` liest `einkauf_wareneingaenge` nicht — KI weiß nicht ob Lieferungen ausstehen. Datei: `app/api/chat/route.ts`.
+- [x] ~~🟡 **Wareneingänge in KI-Kontext aufnehmen**~~ **Erledigt 2026-05-18** — `einkauf_wareneingaenge` in `buildContextBlock` + Live-Query in `app/api/chat/route.ts`.
 - [ ] 🟡 **Bestandstrend-Snapshots**: Tabelle `lager_bestand_snapshots` + täglicher Insert via API-Route. Dateien: Migration, neue Route.
 - [ ] 🟢 **FIFO-Hinweis beim Ausgang**: älteste Charge (nach MHD/`eingelagert_am`) beim Ausgang vorschlagen. Datei: `lager/page.tsx`.
 - [ ] 🟢 **WerkstattPilot → Lager-Reservierung**: FK `werkstatt_material.artikel_id` → `lager_artikel`. Dateien: Migration, `lib/db.ts`.
@@ -627,8 +636,8 @@
 
 ### PlanungPilot – Offene Optimierungen (Analyse 2026-05-18)
 
-- [ ] 🔴 **`deletePlanungRessource` implementieren**: Funktion fehlt komplett in `lib/db.ts` — UI-Delete läuft ins Leere; analog zu `deletePlanungProjekt` ergänzen
-- [ ] 🔴 **Live-Daten-Verifizierung**: In `planung/page.tsx` prüfen ob `hasDemoCookie()`-Guard korrekt weicht und echte Supabase-Calls (`getPlanungProjekte` etc.) tatsächlich ausgeführt werden
+- [x] ~~🔴 **`deletePlanungRessource` implementieren**~~ **Erledigt 2026-05-18** — Funktion in `lib/db.ts`, Import + `handleDelete` in `planung/page.tsx` verdrahtet.
+- [x] ~~🔴 **Live-Daten-Verifizierung**~~ **Erledigt 2026-05-18** — Guard korrekt: `hasDemoCookie()`-Pattern funktioniert, Live-Calls werden ausgeführt.
 - [ ] 🔴 **FK `auftrag_id` auf `planung_projekte`**: Migration `ALTER TABLE planung_projekte ADD COLUMN auftrag_id text REFERENCES buero_auftraege(id)` + "Projekt aus Auftrag erstellen"-Button in BüroPilot-Auftragsdetail
 - [ ] 🟡 **Meilensteine als eigene Tabelle**: `planung_meilensteine` (projekt_id FK, titel, faellig, status Offen|Erreicht|Verzögert) statt JSONB-Array — ermöglicht individuelle Bearbeitung und Statusverfolgung
 - [ ] 🟡 **Ressourcen-Konflikt-Erkennung**: Client-Logik: wenn `genutzt >= kapazitaet` → Badge „Überlastet" + Warnung beim Zuweisen einer neuen Ressource
@@ -643,10 +652,10 @@
 ### AnalysePilot – Offene Optimierungen (Analyse 2026-05-18)
 
 - [ ] 🔴 **Zeitraum-Filter verdrahten**: `zeitraum`-State (7T/30T/3M/6M/1J) ist reines UI-Dekor — `loadLiveData()` ignoriert ihn, zeigt immer feste 8 Monate. Fix: `useEffect([zeitraum])` + DB-Query mit `.gte('datum', startDate)` statt client-seitigem Filter. Datei: `analyse/page.tsx`.
-- [ ] 🔴 **Offene-Angebote-Status abgleichen**: Filter `status === 'Entwurf' || 'Gesendet'` stimmt nicht mehr mit BüroPilot-Workflow überein (`'Erstellt'`, `'Versendet'`, `'Akzeptiert'`). Datei: `analyse/page.tsx:226`.
+- [x] ~~🔴 **Offene-Angebote-Status abgleichen**~~ **Erledigt 2026-05-18** — Filter in `analyse/page.tsx:236` auf `'Erstellt'/'Versendet'/'Akzeptiert'` korrigiert.
 - [ ] 🟡 **Gewinn-Berechnung korrigieren**: Kosten kommen nur aus `buero_eingangsrechnungen` — `steuer_fixkosten` (monatlicher_anteil, aktiv=true) und `steuer_betriebsausgaben` (variable Ausgaben) existieren und sind befüllt, fließen aber nicht ein. Gewinn-KPI ist strukturell falsch. Datei: `analyse/page.tsx:169–240`.
 - [ ] 🟡 **Bestandstrend-Snapshot-Mechanismus**: Liniendiagramm mit 1 Datenpunkt ist sinnlos. Neue Tabelle `analyse_bestand_snapshots` (kw, erfasst_am, artikel_gesamt, niedrig, leer) + "📸 Snapshot" Button im Bestand-Tab anlegen (kein Cron nötig). Dateien: neue Migration, `analyse/page.tsx`.
-- [ ] 🟡 **Pilot-Nutzungs-PieChart entfernen oder ersetzen**: Werte 38/24/18/10/6/4% sind hartcodiert — erscheinen in zwei Tabs als echte Kennzahl. Entweder Chart entfernen oder durch messbare Größe ersetzen (z. B. KI-Erkennungen pro Pilot-Quelle aus `buero_dokumente.document_type`). Datei: `analyse/page.tsx:76–83`.
+- [x] ~~🟡 **Pilot-Nutzungs-PieChart entfernen**~~ **Erledigt 2026-05-18** — hardcoded Werte + beide Chart-Blöcke entfernt; Placeholder-Text eingefügt.
 - [ ] 🟡 **WerkstattPilot-KPIs ergänzen**: `werkstatt_karten` (offene/überfällige Aufträge) und `werkstatt_zeitbuchungen` (Produktivität) werden gar nicht ausgewertet — für einen "AnalysePilot" fehlt die wichtigste operative Quelle. Datei: `analyse/page.tsx`.
 - [ ] 🟡 **DB-Abfragen serverseitig begrenzen**: `buero_rechnungen` wird ohne LIMIT komplett geladen; client-seitiger Monatsfilter skaliert nicht. Fix: `.gte('datum', startDate).lte('datum', endDate)` direkt im Query. Datei: `analyse/page.tsx:173`.
 - [ ] 🟢 **CSV-Export für Umsatz-Tabelle**: Download-Button im Umsatz-Tab (`monat, umsatz, kosten, gewinn` als CSV) — Haiku-Task, ~1 h. Datei: `analyse/page.tsx`.

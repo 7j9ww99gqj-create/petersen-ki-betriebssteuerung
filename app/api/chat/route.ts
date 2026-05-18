@@ -28,6 +28,9 @@ const DEMO_CONTEXT = {
     { artikelname: 'Stahlrohr 40x40', von: 'WE-ZONE-01', nach: 'TL-A-01-01', menge: 20, datum: '2025-05-08', grund: 'Wareneingang' },
     { artikelname: 'Schrauben M8x30', von: 'TL-A-01-01', nach: 'TL-A-01-02', menge: 5, datum: '2025-05-07', grund: 'Umsortierung' },
   ],
+  wareneingaenge: [
+    { lieferant: 'Muster GmbH', artikel: 'Stahlrohr 40x40', menge: 20, erwartet_am: null as string | null, status: 'Geliefert' },
+  ],
 }
 
 // ── Systemkontext als kompakter Prompt-Block ─────────────────────────────────
@@ -71,6 +74,13 @@ ${ctx.stellplaetze.map(sp => `- ${sp.code} | Bereich: ${sp.bereich} | Typ: ${sp.
 
 LETZTE UMLAGERUNGEN (${ctx.umlagerungen.length}):
 ${ctx.umlagerungen.map(u => `- ${u.datum}: ${u.artikelname} (${u.menge}) von ${u.von} → ${u.nach} [${u.grund}]`).join('\n')}
+
+OFFENE WARENEINGÄNGE (${ctx.wareneingaenge.filter((w: { status?: string }) => w.status !== 'Geliefert').length} ausstehend):
+${ctx.wareneingaenge.length === 0
+  ? '- Keine ausstehenden Wareneingänge'
+  : ctx.wareneingaenge.map((w: { lieferant?: string; artikel?: string; menge?: number; erwartet_am?: string | null; status?: string }) =>
+      `- ${w.lieferant ?? 'Unbekannt'}: ${w.artikel} (${w.menge ?? '?'}) — erwartet: ${w.erwartet_am ?? 'offen'} [${w.status}]`
+    ).join('\n')}
 
 === VORBERECHNETE PROBLEM-ANALYSE ===
 
@@ -137,11 +147,12 @@ export async function POST(req: NextRequest) {
     } else {
       const supabase = access.supabase
       try {
-        const [rawArtikel, rawStellplaetze, rawBestand, rawUmlagerungen] = await Promise.allSettled([
+        const [rawArtikel, rawStellplaetze, rawBestand, rawUmlagerungen, rawWareneingaenge] = await Promise.allSettled([
           supabase!.from('lager_artikel').select('*').order('id'),
           supabase!.from('lager_stellplaetze').select('*').order('code'),
           supabase!.from('lager_stellplatz_bestand').select('*, lager_stellplaetze(code, bereich, warengruppe, warenobergruppe)').order('created_at', { ascending: false }),
           supabase!.from('lager_umlagerungen').select('*').order('datum', { ascending: false }).limit(200),
+          supabase!.from('einkauf_wareneingaenge').select('*, einkauf_bestellungen(artikel, menge, lieferant)').order('eingangsdatum', { ascending: false }).limit(50),
         ])
 
         systemContext = {
@@ -178,9 +189,19 @@ export async function POST(req: NextRequest) {
             datum: u.datum as string,
             grund: u.grund as string,
           })) : [],
+          wareneingaenge: rawWareneingaenge.status === 'fulfilled' && !rawWareneingaenge.value.error ? (rawWareneingaenge.value.data ?? []).map((w: Record<string, unknown>) => {
+            const bs = w.einkauf_bestellungen as Record<string, unknown> | null
+            return {
+              lieferant: (bs?.lieferant ?? 'Unbekannt') as string,
+              artikel: (bs?.artikel ?? '') as string,
+              menge: (w.menge_erhalten ?? bs?.menge ?? 0) as number,
+              erwartet_am: w.eingangsdatum as string | null,
+              status: w.qualitaet ? 'Geliefert' : 'Ausstehend',
+            }
+          }) : [],
         }
       } catch {
-        systemContext = { artikel: [], stellplaetze: [], bestand: [], umlagerungen: [] }
+        systemContext = { artikel: [], stellplaetze: [], bestand: [], umlagerungen: [], wareneingaenge: [] }
       }
     }
 

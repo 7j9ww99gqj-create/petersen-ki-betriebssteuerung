@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
+import { genId } from '@/lib/ids'
 import {
   getLagerArtikel, getLagerBewegungen,
   upsertLagerArtikel, insertLagerBewegung, deleteLagerArtikel,
@@ -9,6 +10,7 @@ import {
   upsertLagerStellplatz, deleteLagerStellplatz,
   upsertLagerStellplatzBestand, deleteLagerStellplatzBestand, umlagerArtikel,
   getAiFeatureSettings, type AiFeatureSettings,
+  upsertEinkaufBestellung,
 } from '@/lib/db'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
@@ -1621,6 +1623,17 @@ export default function LagerPilotPage() {
     if (menge) setBestellMengen(prev => ({ ...prev, [id]: menge }))
     setBestellModal(null)
     showToast(`✅ Bestellung für "${bestellModal?.name}" (${menge} ${bestellModal?.einheit}) wurde ausgelöst`)
+    if (!isDemo && bestellModal) {
+      const a = bestellModal
+      upsertEinkaufBestellung({
+        id: genId('BS'),
+        artikel: a.name,
+        menge: parseFloat(menge) || 1,
+        einheit: a.einheit,
+        status: 'Offen',
+        bestellt_am: new Date().toISOString().split('T')[0],
+      }).catch(() => {/* silently ignore — bestellung bleibt lokal sichtbar */})
+    }
   }
 
   // ── Stats ────────────────────────────────────────────────────────────────────

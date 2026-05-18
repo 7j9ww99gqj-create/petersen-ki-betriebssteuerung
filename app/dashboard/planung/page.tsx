@@ -6,7 +6,7 @@ import {
   getPlanungProjekte, upsertPlanungProjekt, deletePlanungProjekt,
   getPlanungAufgaben, upsertPlanungAufgabe, deletePlanungAufgabe,
   getPlanungTermine, upsertPlanungTermin, deletePlanungTermin,
-  getPlanungRessourcen, upsertPlanungRessource,
+  getPlanungRessourcen, upsertPlanungRessource, deletePlanungRessource,
 } from '@/lib/db'
 
 // ── Typen ─────────────────────────────────────────────────────────────────────
@@ -792,7 +792,9 @@ function RessourcenTab({ isDemo }: { isDemo: boolean }) {
   }
 
   const handleDelete = async (id: string) => {
-    // No deletePlanungRessource in db.ts – handle locally / skip db call
+    if (!isDemo) {
+      try { await deletePlanungRessource(id) } catch { /* ignore */ }
+    }
     setRessourcen(prev => prev.filter(r => r.id !== id))
     setDeleteConfirm(null)
     showToast('🗑️ Ressource entfernt')
