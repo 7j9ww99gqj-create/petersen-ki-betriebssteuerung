@@ -65,6 +65,35 @@
 - ✅ ~~**Owner-Sprint #4: Zahlungs-Alert-Center**~~ **Erledigt 2026-05-18** (Commit `1fce336`).
 - ✅ ~~**Owner-Sprint #5: AnalysePilot Zeitraum-Filter**~~ **Erledigt 2026-05-18** (Commit `9a9b0ad`).
 - ✅ ~~**Einkauf-Tabellen in Supabase**~~ Bereits in Migration `20260510213000` angewendet.
+- ✅ ~~**Sprint-Aufgabe 1: AnalysePilot Lagerwert-KPI**~~ **Erledigt 2026-05-18** (Commit `5de7454`) — 💰 Bestand × Einkaufspreis, Demo-Fallback.
+- ✅ ~~**Sprint-Aufgabe 2: SteuerPilot VSt Fixkosten in UStVA**~~ **Erledigt 2026-05-18** (Commit `828bb19`) — separate Zeile "VSt Fixkosten".
+- ✅ ~~**Sprint-Aufgabe 3: LagerPilot FIFO-Hinweis Warenausgang**~~ **Erledigt 2026-05-18** (Commit `3f888fa`) — älteste Charge aus `lager_stellplatz_bestand`.
+- ✅ ~~**Sprint-Aufgabe 4: PlanungPilot Auto-Fortschritt 100%**~~ **Erledigt 2026-05-18** (Commit `7a47b1a`) — wenn alle Aufgaben erledigt.
+- ✅ ~~**Sprint-Aufgabe 5: BüroPilot DSGVO-Anonymisierung**~~ **Erledigt 2026-05-18** (Commit `12d72fe`) — Admin-only, 2-Klick-Bestätigung.
+- ✅ ~~**Sprint-Aufgabe 6: AnalysePilot DB-Queries auf 12 Monate begrenzen**~~ **Erledigt 2026-05-18** (Commit `225e967`).
+- ✅ ~~**Sprint-Aufgabe 7: AnalysePilot CSV-Export Umsatz**~~ **Erledigt 2026-05-18** (Commit `3c8337e`) — Blob-Download, Dateiname mit Datum.
+- ✅ ~~**Sprint-Aufgabe 8: PlanungPilot Empty States alle 4 Tabs**~~ **Erledigt 2026-05-18** (Commit `14398cf`).
+- ✅ ~~**Sprint-Aufgabe 9: BüroPilot Duplikat-Erkennung Kunden**~~ **Erledigt 2026-05-18** (Commit `42f7e07`) — E-Mail-Check inline.
+- ✅ ~~**Sprint-Aufgabe 10: SteuerPilot Fälligkeits-Kalender-Widget**~~ **Erledigt 2026-05-18** (Commit `c518952`) — Ampel + Dauerfristverlängerung-Toggle.
+- ✅ ~~**Sprint-Aufgabe 11: PlanungPilot Ressourcen-Konflikt-Erkennung**~~ **Erledigt 2026-05-18** (Commit `fe81c66`) — Überlastet-Badge + Formular-Warnung.
+- ✅ ~~**Sprint-Aufgabe 12: WerkstattPilot Qualitäts-KPI**~~ **Erledigt 2026-05-18** (Commit `b63ac0e`) — Fehlerquote %, Sparkline 8 Wochen.
+- ✅ ~~**Sprint-Aufgabe 13: Karten-Auto-Erstellung aus BüroPilot**~~ **Erledigt 2026-05-18** (Commit `d498b72`) — URL-Params, Formular-Vorausfüllung in WerkstattPilot.
+- ✅ ~~**Sprint-Aufgabe 14: AnalysePilot Gewinn-KPI strukturell korrigiert**~~ **Erledigt 2026-05-18** (Commit `148bfbe`) — Fixkosten + Betriebsausgaben einbezogen.
+- ✅ ~~**Sprint-Aufgabe 15+16: Zeitraum-Filter + SteuerPilot Stripe-Einnahmen**~~ **Erledigt 2026-05-18** (Commit `ccc6217`).
+- ✅ ~~**Sprint-Aufgabe 17: BüroPilot Angebots-Reminder**~~ **Erledigt 2026-05-18** (Commit `5558c75`) — Alters-Badge (7/14+ Tage), Filter-Button.
+- ✅ ~~**Sprint-Aufgabe 18: PlanungPilot Zeiterfassung**~~ **Erledigt 2026-05-18** (Commit `c64eb68`) — `stunden_soll`/`stunden_ist`, Fortschrittsbalken, Migration eingespielt.
+- ✅ ~~**Sprint-Aufgabe 19: Eingangsrechnung → SteuerPilot-Sync**~~ **Erledigt 2026-05-18** (Commit `8529482`) — Auto-Betriebsausgabe bei Bezahlung.
+- ✅ ~~**Sprint-Aufgabe 20: BüroPilot OPOS-Dashboard**~~ **Erledigt 2026-05-18** (Commit `a677a44`) — 3 Fälligkeits-Buckets, klickbarer Filter.
+- ✅ ~~**Sprint-Aufgabe 21: WerkstattPilot Ist vs. Soll Zeitanzeige**~~ **Erledigt 2026-05-18** (Commit `8e50d12`) — Pill-Badge, Ampelfarbe pro Karte.
+- ✅ ~~**Sprint-Aufgabe 22: LagerPilot lieferant_id FK**~~ **Erledigt 2026-05-18** (Commit `a2762c0`) — FK auf `einkauf_lieferanten`, Dropdown, Migration eingespielt.
+- ✅ ~~**Sprint-Aufgabe 23: BüroPilot KI-Angebotstext**~~ **Erledigt 2026-05-18** (Commit `159da86`) — ✨ Button, API-Route `generate-angebot`.
+- ✅ ~~**Sprint-Aufgabe 24: SteuerPilot SKR04-Buchungsvorschlag**~~ **Erledigt 2026-05-18** (Commit `cd7a1b1`) — KI-Badge im Beleg-Modal, Timeout 3s.
+- ✅ ~~**Sprint-Aufgabe 25: Bestandstrend-Snapshots**~~ **Erledigt 2026-05-18** (Commit `5c639d7`) — Tabelle `lager_bestand_snapshots`, 📸-Button, Liniendiagramm in AnalysePilot.
+- ✅ ~~**Sprint-Aufgabe 26: BüroPilot Positionen-Editor in Angeboten**~~ **Erledigt 2026-05-18** (Commit `7033146`) — JSONB, Konvertierung überträgt Positionen.
+- ✅ ~~**Sprint-Aufgabe 27: WerkstattPilot Material → Lager-Sync**~~ **Erledigt 2026-05-18** (Commit `ae1b821`) — Bestand −, Bewegungslog.
+- ✅ ~~**Sprint-Aufgabe 28: WerkstattPilot Fertigungsleitstand**~~ **Erledigt 2026-05-18** (Commit `e7e76d4`) — neuer Tab, 3-Spalten-Kanban, SLA-Ampel, Batch-Aktionen.
+- ✅ ~~**Sprint-Aufgabe 29: SteuerPilot OCR-Erkennung**~~ **Erledigt 2026-05-18** (Commit `a5d595c`) — API-Route `ocr-beleg`, KI füllt Felder automatisch.
+- ✅ ~~**Sprint-Aufgabe 30: PlanungPilot auftrag_id FK + Meilensteine**~~ **Erledigt 2026-05-18** (Commit `60be09b`) — FK, Button in BüroPilot, Meilenstein-CRUD.
 - 🔴 **LagerPilot: Umlagerung atomarisieren** — Datenverlust-Risiko bei Teil-Fehlern (4 Awaits ohne Rollback). Supabase-RPC nötig.
 - 🔴 **LagerPilot: Dual-Layer-Bestandssync** — `lager_artikel.bestand` und `lager_stellplatz_bestand` laufen auseinander; KI-Kontext inkonsistent.
 - 🔴 **WerkstattPilot: FK `buero_auftrag_id`** — `auftragsnr` ist freier Text ohne Referenzintegrität; echte Karte↔Auftrag-FK fehlt noch.
