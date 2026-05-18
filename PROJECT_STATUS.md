@@ -26,28 +26,33 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `a8259fd`.
-- Jüngste Fortschritte: SteuerPilot A7–A12 live — recharts BarChart, Ausgaben-Übersicht-Karte, Checkliste erweitert, Aufbewahrungspflicht-Hinweis, canViewSteuer-Permission, Migration Remote bestätigt.
-- Wichtigste externe Restpunkte: Stripe-Webhook-URL/Ende-zu-Ende prüfen; E-Mail-Versand bleibt bewusst manuell über das lokale Mailprogramm.
-- Produktivlage: Kernsystem nutzbar, aber noch nicht voll marktreif; Rechte, Integrationen und einige Prozessketten bleiben offene Themen.
+- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `9180136`.
+- Jüngste Fortschritte: Tasks 2-8 parallel abgeschlossen — Multi-Positionen, ELSTER-Export, Marketing CRUD, AnalysePilot Live, Benutzerverwaltung, RLS-Policies, Pipeline-Widget.
+- Wichtigste externe Restpunkte: E-Mail-Versand bleibt bewusst manuell über das lokale Mailprogramm.
+- Produktivlage: Kernsystem weitgehend vollständig; Hauptmodule produktionsreif.
 
 ### 0.2 Top-Offene Aufgaben (Priorisiert)
 - ✅ ~~**Stripe Webhook-URL** im Stripe-Dashboard prüfen und echten End-to-End-Test validieren.~~ **Erledigt 2026-05-18**.
-- ✅ ~~**BüroPilot: Paketauswahl + 1-Klick-Konvertierung**~~ **Erledigt 2026-05-18**: Inhaber-Paketauswahl in Angebots-Formular + `📄 Rechnung erstellen` direkt aus Angebot.
-- 🟡 **Multi-Positions-Rechnungen/-Angebote** im BüroPilot (aktuell nur 1 Pos. hardcoded).
-- 🟡 **SteuerPilot A13: ELSTER-XML-Export** vorbereiten (Formular-Mapping §§ 81/83 UStVA).
-- 🟢 Benutzerverwaltung erweitern: Deaktivieren/Löschen, Einladung erneut öffnen, Suche/Filter.
+- ✅ ~~**BüroPilot: Paketauswahl + 1-Klick-Konvertierung**~~ **Erledigt 2026-05-18**.
+- ✅ ~~**Task 2: Multi-Positions-Rechnungen/-Angebote**~~ **Erledigt 2026-05-18** (Commit `043ff2e`).
+- ✅ ~~**Task 3: SteuerPilot A13: ELSTER-XML-Export**~~ **Erledigt 2026-05-18** (Commit `043ff2e`).
+- ✅ ~~**Task 4: MarketingPilot Edit + Delete**~~ **Erledigt 2026-05-18** (Commit `3166286`).
+- ✅ ~~**Task 5: AnalysePilot Live-Daten**~~ **Erledigt 2026-05-18** (Commit `234fcc2`).
+- ✅ ~~**Task 6: Benutzerverwaltung Deaktivieren/Löschen/Suche**~~ **Erledigt 2026-05-18** (Commit `80e0f8c`).
+- ✅ ~~**Task 7: RLS-Policies vollständig**~~ **Erledigt 2026-05-18** (Commit `7aee934`).
+- ✅ ~~**Task 8: Pipeline-Widget 3 KPIs**~~ **Erledigt 2026-05-18** (Commit `dadb045`).
+- 🟡 **EinkaufTab**: Demo-State auf echte Supabase-Calls umstellen.
+- 🟡 **KI-Aktion "Bestellung"** ausführbar machen (analog zu Umlagerung).
 - 🟢 Analyse-Bestandstrend auf echte Wochensnapshots umstellen.
-- 🟢 RLS-Policies und Datenkonsistenz-Härtung fortsetzen.
 
 ### 0.3 Aktuelle Blocker
 - Keine kritischen Blocker. Stripe E2E validiert.
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-18, Commit `de33bc3`  
-**Letzte Session:** BüroPilot Paketauswahl (Inhaber) + 1-Klick Angebot→Rechnung  
-**Nächster Focus:** Multi-Positionen Rechnungen/Angebote → ELSTER-Export  
+**Letzter Stand:** 2026-05-18, Commit `9180136`  
+**Letzte Session:** Tasks 2-8 parallel — Multi-Positionen, ELSTER-Export, Marketing CRUD, AnalysePilot Live, Benutzerverwaltung, RLS-Policies, Pipeline-Widget  
+**Nächster Focus:** EinkaufTab Live-Daten → KI-Bestellaktion ausführbar  
 **Blocker:** Keine  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
@@ -64,6 +69,15 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – Tasks 2-8 parallel, Commits `043ff2e`–`9180136`)**:
+  - **Task 2 (Multi-Positionen)**: `PositionenEditor`-Komponente in Angebote/Aufträge/Rechnungen. Positionen als JSON-Array, Betrag dynamisch berechnet, rückwärtskompatibel. Dateien: `buero/page.tsx`, `lib/db.ts`.
+  - **Task 3 (ELSTER-Export)**: Neues `lib/steuer-export.ts` mit `generateElsterXml()`. Button „📥 ELSTER-XML exportieren" im UStVA-Tab + Export-Karte. Kennzahlen 81 (USt) + 83 (VSt). Datei: `steuer/page.tsx`.
+  - **Task 4 (Marketing CRUD)**: Edit + Delete für Kampagnen/Leads/Newsletter. Inline-Bestätigung, 2-Klick-Delete. Neue `deleteMarketing*`-Funktionen in `lib/db.ts`. Datei: `marketing/page.tsx`.
+  - **Task 5 (AnalysePilot Live)**: Fehler-Handling verbessert, `loadError`-State + rotes Fehler-Banner. `CLAUDE.md` Status aktualisiert. Datei: `analyse/page.tsx`.
+  - **Task 6 (Benutzerverwaltung)**: Admin-API `app/api/admin/users/route.ts` (DELETE/PUT disable/resend-invite). UI-Suchfeld + Deaktivieren/Löschen/Einladung-Buttons mit Auth-Guard. Datei: `einstellungen/page.tsx`.
+  - **Task 7 (RLS-Policies)**: Migration `supabase/migrations/20260518190000_rls_policies_complete.sql`. 10 Tabellen-Lücken geschlossen (billing_sequences, owner_event_inbox, steuer_*, audit_logs etc.).
+  - **Task 8 (Pipeline-Widget)**: 3 KPI-Kacheln oben auf BüroPilot (🟡 Offene Angebote / 🔵 Laufende Aufträge / 🔴 Offene Rechnungen), klickbar mit Tab-Navigation. Datei: `buero/page.tsx`.
+  - Tests: lint + build grün. Push: `9180136`.
 - **Zuletzt erledigt (2026-05-18 – BüroPilot Paketauswahl + Konvertierung, Commit `de33bc3`)**:
   - **Inhaber-Paketauswahl im Angebots-Formular**: Nach Kundenauswahl erscheint (nur für Admin/Inhaber-Rolle) ein Paket-Selector (Starter/Business/Enterprise + Mitarbeiterstaffel). Wahl befüllt Titel und Betrag automatisch aus `pricingConfig`.
   - **1-Klick Angebot → Rechnung**: Neuer Button „📄 Rechnung erstellen" für akzeptierte Angebote — direkte Konvertierung ohne Auftrag-Zwischenschritt. Bestehender Button „🔄 Auftrag erstellen" bleibt erhalten.
