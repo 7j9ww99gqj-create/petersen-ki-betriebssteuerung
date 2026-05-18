@@ -1911,7 +1911,200 @@ function MaschinenakteTab({ bereiche, karten, wartungen, stoerungen }: {
   )
 }
 
-type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet' | 'wartung' | 'stoerungen' | 'maschinenakte' | 'mitarbeiter' | 'bereiche'
+// ── Fertigungsleitstand-Tab ──────────────────────────────────────────────────
+
+function slaStufe(karte: Arbeitskarte): 'gruen' | 'gelb' | 'rot' {
+  // SLA: geplantes Datum vs. heute; Kritisch = immer rot
+  if (karte.prioritaet === 'Kritisch') return 'rot'
+  if (!karte.geplant) return 'gruen'
+  try {
+    const [d, m, y] = karte.geplant.split('.').map(Number)
+    const geplant = new Date(y, m - 1, d)
+    const diff = (geplant.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    if (diff < 0) return 'rot'
+    if (diff <= 2) return 'gelb'
+    return 'gruen'
+  } catch { return 'gruen' }
+}
+
+function FertigungsleitstandTab({ isDemo, karten, setKarten, mitarbeiterNamen }: {
+  isDemo: boolean
+  karten: Arbeitskarte[]
+  setKarten: React.Dispatch<React.SetStateAction<Arbeitskarte[]>>
+  mitarbeiterNamen: string[]
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [batchAction, setBatchAction] = useState<AKStatus | null>(null)
+  const [batchConfirm, setBatchConfirm] = useState(false)
+  const [toast, setToast] = useState('')
+  const [filterMitarbeiter, setFilterMitarbeiter] = useState('')
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3500) }
+
+  const SPALTEN: { status: AKStatus; label: string; color: string }[] = [
+    { status: 'Offen', label: 'Offen', color: '#aeb9c8' },
+    { status: 'In Arbeit', label: 'In Arbeit', color: '#f59e0b' },
+    { status: 'Fertig', label: 'Fertig', color: '#4ddb7e' },
+  ]
+
+  const aktiveKarten = karten.filter(k =>
+    k.status !== 'Storniert' &&
+    (filterMitarbeiter === '' || k.mitarbeiter === filterMitarbeiter)
+  )
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleBatchStatusChange = async () => {
+    if (!batchAction || selected.size === 0) return
+    const ids = Array.from(selected)
+    if (!isDemo) {
+      await Promise.allSettled(ids.map(id => {
+        const k = karten.find(k => k.id === id)
+        if (!k) return Promise.resolve()
+        return upsertWerkstattKarte({ ...k, status: batchAction })
+      }))
+    }
+    setKarten(prev => prev.map(k => selected.has(k.id) ? { ...k, status: batchAction } : k))
+    showToast(`✅ ${ids.length} Karte${ids.length > 1 ? 'n' : ''} → "${batchAction}"`)
+    setSelected(new Set())
+    setBatchAction(null)
+    setBatchConfirm(false)
+  }
+
+  const slaColors = { gruen: '#4ddb7e', gelb: '#f59e0b', rot: '#f43f5e' }
+  const slaIcons = { gruen: '🟢', gelb: '🟡', rot: '🔴' }
+
+  return (
+    <div>
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 90, right: 24, zIndex: 9999, padding: '14px 20px', borderRadius: 12, background: 'rgba(37,211,102,.12)', border: '1px solid rgba(37,211,102,.35)', color: '#4ddb7e', fontSize: 14, fontWeight: 600 }}>
+          {toast}
+        </div>
+      )}
+
+      {/* Filter + Batch-Aktionen */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select
+          className="pk-input"
+          value={filterMitarbeiter}
+          onChange={e => setFilterMitarbeiter(e.target.value)}
+          style={{ maxWidth: 200, cursor: 'pointer' }}
+        >
+          <option value="">Alle Mitarbeiter</option>
+          {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
+        </select>
+        {selected.size > 0 && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, color: '#a78bfa', fontWeight: 700 }}>{selected.size} ausgewählt</span>
+            {!batchConfirm ? (
+              <>
+                <select
+                  className="pk-input"
+                  style={{ maxWidth: 160, cursor: 'pointer' }}
+                  value={batchAction ?? ''}
+                  onChange={e => setBatchAction(e.target.value as AKStatus || null)}
+                >
+                  <option value="">Status setzen…</option>
+                  <option value="Offen">Offen</option>
+                  <option value="In Arbeit">In Arbeit</option>
+                  <option value="Warten">Warten</option>
+                  <option value="Fertig">Fertig</option>
+                </select>
+                {batchAction && (
+                  <button
+                    onClick={() => setBatchConfirm(true)}
+                    style={{ fontSize: 12, padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(167,139,250,.4)', background: 'rgba(167,139,250,.12)', color: '#c4b5fd', cursor: 'pointer', fontWeight: 700 }}
+                  >
+                    Anwenden
+                  </button>
+                )}
+              </>
+            ) : (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: '#f59e0b' }}>Wirklich {selected.size} Karten → &quot;{batchAction}&quot;?</span>
+                <button onClick={handleBatchStatusChange} style={{ fontSize: 12, padding: '5px 12px', borderRadius: 999, border: '1px solid rgba(37,211,102,.4)', background: 'rgba(37,211,102,.1)', color: '#4ddb7e', cursor: 'pointer', fontWeight: 700 }}>✓ Ja</button>
+                <button onClick={() => { setBatchConfirm(false); setBatchAction(null) }} style={{ fontSize: 12, padding: '5px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Abbrechen</button>
+              </div>
+            )}
+            <button onClick={() => setSelected(new Set())} style={{ fontSize: 12, padding: '5px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>✕ Auswahl aufheben</button>
+          </div>
+        )}
+      </div>
+
+      {/* 3-Spalten Kanban */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+        {SPALTEN.map(sp => {
+          const spaltenKarten = aktiveKarten.filter(k => k.status === sp.status)
+          return (
+            <div key={sp.status}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
+                <span style={{ fontSize: 16, fontWeight: 900, color: sp.color }}>{sp.label}</span>
+                <span style={{ fontSize: 12, color: '#aeb9c8', marginLeft: 'auto' }}>{spaltenKarten.length}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {spaltenKarten.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '24px 12px', color: '#aeb9c8', fontSize: 12, borderRadius: 10, border: '1px dashed rgba(255,255,255,.1)' }}>
+                    Keine Karten
+                  </div>
+                ) : spaltenKarten.map(k => {
+                  const sla = slaStufe(k)
+                  const isSelected = selected.has(k.id)
+                  return (
+                    <div
+                      key={k.id}
+                      onClick={() => toggleSelect(k.id)}
+                      style={{
+                        padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
+                        background: isSelected ? 'rgba(167,139,250,.15)' : 'rgba(255,255,255,.03)',
+                        border: isSelected
+                          ? '1px solid rgba(167,139,250,.5)'
+                          : `1px solid ${slaColors[sla]}30`,
+                        transition: 'all .15s',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: '#aeb9c8', fontFamily: 'monospace' }}>{k.auftragsnr}</span>
+                        <span title={sla === 'gruen' ? 'SLA ok' : sla === 'gelb' ? 'SLA knapp' : 'SLA überfällig/kritisch'}>{slaIcons[sla]}</span>
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 13, marginTop: 4, marginBottom: 4 }}>{k.beschreibung}</div>
+                      <div style={{ fontSize: 11, color: '#aeb9c8', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <span>👷 {k.mitarbeiter || '—'}</span>
+                        <span>📅 {k.geplant || '—'}</span>
+                        {k.prioritaet === 'Kritisch' && <span style={{ color: '#fb7185', fontWeight: 700 }}>🔴 Kritisch</span>}
+                        {k.prioritaet === 'Hoch' && <span style={{ color: '#f59e0b', fontWeight: 700 }}>🟠 Hoch</span>}
+                      </div>
+                      {k.fortschritt > 0 && (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ height: 4, borderRadius: 999, background: 'rgba(255,255,255,.1)', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${Math.min(100, k.fortschritt)}%`, background: k.fortschritt >= 100 ? '#4ddb7e' : '#a78bfa', borderRadius: 999, transition: 'width .3s' }} />
+                          </div>
+                          <div style={{ fontSize: 10, color: '#aeb9c8', marginTop: 2 }}>{k.fortschritt}% Fortschritt</div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={{ marginTop: 16, fontSize: 12, color: '#aeb9c8' }}>
+        {aktiveKarten.length} Karten · Klick zum Auswählen, Batch-Aktionen oben
+      </div>
+    </div>
+  )
+}
+
+type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet' | 'wartung' | 'stoerungen' | 'maschinenakte' | 'mitarbeiter' | 'bereiche' | 'leitstand'
 
 export default function WerkstattPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
@@ -2010,6 +2203,7 @@ export default function WerkstattPilotPage() {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)', flexWrap: 'wrap' }}>
         {([
+          { id: 'leitstand', label: '🏗️ Fertigungsleitstand' },
           { id: 'karten', label: '📋 Arbeitskarten' },
           { id: 'zeit', label: '⏱️ Zeiterfassung' },
           { id: 'material', label: '🔩 Material' },
@@ -2028,6 +2222,7 @@ export default function WerkstattPilotPage() {
         ))}
       </div>
 
+      {tab === 'leitstand' && <FertigungsleitstandTab isDemo={isDemo} karten={karten} setKarten={setKarten} mitarbeiterNamen={mitarbeiterNamen} />}
       {tab === 'karten' && <ArbeitskartentTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} bereichNamen={bereichNamen} newKarteParams={newKarteParams} />}
       {tab === 'zeit' && <ZeiterfassungTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
       {tab === 'material' && <MaterialverbrauchTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
