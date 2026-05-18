@@ -26,14 +26,14 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `23ec7d6`, deployed.
-- Jüngste Fortschritte: 3 PDF-Briefpapier-Vorlagen (Modern Dark / Classic Professional / Elegant Minimal) mit visueller Vorlage-Auswahl in Firmendaten; Inhaber-Rechte-Fix; AB-Nummern/Mahnungsstufen/BüroPilot-Vollprozess; Datenbankbereinigung.
+- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `7ba35c5`, deployed.
+- Jüngste Fortschritte: Billing-Workflow geschlossen — Kunde bucht → Owner-Auftrag (Geplant); Kunde zahlt → Owner-Rechnung (Erstellt); kein Auto-Versand; Mail-Modal nach Auftrag→Rechnung-Konvertierung nicht mehr automatisch.
 - Wichtigste externe Restpunkte: Stripe-Webhook-URL/Ende-zu-Ende prüfen; E-Mail-Versand bleibt bewusst manuell über das lokale Mailprogramm.
 - Produktivlage: Kernsystem nutzbar, aber noch nicht voll marktreif; Rechte, Integrationen und einige Prozessketten bleiben offene Themen.
 
 ### 0.2 Top-Offene Aufgaben
-- Stripe Webhook-URL im Stripe-Dashboard prüfen und echten End-to-End-Test validieren.
-- Manuellen Billing-Prozess weiter härten: Buchung -> Auftrag -> Rechnung -> Mailentwurf -> Freigabe.
+- Stripe Webhook-URL im Stripe-Dashboard prüfen und echten End-to-End-Test validieren (Buchung → Auftrag → Zahlung → Rechnung).
+- Multi-Positions-Liste in Rechnungen/Angeboten (aktuell nur 1 Pos. hardcoded).
 - Benutzerverwaltung weiter ausbauen: optional Deaktivieren/Löschen, Einladung erneut öffnen, Suche/Filter.
 - Analyse-Bestandstrend auf echte Wochensnapshots umstellen.
 - Weitere produktionsreife Härtung bei Rollen/Rechten, Datenkonsistenz und Integrationen.
@@ -56,6 +56,15 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – BüroPilot Workflow-Optimierung: Auftrag bei Buchung, Rechnung bei Zahlung)**:
+  - **stripe-link/route.ts**: Nach erfolgreicher Abo-Buchung (Kunde bucht Module) wird jetzt automatisch ein Owner-Auftrag (`AUF-{subscriptionId}`) mit Status `Geplant` im Inhaber-BüroPilot angelegt (Admin-Client, `user_id=ownerUserId`, Idempotenz per Upsert).
+  - **stripe-webhook/route.ts**: Nach Stripe-Zahlungsbestätigung (`paymentStatus === 'paid'`) wird eine Owner-Rechnung (Status `Erstellt`) im Inhaber-BüroPilot angelegt; dedupliziert per `payment_link_id` (checkout-session-ID); `genId` importiert.
+  - **buero/page.tsx**: Nach Auftrag→Rechnung-Konvertierung öffnet das Mail-Modal nicht mehr automatisch; Tab wechselt zu Rechnungen; Versand vollständig manuell.
+  - Alle Schritte (Buchung→Auftrag, Zahlung→Rechnung, Auftrag→Rechnung) sind Ein-Klick, aber kein Auto-Versand.
+  - Betroffene Dateien: `app/api/billing/stripe-link/route.ts`, `app/api/billing/stripe-webhook/route.ts`, `app/dashboard/buero/page.tsx`.
+  - Offene Punkte: Stripe Webhook-URL im Dashboard prüfen; echter End-to-End-Test Buchung→Auftrag→Zahlung→Rechnung ausstehend.
+  - Tests: `npx tsc --noEmit` grün; `npm run build` grün.
+  - Branch: `main` (Commit `7ba35c5`).
 - **Zuletzt erledigt (2026-05-18 – 3 Briefpapier-Vorlagen + Template-Auswahl in Firmendaten)**:
   - **lib/pdf.ts vollständig überarbeitet**: Neuer Typ `PDFTemplate = 'modern-dark' | 'classic-light' | 'elegant-minimal'`; `briefpapier_layout.template` steuert welches Template genutzt wird.
   - **Template 1 – Modern Dark**: bisheriger Stil verfeinert (dunkler Navy-Header `(10,18,30)`, Akzentlinie, Firmenname in Akzentfarbe, dunkler Footer); Hint-Boxes dunkel mit Akzentborder.
