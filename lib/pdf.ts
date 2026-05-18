@@ -111,7 +111,15 @@ function getCompanySettings(): PDFCompanySettings {
   if (typeof window === 'undefined') return FALLBACK_COMPANY
   try {
     const raw = localStorage.getItem('pk_firma_einstellungen')
-    return raw ? { ...FALLBACK_COMPANY, ...JSON.parse(raw) } : FALLBACK_COMPANY
+    if (!raw) return FALLBACK_COMPANY
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const layout = (parsed.briefpapier_layout as Record<string, unknown>) ?? {}
+    return {
+      ...FALLBACK_COMPANY,
+      ...parsed,
+      // briefpapier_url kann direkt gesetzt oder in briefpapier_layout eingebettet sein
+      briefpapier_url: (parsed.briefpapier_url as string | undefined) || (layout.briefpapier_url as string | undefined),
+    }
   } catch {
     return FALLBACK_COMPANY
   }

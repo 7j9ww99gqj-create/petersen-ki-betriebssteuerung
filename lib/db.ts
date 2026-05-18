@@ -550,7 +550,14 @@ export async function getFirmaEinstellungen() {
     .select('*')
     .maybeSingle()
   if (error) throw error
-  return data as FirmaEinstellungen | null
+  if (!data) return null
+  // briefpapier_url ist in briefpapier_layout JSONB gespeichert (kein eigenes DB-Feld nötig)
+  const layout = (data.briefpapier_layout as Record<string, unknown>) ?? {}
+  return {
+    ...data,
+    briefpapier_url: (data as Record<string, unknown>).briefpapier_url as string | undefined
+      ?? layout.briefpapier_url as string | undefined,
+  } as FirmaEinstellungen
 }
 
 export async function getAiFeatureSettings(): Promise<AiFeatureSettings> {
@@ -567,10 +574,18 @@ export async function getAiFeatureSettings(): Promise<AiFeatureSettings> {
 }
 
 export async function upsertFirmaEinstellungen(data: FirmaEinstellungen) {
+  // briefpapier_url existiert nicht als eigene DB-Spalte → in briefpapier_layout JSONB einbetten
+  const { briefpapier_url, ...dataWithout } = data
+  const mergedLayout: Record<string, unknown> = {
+    ...(data.briefpapier_layout as Record<string, unknown> ?? {}),
+    ...(briefpapier_url !== undefined ? { briefpapier_url } : {}),
+  }
+
   const { data: saved, error } = await db()
     .from('firma_einstellungen')
     .upsert({
-      ...data,
+      ...dataWithout,
+      briefpapier_layout: mergedLayout,
       land: data.land || 'Deutschland',
       standard_waehrung: data.standard_waehrung || 'EUR',
       onboarding_completed: data.onboarding_completed ?? true,
@@ -582,7 +597,12 @@ export async function upsertFirmaEinstellungen(data: FirmaEinstellungen) {
     .select()
     .single()
   if (error) throw error
-  return saved as FirmaEinstellungen
+  // Beim Lesen briefpapier_url aus dem Layout zurückextrahieren
+  const savedLayout = (saved.briefpapier_layout as Record<string, unknown>) ?? {}
+  return {
+    ...saved,
+    briefpapier_url: savedLayout.briefpapier_url as string | undefined,
+  } as FirmaEinstellungen
 }
 
 export async function updateAiFeatureSettings(next: Partial<AiFeatureSettings>) {
