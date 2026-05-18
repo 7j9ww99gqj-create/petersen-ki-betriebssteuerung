@@ -26,7 +26,7 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `7ba35c5`, deployed.
+- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `5afd134`.
 - Jüngste Fortschritte: Billing-Workflow geschlossen — Kunde bucht → Owner-Auftrag (Geplant); Kunde zahlt → Owner-Rechnung (Erstellt); kein Auto-Versand; Mail-Modal nach Auftrag→Rechnung-Konvertierung nicht mehr automatisch.
 - Wichtigste externe Restpunkte: Stripe-Webhook-URL/Ende-zu-Ende prüfen; E-Mail-Versand bleibt bewusst manuell über das lokale Mailprogramm.
 - Produktivlage: Kernsystem nutzbar, aber noch nicht voll marktreif; Rechte, Integrationen und einige Prozessketten bleiben offene Themen.
@@ -56,6 +56,16 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – SteuerPilot Aufgaben 7–12)**:
+  - **A7 – Monatsabschluss-Checkliste**: Zwei neue Checkpunkte ergänzt: „Fixkosten für diesen Monat geprüft" + „Betriebsausgaben für diesen Monat erfasst".
+  - **A8 – recharts BarChart**: CSS-Balkendiagramm im Auswertungen-Tab durch echte `BarChart`-Komponente aus recharts ersetzt (X-Achse: Monat, Balken: USt rot / VSt grün, Tooltip mit `fmt()`, `ResponsiveContainer` 100% × 220px).
+  - **A9 – Ausgaben-Übersicht-Karte**: Neue Karte „📊 Ausgaben-Übersicht" im Dashboard-Tab vor „Letzte Belege" — 4-Zeilen-Tabelle (Fixkosten monatl. / Betriebsausgaben / Belege Eingang / Anschaffungen) + Gesamtsumme.
+  - **A10 – Aufbewahrungspflicht-Hinweis**: Beim Beleg-Löschen erscheint vor den Ja/Nein-Buttons der Hinweis „§ 147 AO: 10 Jahre Aufbewahrungspflicht".
+  - **A11 – canViewSteuer**: Neue Permission `canViewSteuer` in `lib/roles.ts` (Admin/Büro/Inhaber); Rollen-Guard in `steuer/page.tsx` nach Loading-Spinner (zeigt 🔒-Hinweis für unberechtigte Rollen).
+  - **A12 – Migration**: `npx supabase db push` ausgeführt — Remote-DB war bereits aktuell (Migration `20260518150000_add_steuer_erweiterung.sql` bereits angewendet).
+  - Betroffene Dateien: `app/dashboard/steuer/page.tsx`, `lib/roles.ts`.
+  - Tests: `npm run lint` grün (nur bekannte Warnungen); `npm run build` grün.
+  - Branch: `main` (Commit `5afd134`).
 - **Zuletzt erledigt (2026-05-18 – BüroPilot Workflow-Optimierung: Auftrag bei Buchung, Rechnung bei Zahlung)**:
   - **stripe-link/route.ts**: Nach erfolgreicher Abo-Buchung (Kunde bucht Module) wird jetzt automatisch ein Owner-Auftrag (`AUF-{subscriptionId}`) mit Status `Geplant` im Inhaber-BüroPilot angelegt (Admin-Client, `user_id=ownerUserId`, Idempotenz per Upsert).
   - **stripe-webhook/route.ts**: Nach Stripe-Zahlungsbestätigung (`paymentStatus === 'paid'`) wird eine Owner-Rechnung (Status `Erstellt`) im Inhaber-BüroPilot angelegt; dedupliziert per `payment_link_id` (checkout-session-ID); `genId` importiert.
@@ -642,6 +652,8 @@
 
 ## 15. Nächste Empfehlung
 - Als NÄCHSTES umsetzen:
-  1. **Autopilot-Marketing mit echter Logik**: Flow „Ziel → Zielgruppe → Kampagne → Funnel → nächster Schritt" aus echten Leads/Kampagnen/SEO ableiten; schrittweise im KI-Suite-Tab umsetzen.
-  2. **Detailseiten für Werkstatt-/Lager-Kernobjekte**: Arbeitskarten und Artikel haben keine dedizierten Detailseiten/URLs; tiefere Verlinkung und Objektkontext fehlen noch.
-  3. **Rollen/Rechte serverseitig vervollständigen**: RLS-Policies pro Aktion/Datensatz weiter ausbauen; Grundlage für Mehrbenutzer-Launch.
+  1. **SteuerPilot: ELSTER-XML-Export vorbereiten** (Aufgabe 13 folgerichtig): Formular-Mapping §§ 81/83 UStVA; schrittweise als Download-Dummy umsetzen.
+  2. **SteuerPilot: Jahres-Zusammenfassung** mit Gewinn-/Verlust-Rechnung (Einnahmen – Ausgaben gesamt) auf Basis der bestehenden Datenlage.
+  3. **Stripe Webhook-URL** im Stripe-Dashboard prüfen; echter End-to-End-Test Buchung → Auftrag → Zahlung → Rechnung.
+  4. **Autopilot-Marketing mit echter Logik**: Flow „Ziel → Zielgruppe → Kampagne → Funnel → nächster Schritt" aus echten Leads/Kampagnen/SEO ableiten.
+  5. **Rollen/Rechte serverseitig vervollständigen**: RLS-Policies pro Aktion/Datensatz weiter ausbauen; Grundlage für Mehrbenutzer-Launch.
