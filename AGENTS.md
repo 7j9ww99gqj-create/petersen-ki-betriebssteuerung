@@ -122,6 +122,72 @@ Wenn Lint oder Build fehlschlagen:
 | **Sonnet 4.6** | Standard-Features, Code-Review, Mittlere Implementierungen, Multi-File (2–5 Dateien) | ~2k–8k | Neue Tab in Pilot, API-Route, moderate UI-Änderung, mehrere zusammenhängende Edits |
 | **Opus 4.7** | Komplexe Architektur, große Refactorings, Strategische Entscheidungen, Multi-Module (5+ Dateien) | ~10k–30k | SteuerPilot komplett, Komplette Migrationen, Datenbankschema-Redesign, Multi-Pilot-Features |
 
+## Credentials & Secrets
+
+**Alle Keys liegen NUR in `.env.local`** — nie im Code, nie in CLAUDE.md, nie in AGENTS.md.
+Datei ist in `.gitignore` → wird niemals zu GitHub gepusht.
+
+So liest du sie zu Beginn jeder Session:
+```bash
+source /Users/kevinpetersen/Documents/petersen-ki/.env.local
+# Danach verfügbar als Umgebungsvariablen:
+# $SUPABASE_SERVICE_ROLE_KEY  → Supabase Admin-Zugriff
+# $NEXT_PUBLIC_SUPABASE_URL   → https://cchmjrnzaqvowqihcdte.supabase.co
+# $OPENAI_API_KEY             → OpenAI
+# $VERCEL_TOKEN               → Vercel API
+# $STRIPE_SECRET_KEY          → Stripe
+# $STRIPE_WEBHOOK_SECRET      → Stripe Webhooks
+# $VAPID_PRIVATE_KEY          → Push Notifications
+# $CRON_SECRET                → Backup-Cron Schutz
+```
+
+## SQL-Migrationen direkt ausführen
+
+`exec_sql` RPC-Funktion ist permanent in Supabase hinterlegt:
+
+```bash
+source /Users/kevinpetersen/Documents/petersen-ki/.env.local
+curl -s -X POST "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/rpc/exec_sql" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+  -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sql": "DEIN SQL HIER"}'
+# Leere Antwort = Erfolg | JSON mit "message" = Fehler
+```
+SQL-Datei immer zusätzlich unter `supabase/migrations/DATUM_name.sql` speichern.
+
+## Vercel Env-Var setzen
+
+```bash
+source /Users/kevinpetersen/Documents/petersen-ki/.env.local
+curl -s -X POST "https://api.vercel.com/v10/projects/prj_ovhLIo8GAvHKCjz5UWhVmLinVObI/env" \
+  -H "Authorization: Bearer $VERCEL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '[{"key":"KEY","value":"VALUE","type":"plain","target":["production","preview","development"]}]'
+```
+
+## Design-System (Kurzreferenz)
+
+```
+Background:  #05070b  |  Primary: #1684ff  |  Panel: #0b1420  |  Card: #101a28
+Text: #f8fbff  |  Muted: #aeb9c8
+```
+
+CSS-Klassen: `.pk-card` `.pk-btn` `.pk-btn-ghost` `.pk-input` `.pk-table` `.badge` `.fade-in`
+
+Toast-Position immer: `position:fixed, bottom:90px, right:24px, zIndex:9999`
+Kein Browser `confirm()` — immer 2-Klick Inline-Bestätigung.
+Demo-Modus: `if (isDemo) return` vor jedem Supabase-Call.
+
+## Unveränderliche Projekt-Regeln
+
+- Kein großes Refactoring ohne explizite Anweisung
+- Bestehende Funktionen nie entfernen
+- Credentials niemals in Code-Dateien schreiben
+- MarketingPilot nur anfassen wenn explizit angefragt
+- Nach jeder Aufgabe einzeln committen — nie sammeln
+- `npx tsc --noEmit` + `npm run build` müssen grün sein vor jedem Push
+
 ## Ziel
 - minimale Tokens
 - stabile Builds
