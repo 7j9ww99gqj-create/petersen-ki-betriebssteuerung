@@ -18,6 +18,7 @@ import {
   bulkImportBueroRechnungen, bulkImportSteuerBelege, bulkImportSteuerBuchungen,
   bulkImportSteuerKonten, bulkImportWerkstattZeitbuchungen, bulkImportWerkstattMaterial,
   getFirmaEinstellungen, upsertFirmaEinstellungen, uploadFirmenLogo,
+  uploadBriefpapier, deleteBriefpapier,
   type FirmaEinstellungen,
 } from '@/lib/db'
 import { PricingSettingsPage } from '@/components/billing/PricingSettingsPage'
@@ -1748,6 +1749,8 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
   const [loading, setLoading] = useState(!isDemo)
   const [saving, setSaving] = useState(false)
   const [logoUploading, setLogoUploading] = useState(false)
+  const [briefpapierUploading, setBriefpapierUploading] = useState(false)
+  const [briefpapierDeleting, setBriefpapierDeleting] = useState(false)
 
   useEffect(() => {
     if (isDemo) {
@@ -1822,6 +1825,39 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
       showToast('Logo konnte nicht hochgeladen werden', 'error')
     } finally {
       setLogoUploading(false)
+    }
+  }
+
+  const handleBriefpapier = async (file: File | null) => {
+    if (!file || !canEdit) return
+    setBriefpapierUploading(true)
+    try {
+      if (isDemo) {
+        const url = URL.createObjectURL(file)
+        setField('briefpapier_url', url)
+      } else {
+        const uploaded = await uploadBriefpapier(file)
+        setField('briefpapier_url', uploaded.url)
+      }
+      showToast('✅ Briefpapier hochgeladen')
+    } catch {
+      showToast('Briefpapier konnte nicht hochgeladen werden', 'error')
+    } finally {
+      setBriefpapierUploading(false)
+    }
+  }
+
+  const handleBriefpapierDelete = async () => {
+    if (!canEdit || !firma.briefpapier_url) return
+    setBriefpapierDeleting(true)
+    try {
+      if (!isDemo) await deleteBriefpapier(firma.briefpapier_url)
+      setField('briefpapier_url', undefined)
+      showToast('✅ Briefpapier entfernt')
+    } catch {
+      showToast('Briefpapier konnte nicht entfernt werden', 'error')
+    } finally {
+      setBriefpapierDeleting(false)
     }
   }
 
@@ -2135,6 +2171,59 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
             </label>
           ))}
         </div>
+      </div>
+
+      <div className="pk-card">
+        <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 800 }}>📎 Eigenes Briefpapier hochladen</h3>
+        <p style={{ margin: '0 0 16px', color: '#aeb9c8', fontSize: 13, lineHeight: 1.6 }}>
+          Wenn ein eigenes Briefpapier hinterlegt ist, werden Header, Footer, Logo und alle Firmendaten
+          <strong style={{ color: '#d0d9e8' }}> ausschließlich aus dem Briefpapier</strong> übernommen.
+          Der PDF-Generator erzeugt dann nur noch den Dokumentinhalt im freien Mittelbereich.
+        </p>
+
+        {firma.briefpapier_url ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 12, background: 'rgba(32,200,255,.06)', border: '1px solid rgba(32,200,255,.25)', marginBottom: 12 }}>
+            <div style={{ fontSize: 28 }}>
+              {firma.briefpapier_url.toLowerCase().split('?')[0].endsWith('.pdf') ? '📄' : '🖼️'}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, color: '#20c8ff', fontSize: 13 }}>Briefpapier aktiv</div>
+              <div style={{ color: '#aeb9c8', fontSize: 11, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {firma.briefpapier_url.split('/').pop()?.split('?')[0] || 'briefpapier'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <label className="pk-btn-ghost" style={{ cursor: canEdit ? 'pointer' : 'not-allowed', opacity: canEdit ? 1 : .5, fontSize: 12, padding: '6px 12px' }}>
+                {briefpapierUploading ? '⏳' : 'Ersetzen'}
+                <input type="file" accept="application/pdf,image/png,image/jpeg" disabled={!canEdit} onChange={e => handleBriefpapier(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
+              </label>
+              <button
+                onClick={handleBriefpapierDelete}
+                disabled={briefpapierDeleting || !canEdit}
+                style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,80,80,.3)', background: 'rgba(255,80,80,.08)', color: '#ff8080', cursor: canEdit ? 'pointer' : 'not-allowed', opacity: canEdit ? 1 : .5 }}
+              >
+                {briefpapierDeleting ? '⏳' : 'Entfernen'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 22px', borderRadius: 12, border: '2px dashed rgba(32,200,255,.25)', background: 'rgba(32,200,255,.03)', cursor: canEdit ? 'pointer' : 'not-allowed', opacity: canEdit ? 1 : .5, marginBottom: 12, transition: 'border-color .15s, background .15s' }}>
+            <div style={{ fontSize: 32 }}>📄</div>
+            <div>
+              <div style={{ fontWeight: 700, color: '#d0d9e8', fontSize: 14 }}>
+                {briefpapierUploading ? '⏳ Wird hochgeladen…' : 'Briefpapier hochladen'}
+              </div>
+              <div style={{ color: '#7a8898', fontSize: 12, marginTop: 2 }}>PDF, PNG oder JPG · DIN-A4 empfohlen</div>
+            </div>
+            <input type="file" accept="application/pdf,image/png,image/jpeg" disabled={!canEdit || briefpapierUploading} onChange={e => handleBriefpapier(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
+          </label>
+        )}
+
+        {firma.briefpapier_url && (
+          <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', color: '#fbbf24', fontSize: 12 }}>
+            Hinweis: Bitte nach dem Hochladen auf &bdquo;Firmendaten speichern&ldquo; klicken, damit das Briefpapier dauerhaft verknüpft wird.
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

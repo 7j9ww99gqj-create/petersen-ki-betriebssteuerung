@@ -1,5 +1,13 @@
 // lib/pdf.ts – PDF-Generierung mit jsPDF (dynamic import für Next.js SSR-Kompatibilität)
 
+export type PDFPosition = {
+  id: string
+  beschreibung: string
+  menge: number
+  einheit: string
+  einzelpreis: number
+}
+
 export type PDFRechnung = {
   id: string
   nummer?: string
@@ -15,6 +23,7 @@ export type PDFRechnung = {
   internalReference?: string
   leistungszeitraum_von?: string
   leistungszeitraum_bis?: string
+  positionen?: PDFPosition[]
 }
 
 export type PDFAngebot = {
@@ -25,6 +34,7 @@ export type PDFAngebot = {
   datum: string
   gueltig: string
   status: string
+  positionen?: PDFPosition[]
 }
 
 export type PDFAuftragsbestaetigung = {
@@ -37,6 +47,7 @@ export type PDFAuftragsbestaetigung = {
   status: string
   ab_nummer?: string
   ab_verschickt_am?: string
+  positionen?: PDFPosition[]
 }
 
 export type PDFTemplate = 'modern-dark' | 'classic-light' | 'elegant-minimal' | 'petersen-brand'
@@ -44,6 +55,7 @@ export type PDFTemplate = 'modern-dark' | 'classic-light' | 'elegant-minimal' | 
 export type PDFCompanySettings = {
   firmenname?: string
   logo_url?: string
+  briefpapier_url?: string
   adresse?: string
   plz?: string
   ort?: string
@@ -163,6 +175,255 @@ function parseEuroValue(value: string): number {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DocType = any
+
+// ── Briefpapier helpers ───────────────────────────────────────────────────────
+
+function isBriefpapierPdf(url: string): boolean {
+  return url.toLowerCase().split('?')[0].endsWith('.pdf')
+}
+
+async function loadBriefpapierImageDataUrl(url: string): Promise<string | null> {
+  return loadImageDataUrl(url)
+}
+
+async function loadBriefpapierBytes(url: string): Promise<ArrayBuffer | null> {
+  if (typeof window === 'undefined') return null
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    return res.arrayBuffer()
+  } catch {
+    return null
+  }
+}
+
+async function mergeBriefpapierWithContent(contentBase64: string, briefpapierUrl: string): Promise<Uint8Array | null> {
+  try {
+    const { PDFDocument } = await import('pdf-lib')
+    const briefpapierBytes = await loadBriefpapierBytes(briefpapierUrl)
+    if (!briefpapierBytes) return null
+
+    const contentBytes = Uint8Array.from(atob(contentBase64), c => c.charCodeAt(0))
+    const briefpapierDoc = await PDFDocument.load(briefpapierBytes)
+    const contentDoc = await PDFDocument.load(contentBytes)
+
+    const outputDoc = await PDFDocument.create()
+    const bpPageCount = briefpapierDoc.getPageCount()
+    const contentPageCount = contentDoc.getPageCount()
+
+    for (let i = 0; i < contentPageCount; i++) {
+      const bpIdx = Math.min(i, bpPageCount - 1)
+      const [bpPage] = await outputDoc.copyPages(briefpapierDoc, [bpIdx])
+      outputDoc.addPage(bpPage)
+      const embeddedContent = await outputDoc.embedPage(contentDoc.getPage(i))
+      const page = outputDoc.getPage(outputDoc.getPageCount() - 1)
+      page.drawPage(embeddedContent, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() })
+    }
+
+    return outputDoc.save()
+  } catch {
+    return null
+  }
+}
+
+function formatDocNummer(raw: string, prefix: 'RE' | 'AB' | 'AN'): string {
+  if (/^(RE|AB|AN)-\d{4}-/.test(raw)) return raw
+  const year = new Date().getFullYear()
+  const digits = raw.replace(/\D/g, '').slice(-3).padStart(3, '0') || '001'
+  return `${prefix}-${year}-${digits}`
+}
+
+// Draws the clean minimal content for briefpapier-mode PDFs.
+// Top reserved area: 0–topY (briefpapier header).
+// Bottom reserved area: bottomY–297 (briefpapier footer).
+function drawBriefpapierContent(
+  doc: DocType,
+  opts: {
+    docType: 'RECHNUNG' | 'AUFTRAGSBESTÄTIGUNG' | 'ANGEBOT'
+    docNummer: string
+    kundenName: string
+    introText: string
+    metaRows: [string, string][]
+    positionen: PDFPosition[]
+    nettoVal: number
+    mwstSatz: number
+    steuerVal: number
+    bruttoVal: number
+    summenLabel: string
+    topY?: number
+    bottomY?: number
+  }
+): number {
+  const pageW = 210
+  const margin = 22
+  const topY = opts.topY ?? 50
+  const bottomY = opts.bottomY ?? 252
+  let y = topY
+
+  // Document heading
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(22)
+  doc.setTextColor(18, 26, 42)
+  doc.text(opts.docType, margin, y)
+
+  // Accent underline
+  const titleWidth = doc.getTextWidth(opts.docType)
+  doc.setFillColor(32, 200, 255)
+  doc.rect(margin, y + 2.5, Math.min(titleWidth, 80), 0.8, 'F')
+
+  // Right-side info box
+  const boxW = 72
+  const boxX = pageW - margin - boxW
+  const boxPad = 5
+  const rowH = 7
+  const boxH = opts.metaRows.length * rowH + boxPad * 2
+  doc.setFillColor(248, 250, 253)
+  doc.roundedRect(boxX, topY - 4, boxW, boxH, 2, 2, 'F')
+  doc.setDrawColor(220, 228, 240)
+  doc.setLineWidth(0.3)
+  doc.roundedRect(boxX, topY - 4, boxW, boxH, 2, 2, 'S')
+
+  opts.metaRows.forEach(([label, value], i) => {
+    const rowY = topY + boxPad - 1 + i * rowH
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(120, 138, 160)
+    doc.text(label, boxX + boxPad, rowY)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7.5)
+    doc.setTextColor(22, 32, 52)
+    doc.text(value, boxX + boxW - boxPad, rowY, { align: 'right' })
+  })
+
+  y = Math.max(y + 16, topY + boxH - 4 + 8)
+
+  // Recipient + greeting
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(20, 26, 40)
+  doc.text(opts.kundenName, margin, y)
+  y += 7
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(60, 75, 95)
+  doc.text('Sehr geehrte Damen und Herren,', margin, y)
+  y += 5.5
+
+  const introLines = doc.splitTextToSize(opts.introText, pageW - margin * 2 - boxW - 4) as string[]
+  doc.setTextColor(50, 62, 80)
+  doc.text(introLines, margin, y)
+  y += introLines.length * 4.8 + 6
+
+  // Table
+  const colPos = margin
+  const colDesc = margin + 11
+  const colZeitraum = pageW - margin - 58
+  const colBetrag = pageW - margin
+
+  // Table header
+  doc.setFillColor(16, 24, 40)
+  doc.rect(margin, y, pageW - margin * 2, 9, 'F')
+  doc.setFillColor(32, 200, 255)
+  doc.rect(margin, y, 2.5, 9, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(205, 218, 235)
+  doc.text('Pos.', colPos + 3, y + 6)
+  doc.text('Leistung / Beschreibung', colDesc, y + 6)
+
+  const hasZeitraum = opts.positionen.length === 0 ||
+    opts.docType === 'AUFTRAGSBESTÄTIGUNG' || opts.docType === 'RECHNUNG'
+  if (hasZeitraum) doc.text('Zeitraum', colZeitraum, y + 6)
+  doc.text('Betrag netto', colBetrag, y + 6, { align: 'right' })
+  y += 9
+
+  // Table rows
+  const positions: PDFPosition[] = opts.positionen.length > 0 ? opts.positionen : [{
+    id: '1',
+    beschreibung: opts.docType === 'ANGEBOT' ? 'Leistungspaket' : 'Ausgeführte Leistung',
+    menge: 1,
+    einheit: 'Stk',
+    einzelpreis: opts.nettoVal,
+  }]
+
+  positions.forEach((pos, idx) => {
+    const posNetto = pos.menge * pos.einzelpreis
+    const descLines = doc.splitTextToSize(pos.beschreibung || '–', colZeitraum - colDesc - 4) as string[]
+    const rowHeight = Math.max(8, descLines.length * 4.5 + 5)
+
+    if (idx % 2 === 0) {
+      doc.setFillColor(248, 251, 255)
+    } else {
+      doc.setFillColor(241, 246, 254)
+    }
+    doc.rect(margin, y, pageW - margin * 2, rowHeight, 'F')
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(35, 45, 62)
+    doc.text(String(idx + 1), colPos + 3, y + rowHeight / 2 + 1.5)
+    doc.text(descLines, colDesc, y + rowHeight / 2 - (descLines.length - 1) * 2.25 + 1.5)
+    doc.text(fmtEuro(posNetto), colBetrag, y + rowHeight / 2 + 1.5, { align: 'right' })
+    y += rowHeight
+  })
+
+  // Thin separator
+  doc.setDrawColor(210, 220, 235)
+  doc.setLineWidth(0.3)
+  doc.line(margin, y, pageW - margin, y)
+  y += 6
+
+  // Totals block (right-aligned)
+  const sumW = 72
+  const sumX = pageW - margin - sumW
+
+  const sumRows: [string, string][] = [
+    ['Nettobetrag', fmtEuro(opts.nettoVal)],
+    [`zzgl. ${opts.mwstSatz}% MwSt.`, fmtEuro(opts.steuerVal)],
+  ]
+
+  sumRows.forEach(([label, value], i) => {
+    const ry = y + i * 7
+    doc.setFillColor(i % 2 === 0 ? 246 : 251, i % 2 === 0 ? 249 : 253, 255)
+    doc.rect(sumX, ry - 4, sumW, 7, 'F')
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(95, 112, 132)
+    doc.text(label, sumX + 3, ry)
+    doc.setTextColor(22, 32, 52)
+    doc.text(value, sumX + sumW - 3, ry, { align: 'right' })
+  })
+
+  y += sumRows.length * 7 + 2
+
+  // Total highlight bar
+  doc.setFillColor(16, 24, 40)
+  doc.rect(sumX, y - 4, sumW, 10, 'F')
+  doc.setFillColor(32, 200, 255)
+  doc.rect(sumX, y - 4, 2.5, 10, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  doc.setTextColor(205, 218, 235)
+  doc.text(opts.summenLabel, sumX + 5, y + 2.5)
+  doc.setTextColor(32, 200, 255)
+  doc.text(fmtEuro(opts.bruttoVal), sumX + sumW - 3, y + 2.5, { align: 'right' })
+  y += 16
+
+  // Signature
+  if (y + 16 < bottomY) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(75, 90, 110)
+    doc.text('Mit freundlichen Grüßen', margin, y)
+    y += 6
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(22, 32, 52)
+  }
+
+  return y
+}
 
 // ── Document style helpers ────────────────────────────────────────────────────
 
@@ -690,9 +951,71 @@ function drawFooter(doc: DocType, company: PDFCompanySettings, accent: [number, 
 }
 
 export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: string, returnBase64?: boolean): Promise<string | void> {
+  const company = getCompanySettings()
+
+  // ── Briefpapier-Modus ─────────────────────────────────────────────────────
+  if (company.briefpapier_url) {
+    const { jsPDF } = await import('jspdf')
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const bpUrl = company.briefpapier_url
+    const isPdf = isBriefpapierPdf(bpUrl)
+
+    if (!isPdf) {
+      const imgData = await loadBriefpapierImageDataUrl(bpUrl)
+      if (imgData) { try { doc.addImage(imgData, imageFormat(imgData), 0, 0, 210, 297) } catch {} }
+    }
+
+    const betragRaw = parseEuroValue(rechnung.betrag)
+    const mwstSatz = rechnung.steuer_satz ?? Number(company.standard_mwst ?? 19)
+    const nettoVal = rechnung.netto ?? (rechnung.summe ? rechnung.summe / (1 + mwstSatz / 100) : betragRaw)
+    const steuerVal = rechnung.steuerbetrag ?? (nettoVal * mwstSatz / 100)
+    const bruttoVal = rechnung.summe ?? (nettoVal + steuerVal)
+    const docNummer = formatDocNummer(rechnung.nummer || rechnung.id, 'RE')
+    const metaRows: [string, string][] = [
+      ['Datum:', heuteFormatiert()],
+      ['Rechnungs-Nr.:', docNummer],
+      ['Fällig am:', rechnung.faellig],
+    ]
+    if (rechnung.leistungszeitraum_von && rechnung.leistungszeitraum_bis) {
+      metaRows.push(['Leistungszeit.:', `${rechnung.leistungszeitraum_von} – ${rechnung.leistungszeitraum_bis}`])
+    }
+
+    drawBriefpapierContent(doc, {
+      docType: 'RECHNUNG',
+      docNummer,
+      kundenName,
+      introText: 'vielen Dank für Ihr Vertrauen. Nachfolgend stellen wir Ihnen die folgende Leistung in Rechnung.',
+      metaRows,
+      positionen: rechnung.positionen ?? [],
+      nettoVal,
+      mwstSatz,
+      steuerVal,
+      bruttoVal,
+      summenLabel: 'Gesamtbetrag',
+    })
+
+    if (isPdf) {
+      const contentBase64 = doc.output('datauristring').split(',')[1]
+      const merged = await mergeBriefpapierWithContent(contentBase64, bpUrl)
+      if (merged) {
+        if (returnBase64) return btoa(Array.from(merged, b => String.fromCharCode(b)).join(''))
+        const blob = new Blob([merged.buffer as ArrayBuffer], { type: 'application/pdf' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `Rechnung_${rechnung.nummer || rechnung.id}.pdf`
+        link.click()
+        return
+      }
+    }
+
+    if (returnBase64) return doc.output('datauristring').split(',')[1]
+    doc.save(`Rechnung_${rechnung.nummer || rechnung.id}.pdf`)
+    return
+  }
+  // ── Ende Briefpapier-Modus ────────────────────────────────────────────────
+
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-  const company = getCompanySettings()
   const accent = hexToRgb(company.briefpapier_layout?.akzentfarbe || '#20c8ff')
   const template: PDFTemplate = company.briefpapier_layout?.template ?? 'modern-dark'
   const logoData = await loadImageDataUrl(company.logo_url || (template === 'petersen-brand' ? '/logo.jpg' : undefined))
@@ -898,9 +1221,67 @@ export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: str
 }
 
 export async function generateAuftragsbestaetigungPDF(auftrag: PDFAuftragsbestaetigung, kundenName: string, returnBase64?: boolean): Promise<string | void> {
+  const company = getCompanySettings()
+
+  // ── Briefpapier-Modus ─────────────────────────────────────────────────────
+  if (company.briefpapier_url) {
+    const { jsPDF } = await import('jspdf')
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const bpUrl = company.briefpapier_url
+    const isPdf = isBriefpapierPdf(bpUrl)
+
+    if (!isPdf) {
+      const imgData = await loadBriefpapierImageDataUrl(bpUrl)
+      if (imgData) { try { doc.addImage(imgData, imageFormat(imgData), 0, 0, 210, 297) } catch {} }
+    }
+
+    const nettoVal = parseEuroValue(auftrag.wert)
+    const mwstSatz = Number(company.standard_mwst ?? 19)
+    const steuerVal = nettoVal * (mwstSatz / 100)
+    const bruttoVal = nettoVal + steuerVal
+    const docNummer = formatDocNummer(auftrag.ab_nummer || auftrag.id, 'AB')
+    const metaRows: [string, string][] = [
+      ['Datum:', heuteFormatiert()],
+      ['AB-Nr.:', docNummer],
+      ['Leistungszeit:', [auftrag.start, auftrag.ende].filter(Boolean).join(' – ') || '–'],
+    ]
+
+    drawBriefpapierContent(doc, {
+      docType: 'AUFTRAGSBESTÄTIGUNG',
+      docNummer,
+      kundenName,
+      introText: 'vielen Dank für Ihren Auftrag. Hiermit bestätigen wir die Ausführung der folgenden Leistung.',
+      metaRows,
+      positionen: auftrag.positionen ?? [],
+      nettoVal,
+      mwstSatz,
+      steuerVal,
+      bruttoVal,
+      summenLabel: 'Auftragswert',
+    })
+
+    if (isPdf) {
+      const contentBase64 = doc.output('datauristring').split(',')[1]
+      const merged = await mergeBriefpapierWithContent(contentBase64, bpUrl)
+      if (merged) {
+        if (returnBase64) return btoa(Array.from(merged, b => String.fromCharCode(b)).join(''))
+        const blob = new Blob([merged.buffer as ArrayBuffer], { type: 'application/pdf' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `Auftragsbestaetigung_${auftrag.ab_nummer || auftrag.id}.pdf`
+        link.click()
+        return
+      }
+    }
+
+    if (returnBase64) return doc.output('datauristring').split(',')[1]
+    doc.save(`Auftragsbestaetigung_${auftrag.ab_nummer || auftrag.id}.pdf`)
+    return
+  }
+  // ── Ende Briefpapier-Modus ────────────────────────────────────────────────
+
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-  const company = getCompanySettings()
   const accent = hexToRgb(company.briefpapier_layout?.akzentfarbe || '#20c8ff')
   const template: PDFTemplate = company.briefpapier_layout?.template ?? 'modern-dark'
   const logoData = await loadImageDataUrl(company.logo_url || (template === 'petersen-brand' ? '/logo.jpg' : undefined))
@@ -1070,9 +1451,67 @@ export async function generateAuftragsbestaetigungPDF(auftrag: PDFAuftragsbestae
 }
 
 export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string, returnBase64?: boolean): Promise<string | void> {
+  const company = getCompanySettings()
+
+  // ── Briefpapier-Modus ─────────────────────────────────────────────────────
+  if (company.briefpapier_url) {
+    const { jsPDF } = await import('jspdf')
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const bpUrl = company.briefpapier_url
+    const isPdf = isBriefpapierPdf(bpUrl)
+
+    if (!isPdf) {
+      const imgData = await loadBriefpapierImageDataUrl(bpUrl)
+      if (imgData) { try { doc.addImage(imgData, imageFormat(imgData), 0, 0, 210, 297) } catch {} }
+    }
+
+    const nettoVal = parseEuroValue(angebot.betrag)
+    const mwstSatz = Number(company.standard_mwst ?? 19)
+    const steuerVal = nettoVal * (mwstSatz / 100)
+    const bruttoVal = nettoVal + steuerVal
+    const docNummer = formatDocNummer(angebot.id, 'AN')
+    const metaRows: [string, string][] = [
+      ['Datum:', angebot.datum || heuteFormatiert()],
+      ['Angebots-Nr.:', docNummer],
+      ['Gültig bis:', angebot.gueltig],
+    ]
+
+    drawBriefpapierContent(doc, {
+      docType: 'ANGEBOT',
+      docNummer,
+      kundenName,
+      introText: 'wir freuen uns, Ihnen das folgende Angebot unterbreiten zu dürfen.',
+      metaRows,
+      positionen: angebot.positionen ?? [],
+      nettoVal,
+      mwstSatz,
+      steuerVal,
+      bruttoVal,
+      summenLabel: 'Gesamtbetrag',
+    })
+
+    if (isPdf) {
+      const contentBase64 = doc.output('datauristring').split(',')[1]
+      const merged = await mergeBriefpapierWithContent(contentBase64, bpUrl)
+      if (merged) {
+        if (returnBase64) return btoa(Array.from(merged, b => String.fromCharCode(b)).join(''))
+        const blob = new Blob([merged.buffer as ArrayBuffer], { type: 'application/pdf' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `Angebot_${angebot.id}.pdf`
+        link.click()
+        return
+      }
+    }
+
+    if (returnBase64) return doc.output('datauristring').split(',')[1]
+    doc.save(`Angebot_${angebot.id}.pdf`)
+    return
+  }
+  // ── Ende Briefpapier-Modus ────────────────────────────────────────────────
+
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-  const company = getCompanySettings()
   const accent = hexToRgb(company.briefpapier_layout?.akzentfarbe || '#20c8ff')
   const template: PDFTemplate = company.briefpapier_layout?.template ?? 'modern-dark'
   const logoData = await loadImageDataUrl(company.logo_url || (template === 'petersen-brand' ? '/logo.jpg' : undefined))

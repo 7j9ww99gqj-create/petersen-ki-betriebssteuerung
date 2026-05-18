@@ -532,6 +532,7 @@ export type FirmaEinstellungen = {
   standard_mwst?: number
   standard_waehrung?: string
   dokument_footer?: string
+  briefpapier_url?: string
   briefpapier_layout?: Record<string, unknown>
   onboarding_completed?: boolean
   ai_enabled?: boolean
@@ -618,6 +619,29 @@ export async function uploadFirmenLogo(file: File) {
 }
 
 export async function deleteFirmenLogo(pathOrUrl: string) {
+  const marker = '/object/sign/dokumente/'
+  const path = pathOrUrl.includes(marker)
+    ? decodeURIComponent(pathOrUrl.split(marker)[1]?.split('?')[0] ?? '')
+    : pathOrUrl
+  if (!path) return
+  const { error } = await db().storage.from('dokumente').remove([path])
+  if (error) throw error
+}
+
+export async function uploadBriefpapier(file: File) {
+  const supabase = db()
+  const { data: auth } = await supabase.auth.getUser()
+  const userId = auth.user?.id
+  if (!userId) throw new Error('Kein Benutzer für Briefpapier-Upload gefunden.')
+  const ext = file.name.split('.').pop() || 'pdf'
+  const path = `${userId}/firma/briefpapier_${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('dokumente').upload(path, file, { upsert: true })
+  if (error) throw error
+  const { data } = await supabase.storage.from('dokumente').createSignedUrl(path, 60 * 60 * 24 * 365)
+  return { path, url: data?.signedUrl ?? path }
+}
+
+export async function deleteBriefpapier(pathOrUrl: string) {
   const marker = '/object/sign/dokumente/'
   const path = pathOrUrl.includes(marker)
     ? decodeURIComponent(pathOrUrl.split(marker)[1]?.split('?')[0] ?? '')
