@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Petersen KI – Briefpapier Brand Edition</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: #0a0f1e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 44px 20px 64px;
+    font-family: 'Inter', -apple-system, sans-serif;
+    gap: 24px;
+  }
+
+  .label {
+    color: rgba(100,170,255,0.45);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+
+  /* ═══ A4 ═══════════════════════════════ */
+  .sheet {
+    width: 794px;
+    min-height: 1123px;
+    background: #ffffff;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 1px rgba(32,120,255,0.12),
+      0 24px 80px rgba(0,0,0,0.7),
+      0 64px 160px rgba(0,20,100,0.4);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ═══ HEADER ════════════════════════════ */
+  .header {
+    position: relative;
+    height: 148px;
+    background: #040c1a;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* Deep space background gradient */
+  .hdr-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 80% at 50% -10%, rgba(20,80,220,0.22) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 60% at 50% 50%, rgba(10,50,160,0.12) 0%, transparent 70%),
+      linear-gradient(180deg, #060e1e 0%, #040c18 100%);
+  }
+
+  /* Cloud SVG fills the header */
+  .hdr-clouds {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    width: 100%;
+  }
+
+  /* Top bright accent line */
+  .hdr-top-line {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, #1560e8 20%, #20c8ff 50%, #1560e8 80%, transparent 100%);
+    opacity: 0.6;
+  }
+
+  /* Bottom accent line */
+  .hdr-bottom-line {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, #1560e8 20%, #3399ff 50%, #1560e8 80%, transparent 100%);
+    z-index: 10;
+  }
+
+  /* Header content */
+  .hdr-content {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 44px;
+  }
+
+  /* Logo + Name block */
+  .hdr-brand {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .logo-mark {
+    width: 72px;
+    height: 72px;
+    flex-shrink: 0;
+    filter:
+      drop-shadow(0 0 12px rgba(32,150,255,0.5))
+      drop-shadow(0 0 30px rgba(10,80,220,0.35));
+  }
+
+  .brand-text { display: flex; flex-direction: column; gap: 0; }
+
+  .brand-name {
+    font-size: 30px;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: -0.3px;
+    line-height: 1;
+    text-shadow: 0 0 40px rgba(50,130,255,0.4);
+  }
+  .brand-name .ki {
+    background: linear-gradient(135deg, #5eb0ff 0%, #1e78ff 50%, #20c8ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .brand-sub {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: rgba(180,210,255,0.55);
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    margin-top: 5px;
+  }
+
+  /* Contact right */
+  .hdr-contact {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: right;
+  }
+
+  .hdr-contact-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    font-size: 9.5px;
+    color: rgba(160,200,240,0.7);
+    font-weight: 500;
+  }
+
+  .hdr-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(21,96,232,0.45);
+    border: 1px solid rgba(32,150,255,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .hdr-icon svg { width: 8px; height: 8px; }
+
+  /* ═══ SEPARATOR LINE ═══════════════════ */
+  .sep-line {
+    height: 1.5px;
+    background: linear-gradient(90deg, #1048cc 0%, #3399ff 35%, #20c8ff 50%, #3399ff 65%, #1048cc 100%);
+    flex-shrink: 0;
+  }
+
+  /* ═══ BODY ══════════════════════════════ */
+  .body {
+    flex: 1;
+    padding: 28px 44px 148px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Watermark – very faint cube in body */
+  .watermark {
+    position: absolute;
+    right: 30px;
+    top: 50%;
+    transform: translateY(-52%);
+    opacity: 0.038;
+    pointer-events: none;
+    width: 380px;
+    height: 380px;
+  }
+
+  .sender {
+    font-size: 7.5px;
+    color: #8a9ab5;
+    border-bottom: 0.5px solid #dde4f0;
+    padding-bottom: 7px;
+    margin-bottom: 24px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-color: rgba(21,96,232,0.25);
+  }
+
+  .doc-layout {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    margin-bottom: 20px;
+  }
+
+  .doc-left {}
+  .recipient-name { font-size: 13px; font-weight: 800; color: #0d1a35; margin-bottom: 4px; }
+  .recipient-addr { font-size: 10px; color: #4a5568; line-height: 1.7; margin-bottom: 22px; }
+
+  .doc-title-wrap { margin-bottom: 0; }
+  .doc-title { font-size: 28px; font-weight: 900; color: #060e20; letter-spacing: -0.5px; line-height: 1; }
+  .doc-title-accent {
+    width: 50px; height: 2.5px;
+    background: linear-gradient(90deg, #1560e8, #20c8ff);
+    border-radius: 2px; margin-top: 5px;
+  }
+
+  /* Meta box right */
+  .meta-box {
+    border: 0.5px solid #d0daf0;
+    border-radius: 8px;
+    overflow: hidden;
+    width: 185px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 12px rgba(0,30,100,0.06);
+  }
+  .meta-head {
+    background: #060e20;
+    padding: 7px 12px;
+    font-size: 7px;
+    font-weight: 700;
+    color: rgba(100,180,255,0.6);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .meta-row { padding: 6px 12px; border-bottom: 0.5px solid #edf0f8; display: flex; flex-direction: column; gap: 1px; }
+  .meta-row:last-child { border-bottom: none; }
+  .meta-lbl { font-size: 7px; color: #9ca3af; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .meta-val { font-size: 9px; color: #0d1a35; font-weight: 700; }
+  .meta-val.accent { color: #1560e8; }
+
+  .doc-greeting {
+    font-size: 10px;
+    color: #374151;
+    margin-top: 18px;
+    margin-bottom: 18px;
+    line-height: 1.65;
+  }
+
+  /* Invoice table */
+  .inv-table { width:100%; border-collapse:collapse; font-size:9px; margin-bottom:12px; }
+  .inv-table thead tr { background: #060e20; }
+  .inv-table thead th { padding:9px 10px; color:rgba(180,210,240,0.85); font-size:7.5px; font-weight:700; text-align:left; letter-spacing:0.5px; text-transform:uppercase; }
+  .inv-table thead th:first-child { border-left:2.5px solid #1e78ff; }
+  .inv-table thead th:last-child { text-align:right; }
+  .inv-table tbody tr:nth-child(odd) { background:#f7f9fd; }
+  .inv-table tbody tr:nth-child(even) { background:#fff; }
+  .inv-table tbody td { padding:8px 10px; color:#1f2937; }
+  .inv-table tbody td:last-child { text-align:right; font-weight:700; }
+
+  /* Sums */
+  .sum-wrap { display:flex; justify-content:flex-end; margin-bottom:18px; }
+  .sum-block { width:230px; }
+  .sum-r { display:flex; justify-content:space-between; padding:5px 10px; font-size:9px; color:#4a5568; background:#f4f7fd; margin-bottom:2px; border-radius:2px; }
+  .sum-r.total { background:#060e20; color:#c0d5f0; font-weight:800; font-size:10.5px; border-left:2.5px solid #1e78ff; border-radius:3px; margin-top:4px; }
+  .sum-r.total .amt { color:#20c8ff; }
+
+  /* Payment box */
+  .pay-box { background:#060e20; border-left:3px solid #1560e8; border-radius:6px; padding:12px 16px; margin-bottom:24px; }
+  .pay-title { font-size:9px; font-weight:800; color:#3399ff; margin-bottom:4px; letter-spacing:0.4px; }
+  .pay-text { font-size:8.5px; color:rgba(170,200,240,0.8); line-height:1.6; }
+
+  /* Signature */
+  .sig { margin-top:6px; }
+  .sig-greet { font-size:9.5px; color:#5a6a85; margin-bottom:4px; }
+  .sig-name { font-size:11px; font-weight:900; background: linear-gradient(135deg, #1e78ff, #20c8ff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  .sig-tag { font-size:8px; color:#9ca3af; margin-top:2px; }
+
+  /* ═══ FOOTER ════════════════════════════ */
+  .footer {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 138px;
+    overflow: hidden;
+  }
+
+  .footer-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  /* The diagonal top edge SVG */
+  .footer-shape-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Footer content */
+  .footer-content {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    padding: 20px 44px 12px;
+    gap: 0;
+    height: 100%;
+  }
+
+  .footer-logo-col { display:flex; align-items:center; gap:10px; width:210px; flex-shrink:0; }
+  .footer-logo-mark { width:34px; height:34px; flex-shrink:0; filter: drop-shadow(0 0 6px rgba(32,150,255,0.4)); }
+  .footer-co { display:flex; flex-direction:column; gap:2px; }
+  .footer-co-name { font-size:9px; font-weight:800; color:rgba(255,255,255,0.88); }
+  .footer-co-addr { font-size:7.5px; color:rgba(140,180,230,0.55); line-height:1.5; }
+
+  .footer-div { width:0.5px; height:42px; background:rgba(100,160,255,0.12); margin:0 26px; flex-shrink:0; }
+
+  .footer-contact-col { display:flex; flex-direction:column; gap:5px; flex:1; }
+  .footer-cr { display:flex; align-items:center; gap:7px; font-size:8px; color:rgba(160,200,240,0.6); }
+  .footer-ic { width:13px; height:13px; background:rgba(21,96,232,0.35); border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .footer-ic svg { width:7px; height:7px; }
+
+  .footer-bank-col { display:flex; flex-direction:column; gap:3px; width:195px; flex-shrink:0; }
+  .footer-bank-title { font-size:7.5px; font-weight:800; color:rgba(255,255,255,0.6); margin-bottom:2px; letter-spacing:0.3px; }
+  .footer-bank-row { font-size:7.5px; color:rgba(140,180,220,0.55); line-height:1.55; }
+
+  .footer-bottom-line {
+    position:absolute; bottom:0; left:0; right:0; height:3px; z-index:6;
+    background: linear-gradient(90deg, #1048cc 0%, #1e78ff 35%, #20c8ff 50%, #1e78ff 65%, #1048cc 100%);
+  }
+
+</style>
+</head>
+<body>
+
+<p class="label">Petersen KI Betriebssteuerung — Brand Edition · Inhaber</p>
+
+<!-- ══════════════ A4 SHEET ══════════════ -->
+<div class="sheet">
+
+  <!-- ── HEADER ── -->
+  <div class="header">
+    <div class="hdr-bg"></div>
+
+    <!-- CLOUDS as inline SVG -->
+    <svg class="hdr-clouds" viewBox="0 0 794 148" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="c1" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="14"/>
+        </filter>
+        <filter id="c2" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="9"/>
+        </filter>
+        <filter id="c3" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="6"/>
+        </filter>
+        <radialGradient id="centerGlow" cx="50%" cy="80%" r="50%">
+          <stop offset="0%" stop-color="#1855e8" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="#040c18" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+
+      <!-- Center atmospheric glow -->
+      <ellipse cx="397" cy="148" rx="300" ry="160" fill="url(#centerGlow)"/>
+
+      <!-- LEFT clouds – deep layer -->
+      <g filter="url(#c1)" opacity="0.7">
+        <ellipse cx="95"  cy="165" rx="130" ry="65" fill="#0535c8"/>
+        <ellipse cx="45"  cy="172" rx="90"  ry="55" fill="#0428a8"/>
+        <ellipse cx="155" cy="158" rx="110" ry="52" fill="#0840e0"/>
+        <ellipse cx="20"  cy="168" rx="70"  ry="42" fill="#031888"/>
+      </g>
+      <!-- LEFT clouds – mid layer -->
+      <g filter="url(#c2)" opacity="0.55">
+        <ellipse cx="80"  cy="155" rx="100" ry="48" fill="#0d48e8"/>
+        <ellipse cx="130" cy="148" rx="85"  ry="38" fill="#1050f0"/>
+        <ellipse cx="40"  cy="160" rx="65"  ry="36" fill="#0838c0"/>
+      </g>
+      <!-- LEFT clouds – bright top highlights -->
+      <g filter="url(#c3)" opacity="0.35">
+        <ellipse cx="90"  cy="142" rx="70"  ry="30" fill="#2070ff"/>
+        <ellipse cx="140" cy="138" rx="55"  ry="22" fill="#1868f8"/>
+        <ellipse cx="55"  cy="148" rx="45"  ry="20" fill="#1555e8"/>
+      </g>
+
+      <!-- RIGHT clouds – deep layer -->
+      <g filter="url(#c1)" opacity="0.65">
+        <ellipse cx="700" cy="165" rx="125" ry="62" fill="#0535c8"/>
+        <ellipse cx="750" cy="170" rx="88"  ry="52" fill="#0428a8"/>
+        <ellipse cx="640" cy="158" rx="105" ry="50" fill="#0640d8"/>
+        <ellipse cx="775" cy="167" rx="68"  ry="40" fill="#031888"/>
+      </g>
+      <!-- RIGHT clouds – mid layer -->
+      <g filter="url(#c2)" opacity="0.5">
+        <ellipse cx="714" cy="155" rx="95"  ry="46" fill="#0d48e8"/>
+        <ellipse cx="662" cy="148" rx="80"  ry="36" fill="#0e50f0"/>
+        <ellipse cx="755" cy="158" rx="62"  ry="34" fill="#0838c0"/>
+      </g>
+      <!-- RIGHT clouds – bright top highlights -->
+      <g filter="url(#c3)" opacity="0.3">
+        <ellipse cx="704" cy="142" rx="65"  ry="28" fill="#2070ff"/>
+        <ellipse cx="652" cy="138" rx="52"  ry="21" fill="#1868f8"/>
+        <ellipse cx="748" cy="146" rx="42"  ry="19" fill="#1555e8"/>
+      </g>
+    </svg>
+
+    <div class="hdr-top-line"></div>
+    <div class="hdr-bottom-line"></div>
+
+    <div class="hdr-content">
+      <!-- Brand left -->
+      <div class="hdr-brand">
+
+        <!-- 3D Hex Cube Logo Mark SVG -->
+        <svg class="logo-mark" viewBox="0 0 100 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <!-- Top face gradient: white → bright blue -->
+            <linearGradient id="LT" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%"   stop-color="#d0e8ff"/>
+              <stop offset="35%"  stop-color="#6ab0ff"/>
+              <stop offset="100%" stop-color="#1555e8"/>
+            </linearGradient>
+            <!-- Left face: dark navy -->
+            <linearGradient id="LL" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%"   stop-color="#05194a"/>
+              <stop offset="100%" stop-color="#0a2878"/>
+            </linearGradient>
+            <!-- Right face: medium blue -->
+            <linearGradient id="LR" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%"   stop-color="#1048cc"/>
+              <stop offset="100%" stop-color="#1e6aff"/>
+            </linearGradient>
+            <!-- Inner top face -->
+            <linearGradient id="IT" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%"   stop-color="#0a1e58"/>
+              <stop offset="100%" stop-color="#040c28"/>
+            </linearGradient>
+            <!-- Edge glow -->
+            <filter id="edgeGlow">
+              <feGaussianBlur stdDeviation="1.5" result="blur"/>
+              <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+            </filter>
+          </defs>
+
+          <!-- ── OUTER SHELL ── isometric hex prism
+               Top vertex:     50, 6
+               Right vertex:   90, 28
+               Bottom-right:   90, 72
+               Bottom vertex:  50, 94
+               Bottom-left:    10, 72
+               Top-left:       10, 28
+               Center mid:     50, 50
+          -->
+          <!-- TOP outer face (rhombus) -->
+          <polygon points="50,6  90,28  50,50  10,28" fill="url(#LT)"/>
+          <!-- LEFT outer face -->
+          <polygon points="10,28  50,50  50,94  10,72" fill="url(#LL)"/>
+          <!-- RIGHT outer face -->
+          <polygon points="90,28  90,72  50,94  50,50" fill="url(#LR)"/>
+
+          <!-- ── INNER VOID (hollow frame effect) ──
+               Inner hex 55% scale, centered at 50,50
+               iTop:   50,24   iTopR: 77,38   iBotR: 77,62   iBot: 50,76   iBotL: 23,62   iTopL: 23,38
+          -->
+          <!-- Inner TOP face – dark, showing depth -->
+          <polygon points="50,24  77,38  50,52  23,38" fill="#030a1e" opacity="0.95"/>
+          <!-- Inner LEFT face -->
+          <polygon points="23,38  50,52  50,76  23,62" fill="#020814" opacity="0.92"/>
+          <!-- Inner RIGHT face -->
+          <polygon points="77,38  77,62  50,76  50,52" fill="#060e2a" opacity="0.9"/>
+
+          <!-- ── FLOATING INNER CUBE (in the void) ──
+               Small cube: 32% scale centered at 50,50
+               sTop: 50,33  sR: 67,42  sBotR: 67,58  sBot: 50,67  sBotL: 33,58  sTopL: 33,42
+          -->
+          <polygon points="50,33  67,42  50,51  33,42" fill="url(#LT)" opacity="0.9"/>
+          <polygon points="33,42  50,51  50,67  33,58" fill="url(#LL)" opacity="0.85"/>
+          <polygon points="67,42  67,58  50,67  50,51" fill="url(#LR)" opacity="0.88"/>
+
+          <!-- Edge highlight lines -->
+          <line x1="50" y1="6"  x2="50" y2="24" stroke="rgba(200,230,255,0.6)" stroke-width="0.8"/>
+          <line x1="10" y1="28" x2="23" y2="38" stroke="rgba(200,230,255,0.3)" stroke-width="0.6"/>
+          <line x1="90" y1="28" x2="77" y2="38" stroke="rgba(200,230,255,0.3)" stroke-width="0.6"/>
+          <!-- Bottom frame edges -->
+          <line x1="50" y1="76" x2="50" y2="94" stroke="rgba(100,150,220,0.3)" stroke-width="0.6"/>
+          <line x1="23" y1="62" x2="10" y2="72" stroke="rgba(100,150,220,0.2)" stroke-width="0.6"/>
+          <line x1="77" y1="62" x2="90" y2="72" stroke="rgba(100,150,220,0.2)" stroke-width="0.6"/>
+          <!-- Inner cube edges -->
+          <line x1="50" y1="33" x2="50" y2="51" stroke="rgba(150,200,255,0.25)" stroke-width="0.5"/>
+        </svg>
+
+        <div class="brand-text">
+          <div class="brand-name">Petersen <span class="ki">KI</span></div>
+          <div class="brand-sub">Betriebssteuerung</div>
+        </div>
+      </div>
+
+      <!-- Contact right -->
+      <div class="hdr-contact">
+        <div class="hdr-contact-row">
+          Musterstraße 12, 20095 Hamburg
+          <div class="hdr-icon">
+            <svg viewBox="0 0 8 8" fill="none"><path d="M4 0.5C2.6 0.5 1.5 1.6 1.5 3C1.5 4.9 4 7.5 4 7.5S6.5 4.9 6.5 3C6.5 1.6 5.4.5 4 .5ZM4 4C3.4 4 3 3.6 3 3S3.4 2 4 2 5 2.4 5 3 4.6 4 4 4Z" fill="rgba(140,200,255,0.8)"/></svg>
+          </div>
+        </div>
+        <div class="hdr-contact-row">
+          info@petersen-ki-pilot.de
+          <div class="hdr-icon">
+            <svg viewBox="0 0 8 8" fill="none"><rect x="1" y="2" width="6" height="4" rx="0.5" stroke="rgba(140,200,255,0.8)" stroke-width="0.7"/><path d="M1 2.5L4 4.5L7 2.5" stroke="rgba(140,200,255,0.8)" stroke-width="0.7"/></svg>
+          </div>
+        </div>
+        <div class="hdr-contact-row">
+          petersen-ki-pilot.de
+          <div class="hdr-icon">
+            <svg viewBox="0 0 8 8" fill="none"><circle cx="4" cy="4" r="3" stroke="rgba(140,200,255,0.8)" stroke-width="0.7"/><path d="M4 1C4 1 2.5 2.5 2.5 4C2.5 5.5 4 7 4 7" stroke="rgba(140,200,255,0.8)" stroke-width="0.7"/><path d="M4 1C4 1 5.5 2.5 5.5 4C5.5 5.5 4 7 4 7" stroke="rgba(140,200,255,0.8)" stroke-width="0.7"/><line x1="1.2" y1="4" x2="6.8" y2="4" stroke="rgba(140,200,255,0.8)" stroke-width="0.7"/></svg>
+          </div>
+        </div>
+        <div class="hdr-contact-row" style="opacity:.6; font-size:8.5px;">
+          USt-ID: DE123456789
+          <div class="hdr-icon" style="background:rgba(10,50,160,0.3);">
+            <svg viewBox="0 0 8 8" fill="none"><text x="1" y="6.5" font-size="5" fill="rgba(140,200,255,0.8)" font-family="sans-serif" font-weight="bold">§</text></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /header -->
+
+  <!-- SEPARATOR LINE -->
+  <div class="sep-line"></div>
+
+  <!-- ── BODY ── -->
+  <div class="body">
+
+    <!-- Watermark -->
+    <svg class="watermark" viewBox="0 0 380 380" fill="none">
+      <polygon points="190,20 340,105 340,275 190,360 40,275 40,105" fill="#1044cc"/>
+      <polygon points="190,60 305,125 305,255 190,320 75,255 75,125" fill="transparent" stroke="#1044cc" stroke-width="3"/>
+    </svg>
+
+    <div class="sender">Petersen KI GmbH · Musterstraße 12 · 20095 Hamburg</div>
+
+    <!-- Doc layout: left content + right meta -->
+    <div class="doc-layout">
+      <div class="doc-left">
+        <div class="recipient-name">Musterfirma GmbH</div>
+        <div class="recipient-addr">z. Hd. Max Mustermann<br>Beispielstraße 42<br>10115 Berlin</div>
+        <div class="doc-title-wrap">
+          <div class="doc-title">RECHNUNG</div>
+          <div class="doc-title-accent"></div>
+        </div>
+      </div>
+      <div class="meta-box">
+        <div class="meta-head">Dokumentinfo</div>
+        <div class="meta-row"><span class="meta-lbl">Datum</span><span class="meta-val">18.05.2026</span></div>
+        <div class="meta-row"><span class="meta-lbl">Rechnungs-Nr.</span><span class="meta-val accent">RE-2026-001</span></div>
+        <div class="meta-row"><span class="meta-lbl">Fällig am</span><span class="meta-val">01.06.2026</span></div>
+        <div class="meta-row"><span class="meta-lbl">Zahlungsziel</span><span class="meta-val">14 Tage</span></div>
+        <div class="meta-row"><span class="meta-lbl">Status</span><span class="meta-val">Erstellt</span></div>
+      </div>
+    </div>
+
+    <div class="doc-greeting">vielen Dank für Ihr Vertrauen. Nachfolgend stellen wir Ihnen die folgende Leistung in Rechnung:</div>
+
+    <table class="inv-table">
+      <thead><tr>
+        <th style="width:30px">Pos.</th>
+        <th>Bezeichnung / Leistung</th>
+        <th style="width:50px">Menge</th>
+        <th style="width:78px">Einzelpreis</th>
+        <th style="width:80px">Betrag netto</th>
+      </tr></thead>
+      <tbody><tr>
+        <td>1</td>
+        <td>Petersen KI Betriebssoftware – monatliches Abonnement</td>
+        <td>1</td>
+        <td>149,00 €</td>
+        <td>149,00 €</td>
+      </tr></tbody>
+    </table>
+
+    <div class="sum-wrap">
+      <div class="sum-block">
+        <div class="sum-r"><span>Nettobetrag</span><span>149,00 €</span></div>
+        <div class="sum-r"><span>zzgl. 19 % MwSt.</span><span>28,31 €</span></div>
+        <div class="sum-r total"><span>Gesamtbetrag</span><span class="amt">177,31 €</span></div>
+      </div>
+    </div>
+
+    <div class="pay-box">
+      <div class="pay-title">Zahlungshinweis</div>
+      <div class="pay-text">
+        Bitte überweisen Sie <strong style="color:#fff">177,31 €</strong> bis zum <strong style="color:#fff">01.06.2026</strong>.<br>
+        Musterbank · IBAN DE02 1203 0000 0000 2020 51 · BIC MUSTDEHHXXX · Verwendungszweck: RE-2026-001
+      </div>
+    </div>
+
+    <div class="sig">
+      <div class="sig-greet">Mit freundlichen Grüßen</div>
+      <div class="sig-name">Petersen KI Betriebssteuerung</div>
+      <div class="sig-tag">Digitale Betriebssteuerung für moderne Unternehmen</div>
+    </div>
+
+  </div><!-- /body -->
+
+  <!-- ── FOOTER ── -->
+  <div class="footer">
+    <!-- Dark bg with diagonal cut + cloud effects -->
+    <svg class="footer-shape-svg" viewBox="0 0 794 138" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="fc1" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="11"/></filter>
+        <filter id="fc2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7"/></filter>
+        <filter id="fc3" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>
+      </defs>
+      <!-- Base dark shape with diagonal cut -->
+      <polygon points="0,38 794,0 794,138 0,138" fill="#040c1a"/>
+      <!-- Left footer clouds -->
+      <g filter="url(#fc1)" opacity="0.6">
+        <ellipse cx="85"  cy="135" rx="110" ry="55" fill="#0535c8"/>
+        <ellipse cx="40"  cy="142" rx="75"  ry="45" fill="#0428a8"/>
+        <ellipse cx="135" cy="128" rx="90"  ry="42" fill="#0640d8"/>
+      </g>
+      <g filter="url(#fc2)" opacity="0.4">
+        <ellipse cx="75"  cy="122" rx="80"  ry="35" fill="#0d48e8"/>
+        <ellipse cx="120" cy="115" rx="65"  ry="28" fill="#1050f0"/>
+      </g>
+      <g filter="url(#fc3)" opacity="0.25">
+        <ellipse cx="80"  cy="112" rx="55"  ry="22" fill="#2070ff"/>
+        <ellipse cx="125" cy="108" rx="42"  ry="17" fill="#1868f8"/>
+      </g>
+      <!-- Right footer clouds -->
+      <g filter="url(#fc1)" opacity="0.5">
+        <ellipse cx="710" cy="135" rx="105" ry="50" fill="#0535c8"/>
+        <ellipse cx="755" cy="140" rx="72"  ry="42" fill="#0428a8"/>
+        <ellipse cx="660" cy="127" rx="85"  ry="40" fill="#0640d8"/>
+      </g>
+      <g filter="url(#fc2)" opacity="0.35">
+        <ellipse cx="700" cy="122" rx="75"  ry="32" fill="#0d48e8"/>
+        <ellipse cx="655" cy="115" rx="60"  ry="26" fill="#0e50f0"/>
+      </g>
+    </svg>
+
+    <div class="footer-bottom-line"></div>
+
+    <div class="footer-content">
+      <!-- Logo col -->
+      <div class="footer-logo-col">
+        <svg class="footer-logo-mark" viewBox="0 0 100 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="FT" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#90c0ff"/><stop offset="100%" stop-color="#1a5ae0"/></linearGradient>
+            <linearGradient id="FL" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#05194a"/><stop offset="100%" stop-color="#0a2878"/></linearGradient>
+            <linearGradient id="FR" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1048cc"/><stop offset="100%" stop-color="#1e6aff"/></linearGradient>
+          </defs>
+          <polygon points="50,6  90,28  50,50  10,28" fill="url(#FT)"/>
+          <polygon points="10,28 50,50  50,94  10,72" fill="url(#FL)"/>
+          <polygon points="90,28 90,72  50,94  50,50" fill="url(#FR)"/>
+          <polygon points="50,24  77,38  50,52  23,38" fill="#030a1e" opacity="0.9"/>
+          <polygon points="23,38  50,52  50,76  23,62" fill="#020814" opacity="0.88"/>
+          <polygon points="77,38  77,62  50,76  50,52" fill="#060e2a" opacity="0.85"/>
+          <polygon points="50,33  67,42  50,51  33,42" fill="url(#FT)" opacity="0.85"/>
+          <polygon points="33,42  50,51  50,67  33,58" fill="url(#FL)" opacity="0.8"/>
+          <polygon points="67,42  67,58  50,67  50,51" fill="url(#FR)" opacity="0.82"/>
+        </svg>
+        <div class="footer-co">
+          <div class="footer-co-name">Petersen KI GmbH</div>
+          <div class="footer-co-addr">Musterstraße 12<br>20095 Hamburg</div>
+        </div>
+      </div>
+
+      <div class="footer-div"></div>
+
+      <div class="footer-contact-col">
+        <div class="footer-cr">
+          <div class="footer-ic"><svg viewBox="0 0 7 7" fill="none"><path d="M1 1.5H2.5L3 3.5L2.25 4C2.6 4.75 3.25 5.4 4 5.75L4.75 5L6.5 5.5V7C5 7.25 0.75 4.75 1 1.5Z" fill="rgba(120,190,255,0.7)"/></svg></div>
+          +49 123 456789-0
+        </div>
+        <div class="footer-cr">
+          <div class="footer-ic"><svg viewBox="0 0 7 7" fill="none"><rect x="0.5" y="1.5" width="6" height="4" rx="0.5" stroke="rgba(120,190,255,0.7)" stroke-width="0.7"/><path d="M0.5 2L3.5 4L6.5 2" stroke="rgba(120,190,255,0.7)" stroke-width="0.7"/></svg></div>
+          info@petersen-ki-pilot.de
+        </div>
+        <div class="footer-cr">
+          <div class="footer-ic"><svg viewBox="0 0 7 7" fill="none"><circle cx="3.5" cy="3.5" r="3" stroke="rgba(120,190,255,0.7)" stroke-width="0.6"/><ellipse cx="3.5" cy="3.5" rx="1.3" ry="3" stroke="rgba(120,190,255,0.7)" stroke-width="0.6"/><line x1="0.6" y1="3.5" x2="6.4" y2="3.5" stroke="rgba(120,190,255,0.7)" stroke-width="0.6"/></svg></div>
+          petersen-ki-pilot.de
+        </div>
+      </div>
+
+      <div class="footer-div"></div>
+
+      <div class="footer-bank-col">
+        <div class="footer-bank-title">Bankverbindung</div>
+        <div class="footer-bank-row">Musterbank</div>
+        <div class="footer-bank-row">IBAN: DE02 1203 0000 0000 2020 51</div>
+        <div class="footer-bank-row">BIC: MUSTDEHHXXX</div>
+        <div class="footer-bank-row" style="margin-top:3px; color:rgba(100,150,220,0.3); font-size:7px;">Seite 1 · 18.05.2026</div>
+      </div>
+    </div>
+  </div><!-- /footer -->
+
+</div><!-- /sheet -->
+
+</body>
+</html>
