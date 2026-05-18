@@ -404,7 +404,7 @@ const labelStyle: React.CSSProperties = { display: 'block', fontSize: 12, color:
 
 // ── Kunden-Tab ──────────────────────────────────────────────────────────────
 
-function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftraege: Auftrag[]; rechnungen: Rechnung[] }) {
+function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolean; auftraege: Auftrag[]; rechnungen: Rechnung[]; angebote: Angebot[] }) {
   const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -415,6 +415,7 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
   const [loadError, setLoadError] = useState('')
   const [retryKey, setRetryKey] = useState(0)
   const [form, setForm] = useState({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '' })
+  const [cockpitTab, setCockpitTab] = useState<'angebote' | 'auftraege' | 'rechnungen'>('auftraege')
 
   useEffect(() => {
     if (isDemo) return
@@ -475,83 +476,118 @@ function KundenTab({ isDemo, auftraege, rechnungen }: { isDemo: boolean; auftrae
   )
 
   if (selected) {
+    const matchKunde = (item: { kunde_id?: string; kunde?: string }) =>
+      (item.kunde_id && item.kunde_id === selected.id) || item.kunde === selected.name
+    const kundAngebote = angebote.filter(matchKunde)
+    const kundAuftraege = auftraege.filter(matchKunde)
+    const kundRechnungen = rechnungen.filter(matchKunde)
+    const umsatzBezahlt = kundRechnungen
+      .filter(r => r.status === 'Bezahlt')
+      .reduce((s, r) => s + parseBetrag(r.betrag), 0)
+    const offeneReCount = kundRechnungen.filter(r => r.status !== 'Bezahlt').length
+
     return (
       <div className="fade-in">
         <Toast msg={toast} error={toastError} />
-        <button className="pk-btn-ghost" onClick={() => setSelected(null)} style={{ marginBottom: 20, fontSize: 13 }}>
+        <button className="pk-btn-ghost" onClick={() => setSelected(null)} style={{ marginBottom: 16, fontSize: 13 }}>
           ← Zurück zur Übersicht
         </button>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div className="pk-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(32,200,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
-                {selected.typ === 'Firma' ? '🏢' : '👤'}
-              </div>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 18 }}>{selected.name}</div>
-                <div style={{ color: '#aeb9c8', fontSize: 13 }}>{selected.id} · {selected.typ}</div>
-              </div>
-              <span className={`badge ${selected.status === 'Aktiv' ? 'badge-green' : 'badge-gray'}`} style={{ marginLeft: 'auto' }}>
-                {selected.status}
-              </span>
+
+        {/* Cockpit Header */}
+        <div className="pk-card" style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(32,200,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+              {selected.typ === 'Firma' ? '🏢' : '👤'}
             </div>
-            <div style={{ display: 'grid', gap: 12 }}>
-              {[
-                { label: 'Ansprechpartner', value: selected.ansprechpartner, icon: '👤' },
-                { label: 'E-Mail', value: selected.email, icon: '✉️' },
-                { label: 'Telefon', value: selected.telefon, icon: '📞' },
-                { label: 'Standort', value: selected.ort, icon: '📍' },
-                { label: 'Gesamtumsatz', value: selected.umsatz, icon: '💶' },
-              ].map(r => (
-                <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-                  <span style={{ fontSize: 16, width: 24 }}>{r.icon}</span>
-                  <div>
-                    <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>{r.label}</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{r.value}</div>
-                  </div>
-                </div>
-              ))}
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <div style={{ fontWeight: 900, fontSize: 18 }}>{selected.name}</div>
+              <div style={{ color: '#aeb9c8', fontSize: 13 }}>{selected.id} · {selected.typ} · {selected.ort}</div>
+              <div style={{ color: '#aeb9c8', fontSize: 12, marginTop: 2 }}>{selected.ansprechpartner} · {selected.email} · {selected.telefon}</div>
             </div>
-            <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
-              <button className="pk-btn" style={{ fontSize: 13 }}>✉️ E-Mail senden</button>
-              <button className="pk-btn-ghost" style={{ fontSize: 13 }}>📋 Angebot erstellen</button>
-            </div>
+            <span className={`badge ${selected.status === 'Aktiv' ? 'badge-green' : 'badge-gray'}`}>{selected.status}</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="pk-card">
-              <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 800, color: '#aeb9c8', textTransform: 'uppercase', letterSpacing: '.06em' }}>Letzte Aufträge</h4>
-              {auftraege.filter(a => a.kunde === selected.name).slice(0, 3).map(a => (
-                <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{a.id}</div>
-                    <div style={{ color: '#aeb9c8', fontSize: 12 }}>{a.beschreibung}</div>
-                  </div>
-                  <StatusBadgeAuftrag status={a.status} />
-                </div>
-              ))}
-              {auftraege.filter(a => a.kunde === selected.name).length === 0 && (
-                <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine Aufträge vorhanden</div>
-              )}
-            </div>
-            <div className="pk-card">
-              <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 800, color: '#aeb9c8', textTransform: 'uppercase', letterSpacing: '.06em' }}>Offene Rechnungen</h4>
-              {rechnungen.filter(r => r.kunde === selected.name && r.status !== 'Bezahlt').map(r => (
-                <div key={r.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{r.nummer || r.id}</div>
-                    <div style={{ color: '#aeb9c8', fontSize: 12 }}>Fällig: {r.faellig}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{r.betrag}</div>
-                    <StatusBadgeRechnung status={r.status} />
-                  </div>
-                </div>
-              ))}
-              {rechnungen.filter(r => r.kunde === selected.name && r.status !== 'Bezahlt').length === 0 && (
-                <div style={{ color: '#aeb9c8', fontSize: 13 }}>Alle Rechnungen beglichen ✅</div>
-              )}
-            </div>
+          {/* KPI-Zeile */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginTop: 16 }}>
+            {[
+              { label: 'Umsatz (bezahlt)', value: umsatzBezahlt.toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' €', color: '#25d366' },
+              { label: 'Angebote', value: String(kundAngebote.length), color: '#1684ff' },
+              { label: 'Aufträge', value: String(kundAuftraege.length), color: '#20c8ff' },
+              { label: 'Offene Rechnungen', value: String(offeneReCount), color: offeneReCount > 0 ? '#f59e0b' : '#aeb9c8' },
+            ].map(k => (
+              <div key={k.label} style={{ background: 'rgba(255,255,255,.04)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ fontWeight: 900, fontSize: 16, color: k.color }}>{k.value}</div>
+                <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{k.label}</div>
+              </div>
+            ))}
           </div>
+        </div>
+
+        {/* Cockpit Tabs */}
+        <div className="pk-tab-bar" style={{ marginBottom: 14 }}>
+          {([['auftraege', `Aufträge (${kundAuftraege.length})`], ['angebote', `Angebote (${kundAngebote.length})`], ['rechnungen', `Rechnungen (${kundRechnungen.length})`]] as const).map(([t, label]) => (
+            <button key={t} onClick={() => setCockpitTab(t)}
+              className={cockpitTab === t ? 'pk-btn' : 'pk-btn-ghost'}
+              style={{ fontSize: 13, padding: '8px 14px' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="pk-card" style={{ padding: 0 }}>
+          {cockpitTab === 'angebote' && (
+            <table className="pk-table">
+              <thead><tr><th>Nr.</th><th>Titel</th><th>Betrag</th><th>Datum</th><th>Status</th></tr></thead>
+              <tbody>
+                {kundAngebote.length === 0 ? (
+                  <tr><td colSpan={5} style={{ color: '#aeb9c8', textAlign: 'center', padding: 24 }}>Keine Angebote vorhanden</td></tr>
+                ) : kundAngebote.map(a => (
+                  <tr key={a.id}>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#aeb9c8' }}>{a.nummer || a.id}</td>
+                    <td style={{ fontWeight: 600 }}>{a.titel}</td>
+                    <td style={{ fontWeight: 700, color: '#20c8ff' }}>{a.betrag}</td>
+                    <td style={{ color: '#aeb9c8' }}>{a.datum}</td>
+                    <td><StatusBadgeAngebot status={a.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {cockpitTab === 'auftraege' && (
+            <table className="pk-table">
+              <thead><tr><th>Nr.</th><th>Beschreibung</th><th>Wert</th><th>Zeitraum</th><th>Status</th></tr></thead>
+              <tbody>
+                {kundAuftraege.length === 0 ? (
+                  <tr><td colSpan={5} style={{ color: '#aeb9c8', textAlign: 'center', padding: 24 }}>Keine Aufträge vorhanden</td></tr>
+                ) : kundAuftraege.map(a => (
+                  <tr key={a.id}>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#aeb9c8' }}>{a.id}</td>
+                    <td style={{ fontWeight: 600 }}>{a.beschreibung}</td>
+                    <td style={{ fontWeight: 700, color: '#20c8ff' }}>{a.wert}</td>
+                    <td style={{ color: '#aeb9c8', fontSize: 12 }}>{a.start} – {a.ende}</td>
+                    <td><StatusBadgeAuftrag status={a.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {cockpitTab === 'rechnungen' && (
+            <table className="pk-table">
+              <thead><tr><th>Nr.</th><th>Betrag</th><th>Erstellt</th><th>Fällig</th><th>Status</th></tr></thead>
+              <tbody>
+                {kundRechnungen.length === 0 ? (
+                  <tr><td colSpan={5} style={{ color: '#aeb9c8', textAlign: 'center', padding: 24 }}>Keine Rechnungen vorhanden</td></tr>
+                ) : kundRechnungen.map(r => (
+                  <tr key={r.id}>
+                    <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#aeb9c8' }}>{r.nummer || r.id}</td>
+                    <td style={{ fontWeight: 700, color: '#20c8ff' }}>{r.betrag}</td>
+                    <td style={{ color: '#aeb9c8' }}>{r.erstellt}</td>
+                    <td style={{ color: '#aeb9c8' }}>{r.faellig}</td>
+                    <td><StatusBadgeRechnung status={r.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     )
@@ -3464,7 +3500,7 @@ export default function BueroPilotPage() {
 
       <TabBar tab={tab} setTab={setTab} />
 
-      {tab === 'kunden' && <KundenTab isDemo={isDemo} auftraege={auftraege} rechnungen={sharedRechnungen} />}
+      {tab === 'kunden' && <KundenTab isDemo={isDemo} auftraege={auftraege} rechnungen={sharedRechnungen} angebote={angebote} />}
       {tab === 'angebote' && <AngeboteTab isDemo={isDemo} kunden={kunden} auftraege={auftraege} setAuftraege={setAuftraege} initialFilterStatus={searchParams.get('filter') ?? undefined} isOwner={isOwner} setTab={setTab} setRechnungen={setSharedRechnungen} />}
       {tab === 'auftraege' && <AuftraegeTab isDemo={isDemo} auftraege={auftraege} setAuftraege={setAuftraege} kunden={kunden} setTab={setTab} setRechnungen={setSharedRechnungen} setMailTarget={setSharedMailTarget} />}
       {tab === 'rechnungen' && <RechnungenTab isDemo={isDemo} kunden={kunden} initialFilterStatus={searchParams.get('filter') ?? undefined} sharedRechnungen={sharedRechnungen} setSharedRechnungen={setSharedRechnungen} sharedMailTarget={sharedMailTarget} setSharedMailTarget={setSharedMailTarget} />}
