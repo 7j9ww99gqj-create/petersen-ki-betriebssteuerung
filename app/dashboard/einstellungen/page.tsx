@@ -24,6 +24,7 @@ import {
 import { PricingSettingsPage } from '@/components/billing/PricingSettingsPage'
 import { OwnerAiControlPanel } from '@/components/billing/OwnerAiControlPanel'
 import { OwnerCustomerControlPanel } from '@/components/billing/OwnerCustomerControlPanel'
+import { OwnerOpenAiCostsPanel } from '@/components/billing/OwnerOpenAiCostsPanel'
 import type { PilotId } from '@/lib/pricingConfig'
 import { isPushSupported, subscribeToPush, unsubscribeFromPush, getCurrentPushSubscription } from '@/lib/push'
 
@@ -764,6 +765,7 @@ export default function EinstellungenPage() {
           {section === 'kundensteuerung' && (
             <div style={{ display: 'grid', gap: 16 }}>
               <OwnerAiControlPanel enabled={isInhaberAccount} showToast={showToast} />
+              <OwnerOpenAiCostsPanel enabled={isInhaberAccount} />
               <OwnerCustomerControlPanel enabled={isInhaberAccount} showToast={showToast} />
             </div>
           )}
