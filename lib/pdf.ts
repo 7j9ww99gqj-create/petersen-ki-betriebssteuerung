@@ -391,7 +391,7 @@ function drawBriefpapierContent(
 
   const sumRows: [string, string][] = [
     ['Nettobetrag', fmtEuro(opts.nettoVal)],
-    [`zzgl. ${opts.mwstSatz}% MwSt.`, fmtEuro(opts.steuerVal)],
+    [`inkl. ${opts.mwstSatz}% MwSt.`, fmtEuro(opts.steuerVal)],
   ]
 
   sumRows.forEach(([label, value], i) => {
@@ -1255,10 +1255,10 @@ export async function generateAuftragsbestaetigungPDF(auftrag: PDFAuftragsbestae
       if (imgData) { try { doc.addImage(imgData, imageFormat(imgData), 0, 0, 210, 297) } catch {} }
     }
 
-    const nettoVal = parseEuroValue(auftrag.wert)
+    const bruttoVal = parseEuroValue(auftrag.wert)
     const mwstSatz = Number(company.standard_mwst ?? 19)
-    const steuerVal = nettoVal * (mwstSatz / 100)
-    const bruttoVal = nettoVal + steuerVal
+    const nettoVal = Number((bruttoVal / (1 + mwstSatz / 100)).toFixed(2))
+    const steuerVal = Number((bruttoVal - nettoVal).toFixed(2))
     const docNummer = formatDocNummer(auftrag.ab_nummer || auftrag.id, 'AB')
     const metaRows: [string, string][] = [
       ['Datum:', heuteFormatiert()],
@@ -1392,18 +1392,19 @@ export async function generateAuftragsbestaetigungPDF(auftrag: PDFAuftragsbestae
   doc.text('1', margin + 4, rowY + 7)
   doc.text(beschreibung, margin + 16, rowY + 7)
   doc.text([auftrag.start, auftrag.ende].filter(Boolean).join(' – ') || '-', pageW - margin - 64, rowY + 7)
-  const nettoVal = parseEuroValue(auftrag.wert)
-  doc.text(fmtEuro(nettoVal), pageW - margin - 3, rowY + 7, { align: 'right' })
+  const bruttoAuftrag = parseEuroValue(auftrag.wert)
+  doc.text(fmtEuro(bruttoAuftrag), pageW - margin - 3, rowY + 7, { align: 'right' })
 
   const mwstSatz = Number(company.standard_mwst ?? 19)
-  const mwst = nettoVal * (mwstSatz / 100)
-  const brutto = nettoVal + mwst
+  const nettoVal = Number((bruttoAuftrag / (1 + mwstSatz / 100)).toFixed(2))
+  const mwst = Number((bruttoAuftrag - nettoVal).toFixed(2))
+  const brutto = bruttoAuftrag
   const sumY = rowY + rowH + 3
   const sumX = pageW - margin - 70
   const sumW = 70
   const sumRowsData: [string, string][] = [
     ['Nettobetrag', fmtEuro(nettoVal)],
-    [`zzgl. ${mwstSatz}% MwSt.`, fmtEuro(mwst)],
+    [`inkl. ${mwstSatz}% MwSt.`, fmtEuro(mwst)],
   ]
   sumRowsData.forEach(([label, value], i) => {
     const y = sumY + 6 + i * 6.5
@@ -1486,10 +1487,10 @@ export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string
       if (imgData) { try { doc.addImage(imgData, imageFormat(imgData), 0, 0, 210, 297) } catch {} }
     }
 
-    const nettoVal = parseEuroValue(angebot.betrag)
+    const bruttoVal = parseEuroValue(angebot.betrag)
     const mwstSatz = Number(company.standard_mwst ?? 19)
-    const steuerVal = nettoVal * (mwstSatz / 100)
-    const bruttoVal = nettoVal + steuerVal
+    const nettoVal = Number((bruttoVal / (1 + mwstSatz / 100)).toFixed(2))
+    const steuerVal = Number((bruttoVal - nettoVal).toFixed(2))
     const docNummer = formatDocNummer(angebot.id, 'AN')
     const metaRows: [string, string][] = [
       ['Datum:', angebot.datum || heuteFormatiert()],
@@ -1627,18 +1628,18 @@ export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string
   doc.text(titelText, margin + 16, row1Y + 7)
   doc.text(angebot.betrag, pageW - margin - 3, row1Y + 7, { align: 'right' })
 
-  // Summen-Block
-  const betragNetto = parseEuroValue(angebot.betrag)
+  // Summen-Block (Preise sind Brutto inkl. MwSt.)
+  const brutto = parseEuroValue(angebot.betrag)
   const mwstSatz = Number(company.standard_mwst ?? 19)
-  const mwst = betragNetto * (mwstSatz / 100)
-  const brutto = betragNetto + mwst
+  const betragNetto = Number((brutto / (1 + mwstSatz / 100)).toFixed(2))
+  const mwst = Number((brutto - betragNetto).toFixed(2))
 
   const sumY = row1Y + 11
   const sumX = pageW - margin - 70
   const sumW = 70
   const sumRowsData: [string, string][] = [
     ['Nettobetrag', fmtEuro(betragNetto)],
-    [`zzgl. ${mwstSatz}% MwSt.`, fmtEuro(mwst)],
+    [`inkl. ${mwstSatz}% MwSt.`, fmtEuro(mwst)],
   ]
   sumRowsData.forEach(([label, value], i) => {
     const y = sumY + 6 + i * 6.5

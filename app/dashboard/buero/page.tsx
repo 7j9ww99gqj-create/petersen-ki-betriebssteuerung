@@ -421,6 +421,9 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
   const [cockpitTab, setCockpitTab] = useState<'angebote' | 'auftraege' | 'rechnungen'>('auftraege')
   const [anonConfirm, setAnonConfirm] = useState<string | null>(null)
   const [duplikatWarnung, setDuplikatWarnung] = useState<string | null>(null)
+  const [editKunde, setEditKunde] = useState<Kunde | null>(null)
+  const [editKundeForm, setEditKundeForm] = useState({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '', status: 'Aktiv' as Kunde['status'] })
+  const [deleteKundeConfirm, setDeleteKundeConfirm] = useState<string | null>(null)
   const { role } = useRole()
 
   useEffect(() => {
@@ -472,6 +475,33 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
     showToast(`✅ Kunde "${newKunde.name}" wurde erfolgreich angelegt (${newKunde.id})`)
   }
 
+  const openEditKunde = (k: Kunde) => {
+    setEditKunde(k)
+    setEditKundeForm({ name: k.name, typ: k.typ, ansprechpartner: k.ansprechpartner, email: k.email, telefon: k.telefon, ort: k.ort, status: k.status })
+  }
+
+  const handleEditKundeSave = async () => {
+    if (!editKunde || !editKundeForm.name || !editKundeForm.email) return
+    const updated: Kunde = { ...editKunde, ...editKundeForm, typ: editKundeForm.typ as Kunde['typ'] }
+    if (!isDemo) {
+      try { await upsertBueroKunde(updated) } catch { showToast('Fehler beim Speichern', true); return }
+    }
+    setKunden(prev => prev.map(k => k.id === updated.id ? updated : k))
+    if (selected?.id === updated.id) setSelected(updated)
+    setEditKunde(null)
+    showToast(`✅ Kunde "${updated.name}" wurde aktualisiert`)
+  }
+
+  const handleDeleteKunde = async (id: string) => {
+    setDeleteKundeConfirm(null)
+    if (!isDemo) {
+      try { await deleteBueroKunde(id) } catch { showToast('Fehler beim Löschen', true); return }
+    }
+    setKunden(prev => prev.filter(k => k.id !== id))
+    if (selected?.id === id) setSelected(null)
+    showToast('🗑️ Kunde wurde gelöscht')
+  }
+
   const handleAnonymize = async (id: string) => {
     if (isDemo) {
       setKunden(prev => prev.map(k => k.id === id ? { ...k, name: '[Anonym]', email: 'anonym@geloescht.de', telefon: '', ansprechpartner: '', ort: '' } : k))
@@ -507,6 +537,56 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
     </div>
   )
 
+  if (editKunde) {
+    return (
+      <div>
+        <Toast msg={toast} error={toastError} />
+        <Modal title={`👤 Kunde bearbeiten – ${editKunde.id}`} onClose={() => setEditKunde(null)}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+            <div>
+              <label style={labelStyle}>Name / Firma *</label>
+              <input className="pk-input" value={editKundeForm.name} onChange={e => setEditKundeForm(p => ({ ...p, name: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Typ</label>
+              <select className="pk-input" value={editKundeForm.typ} onChange={e => setEditKundeForm(p => ({ ...p, typ: e.target.value }))} style={{ cursor: 'pointer' }}>
+                <option>Firma</option>
+                <option>Privat</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Ansprechpartner</label>
+              <input className="pk-input" value={editKundeForm.ansprechpartner} onChange={e => setEditKundeForm(p => ({ ...p, ansprechpartner: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>E-Mail *</label>
+              <input className="pk-input" type="email" value={editKundeForm.email} onChange={e => setEditKundeForm(p => ({ ...p, email: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Telefon</label>
+              <input className="pk-input" value={editKundeForm.telefon} onChange={e => setEditKundeForm(p => ({ ...p, telefon: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Ort</label>
+              <input className="pk-input" value={editKundeForm.ort} onChange={e => setEditKundeForm(p => ({ ...p, ort: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Status</label>
+              <select className="pk-input" value={editKundeForm.status} onChange={e => setEditKundeForm(p => ({ ...p, status: e.target.value as Kunde['status'] }))} style={{ cursor: 'pointer' }}>
+                <option>Aktiv</option>
+                <option>Inaktiv</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
+            <button className="pk-btn" onClick={handleEditKundeSave}>Speichern</button>
+            <button className="pk-btn-ghost" onClick={() => setEditKunde(null)}>Abbrechen</button>
+          </div>
+        </Modal>
+      </div>
+    )
+  }
+
   if (selected) {
     const matchKunde = (item: { kunde_id?: string; kunde?: string }) =>
       (item.kunde_id && item.kunde_id === selected.id) || item.kunde === selected.name
@@ -537,6 +617,20 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
               <div style={{ color: '#aeb9c8', fontSize: 12, marginTop: 2 }}>{selected.ansprechpartner} · {selected.email} · {selected.telefon}</div>
             </div>
             <span className={`badge ${selected.status === 'Aktiv' ? 'badge-green' : 'badge-gray'}`}>{selected.status}</span>
+            {PERMISSIONS.canEdit(role) && (
+              <button onClick={() => openEditKunde(selected)} style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(32,200,255,.3)', background: 'rgba(32,200,255,.08)', color: '#20c8ff', cursor: 'pointer', fontWeight: 600 }}>✏️ Bearbeiten</button>
+            )}
+            {PERMISSIONS.canDelete(role) && (
+              deleteKundeConfirm === selected.id ? (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: '#ff8080' }}>Wirklich löschen?</span>
+                  <button onClick={() => handleDeleteKunde(selected.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.12)', color: '#ff8080', cursor: 'pointer', fontWeight: 700 }}>Ja, löschen</button>
+                  <button onClick={() => setDeleteKundeConfirm(null)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Abbrechen</button>
+                </div>
+              ) : (
+                <button onClick={() => setDeleteKundeConfirm(selected.id)} style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,80,80,.3)', background: 'rgba(255,80,80,.08)', color: '#ff8080', cursor: 'pointer', fontWeight: 600 }}>🗑️ Löschen</button>
+              )
+            )}
             {PERMISSIONS.canDelete(role) && (
               anonConfirm === selected.id ? (
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -711,7 +805,24 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
                 <td><span className="badge badge-gray">{k.typ}</span></td>
                 <td style={{ fontWeight: 700, color: '#20c8ff' }}>{k.umsatz}</td>
                 <td><span className={`badge ${k.status === 'Aktiv' ? 'badge-green' : 'badge-gray'}`}>{k.status}</span></td>
-                <td><span style={{ color: '#aeb9c8', fontSize: 16 }}>›</span></td>
+                <td>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                    {PERMISSIONS.canEdit(role) && (
+                      <button onClick={() => openEditKunde(k)} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(32,200,255,.3)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>✏️</button>
+                    )}
+                    {PERMISSIONS.canDelete(role) && (
+                      deleteKundeConfirm === k.id ? (
+                        <>
+                          <button onClick={() => handleDeleteKunde(k.id)} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.12)', color: '#ff8080', cursor: 'pointer', fontWeight: 700 }}>Ja</button>
+                          <button onClick={() => setDeleteKundeConfirm(null)} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setDeleteKundeConfirm(k.id)} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,80,80,.2)', background: 'rgba(255,80,80,.05)', color: '#ff8080', cursor: 'pointer' }}>🗑️</button>
+                      )
+                    )}
+                    <span style={{ color: '#aeb9c8', fontSize: 16 }}>›</span>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -857,6 +968,22 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
     const firmaDefaults = getLocalFirmaDefaults()
     const kunde = kunden.find(entry => entry.name === form.kunde)
     const fmt = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    // Positionen aus Paket-Auswahl ableiten
+    let autoPositionen: Position[] = []
+    if (form.paketId && form.tier) {
+      const pkg = PACKAGE_PRICING[form.paketId as PackageId]
+      const price = pkg?.prices[form.tier as EmployeeTierId]
+      if (pkg && price && typeof price === 'number') {
+        const tierLabel = EMPLOYEE_TIERS.find(t => t.id === form.tier)?.label ?? form.tier
+        autoPositionen = [{
+          id: `POS-${Date.now()}`,
+          beschreibung: `${pkg.name} Paket (${tierLabel}) – ${pkg.included.join(', ')}`,
+          menge: 1,
+          einheit: 'Abo/Monat',
+          einzelpreis: price,
+        }]
+      }
+    }
     const newAng: Angebot = {
       id: genId('ANG'),
       kunde_id: kunde?.id,
@@ -865,6 +992,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
       datum: fmt(today),
       gueltig: form.gueltig || fmt(new Date(today.getTime() + firmaDefaults.zahlungsziel_tage * 86400000)),
       status: 'Entwurf',
+      positionen: autoPositionen.length > 0 ? autoPositionen : undefined,
     }
     if (!isDemo) {
       try {
@@ -1285,8 +1413,8 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
               <input className="pk-input" placeholder="z.B. Wartungsvertrag 2025" value={form.titel} onChange={e => setForm(p => ({ ...p, titel: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Nettobetrag (€) *</label>
-              <input className="pk-input" placeholder="z.B. 4.200,00" value={form.betrag} onChange={e => setForm(p => ({ ...p, betrag: e.target.value }))} />
+              <label style={labelStyle}>Betrag inkl. MwSt. (€) *</label>
+              <input className="pk-input" placeholder="z.B. 89,00" value={form.betrag} onChange={e => setForm(p => ({ ...p, betrag: e.target.value }))} />
             </div>
             <div>
               <label style={labelStyle}>Gültig bis</label>
