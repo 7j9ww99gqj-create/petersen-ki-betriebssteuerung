@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "command": "cd /Users/kevinpetersen/Documents/petersen-ki && if ! npx tsc --noEmit > /tmp/tsc-check.txt 2>&1; then jq -Rn --rawfile err /tmp/tsc-check.txt '{\"continue\": false, \"stopReason\": (\"❌ TypeScript-Fehler gefunden — Push blockiert:\\n\" + $err)}'; fi",
+            "timeout": 60,
+            "statusMessage": "🔍 TypeScript prüfen vor Push..."
+          }
+        ]
+      }
+    ]
+  }
+}
