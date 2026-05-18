@@ -196,13 +196,15 @@ export default function AnalysePilotPage() {
       const start12Iso = startOf12MonthsAgo.toISOString()
       const todayIso = new Date().toISOString()
 
-      const [rechnungen, eingangsrechnungen, kunden, angebote, artikel, kiDocs] = await Promise.allSettled([
+      const [rechnungen, eingangsrechnungen, kunden, angebote, artikel, kiDocs, fixkosten, betriebsausgaben] = await Promise.allSettled([
         supabase.from('buero_rechnungen').select('betrag,summe,datum,status').gte('datum', start12Iso.slice(0, 10)).lte('datum', todayIso.slice(0, 10)).order('datum'),
         supabase.from('buero_eingangsrechnungen').select('betrag_brutto,rechnungsdatum,status').gte('rechnungsdatum', start12Iso.slice(0, 10)),
         supabase.from('buero_kunden').select('status'),
         supabase.from('buero_angebote').select('betrag,datum,status').gte('datum', start12Iso.slice(0, 10)),
         supabase.from('lager_artikel').select('bestand,status,mindestbestand,created_at,einkaufspreis'),
         supabase.from('buero_dokumente').select('document_type,confidence,created_at').gte('created_at', sevenDaysAgo),
+        supabase.from('steuer_fixkosten').select('betrag_brutto,steuersatz,zahlungsintervall,aktiv'),
+        supabase.from('steuer_betriebsausgaben').select('betrag_brutto,datum').gte('datum', start12Iso.slice(0, 10)),
       ])
 
       // ── Rechnungen ──
@@ -215,6 +217,20 @@ export default function AnalysePilotPage() {
       // ── Eingangsrechnungen als Kostenquelle ──
       const kosten = eingangsrechnungen.status === 'fulfilled' && !eingangsrechnungen.value.error
         ? (eingangsrechnungen.value.data ?? []) as Array<{ betrag_brutto?: number | null; rechnungsdatum?: string | null }>
+        : []
+
+      // ── Fixkosten (monatlicher Anteil) ──
+      type FixkostenRow = { betrag_brutto?: number | null; steuersatz?: number | null; zahlungsintervall?: string | null; aktiv?: boolean | null }
+      const fixkostenRows = fixkosten.status === 'fulfilled' && !fixkosten.value.error
+        ? (fixkosten.value.data ?? []) as FixkostenRow[]
+        : []
+      const faktorMap: Record<string, number> = { monatlich: 1, quartalsweise: 1/3, halbjährlich: 1/6, jährlich: 1/12 }
+      const fixkostenMonatlich = fixkostenRows.filter(f => f.aktiv !== false).reduce((s, f) => s + (f.betrag_brutto ?? 0) * (faktorMap[f.zahlungsintervall ?? 'monatlich'] ?? 1), 0)
+
+      // ── Betriebsausgaben ──
+      type BetriebsausgabeRow = { betrag_brutto?: number | null; datum?: string | null }
+      const betriebsausgabenRows = betriebsausgaben.status === 'fulfilled' && !betriebsausgaben.value.error
+        ? (betriebsausgaben.value.data ?? []) as BetriebsausgabeRow[]
         : []
 
       // ── Kunden ──
@@ -252,9 +268,13 @@ export default function AnalysePilotPage() {
         .filter(r => r.datum && new Date(r.datum) >= zeitraumStart)
         .reduce((s, r) => s + (r.summe ?? parseEuro(r.betrag)), 0)
 
-      const kostenDiesen = kosten
+      const eingangsKostenDiesen = kosten
         .filter(k => k.rechnungsdatum && new Date(k.rechnungsdatum) >= zeitraumStart)
         .reduce((s, k) => s + (k.betrag_brutto ?? 0), 0)
+      const betriebsausgabenDiesen = betriebsausgabenRows
+        .filter(b => b.datum && new Date(b.datum) >= zeitraumStart)
+        .reduce((s, b) => s + (b.betrag_brutto ?? 0), 0)
+      const kostenDiesen = eingangsKostenDiesen + fixkostenMonatlich * chartMonate + betriebsausgabenDiesen
 
       const offeneRechnungenList = rechnungenRows.filter(r => r.status === 'Offen' || r.status === 'Fällig')
       const offeneRechnungenSumme = offeneRechnungenList.reduce((s, r) => s + (r.summe ?? parseEuro(r.betrag)), 0)
@@ -298,6 +318,19 @@ export default function AnalysePilotPage() {
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
         if (umsatzByMonth.has(key)) {
           umsatzByMonth.get(key)!.kosten += k.betrag_brutto ?? 0
+        }
+      }
+      // Fixkosten: monatlicher Anteil auf jeden Monat verteilen
+      for (const [key] of umsatzByMonth) {
+        umsatzByMonth.get(key)!.kosten += fixkostenMonatlich
+      }
+      // Betriebsausgaben: nach Monat zuordnen
+      for (const b of betriebsausgabenRows) {
+        if (!b.datum) continue
+        const d = new Date(b.datum)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        if (umsatzByMonth.has(key)) {
+          umsatzByMonth.get(key)!.kosten += b.betrag_brutto ?? 0
         }
       }
       const newUmsatz: UmsatzPoint[] = Array.from(umsatzByMonth.entries()).map(([key, v]) => {
