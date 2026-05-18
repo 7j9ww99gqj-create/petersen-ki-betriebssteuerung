@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { sendPushNotification } from '@/lib/push'
+import { sendPushNotification } from '@/lib/push.server'
 
 function getSupabase() {
   const cookieStore = cookies()

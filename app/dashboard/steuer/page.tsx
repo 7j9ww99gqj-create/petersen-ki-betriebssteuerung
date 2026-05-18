@@ -892,7 +892,7 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: 16 }}>Beleg-Archiv ({filteredBelege.length})</div>
-              <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>Alle erfassten Belege – zum Hinzufügen den "+ Beleg" Button oben rechts nutzen</div>
+              <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>Alle erfassten Belege &ndash; zum Hinzufügen den &quot;+ Beleg&quot; Button oben rechts nutzen</div>
             </div>
             <button className="pk-btn" onClick={() => { setShowNewBelegModal(true); setNewBelegStep(1) }} style={{ fontSize: 13, background: STEUER_COLOR, color: '#0a0f1a' }}>+ Beleg</button>
           </div>

@@ -87,35 +87,3 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return output
 }
 
-// ── Server-seitige Hilfsfunktionen ───────────────────────────────────────────
-
-/** Server-seitig: Push-Benachrichtigung an einen User senden */
-export async function sendPushNotification(
-  endpoint: string,
-  keys: { p256dh: string; auth: string },
-  payload: { title: string; body: string; url?: string }
-): Promise<{ success: boolean; error?: string }> {
-  // Dynamischer Import – nur server-seitig
-  try {
-    const webpush = await import('web-push')
-
-    const vapidPublicKey = process.env.VAPID_PUBLIC_KEY
-    const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
-    const vapidEmail = process.env.VAPID_EMAIL
-
-    if (!vapidPublicKey || !vapidPrivateKey || !vapidEmail) {
-      return { success: false, error: 'VAPID Keys nicht konfiguriert (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL in Vercel Env-Vars setzen)' }
-    }
-
-    webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey)
-
-    await webpush.sendNotification(
-      { endpoint, keys },
-      JSON.stringify(payload)
-    )
-    return { success: true }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    return { success: false, error: msg }
-  }
-}

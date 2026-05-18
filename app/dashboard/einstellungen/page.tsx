@@ -1252,7 +1252,7 @@ export default function EinstellungenPage() {
                   fontSize: 12, color: '#6cb6ff',
                 }}>
                   💡 <strong>Tipp:</strong> Für beste Push-Unterstützung die App als PWA auf dem Startbildschirm hinzufügen:
-                  Safari → Teilen → „Zum Home-Bildschirm hinzufügen" · Chrome → Menü → „App installieren"
+                  Safari → Teilen → &bdquo;Zum Home-Bildschirm hinzufügen&ldquo; · Chrome → Menü → &bdquo;App installieren&ldquo;
                 </div>
               </div>
             </div>
