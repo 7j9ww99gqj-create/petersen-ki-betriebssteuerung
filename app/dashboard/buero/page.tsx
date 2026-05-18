@@ -1749,7 +1749,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
     showToast(`🗑️ Rechnung ${id} wurde gelöscht`)
   }
 
-  const offenCount = rechnungen.filter(r => r.status === 'Offen' || r.status === 'Überfällig' || r.status === 'Mahnung').length
+  const offenCount = rechnungen.filter(r => r.status === 'Erstellt' || r.status === 'Offen' || r.status === 'Überfällig' || r.status === 'Mahnung').length
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
@@ -1785,6 +1785,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
             <div>
               <label style={labelStyle}>Status</label>
               <select className="pk-input" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value as Rechnung['status'] }))} style={{ cursor: 'pointer' }}>
+                <option>Erstellt</option>
                 <option>Offen</option>
                 <option>Bezahlt</option>
                 <option>Überfällig</option>
@@ -1914,6 +1915,11 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
                     <DeleteConfirm label={r.id} onConfirm={() => handleDelete(r.id)} onCancel={() => setDeleteId(null)} />
                   ) : (
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {r.status === 'Erstellt' && (
+                        <button onClick={e => { e.stopPropagation(); const k = kunden.find(k => k.id === r.kunde_id || k.name === r.kunde); setMailTarget({ id: r.id, email: k?.email || '', typ: 'rechnung' }) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.4)', background: 'rgba(32,200,255,.12)', color: '#20c8ff', cursor: 'pointer', fontWeight: 700 }}>
+                          ✉️ Verschicken
+                        </button>
+                      )}
                       {(r.status === 'Offen' || r.status === 'Überfällig') && (
                         <>
                           <button onClick={e => { e.stopPropagation(); handleBezahlt(r.id) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
@@ -3203,7 +3209,7 @@ export default function BueroPilotPage() {
 
       {tab === 'kunden' && <KundenTab isDemo={isDemo} auftraege={auftraege} rechnungen={isDemo ? demoRechnungen : []} />}
       {tab === 'angebote' && <AngeboteTab isDemo={isDemo} kunden={kunden} auftraege={auftraege} setAuftraege={setAuftraege} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
-      {tab === 'auftraege' && <AuftraegeTab isDemo={isDemo} auftraege={auftraege} setAuftraege={setAuftraege} kunden={kunden} />}
+      {tab === 'auftraege' && <AuftraegeTab isDemo={isDemo} auftraege={auftraege} setAuftraege={setAuftraege} kunden={kunden} setTab={setTab} />}
       {tab === 'rechnungen' && <RechnungenTab isDemo={isDemo} kunden={kunden} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
       {tab === 'eingangsrechnungen' && <EingangRechnungenTab isDemo={isDemo} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
       {tab === 'dokumente' && <DokumenteTab isDemo={isDemo} />}
