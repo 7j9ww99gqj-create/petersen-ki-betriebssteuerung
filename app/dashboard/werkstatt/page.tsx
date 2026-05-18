@@ -1120,7 +1120,7 @@ function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeit
           <div style={{ flex: 2, minWidth: 200, height: 80 }}>
             <ResponsiveContainer width="100%" height={80}>
               <LineChart data={sparklineDemoData} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
-                <Tooltip contentStyle={{ background: '#0b1420', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, fontSize: 11 }} formatter={(v: number) => [`${v}%`, 'Fehlerrate']} />
+                <Tooltip contentStyle={{ background: '#0b1420', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, fontSize: 11 }} formatter={(v) => [`${v}%`, 'Fehlerrate']} />
                 <Line type="monotone" dataKey="rate" stroke={fehlerRate > 10 ? '#f43f5e' : '#a78bfa'} strokeWidth={2} dot={{ fill: fehlerRate > 10 ? '#f43f5e' : '#a78bfa', r: 3 }} />
               </LineChart>
             </ResponsiveContainer>

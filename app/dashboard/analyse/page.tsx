@@ -322,7 +322,7 @@ export default function AnalysePilotPage() {
         }
       }
       // Fixkosten: monatlicher Anteil auf jeden Monat verteilen
-      for (const [key] of umsatzByMonth) {
+      for (const [key] of Array.from(umsatzByMonth)) {
         umsatzByMonth.get(key)!.kosten += fixkostenMonatlich
       }
       // Betriebsausgaben: nach Monat zuordnen
