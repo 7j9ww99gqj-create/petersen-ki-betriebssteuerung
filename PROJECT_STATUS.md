@@ -32,7 +32,7 @@
 - Produktivlage: Kernsystem nutzbar, aber noch nicht voll marktreif; Rechte, Integrationen und einige Prozessketten bleiben offene Themen.
 
 ### 0.2 Top-Offene Aufgaben (Priorisiert)
-- 🔴 **Stripe Webhook-URL** im Stripe-Dashboard prüfen und echten End-to-End-Test validieren (Buchung → Auftrag → Zahlung → Rechnung).
+- ✅ ~~**Stripe Webhook-URL** im Stripe-Dashboard prüfen und echten End-to-End-Test validieren.~~ **Erledigt 2026-05-18**: Webhook live + E2E-Test (Test-Modus) erfolgreich.
 - 🟡 **Multi-Positions-Rechnungen/-Angebote** im BüroPilot (aktuell nur 1 Pos. hardcoded).
 - 🟡 **SteuerPilot A13: ELSTER-XML-Export** vorbereiten (Formular-Mapping §§ 81/83 UStVA).
 - 🟢 Benutzerverwaltung erweitern: Deaktivieren/Löschen, Einladung erneut öffnen, Suche/Filter.
@@ -40,14 +40,14 @@
 - 🟢 RLS-Policies und Datenkonsistenz-Härtung fortsetzen.
 
 ### 0.3 Aktuelle Blocker
-- Stripe-Ende-zu-Ende-Validierung ist noch nicht vollständig abgeschlossen.
+- Keine kritischen Blocker. Stripe E2E validiert.
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-18, Commit `897262b` (BüroPilot Delete-Buttons, grün)  
-**Letzte Session:** Delete-Buttons Angebote/Aufträge/Rechnungen (echte DB-Delete statt Soft-Delete)  
-**Nächster Focus:** Stripe End-to-End-Test → Multi-Positionen → ELSTER-Export  
-**Blocker:** Stripe Webhook-URL noch nicht getestet; sonst grün  
+**Letzter Stand:** 2026-05-18, Stripe E2E-Test erfolgreich (kein Code-Commit)  
+**Letzte Session:** Stripe Webhook konfiguriert + E2E-Test im Test-Modus validiert  
+**Nächster Focus:** Multi-Positionen Rechnungen/Angebote → ELSTER-Export  
+**Blocker:** Keine  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
 ## 1. Kurzüberblick
@@ -63,6 +63,9 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – Stripe E2E)**:
+  - **Stripe Webhook live**: Webhook `we_1TYSV1Ih98MCn5G32jwWGWQk` angelegt; `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` in Vercel gesetzt; E2E-Test im Test-Modus erfolgreich (Checkout-Session → Zahlung → Webhook empfangen).
+  - Kein Code-Commit (nur Infrastruktur/Konfiguration).
 - **Zuletzt erledigt (2026-05-18 – Delete-Buttons)**:
   - **BüroPilot Delete-Buttons verdrahtet**: Angebote/Aufträge/Rechnungen mit echten DB-Funktionen statt Soft-Delete.
   - Betroffene Dateien: `app/dashboard/buero/page.tsx`.
