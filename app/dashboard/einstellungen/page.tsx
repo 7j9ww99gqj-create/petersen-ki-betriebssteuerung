@@ -1571,7 +1571,7 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
   currentRole: AppRole
   showToast: (msg: string, type?: 'success' | 'error') => void
 }) {
-  const canEdit = currentRole === 'Admin'
+  const canEdit = currentRole === 'Admin' || currentRole === 'Inhaber'
   const [firma, setFirma] = useState<FirmaEinstellungen>(isDemo ? {
     ...emptyFirma,
     firmenname: 'Petersen Musterbetrieb GmbH',
