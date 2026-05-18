@@ -51,6 +51,12 @@ type SteuerTab =
 const STEUER_COLOR = '#f59e0b'
 const STEUERSAETZE = [0, 7, 19]
 
+const BELEG_KATEGORIEN: Record<string, string[]> = {
+  'Fixkosten': ['Hosting', 'Domain', 'Versicherung', 'Miete', 'Leasing', 'Telefonkosten', 'Internetkosten', 'Steuerberatung', 'Buchführung', 'Sonstiges'],
+  'Betriebsausgaben': ['Material', 'Werkzeug', 'Transport', 'Kraftstoff', 'Wartung', 'Reparatur', 'Software-Lizenzen', 'Bürobedarf', 'Marketingkosten', 'Reisekosten', 'Bewirtungskosten', 'Sonstiges'],
+  'Anschaffungen': ['Hardware/IT', 'Büromöbel', 'Maschinen', 'Fahrzeuge', 'Werkzeuge/Geräte', 'Sonstiges'],
+}
+
 const NAV_ITEMS: { id: SteuerTab; icon: string; label: string }[] = [
   { id: 'dashboard',        icon: '📊', label: 'Dashboard' },
   { id: 'einnahmen',        icon: '💰', label: 'Einnahmen' },
@@ -215,6 +221,16 @@ export default function SteuerPilotPage() {
   const [ocrLoading, setOcrLoading] = useState(false)
   const [ocrText, setOcrText] = useState('')
   const [showOcrInput, setShowOcrInput] = useState(false)
+
+  // ── Neues 3-stufiges Beleg-Erfassungs-Modal ───────────────────────────────────
+  const [showNewBelegModal, setShowNewBelegModal] = useState(false)
+  const [newBelegStep, setNewBelegStep] = useState<1 | 2 | 3>(1)
+  const [newBelegArt, setNewBelegArt] = useState('')
+  const [newBelegKategorie, setNewBelegKategorie] = useState('')
+  const [newBelegDetails, setNewBelegDetails] = useState({ betrag: '', datum: new Date().toISOString().split('T')[0], beschreibung: '' })
+  const [newBelegFile, setNewBelegFile] = useState<File | null>(null)
+  const [newBelegSaving, setNewBelegSaving] = useState(false)
+  const newBelegFileRef = useRef<HTMLInputElement>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast(msg); setToastType(type)
@@ -428,6 +444,52 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
     } catch { showToast('Fehler', 'error') }
   }
 
+  // ── Neues 3-stufiges Beleg-Modal speichern ────────────────────────────────────
+
+  const handleSaveNewBeleg = async () => {
+    if (!newBelegArt || !newBelegKategorie || !newBelegDetails.betrag || !newBelegDetails.datum) {
+      showToast('Bitte alle Pflichtfelder ausfüllen', 'error'); return
+    }
+    setNewBelegSaving(true)
+    try {
+      let fileUrl: string | undefined
+      if (newBelegFile && !isDemo) {
+        const supabase = createSupabaseClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        fileUrl = await uploadSteuerBelegFile(newBelegFile, session?.user.id ?? 'anon')
+      }
+
+      // Speichere als BelegUpload (bestehende Tabelle steuer_beleg_uploads)
+      const entry: SteuerBelegUpload = {
+        id: `BU-${Date.now().toString(36).toUpperCase()}`,
+        kategorie: newBelegArt as SteuerBelegUpload['kategorie'],
+        datei_url: fileUrl,
+        betrag: newBelegDetails.betrag ? parseFloat(newBelegDetails.betrag.replace(',', '.')) : null,
+        datum: newBelegDetails.datum || null,
+        notiz: [newBelegKategorie, newBelegDetails.beschreibung].filter(Boolean).join(' – ') || null,
+      }
+      if (!isDemo) {
+        await upsertSteuerBelegUpload(entry)
+        setBelegUploads(await getSteuerBelegUploads())
+      } else {
+        setBelegUploads(prev => [entry, ...prev])
+      }
+
+      showToast('Beleg erfasst')
+      setShowNewBelegModal(false)
+      setNewBelegStep(1)
+      setNewBelegArt('')
+      setNewBelegKategorie('')
+      setNewBelegDetails({ betrag: '', datum: new Date().toISOString().split('T')[0], beschreibung: '' })
+      setNewBelegFile(null)
+      setTab('belege')
+    } catch {
+      showToast('Fehler beim Speichern', 'error')
+    } finally {
+      setNewBelegSaving(false)
+    }
+  }
+
   // ── Exports ───────────────────────────────────────────────────────────────────
 
   const handleDatevExport = () => {
@@ -517,7 +579,7 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="pk-btn" onClick={() => { setTab('belege'); setEditBeleg({}) }} style={{ fontSize: 13 }}>+ Beleg</button>
+            <button className="pk-btn" onClick={() => { setShowNewBelegModal(true); setNewBelegStep(1); setNewBelegArt(''); setNewBelegKategorie('') }} style={{ fontSize: 13, background: STEUER_COLOR, color: '#0a0f1a' }}>+ Beleg</button>
             <button className="pk-btn-ghost" onClick={handleDatevExport} style={{ fontSize: 13 }}>DATEV Export</button>
           </div>
         </div>
@@ -829,10 +891,10 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>Eingangsbelege ({filteredBelege.length})</div>
-              <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>Alle steuerrelevanten Eingangsbelege und Quittungen</div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>Beleg-Archiv ({filteredBelege.length})</div>
+              <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>Alle erfassten Belege – zum Hinzufügen den "+ Beleg" Button oben rechts nutzen</div>
             </div>
-            <button className="pk-btn" onClick={() => setEditBeleg({})} style={{ fontSize: 13 }}>+ Beleg erfassen</button>
+            <button className="pk-btn" onClick={() => { setShowNewBelegModal(true); setNewBelegStep(1) }} style={{ fontSize: 13, background: STEUER_COLOR, color: '#0a0f1a' }}>+ Beleg</button>
           </div>
 
           {/* Duplikat-Warnung */}
@@ -1532,6 +1594,215 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* ── 3-stufiges Beleg-Erfassungs-Modal ─────────────────────────────────── */}
+      {showNewBelegModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 500,
+            background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+          onClick={() => setShowNewBelegModal(false)}
+        >
+          <div
+            className="pk-card fade-in"
+            style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>+ Beleg erfassen</h3>
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 4 }}>
+                  Schritt {newBelegStep} von 3
+                </div>
+              </div>
+              <button
+                onClick={() => setShowNewBelegModal(false)}
+                style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}
+              >✕</button>
+            </div>
+
+            {/* Schritt-Anzeige */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
+              {[1, 2, 3].map(s => (
+                <div
+                  key={s}
+                  style={{
+                    flex: 1, height: 4, borderRadius: 999,
+                    background: s <= newBelegStep ? STEUER_COLOR : 'rgba(255,255,255,.1)',
+                    transition: 'background .2s',
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* ── STUFE 1: Beleg-Art ── */}
+            {newBelegStep === 1 && (
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>
+                  1. Beleg-Art auswählen
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {Object.keys(BELEG_KATEGORIEN).map(art => (
+                    <button
+                      key={art}
+                      onClick={() => { setNewBelegArt(art); setNewBelegKategorie(''); setNewBelegStep(2) }}
+                      style={{
+                        padding: '14px 18px', borderRadius: 10, border: `2px solid ${newBelegArt === art ? STEUER_COLOR : 'rgba(255,255,255,.12)'}`,
+                        background: newBelegArt === art ? `rgba(245,158,11,.12)` : 'rgba(255,255,255,.03)',
+                        color: newBelegArt === art ? STEUER_COLOR : '#f8fbff',
+                        cursor: 'pointer', textAlign: 'left', fontWeight: 700, fontSize: 14,
+                        transition: 'all .15s',
+                      }}
+                    >
+                      {art === 'Fixkosten' ? '📋' : art === 'Betriebsausgaben' ? '💸' : '🖥️'} {art}
+                      <div style={{ fontSize: 11, fontWeight: 400, color: '#aeb9c8', marginTop: 4 }}>
+                        {art === 'Fixkosten' ? 'Wiederkehrende laufende Kosten'
+                          : art === 'Betriebsausgaben' ? 'Einmalige betriebliche Ausgaben'
+                          : 'Investitionen und Anschaffungen'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── STUFE 2: Kategorie ── */}
+            {newBelegStep === 2 && (
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
+                  2. Kategorie wählen
+                </div>
+                <div style={{ fontSize: 13, color: '#aeb9c8', marginBottom: 16 }}>
+                  Beleg-Art: <strong style={{ color: STEUER_COLOR }}>{newBelegArt}</strong>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+                  {(BELEG_KATEGORIEN[newBelegArt] ?? []).map(kat => (
+                    <button
+                      key={kat}
+                      onClick={() => setNewBelegKategorie(kat)}
+                      style={{
+                        padding: '8px 14px', borderRadius: 8,
+                        border: `1px solid ${newBelegKategorie === kat ? STEUER_COLOR : 'rgba(255,255,255,.12)'}`,
+                        background: newBelegKategorie === kat ? `rgba(245,158,11,.15)` : 'rgba(255,255,255,.04)',
+                        color: newBelegKategorie === kat ? STEUER_COLOR : '#aeb9c8',
+                        cursor: 'pointer', fontWeight: newBelegKategorie === kat ? 700 : 500,
+                        fontSize: 13, transition: 'all .15s',
+                      }}
+                    >
+                      {kat}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between' }}>
+                  <button className="pk-btn-ghost" onClick={() => setNewBelegStep(1)}>← Zurück</button>
+                  <button
+                    className="pk-btn"
+                    onClick={() => { if (newBelegKategorie) { setNewBelegStep(3) } else { showToast('Bitte Kategorie auswählen', 'error') } }}
+                    style={{ background: STEUER_COLOR, color: '#0a0f1a' }}
+                    disabled={!newBelegKategorie}
+                  >
+                    Weiter →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── STUFE 3: Details ── */}
+            {newBelegStep === 3 && (
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
+                  3. Beleg-Details eingeben
+                </div>
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 16 }}>
+                  {newBelegArt} › <strong style={{ color: STEUER_COLOR }}>{newBelegKategorie}</strong>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6, fontWeight: 600 }}>Betrag (€) *</label>
+                      <input
+                        className="pk-input"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        value={newBelegDetails.betrag}
+                        onChange={e => setNewBelegDetails(d => ({ ...d, betrag: e.target.value }))}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6, fontWeight: 600 }}>Datum *</label>
+                      <input
+                        className="pk-input"
+                        type="date"
+                        value={newBelegDetails.datum}
+                        onChange={e => setNewBelegDetails(d => ({ ...d, datum: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6, fontWeight: 600 }}>Beschreibung (optional)</label>
+                    <textarea
+                      className="pk-input"
+                      placeholder="Kurze Beschreibung des Belegs…"
+                      value={newBelegDetails.beschreibung}
+                      onChange={e => setNewBelegDetails(d => ({ ...d, beschreibung: e.target.value }))}
+                      rows={2}
+                      style={{ resize: 'vertical' }}
+                    />
+                  </div>
+
+                  {/* Datei-Upload */}
+                  <div>
+                    <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6, fontWeight: 600 }}>Beleg-Datei (optional)</label>
+                    <div
+                      onClick={() => newBelegFileRef.current?.click()}
+                      style={{
+                        border: `2px dashed ${newBelegFile ? STEUER_COLOR : 'rgba(255,255,255,.2)'}`,
+                        borderRadius: 10, padding: '14px 16px', textAlign: 'center',
+                        cursor: 'pointer', background: newBelegFile ? 'rgba(245,158,11,.06)' : 'transparent',
+                      }}
+                    >
+                      <input
+                        ref={newBelegFileRef}
+                        type="file"
+                        accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
+                        onChange={e => setNewBelegFile(e.target.files?.[0] ?? null)}
+                        style={{ display: 'none' }}
+                      />
+                      {newBelegFile ? (
+                        <div style={{ fontSize: 13, color: STEUER_COLOR, fontWeight: 600 }}>
+                          ✅ {newBelegFile.name}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>
+                          📎 PDF oder Bild hochladen
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', marginTop: 20 }}>
+                  <button className="pk-btn-ghost" onClick={() => setNewBelegStep(2)}>← Zurück</button>
+                  <button
+                    className="pk-btn"
+                    onClick={handleSaveNewBeleg}
+                    disabled={newBelegSaving || !newBelegDetails.betrag || !newBelegDetails.datum}
+                    style={{ background: STEUER_COLOR, color: '#0a0f1a' }}
+                  >
+                    {newBelegSaving ? '⏳ Speichern…' : '💾 Beleg speichern'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       <Toast msg={toast} type={toastType} />
