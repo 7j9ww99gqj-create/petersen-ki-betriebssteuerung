@@ -26,8 +26,34 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, Commit `7c77673`.
-- Letzter Commit: OpenAI Kostenübersicht im Inhaber-Kundensteuerung-Bereich.
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, Commit `2a6c4de` (nach 10-Aufgaben-Sprint).
+- Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main, HTTP 307 → OK).
+- TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19 nach Sprint).
+
+### 10-Aufgaben-Sprint (2026-05-19) — Alle Aufgaben abgeschlossen
+| # | Aufgabe | Commit | Status |
+|---|---------|--------|--------|
+| 1 | Supabase DB-Indizes (23 Indexes auf Haupttabellen) | `9d63694` | ✅ |
+| 2 | Standardisiertes Error-Handling + Retry in allen 8 Piloten | `b656e66` | ✅ |
+| 3 | Tab-Lazy-Loading in Lager- und BüroPilot | `ef6e0ba` | ✅ |
+| 4 | Marketing Edit/Delete | — | ✅ bereits implementiert |
+| 5 | Büro Workflow-Buttons | — | ✅ bereits implementiert |
+| 6 | URL Filter-/Tab-Persistenz (Lager, Büro, Werkstatt, Marketing, Steuer) | `24ae1d7` | ✅ |
+| 7 | Dashboard „Zuletzt besucht"-Widget (localStorage) | `02299f4` | ✅ |
+| 8 | Globale Suche erweitert (Lager, Kunden, Rechnungen, Werkstatt live) | `bfdd70c` | ✅ |
+| 9 | PDF-Berichte für Analyse und Lager (jsPDF, Dark-Theme) | `3288426` | ✅ |
+| 10 | Mobile Swipe-Gesten für Tab-Navigation (`useSwipeTabs` Hook) | `2a6c4de` | ✅ |
+
+#### Details Sprint-Aufgaben
+- **Aufgabe 1**: `supabase/migrations/20260519100000_performance_indexes.sql` — 23 Indexes über lager, buero, werkstatt, marketing, planung, steuer, cloud.
+- **Aufgabe 2**: Alle Piloten (lager, buero, werkstatt, marketing, analyse, planung, steuer, cloud) haben jetzt standardisierten Error-Banner mit `pk-btn-ghost`-Retry-Button und `loadData()`-Funktion auf Komponentenebene.
+- **Aufgabe 3**: `loadedTabs: Set<string>` in lager/page.tsx und buero/page.tsx; stellplaetze/umlagerung/angebote+auftraege werden erst bei Tab-Wechsel geladen.
+- **Aufgabe 6**: `useRouter` + `useSearchParams` in allen Piloten; `setTab`-Wrapper schreibt URL-Params mit `router.replace`.
+- **Aufgabe 7**: `lib/recent.ts` (neu) — `trackVisit()` + `getRecentVisits()` via localStorage; Dashboard zeigt „🕐 Zuletzt besucht"-Widget.
+- **Aufgabe 8**: `components/GlobalSearch.tsx` neu geschrieben — live Supabase-Queries (Promise.allSettled, 300ms Debounce, max 3 Treffer/Kategorie); Demo-Fallback auf statische Daten.
+- **Aufgabe 9**: `lib/pdf.ts` um `generateAnalysePDF()` und `generateLagerberichtPDF()` erweitert; dynamischer jsPDF-Import (SSR-sicher); Buttons in analyse/page.tsx und lager/page.tsx.
+- **Aufgabe 10**: `hooks/useSwipeTabs.ts` (neu) — passive Touch-Events, 60px Mindest-Swipe; in LagerPilot, BüroPilot, WerkstattPilot integriert.
+
 - Jüngste Fortschritte (2026-05-19 – Marketing-KI Sprint):
   - **Marketing-KI Module (offline by default):** 3 neue OpenAI-gestützte KI-Suite-Kacheln live eingebaut
     - `📊 Was soll ich morgen posten?` → `/api/marketing/content-daily`
