@@ -102,7 +102,7 @@ insertEinkaufWareneingang(w: { bestellung_id, eingangsdatum, menge_bestellt, men
 | BüroPilot | `/dashboard/buero` | ✅ Vollständig | kunden/angebote/auftraege/rechnungen/dokumente/einkauf |
 | WerkstattPilot | `/dashboard/werkstatt` | ✅ Vollständig | Karten/Zeit/Material/Prüfprotokoll |
 | MarketingPilot | `/dashboard/marketing` | ⚠️ Teilweise | Create OK, Edit/Delete fehlt; KI-Suite sichtbar und klickbar, aber noch ohne echte KI-Logik |
-| AnalysePilot | `/dashboard/analyse` | ⚠️ Demo-Daten | Charts laufen, kein Supabase |
+| AnalysePilot | `/dashboard/analyse` | ✅ Live-Daten | Charts aus Supabase; Demo-Fallback via hasDemoCookie() |
 | PlanungPilot | `/dashboard/planung` | ✅ Vollständig | Projekte/Aufgaben/Kalender/Ressourcen |
 | KI-Assistent | `/dashboard/ki-erkennung` | ✅ Vollständig | Tagesbrief/Erkennung/Chat + Aktions-Ausführung |
 | Cloud & Sync | `/dashboard/cloud` | ✅ Live-Basis | echte Kennzahlen, Aktivität, Storage, ehrliche Geräte-/Backup-Übersicht |
@@ -474,7 +474,7 @@ const { role, setRole, permissions } = useRole()
 ### 🟡 Feature-Vervollständigung
 - [ ] **EinkaufTab**: Demo-State auf echte Supabase-Calls umstellen (db.ts-Funktionen fertig)
 - [ ] **MarketingPilot**: Edit + Delete implementieren
-- [ ] **AnalysePilot**: echte Daten aus Supabase statt Demo-Charts
+- [x] **AnalysePilot**: echte Daten aus Supabase, Demo-Fallback via hasDemoCookie(), Fehler-Handling mit Ladefehler-Banner
 
 ### 🟢 Langfristig
 - [ ] Stripe Integration (Abos/Bezahlung)
