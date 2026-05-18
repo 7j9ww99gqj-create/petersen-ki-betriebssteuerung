@@ -44,8 +44,8 @@
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-18, Commit `ff5af5b` (gepusht & Vercel deployed)  
-**Letzte Session:** SteuerPilot A7–A12 (recharts, Checkliste, Ausgaben-Karte, canViewSteuer)  
+**Letzter Stand:** 2026-05-18, Commit `897262b` (BüroPilot Delete-Buttons, grün)  
+**Letzte Session:** Delete-Buttons Angebote/Aufträge/Rechnungen (echte DB-Delete statt Soft-Delete)  
 **Nächster Focus:** Stripe End-to-End-Test → Multi-Positionen → ELSTER-Export  
 **Blocker:** Stripe Webhook-URL noch nicht getestet; sonst grün  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
@@ -63,6 +63,11 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – Delete-Buttons)**:
+  - **BüroPilot Delete-Buttons verdrahtet**: Angebote/Aufträge/Rechnungen mit echten DB-Funktionen statt Soft-Delete.
+  - Betroffene Dateien: `app/dashboard/buero/page.tsx`.
+  - Tests: lint + build grün.
+  - Commit: `897262b`.
 - **Zuletzt erledigt (2026-05-18 – SteuerPilot Aufgaben 7–12)**:
   - **A7 – Monatsabschluss-Checkliste**: Zwei neue Checkpunkte ergänzt: „Fixkosten für diesen Monat geprüft" + „Betriebsausgaben für diesen Monat erfasst".
   - **A8 – recharts BarChart**: CSS-Balkendiagramm im Auswertungen-Tab durch echte `BarChart`-Komponente aus recharts ersetzt (X-Achse: Monat, Balken: USt rot / VSt grün, Tooltip mit `fmt()`, `ResponsiveContainer` 100% × 220px).
