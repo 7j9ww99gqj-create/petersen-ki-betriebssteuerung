@@ -28,7 +28,7 @@
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
 - Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `9a9b0ad`.
 - Jüngste Fortschritte (2026-05-18 Owner-Dashboard-Sprint): MTD/YTD-KPIs, Kunden-Cockpit, Alerts-Tab, AnalysePilot Zeitraum-Filter live — alle 5 geplanten Tasks deployed.
-- Wichtigste externe Restpunkte: Migration `20260518200000_steuer_belege_uploads.sql` im Supabase SQL-Editor ausführen. Einkauf-Tabellen im Supabase SQL-Editor ausführen (Code ist live-ready).
+- Wichtigste externe Restpunkte: Alle Migrations sind eingespielt (`Remote database is up to date`). Keine ausstehenden SQL-Migrationen mehr.
 - Produktivlage: Kernsystem weitgehend vollständig; Hauptmodule produktionsreif.
 
 ### 0.2 Top-Offene Aufgaben (Priorisiert)
@@ -64,7 +64,7 @@
 - ✅ ~~**Owner-Sprint #3: Kunden-Cockpit**~~ **Erledigt 2026-05-18** (Commit `021d2fc`).
 - ✅ ~~**Owner-Sprint #4: Zahlungs-Alert-Center**~~ **Erledigt 2026-05-18** (Commit `1fce336`).
 - ✅ ~~**Owner-Sprint #5: AnalysePilot Zeitraum-Filter**~~ **Erledigt 2026-05-18** (Commit `9a9b0ad`).
-- 🔴 **Einkauf-Tabellen in Supabase ausführen** — Code ist live-ready, Tabellen fehlen noch: `einkauf_lieferanten`, `einkauf_bestellungen`, `einkauf_wareneingaenge`.
+- ✅ ~~**Einkauf-Tabellen in Supabase**~~ — Bereits in Migration `20260510213000` angewendet; EinkaufTab ist vollständig live.
 - 🟡 **Owner-Sprint #6: Pipeline-Kanban-View** — horizontale Spalten Anfrage/Angebot/Auftrag/Rechnung/Bezahlt (5h, Opus-Modell empfohlen).
 - 🟡 **Owner-Sprint #7: Positions-Übernahme Angebot→Rechnung** — Positionen gehen bei Direktkonvertierung verloren, 1-Zeiler Fix (1h).
 - 🟡 **Owner-Sprint #8: BüroPilot↔PlanungPilot FK** — `planung_projekte.auftrag_id` Migration + „Als Projekt anlegen"-Button (4h).
@@ -78,7 +78,7 @@
 **Letzter Stand:** 2026-05-18, Commit `9a9b0ad`  
 **Letzte Session:** Owner-Dashboard-Sprint — 5 Tasks deployed: MTD/YTD-KPIs, Kunden-Cockpit, Alerts-Tab, AnalysePilot Zeitraum-Filter  
 **Nächster Focus:** Pipeline-Kanban (5h, Opus) → Positions-Übernahme Angebot→Rechnung (1h) → BüroPilot↔PlanungPilot FK (4h)  
-**Blocker:** `20260518200000_steuer_belege_uploads.sql` + Einkauf-Tabellen manuell im SQL-Editor ausführen  
+**Blocker:** Keine — alle Migrations eingespielt (`db push` sauber)  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
 ## 1. Kurzüberblick
