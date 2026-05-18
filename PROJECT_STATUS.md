@@ -111,11 +111,11 @@
 - 🔴 **VAPID Keys setzen** — Vercel Env-Vars: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL, NEXT_PUBLIC_VAPID_PUBLIC_KEY. Generieren mit `npx web-push generate-vapid-keys`.
 - 🔴 **Supabase Storage Bucket** — `pilot-documents` manuell im Supabase Dashboard erstellen (authenticated read/write, owner delete).
 - 🔴 **Messaging SQL-Schema ausführen** — Tabellen `user_messages` + `broadcast_messages` müssen einmalig manuell im Supabase SQL-Editor eingespielt werden. Bis dahin ist das Postfach nicht funktionsfähig.
-- 🔴 **LagerPilot: Umlagerung atomarisieren** — Datenverlust-Risiko bei Teil-Fehlern (4 Awaits ohne Rollback). Supabase-RPC nötig.
-- 🔴 **LagerPilot: Dual-Layer-Bestandssync** — `lager_artikel.bestand` und `lager_stellplatz_bestand` laufen auseinander; KI-Kontext inkonsistent.
-- 🔴 **WerkstattPilot: FK `buero_auftrag_id`** — `auftragsnr` ist freier Text ohne Referenzintegrität; echte Karte↔Auftrag-FK fehlt noch.
-- 🟡 **Owner-Sprint #6: Pipeline-Kanban-View** — horizontale Spalten Anfrage/Angebot/Auftrag/Rechnung/Bezahlt (5h, Opus-Modell empfohlen).
-- 🟡 **Owner-Sprint #9: Zahlungsmoral-Report** — Ø Zahlungsverzug + Mahnung-Rate je Kunde (2h).
+- ✅ ~~**LagerPilot: Umlagerung atomarisieren**~~ — RPC `umlager_artikel` in `20260519020000_umlager_artikel_rpc.sql` erstellt; `lib/db.ts` nutzt `supabase.rpc()`.
+- ✅ ~~**LagerPilot: Dual-Layer-Bestandssync**~~ — Trigger `trg_sync_bestand` in `20260519030000_bestand_sync_trigger.sql` erstellt; `lager_artikel.bestand` wird automatisch bei jedem Stellplatz-Update aktualisiert.
+- ✅ ~~**WerkstattPilot: FK `buero_auftrag_id`**~~ — Migration `20260519040000_werkstatt_karte_buero_auftrag_fk.sql` erstellt; `werkstatt_karten.buero_auftrag_id` referenziert `buero_auftraege.id`; UI-Dropdown im Formular.
+- ✅ ~~**Owner-Sprint #6: Pipeline-Kanban-View**~~ — `PipelineKanbanTab` in `buero/page.tsx` — 5 Spalten, Σ-Summen, klickbar.
+- ✅ ~~**Owner-Sprint #9: Zahlungsmoral-Report**~~ — Tab `💳 Zahlungsmoral` in `analyse/page.tsx` — Ø Verzug, Mahnquote, Ampelfarben je Kunde.
 - 🟡 **Stripe Analytics Integration** (4h) — MRR-Verlauf im Marketing-Auswertungs-Tab.
 - 🟡 **Mailchimp API** (5h) — Echtzeit-Öffnungsraten + Lead→Subscriber-Automatisierung.
 
@@ -124,10 +124,10 @@
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-18, Commit `f35f444`  
-**Letzte Session:** Messaging & Postfach-System implementiert — Zahnrad-Icon, Postfach-Menüpunkt, User-Support, Owner-Broadcast/Einzelnachricht mit Empfänger-Dropdown  
-**Nächster Focus:** Messaging SQL-Schema in Supabase ausführen → Pipeline-Kanban (5h, Opus) → Zahlungsmoral-Report (2h)  
-**Blocker:** Messaging SQL-Schema noch nicht in Supabase eingespielt (Tabellen `user_messages`, `broadcast_messages` fehlen in DB)  
+**Letzter Stand:** 2026-05-18, Commit `e325d19`  
+**Letzte Session (14-Task-Sprint):** Messaging-Schema, atomare Umlagerung RPC, Bestandssync-Trigger, WerkstattPilot FK, Pipeline-Kanban, KI-Bestellung ausführbar, Push-Alerts, Zahlungsmoral-Report, Hinweis-Deeplinks, Rollen-Sync, BüroPilot E2E-Bug behoben  
+**Nächster Focus:** Messaging + pilot_documents SQL in Supabase ausführen → VAPID Keys in Vercel setzen → pilot-documents Bucket erstellen  
+**Blocker:** SQL-Schemas noch nicht manuell eingespielt (user_messages, broadcast_messages, pilot_documents, push_subscriptions); VAPID Keys fehlen in Vercel  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
 ## 1. Kurzüberblick
@@ -143,6 +143,22 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – 14-Task-Sprint, Commits `…`–`e325d19`):**
+  - **Task 1 — Messaging SQL-Schema** (`20260519010000_messaging_schema.sql`): Tabellen `user_messages` + `broadcast_messages` + RLS-Policies + Indexes als Migration. ⚠️ Noch manuell in Supabase einzuspielen.
+  - **Task 2 — pilot-documents Bucket** (`20260518210000_pilot_documents.sql`): Migration verifiziert + Timestamp-Konflikt behoben (umbenannt auf `20260518211000`). ⚠️ Bucket `pilot-documents` manuell erstellen.
+  - **Task 3 — VAPID Keys**: `NEXT_PUBLIC_VAPID_PUBLIC_KEY` in `.env.local` gesetzt; in Vercel müssen `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_EMAIL` noch gesetzt werden.
+  - **Task 4 — Push-Alerts Cron**: `vercel.json` mit Cron `0 8 * * *` auf `/api/cron/push-alerts` verifiziert.
+  - **Task 5 — Atomare Umlagerung**: RPC `umlager_artikel()` in `20260519020000_umlager_artikel_rpc.sql`; `lib/db.ts` `umlagerArtikel()` nutzt `supabase.rpc()` statt 4 sequentielle Awaits.
+  - **Task 6 — Bestandssync-Trigger**: `trg_sync_bestand` in `20260519030000_bestand_sync_trigger.sql` — bei INSERT/UPDATE/DELETE auf `lager_stellplatz_bestand` wird `lager_artikel.bestand` automatisch per SUM synchronisiert.
+  - **Task 7 — WerkstattPilot FK**: `20260519040000_werkstatt_karte_buero_auftrag_fk.sql` — `werkstatt_karten.buero_auftrag_id TEXT REFERENCES buero_auftraege(id) ON DELETE SET NULL`; Dropdown im Formular (auto-füllt Auftragsnr + Beschreibung).
+  - **Task 8 — Pipeline-Kanban**: `PipelineKanbanTab` in `buero/page.tsx` — 5 Spalten (Angebot/Auftrag/In Bearbeitung/Rechnung/Bezahlt), Σ-Spaltensummen, klickbare Karten.
+  - **Task 9 — KI-Bestellung ausführbar**: `executeBestellung()` in `ki-erkennung/page.tsx` — 2-Klick-Bestätigung, `upsertEinkaufBestellung()` + Demo-Simulation.
+  - **Task 10 — KI-Hinweis Deeplinks**: Hinweis-Aktionen leiten je nach Schlüsselwort zum richtigen Pilot weiter (buero/werkstatt/steuer/planung/analyse/lager).
+  - **Task 11 — Zahlungsmoral-Report**: Tab `💳 Zahlungsmoral` in `analyse/page.tsx` — Ø Verzug, Mahnquote, Ampelfarben je Kunde.
+  - **Task 12 — lib/access.ts Rollen-Sync**: `DEFAULT_ROLE_PILOTS.Büro` um `'steuer'` ergänzt (war in `lib/roles.ts` bereits enthalten).
+  - **Task 13 — WerkstattPilot BüroAuftrag-Link**: Dropdown `bueroAuftraege` im Arbeitskarten-Formular; Daten via `getBueroAuftraege()` + `Promise.all`.
+  - **Task 14 — BüroPilot E2E-Bug behoben** (`e325d19`): `handleKonvertieren` setzt Angebot-Status auf `'Akzeptiert'` + navigiert nach Konvertierung zum `auftraege`-Tab.
+  - Build ✅, TSC ✅, alle Commits gepusht.
 - **Zuletzt erledigt (2026-05-18 – Messaging & Postfach-System, Commits `9ae15d1`–`f35f444`):**
   - **Settings-Icon** (`layout.tsx`): Zahnrad-Icon ⚙️ oben rechts neben Glocke ersetzt alten Buchstaben-Button. Hover-Effekt blau.
   - **Postfach-Menüpunkt** (`einstellungen/page.tsx`): Neuer NavItem 📬 zwischen Billing & Benachrichtigungen. Für alle User sichtbar.
