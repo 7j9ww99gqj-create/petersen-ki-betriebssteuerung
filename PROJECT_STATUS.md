@@ -51,6 +51,8 @@
 - 🟡 **KI-Aktion "Bestellung"** ausführbar machen — aktuell nur Toast, kein DB-Insert.
 - 🟡 **Stripe Analytics Integration** (4 h, einfach) — MRR-Verlauf im Marketing-Auswertungs-Tab.
 - 🟡 **Mailchimp API** (5 h, einfach) — Echtzeit-Öffnungsraten + Lead→Subscriber-Automatisierung.
+- 🔴 **AnalysePilot: Zeitraum-Filter verdrahten** — UI-Buttons (7T/30T/3M/6M/1J) sind funktionslos; DB-Queries ignorieren den State (Analyse 2026-05-18).
+- 🔴 **AnalysePilot: Gewinn-KPI korrigieren** — steuer_fixkosten/betriebsausgaben nicht einbezogen; Gewinn strukturell falsch (Analyse 2026-05-18).
 - 🟢 Analyse-Bestandstrend auf echte Wochensnapshots umstellen.
 - ✅ ~~**Task 6: Benutzerverwaltung Deaktivieren/Löschen/Suche**~~ **Erledigt 2026-05-18** (Commit `80e0f8c`).
 - ✅ ~~**Task 7: RLS-Policies vollständig**~~ **Erledigt 2026-05-18** (Commit `7aee934`).
@@ -606,6 +608,18 @@
 - [ ] 🟢 **Fortschritts-Auto-Update**: Wenn alle Aufgaben eines Projekts `Erledigt` → `fortschritt = 100` automatisch setzen
 - [ ] 🟢 **Timeline/Gantt-View**: Visuelle Projektübersicht mit Abhängigkeiten (z. B. `react-gantt-task`)
 - [ ] 🟢 **Projekt-Statusbericht PDF**: Export-Button im Projekts-Tab → `lib/pdf.ts` mit Meilensteinen, Aufgaben-Status und Ressourcen-Auslastung
+
+### AnalysePilot – Offene Optimierungen (Analyse 2026-05-18)
+
+- [ ] 🔴 **Zeitraum-Filter verdrahten**: `zeitraum`-State (7T/30T/3M/6M/1J) ist reines UI-Dekor — `loadLiveData()` ignoriert ihn, zeigt immer feste 8 Monate. Fix: `useEffect([zeitraum])` + DB-Query mit `.gte('datum', startDate)` statt client-seitigem Filter. Datei: `analyse/page.tsx`.
+- [ ] 🔴 **Offene-Angebote-Status abgleichen**: Filter `status === 'Entwurf' || 'Gesendet'` stimmt nicht mehr mit BüroPilot-Workflow überein (`'Erstellt'`, `'Versendet'`, `'Akzeptiert'`). Datei: `analyse/page.tsx:226`.
+- [ ] 🟡 **Gewinn-Berechnung korrigieren**: Kosten kommen nur aus `buero_eingangsrechnungen` — `steuer_fixkosten` (monatlicher_anteil, aktiv=true) und `steuer_betriebsausgaben` (variable Ausgaben) existieren und sind befüllt, fließen aber nicht ein. Gewinn-KPI ist strukturell falsch. Datei: `analyse/page.tsx:169–240`.
+- [ ] 🟡 **Bestandstrend-Snapshot-Mechanismus**: Liniendiagramm mit 1 Datenpunkt ist sinnlos. Neue Tabelle `analyse_bestand_snapshots` (kw, erfasst_am, artikel_gesamt, niedrig, leer) + "📸 Snapshot" Button im Bestand-Tab anlegen (kein Cron nötig). Dateien: neue Migration, `analyse/page.tsx`.
+- [ ] 🟡 **Pilot-Nutzungs-PieChart entfernen oder ersetzen**: Werte 38/24/18/10/6/4% sind hartcodiert — erscheinen in zwei Tabs als echte Kennzahl. Entweder Chart entfernen oder durch messbare Größe ersetzen (z. B. KI-Erkennungen pro Pilot-Quelle aus `buero_dokumente.document_type`). Datei: `analyse/page.tsx:76–83`.
+- [ ] 🟡 **WerkstattPilot-KPIs ergänzen**: `werkstatt_karten` (offene/überfällige Aufträge) und `werkstatt_zeitbuchungen` (Produktivität) werden gar nicht ausgewertet — für einen "AnalysePilot" fehlt die wichtigste operative Quelle. Datei: `analyse/page.tsx`.
+- [ ] 🟡 **DB-Abfragen serverseitig begrenzen**: `buero_rechnungen` wird ohne LIMIT komplett geladen; client-seitiger Monatsfilter skaliert nicht. Fix: `.gte('datum', startDate).lte('datum', endDate)` direkt im Query. Datei: `analyse/page.tsx:173`.
+- [ ] 🟢 **CSV-Export für Umsatz-Tabelle**: Download-Button im Umsatz-Tab (`monat, umsatz, kosten, gewinn` als CSV) — Haiku-Task, ~1 h. Datei: `analyse/page.tsx`.
+- [ ] 🟢 **Bestandswert-KPI**: Artikelanzahl × Einkaufspreis (falls in `lager_artikel` vorhanden) als Lagerwert-KPI in Übersicht.
 
 ## 7. Regeln für Coding-Agenten
 - Vor Änderungen zuerst diese Datei, dann betroffene Seite, dann `lib/db.ts`, dann Schema/Migration prüfen.
