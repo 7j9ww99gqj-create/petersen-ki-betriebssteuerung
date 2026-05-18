@@ -26,14 +26,16 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Multi-Feature Sprint abgeschlossen.
-- Letzter Commit: `02e91a0` — Push-Benachrichtigungen (PWA) implementiert.
-- Jüngste Fortschritte (2026-05-18 – Sprint):
-  - Mobile NotificationBell: fixed position, scrollbar, kein Viewport-Overflow
-  - Dokumenten-Archiv (PilotDocumentArchive) für alle 4 Piloten (Lager/Werkstatt/Analyse/Planung)
-  - SteuerPilot: 3-stufiges Beleg-Erfassungs-Modal, Belege-Tab als read-only Archiv
-  - Bottom-Nav: SteuerPilot Direktzugriff hinzugefügt
-  - PWA Push-Benachrichtigungen: SW, API-Routen, lib/push.ts, Einstellungen-UI
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, 7-Task-Sprint abgeschlossen.
+- Letzter Commit: `b9185eb` — einkaufspreis-Spalte in lager_artikel + Modal-Feld im LagerPilot.
+- Jüngste Fortschritte (2026-05-19 – Sprint):
+  - Aufgabe 2: cron push-alerts Spaltenfehler behoben (summe statt gesamtbetrag) + early-return ohne Subscriptions — Commit `ef5c142`
+  - Aufgabe 3: Zod-Validierung für /api/chat — 400 Bad Request bei malformed Body — Commit `2ab7b25`
+  - Aufgabe 6: DB-Indexes für Status/Faellig/MHD-Spalten (8 Indexes) + Migration eingespielt — Commit `01ebdce`
+  - Aufgabe 7+8: EinkaufTab Demo→Live + MarketingPilot Edit/Delete waren bereits vollständig implementiert
+  - Aufgabe 11: SkeletonCard-Komponente + Loading-Skeletons in Dashboard/Analyse/Lager/Werkstatt/Büro — Commit `8ef5305`
+  - Aufgabe 12: EmptyState-Komponente + leere Zustände in Kunden/Karten/Projekte/Kampagnen/Bestand — Commit `69d85ad`
+  - Aufgabe 13: einkaufspreis-Spalte in lager_artikel (Migration eingespielt) + Modal-Feld + upsertLagerArtikel erweitert — Commit `b9185eb`
 - Infrastruktur: PreToolUse-Hook konfiguriert — `npx tsc --noEmit` blockiert Push bei TypeScript-Fehlern.
 - ⚠️ Ausstehend: Messaging SQL-Schema manuell im Supabase SQL-Editor ausführen (Tabellen `user_messages`, `broadcast_messages`).
 - ⚠️ Ausstehend: Neue SQL-Schemas ausführen (pilot_documents, tax_receipts, push_subscriptions) — Migration `20260518210000_pilot_documents.sql`.
@@ -116,6 +118,12 @@
 - ✅ ~~**WerkstattPilot: FK `buero_auftrag_id`**~~ — Migration `20260519040000_werkstatt_karte_buero_auftrag_fk.sql` erstellt; `werkstatt_karten.buero_auftrag_id` referenziert `buero_auftraege.id`; UI-Dropdown im Formular.
 - ✅ ~~**Owner-Sprint #6: Pipeline-Kanban-View**~~ — `PipelineKanbanTab` in `buero/page.tsx` — 5 Spalten, Σ-Summen, klickbar.
 - ✅ ~~**Owner-Sprint #9: Zahlungsmoral-Report**~~ — Tab `💳 Zahlungsmoral` in `analyse/page.tsx` — Ø Verzug, Mahnquote, Ampelfarben je Kunde.
+- ✅ ~~**Aufgabe 2: cron push-alerts Spaltenfehler**~~ — `ef5c142` summe statt gesamtbetrag, early-return ohne Subs.
+- ✅ ~~**Aufgabe 3: Zod-Validierung /api/chat**~~ — `2ab7b25` 400 Bad Request bei malformed Body.
+- ✅ ~~**Aufgabe 6: DB-Indexes**~~ — `01ebdce` 8 Indexes auf Status/Faellig/MHD, Migration eingespielt.
+- ✅ ~~**Aufgabe 11: Loading Skeletons**~~ — `8ef5305` SkeletonCard in Dashboard/Analyse/Lager/Werkstatt/Büro.
+- ✅ ~~**Aufgabe 12: EmptyState**~~ — `69d85ad` EmptyState-Komponente in 5 Piloten eingebaut.
+- ✅ ~~**Aufgabe 13: einkaufspreis-Spalte lager_artikel**~~ — `b9185eb` Migration + lib/db.ts + Modal-Feld.
 - 🟡 **Stripe Analytics Integration** (4h) — MRR-Verlauf im Marketing-Auswertungs-Tab.
 - 🟡 **Mailchimp API** (5h) — Echtzeit-Öffnungsraten + Lead→Subscriber-Automatisierung.
 
@@ -124,10 +132,10 @@
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-18, Commit `e325d19`  
-**Letzte Session (14-Task-Sprint):** Messaging-Schema, atomare Umlagerung RPC, Bestandssync-Trigger, WerkstattPilot FK, Pipeline-Kanban, KI-Bestellung ausführbar, Push-Alerts, Zahlungsmoral-Report, Hinweis-Deeplinks, Rollen-Sync, BüroPilot E2E-Bug behoben  
-**Nächster Focus:** Messaging + pilot_documents SQL in Supabase ausführen → VAPID Keys in Vercel setzen → pilot-documents Bucket erstellen  
-**Blocker:** SQL-Schemas noch nicht manuell eingespielt (user_messages, broadcast_messages, pilot_documents, push_subscriptions); VAPID Keys fehlen in Vercel  
+**Letzter Stand:** 2026-05-19, Commit `b9185eb`  
+**Letzte Session (7-Task-Sprint):** cron push-alerts Spaltenfehler, Zod-Validierung /api/chat, DB-Indexes (8 Tabellen), SkeletonCard, EmptyState, einkaufspreis-Spalte  
+**Nächster Focus:** Weitere UX-Verbesserungen, Stripe Analytics, AnalysePilot Lagerwert nutzt jetzt einkaufspreis-Spalte  
+**Blocker:** Keine  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
 ## 1. Kurzüberblick
