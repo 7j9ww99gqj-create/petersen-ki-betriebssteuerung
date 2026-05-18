@@ -94,6 +94,21 @@ type TFmt = (...args: any[]) => any
 function formatEuro(v: number) { return `${(v / 1000).toFixed(0)}k €` }
 const fmtEuro: TFmt = (v) => [`${Number(v).toLocaleString('de-DE')} €`]
 
+function exportUmsatzCsv(data: UmsatzPoint[]) {
+  const rows = [
+    ['monat', 'umsatz', 'kosten', 'gewinn'],
+    ...data.map(d => [d.monat, String(d.umsatz), String(d.kosten), String(d.gewinn)]),
+  ]
+  const csv = rows.map(r => r.join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `umsatz-export-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ── KPI Card ───────────────────────────────────────────────────────────────────
 
 function KPICard({ icon, label, value, delta, color, sub }: {
@@ -479,7 +494,7 @@ export default function AnalysePilotPage() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>💶 Umsatz, Kosten & Gewinn</h2>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               {(['7T', '30T', '3M', '6M', '1J'] as const).map(z => (
                 <button key={z} onClick={() => setZeitraum(z)} style={{
                   padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)',
@@ -487,6 +502,7 @@ export default function AnalysePilotPage() {
                   color: zeitraum === z ? '#34d399' : '#aeb9c8', fontSize: 12, fontWeight: 700, cursor: 'pointer',
                 }}>{z}</button>
               ))}
+              <button onClick={() => exportUmsatzCsv(umsatzData)} style={{ padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(16,185,129,.35)', background: 'rgba(16,185,129,.1)', color: '#34d399', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📥 CSV exportieren</button>
             </div>
           </div>
 
