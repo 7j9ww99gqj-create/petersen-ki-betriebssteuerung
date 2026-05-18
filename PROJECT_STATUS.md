@@ -55,6 +55,18 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – BüroPilot Angebot/Auftrag/Rechnung Vollprozess)**:
+  - **Kompletter Workflow Angebot→Auftrag→Rechnung** mit Status-Tracking, Freigabelogik, mailto-Integration und 10-Tage-Erinnerung.
+  - **Angebote**: neues Status `Erstellt` (Freigabe), `Versendet` (nach Mail); fortlaufende Nummern via `pk_next_angebot_number()`; ⏰-Reminder-Badge nach 10 Tagen ohne Auftragskonvertierung; Mail öffnet lokales Mailprogramm mit vorausgefülltem Empfänger/Betreff und setzt Status automatisch auf `Versendet`.
+  - **Aufträge**: neue Stati `AB erforderlich` → `AB erstellt` → `AB versendet` → `In Bearbeitung`; Auftragsbestätigung (AB) per mailto verschicken; Workflow-Buttons pro Status; Auftrag → Rechnung erstellen wechselt direkt in Rechnungen-Tab.
+  - **Rechnungen**: neue Rechnungen starten mit Status `Erstellt` (muss verschickt werden); "✉️ Verschicken"-Button setzt Status auf `Offen`; KPI-Summen und Filter berücksichtigen `Erstellt`.
+  - **DB-Migration**: `20260518120000_add_buero_workflow_columns.sql` – `buero_angebote.nummer`, `buero_angebote.verschickt_am`, `buero_auftraege.angebot_id`, `buero_auftraege.ab_verschickt_am`, Funktion `pk_next_angebot_number()`.
+  - Betroffene Dateien: `supabase/migrations/20260518120000_add_buero_workflow_columns.sql`, `lib/db.ts`, `app/dashboard/buero/page.tsx`.
+  - Offene Punkte:
+    - Migration `20260518120000_add_buero_workflow_columns.sql` muss noch per `npx supabase db push` auf Remote-Supabase angewendet werden.
+    - 10-Tage-Erinnerung basiert auf `verschickt_am` – Altdaten haben dieses Feld nicht gesetzt.
+  - Tests: `npm run lint` grün (bekannte Warnungen); `npm run build` grün.
+  - Branch: `feature/buero-workflow` (oder aktueller Branch – git log prüfen)
 - **Zuletzt erledigt (2026-05-18 – Manueller Registrierungs-/Billing-Prozess ohne automatischen Mailversand)**:
   - **Automatischen Mailversand aus dem Zielprozess entfernt**: keine automatische Rechnungs-/Angebotsmail mehr; vorhandene Mail-Aktionen öffnen nur noch einen lokalen `mailto:`-Entwurf.
   - **Registrierung läuft serverseitig ohne Bestätigungsmail**: neue Route `app/api/auth/register/route.ts` erstellt Supabase-Auth-User per Admin API, setzt `access_status = pending` und legt im Inhaber-BüroPilot automatisch einen Kunden aus den Registrierungsdaten an.
