@@ -27,6 +27,8 @@ export type PDFAngebot = {
   status: string
 }
 
+export type PDFTemplate = 'modern-dark' | 'classic-light' | 'elegant-minimal'
+
 export type PDFCompanySettings = {
   firmenname?: string
   logo_url?: string
@@ -46,6 +48,7 @@ export type PDFCompanySettings = {
   standard_mwst?: number
   dokument_footer?: string
   briefpapier_layout?: {
+    template?: PDFTemplate
     akzentfarbe?: string
     showBankdaten?: boolean
     showSteuernummer?: boolean
@@ -59,7 +62,14 @@ const FALLBACK_COMPANY: PDFCompanySettings = {
   website: 'petersen-ki-pilot.de',
   standard_mwst: 19,
   dokument_footer: 'Vielen Dank für Ihr Vertrauen',
-  briefpapier_layout: { akzentfarbe: '#20c8ff', showBankdaten: true, showSteuernummer: true, showUstId: true, showWebsite: true },
+  briefpapier_layout: {
+    template: 'modern-dark',
+    akzentfarbe: '#20c8ff',
+    showBankdaten: true,
+    showSteuernummer: true,
+    showUstId: true,
+    showWebsite: true,
+  },
 }
 
 function getCompanySettings(): PDFCompanySettings {
@@ -113,7 +123,49 @@ function fmtEuro(n: number): string {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DocType = any
 
-function drawHeader(doc: DocType, company: PDFCompanySettings, logoData: string | null, accent: [number, number, number]): void {
+// ── Document style helpers ────────────────────────────────────────────────────
+
+type HintStyle = {
+  bg: [number, number, number]
+  borderMode: 'none' | 'stroke'
+  accentBar: [number, number, number] | null
+  titleColor: [number, number, number] | null  // null = use accent
+  textColor: [number, number, number]
+  subtextColor: [number, number, number]
+}
+
+function getHintStyle(template: PDFTemplate, accent: [number, number, number]): HintStyle {
+  switch (template) {
+    case 'classic-light': return {
+      bg: [230, 241, 255],
+      borderMode: 'none',
+      accentBar: accent,
+      titleColor: [20, 40, 85],
+      textColor: [35, 60, 105],
+      subtextColor: [75, 105, 155],
+    }
+    case 'elegant-minimal': return {
+      bg: [252, 253, 255],
+      borderMode: 'stroke',
+      accentBar: accent,
+      titleColor: null,
+      textColor: [45, 60, 80],
+      subtextColor: [95, 115, 140],
+    }
+    default: return {
+      bg: [12, 22, 36],
+      borderMode: 'none',
+      accentBar: accent,
+      titleColor: null,
+      textColor: [170, 185, 205],
+      subtextColor: [130, 150, 170],
+    }
+  }
+}
+
+// ── Template 1: Modern Dark ───────────────────────────────────────────────────
+
+function drawHeaderModernDark(doc: DocType, company: PDFCompanySettings, logoData: string | null, accent: [number, number, number]): void {
   const pageW = 210
   const margin = 20
 
@@ -161,7 +213,7 @@ function drawHeader(doc: DocType, company: PDFCompanySettings, logoData: string 
   }
 }
 
-function drawFooter(doc: DocType, company: PDFCompanySettings, accent: [number, number, number]): void {
+function drawFooterModernDark(doc: DocType, company: PDFCompanySettings, accent: [number, number, number]): void {
   const pageW = 210
   const margin = 20
 
@@ -187,12 +239,190 @@ function drawFooter(doc: DocType, company: PDFCompanySettings, accent: [number, 
   doc.text(`Seite 1  ·  erstellt am ${heuteFormatiert()}`, pageW / 2, 283, { align: 'center' })
 }
 
+// ── Template 2: Classic Professional ─────────────────────────────────────────
+
+function drawHeaderClassicLight(doc: DocType, company: PDFCompanySettings, logoData: string | null, accent: [number, number, number]): void {
+  const pageW = 210
+  const margin = 20
+
+  // Deep navy header bar
+  doc.setFillColor(22, 42, 88)
+  doc.rect(0, 0, pageW, 28, 'F')
+  // Accent bottom line
+  doc.setFillColor(...accent)
+  doc.rect(0, 27.2, pageW, 1.2, 'F')
+
+  if (logoData) {
+    try { doc.addImage(logoData, imageFormat(logoData), margin, 5, 17, 17) } catch {}
+  }
+  const nameX = logoData ? margin + 21 : margin
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(255, 255, 255)
+  doc.text((company.firmenname || FALLBACK_COMPANY.firmenname!).toUpperCase(), nameX, 13.5)
+
+  const contactParts: string[] = []
+  if (company.website) contactParts.push(company.website)
+  if (company.email) contactParts.push(company.email)
+  if (company.telefon) contactParts.push(company.telefon)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(175, 200, 235)
+  if (contactParts.length) doc.text(contactParts.join('  ·  '), pageW - margin, 13.5, { align: 'right' })
+
+  const adressParts: string[] = []
+  if (company.adresse) adressParts.push(company.adresse)
+  if (company.plz || company.ort) adressParts.push([company.plz, company.ort].filter(Boolean).join(' '))
+  if (adressParts.length) {
+    doc.setFontSize(7.5)
+    doc.setTextColor(145, 170, 210)
+    doc.text(adressParts.join(', '), nameX, 21)
+  }
+
+  const taxParts: string[] = []
+  if (company.briefpapier_layout?.showUstId !== false && company.ust_id) taxParts.push(`USt-ID: ${company.ust_id}`)
+  if (company.briefpapier_layout?.showSteuernummer !== false && company.steuernummer) taxParts.push(`St.-Nr.: ${company.steuernummer}`)
+  if (taxParts.length) {
+    doc.setFontSize(7.5)
+    doc.setTextColor(145, 170, 210)
+    doc.text(taxParts.join('  ·  '), pageW - margin, 21, { align: 'right' })
+  }
+}
+
+function drawFooterClassicLight(doc: DocType, company: PDFCompanySettings, accent: [number, number, number]): void {
+  const pageW = 210
+  const margin = 20
+
+  // Light gray footer background
+  doc.setFillColor(242, 246, 252)
+  doc.rect(0, 268, pageW, 29, 'F')
+  // Thin border at top
+  doc.setDrawColor(...accent)
+  doc.setLineWidth(0.5)
+  doc.line(0, 268.5, pageW, 268.5)
+
+  const parts: string[] = []
+  if (company.dokument_footer) parts.push(company.dokument_footer)
+  if (company.briefpapier_layout?.showWebsite !== false && company.website) parts.push(company.website)
+  if (company.briefpapier_layout?.showBankdaten !== false && company.bankname) parts.push(company.bankname)
+  if (company.briefpapier_layout?.showBankdaten !== false && company.iban) parts.push(`IBAN ${company.iban}`)
+  if (company.briefpapier_layout?.showBankdaten !== false && company.bic) parts.push(`BIC ${company.bic}`)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(55, 80, 130)
+  if (parts.length) doc.text(parts.join('  ·  '), pageW / 2, 277, { align: 'center' })
+
+  doc.setFontSize(7)
+  doc.setTextColor(120, 140, 175)
+  doc.text(`Seite 1  ·  erstellt am ${heuteFormatiert()}`, pageW / 2, 284, { align: 'center' })
+}
+
+// ── Template 3: Elegant Minimal ───────────────────────────────────────────────
+
+function drawHeaderElegantMinimal(doc: DocType, company: PDFCompanySettings, logoData: string | null, accent: [number, number, number]): void {
+  const pageW = 210
+  const margin = 20
+
+  // Slim accent bar at very top
+  doc.setFillColor(...accent)
+  doc.rect(0, 0, pageW, 2.5, 'F')
+
+  if (logoData) {
+    try { doc.addImage(logoData, imageFormat(logoData), margin, 6, 16, 16) } catch {}
+  }
+  const nameX = logoData ? margin + 20 : margin
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(22, 32, 52)
+  doc.text((company.firmenname || FALLBACK_COMPANY.firmenname!).toUpperCase(), nameX, 14)
+
+  const contactParts: string[] = []
+  if (company.website) contactParts.push(company.website)
+  if (company.email) contactParts.push(company.email)
+  if (company.telefon) contactParts.push(company.telefon)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(135, 150, 170)
+  if (contactParts.length) doc.text(contactParts.join('  ·  '), pageW - margin, 14, { align: 'right' })
+
+  const adressParts: string[] = []
+  if (company.adresse) adressParts.push(company.adresse)
+  if (company.plz || company.ort) adressParts.push([company.plz, company.ort].filter(Boolean).join(' '))
+  if (adressParts.length) {
+    doc.setFontSize(7.5)
+    doc.setTextColor(155, 168, 185)
+    doc.text(adressParts.join(', '), nameX, 20.5)
+  }
+
+  const taxParts: string[] = []
+  if (company.briefpapier_layout?.showUstId !== false && company.ust_id) taxParts.push(`USt-ID: ${company.ust_id}`)
+  if (company.briefpapier_layout?.showSteuernummer !== false && company.steuernummer) taxParts.push(`St.-Nr.: ${company.steuernummer}`)
+  if (taxParts.length) {
+    doc.setFontSize(7.5)
+    doc.setTextColor(155, 168, 185)
+    doc.text(taxParts.join('  ·  '), pageW - margin, 20.5, { align: 'right' })
+  }
+
+  // Clean separator line
+  doc.setDrawColor(215, 222, 232)
+  doc.setLineWidth(0.3)
+  doc.line(margin, 26, pageW - margin, 26)
+}
+
+function drawFooterElegantMinimal(doc: DocType, company: PDFCompanySettings, accent: [number, number, number]): void {
+  const pageW = 210
+  const margin = 20
+
+  // Thin accent separator
+  doc.setFillColor(...accent)
+  doc.rect(margin, 268, pageW - 2 * margin, 0.5, 'F')
+
+  const parts: string[] = []
+  if (company.dokument_footer) parts.push(company.dokument_footer)
+  if (company.briefpapier_layout?.showWebsite !== false && company.website) parts.push(company.website)
+  if (company.briefpapier_layout?.showBankdaten !== false && company.bankname) parts.push(company.bankname)
+  if (company.briefpapier_layout?.showBankdaten !== false && company.iban) parts.push(`IBAN ${company.iban}`)
+  if (company.briefpapier_layout?.showBankdaten !== false && company.bic) parts.push(`BIC ${company.bic}`)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(155, 168, 185)
+  if (parts.length) doc.text(parts.join('  ·  '), pageW / 2, 277, { align: 'center' })
+
+  doc.setFontSize(7)
+  doc.setTextColor(180, 190, 205)
+  doc.text(`Seite 1  ·  erstellt am ${heuteFormatiert()}`, pageW / 2, 284, { align: 'center' })
+}
+
+// ── Dispatch ──────────────────────────────────────────────────────────────────
+
+function drawHeader(doc: DocType, company: PDFCompanySettings, logoData: string | null, accent: [number, number, number]): void {
+  const t = company.briefpapier_layout?.template ?? 'modern-dark'
+  if (t === 'classic-light') return drawHeaderClassicLight(doc, company, logoData, accent)
+  if (t === 'elegant-minimal') return drawHeaderElegantMinimal(doc, company, logoData, accent)
+  return drawHeaderModernDark(doc, company, logoData, accent)
+}
+
+function drawFooter(doc: DocType, company: PDFCompanySettings, accent: [number, number, number]): void {
+  const t = company.briefpapier_layout?.template ?? 'modern-dark'
+  if (t === 'classic-light') return drawFooterClassicLight(doc, company, accent)
+  if (t === 'elegant-minimal') return drawFooterElegantMinimal(doc, company, accent)
+  return drawFooterModernDark(doc, company, accent)
+}
+
 export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: string, returnBase64?: boolean): Promise<string | void> {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const company = getCompanySettings()
   const accent = hexToRgb(company.briefpapier_layout?.akzentfarbe || '#20c8ff')
+  const template: PDFTemplate = company.briefpapier_layout?.template ?? 'modern-dark'
   const logoData = await loadImageDataUrl(company.logo_url)
+  const hint = getHintStyle(template, accent)
   const pageW = 210
   const margin = 20
 
@@ -331,19 +561,28 @@ export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: str
   const hasRef = !!rechnung.internalReference
   const hinweisH = company.iban ? (hasRef ? 24 : 18) : (hasRef ? 18 : 14)
   const hinweisY = totalY + 14
-  doc.setFillColor(12, 22, 36)
+
+  doc.setFillColor(...hint.bg)
   doc.roundedRect(margin, hinweisY, pageW - 2 * margin, hinweisH, 3, 3, 'F')
-  doc.setFillColor(...accent)
-  doc.roundedRect(margin, hinweisY, 3, hinweisH, 1.5, 1.5, 'F')
+  if (hint.borderMode === 'stroke') {
+    doc.setDrawColor(...accent)
+    doc.setLineWidth(0.5)
+    doc.roundedRect(margin, hinweisY, pageW - 2 * margin, hinweisH, 3, 3, 'S')
+  }
+  if (hint.accentBar) {
+    doc.setFillColor(...hint.accentBar)
+    doc.roundedRect(margin, hinweisY, 3, hinweisH, 1.5, 1.5, 'F')
+  }
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(9)
-  doc.setTextColor(...accent)
+  if (hint.titleColor) doc.setTextColor(...hint.titleColor)
+  else doc.setTextColor(...accent)
   doc.text('Zahlungshinweis', margin + 6, hinweisY + 6.5)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
-  doc.setTextColor(170, 185, 205)
+  doc.setTextColor(...hint.textColor)
   doc.text(`Bitte überweisen Sie ${fmtEuro(bruttoVal)} bis zum ${rechnung.faellig}.`, margin + 6, hinweisY + 12.5)
 
   let bankLineY = hinweisY + 18
@@ -354,14 +593,14 @@ export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: str
       company.bic ? `BIC ${company.bic}` : '',
     ].filter(Boolean).join('  ·  ')
     doc.setFontSize(8)
-    doc.setTextColor(130, 150, 170)
+    doc.setTextColor(...hint.subtextColor)
     doc.text(bankLine, margin + 6, bankLineY)
     bankLineY += 5.5
   }
 
   if (hasRef) {
     doc.setFontSize(7.5)
-    doc.setTextColor(100, 120, 140)
+    doc.setTextColor(...hint.subtextColor)
     doc.text(`Verwendungszweck: ${rechnung.internalReference}`, margin + 6, bankLineY)
   }
 
@@ -389,7 +628,9 @@ export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const company = getCompanySettings()
   const accent = hexToRgb(company.briefpapier_layout?.akzentfarbe || '#20c8ff')
+  const template: PDFTemplate = company.briefpapier_layout?.template ?? 'modern-dark'
   const logoData = await loadImageDataUrl(company.logo_url)
+  const hint = getHintStyle(template, accent)
   const pageW = 210
   const margin = 20
 
@@ -519,16 +760,28 @@ export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string
 
   // Gültigkeitshinweis-Box
   const hinweisY = totalY + 14
-  doc.setFillColor(12, 22, 36)
-  doc.roundedRect(margin, hinweisY, pageW - 2 * margin, 15, 3, 3, 'F')
-  doc.setFillColor(...accent)
-  doc.roundedRect(margin, hinweisY, 3, 15, 1.5, 1.5, 'F')
+  const hinweisH = 15
+
+  doc.setFillColor(...hint.bg)
+  doc.roundedRect(margin, hinweisY, pageW - 2 * margin, hinweisH, 3, 3, 'F')
+  if (hint.borderMode === 'stroke') {
+    doc.setDrawColor(...accent)
+    doc.setLineWidth(0.5)
+    doc.roundedRect(margin, hinweisY, pageW - 2 * margin, hinweisH, 3, 3, 'S')
+  }
+  if (hint.accentBar) {
+    doc.setFillColor(...hint.accentBar)
+    doc.roundedRect(margin, hinweisY, 3, hinweisH, 1.5, 1.5, 'F')
+  }
+
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8.5)
-  doc.setTextColor(...accent)
+  if (hint.titleColor) doc.setTextColor(...hint.titleColor)
+  else doc.setTextColor(...accent)
   doc.text('Hinweis', margin + 6, hinweisY + 6)
+
   doc.setFont('helvetica', 'normal')
-  doc.setTextColor(170, 185, 205)
+  doc.setTextColor(...hint.textColor)
   doc.text(`Dieses Angebot ist gültig bis zum ${angebot.gueltig}. Wir freuen uns auf Ihren Auftrag!`, margin + 6, hinweisY + 11.5)
 
   // Signatur

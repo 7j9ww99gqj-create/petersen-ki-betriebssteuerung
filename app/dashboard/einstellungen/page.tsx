@@ -1555,6 +1555,7 @@ const emptyFirma: FirmaEinstellungen = {
   standard_waehrung: 'EUR',
   dokument_footer: 'Vielen Dank für Ihr Vertrauen.',
   briefpapier_layout: {
+    template: 'modern-dark',
     logoPosition: 'links',
     akzentfarbe: '#20c8ff',
     showBankdaten: true,
@@ -1723,6 +1724,123 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
 
       <div className="pk-card">
         <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800 }}>📄 Briefpapier / Design</h3>
+
+        {/* Template selector */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 10, fontWeight: 700, textTransform: 'uppercase' }}>Briefpapier-Vorlage</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+            {([
+              {
+                id: 'modern-dark',
+                name: 'Modern Dark',
+                desc: 'Dunkel & professionell',
+                preview: (
+                  <div style={{ width: '100%', aspectRatio: '0.707', background: '#ffffff', borderRadius: 4, overflow: 'hidden', position: 'relative', fontSize: 0 }}>
+                    {/* Header bar */}
+                    <div style={{ background: '#0a121e', height: '12%', display: 'flex', alignItems: 'center', paddingLeft: 6 }}>
+                      <div style={{ width: 10, height: 3, background: String(layout.akzentfarbe ?? '#20c8ff'), borderRadius: 1 }} />
+                      <div style={{ marginLeft: 4, width: 30, height: 3, background: String(layout.akzentfarbe ?? '#20c8ff'), borderRadius: 1, opacity: 0.8 }} />
+                    </div>
+                    <div style={{ height: 1, background: String(layout.akzentfarbe ?? '#20c8ff') }} />
+                    {/* Body lines */}
+                    <div style={{ padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ width: '45%', height: 2.5, background: '#1a2535', borderRadius: 1 }} />
+                      <div style={{ width: '30%', height: 2, background: '#e8edf3', borderRadius: 1 }} />
+                      <div style={{ marginTop: 3, width: '100%', height: 5, background: '#0a121e', borderRadius: 1 }} />
+                      <div style={{ width: '100%', height: 3, background: '#f3f6fa', borderRadius: 1 }} />
+                      <div style={{ width: '100%', height: 3, background: '#f8fafc', borderRadius: 1 }} />
+                      <div style={{ marginTop: 1, width: '55%', height: 4, background: '#0a121e', borderRadius: 1, alignSelf: 'flex-end' }} />
+                      <div style={{ marginTop: 2, width: '100%', height: 8, background: '#0c1624', borderRadius: 2 }} />
+                    </div>
+                    {/* Footer bar */}
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '10%', background: '#0a121e' }} />
+                    <div style={{ position: 'absolute', bottom: '10%', left: 0, right: 0, height: 1, background: String(layout.akzentfarbe ?? '#20c8ff') }} />
+                  </div>
+                ),
+              },
+              {
+                id: 'classic-light',
+                name: 'Classic Professional',
+                desc: 'Klassisch & seriös',
+                preview: (
+                  <div style={{ width: '100%', aspectRatio: '0.707', background: '#ffffff', borderRadius: 4, overflow: 'hidden', position: 'relative', fontSize: 0 }}>
+                    <div style={{ background: '#162a58', height: '12%', display: 'flex', alignItems: 'center', paddingLeft: 6 }}>
+                      <div style={{ width: 10, height: 3, background: '#ffffff', borderRadius: 1, opacity: 0.9 }} />
+                      <div style={{ marginLeft: 4, width: 30, height: 3, background: '#ffffff', borderRadius: 1, opacity: 0.7 }} />
+                    </div>
+                    <div style={{ height: 1.5, background: String(layout.akzentfarbe ?? '#20c8ff') }} />
+                    <div style={{ padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ width: '45%', height: 2.5, background: '#162a58', borderRadius: 1 }} />
+                      <div style={{ width: '30%', height: 2, background: '#d0d8e8', borderRadius: 1 }} />
+                      <div style={{ marginTop: 3, width: '100%', height: 5, background: '#0a121e', borderRadius: 1 }} />
+                      <div style={{ width: '100%', height: 3, background: '#f3f6fa', borderRadius: 1 }} />
+                      <div style={{ width: '100%', height: 3, background: '#f8fafc', borderRadius: 1 }} />
+                      <div style={{ marginTop: 1, width: '55%', height: 4, background: '#0a121e', borderRadius: 1, alignSelf: 'flex-end' }} />
+                      <div style={{ marginTop: 2, width: '100%', height: 8, background: '#e6f1ff', borderRadius: 2, border: `1px solid ${String(layout.akzentfarbe ?? '#20c8ff')}40` }} />
+                    </div>
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '10%', background: '#f2f6fc' }} />
+                    <div style={{ position: 'absolute', bottom: '10%', left: 0, right: 0, height: 1, background: String(layout.akzentfarbe ?? '#20c8ff') }} />
+                  </div>
+                ),
+              },
+              {
+                id: 'elegant-minimal',
+                name: 'Elegant Minimal',
+                desc: 'Puristisch & edel',
+                preview: (
+                  <div style={{ width: '100%', aspectRatio: '0.707', background: '#ffffff', borderRadius: 4, overflow: 'hidden', position: 'relative', fontSize: 0 }}>
+                    <div style={{ height: 3, background: String(layout.akzentfarbe ?? '#20c8ff') }} />
+                    <div style={{ padding: '5px 6px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ width: '40%', height: 3, background: '#161e34', borderRadius: 1 }} />
+                        <div style={{ width: '25%', height: 2, background: '#c8d0dc', borderRadius: 1 }} />
+                      </div>
+                      <div style={{ width: '28%', height: 2, background: '#dce1ea', borderRadius: 1 }} />
+                      <div style={{ height: 0.8, background: '#d7dee8', marginTop: 2, marginBottom: 2 }} />
+                      <div style={{ width: '45%', height: 2.5, background: '#161e34', borderRadius: 1 }} />
+                      <div style={{ marginTop: 2, width: '100%', height: 5, background: '#0a121e', borderRadius: 1 }} />
+                      <div style={{ width: '100%', height: 3, background: '#f3f6fa', borderRadius: 1 }} />
+                      <div style={{ width: '100%', height: 3, background: '#f8fafc', borderRadius: 1 }} />
+                      <div style={{ marginTop: 1, width: '55%', height: 4, background: '#0a121e', borderRadius: 1, alignSelf: 'flex-end' }} />
+                      <div style={{ marginTop: 2, width: '100%', height: 8, background: '#fcfdff', borderRadius: 2, border: `1px solid ${String(layout.akzentfarbe ?? '#20c8ff')}60` }} />
+                    </div>
+                    <div style={{ position: 'absolute', bottom: '10%', left: 6, right: 6, height: 0.8, background: String(layout.akzentfarbe ?? '#20c8ff') }} />
+                  </div>
+                ),
+              },
+            ] as Array<{ id: string; name: string; desc: string; preview: React.ReactNode }>).map(tpl => {
+              const isSelected = (layout.template ?? 'modern-dark') === tpl.id
+              const accentColor = String(layout.akzentfarbe ?? '#20c8ff')
+              return (
+                <button
+                  key={tpl.id}
+                  disabled={inputDisabled}
+                  onClick={() => setLayout('template', tpl.id)}
+                  style={{
+                    background: isSelected ? 'rgba(32,200,255,.06)' : 'rgba(255,255,255,.03)',
+                    border: isSelected ? `2px solid ${accentColor}` : '2px solid rgba(255,255,255,.08)',
+                    borderRadius: 12,
+                    padding: 10,
+                    cursor: inputDisabled ? 'not-allowed' : 'pointer',
+                    textAlign: 'left',
+                    opacity: inputDisabled ? 0.5 : 1,
+                    transition: 'border-color .15s, background .15s',
+                  }}
+                >
+                  {tpl.preview}
+                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: isSelected ? accentColor : 'rgba(255,255,255,.2)', flexShrink: 0, transition: 'background .15s' }} />
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: isSelected ? accentColor : '#d0d9e8' }}>{tpl.name}</div>
+                      <div style={{ fontSize: 10, color: '#7a8898', marginTop: 1 }}>{tpl.desc}</div>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           <div>
             <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Logo-Position</label>
