@@ -117,6 +117,7 @@ type BueroAuftragRecord = {
   fortschritt?: number | null
   angebot_id?: string | null
   ab_verschickt_am?: string | null
+  ab_nummer?: string | null
 }
 
 type BueroRechnungRecord = {
@@ -477,6 +478,7 @@ function normalizeBueroAuftrag(
     kunde: firstText(row.kunde, row.kunde_id ? kundenById.get(row.kunde_id)?.name ?? '' : ''),
     angebot_id: firstText(row.angebot_id) || undefined,
     ab_verschickt_am: firstText(row.ab_verschickt_am) || undefined,
+    ab_nummer: firstText(row.ab_nummer) || undefined,
   }
 }
 
@@ -1163,7 +1165,7 @@ export async function getBueroAuftraege() {
 
 export async function upsertBueroAuftrag(a: {
   id: string; kunde_id?: string; billing_subscription_id?: string; kunde?: string; beschreibung?: string; wert?: string
-  start?: string; ende?: string; status?: string; fortschritt?: number; angebot_id?: string; ab_verschickt_am?: string
+  start?: string; ende?: string; status?: string; fortschritt?: number; angebot_id?: string; ab_verschickt_am?: string; ab_nummer?: string
 }) {
   const kundenIndex = await listBueroKundenIndex()
   const kundeRecord = a.kunde_id
