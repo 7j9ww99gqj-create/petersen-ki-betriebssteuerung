@@ -242,8 +242,8 @@ function formatDocNummer(raw: string, prefix: 'RE' | 'AB' | 'AN'): string {
 }
 
 // Draws the clean minimal content for briefpapier-mode PDFs.
-// Top reserved area: 0–topY (briefpapier header).
-// Bottom reserved area: bottomY–297 (briefpapier footer).
+// topY: where to start (below briefpapier header, default 78mm for Petersen brand).
+// bottomY: where footer begins (default 244mm).
 function drawBriefpapierContent(
   doc: DocType,
   opts: {
@@ -258,95 +258,96 @@ function drawBriefpapierContent(
     steuerVal: number
     bruttoVal: number
     summenLabel: string
+    geschaeftsfuehrer?: string
     topY?: number
     bottomY?: number
   }
 ): number {
   const pageW = 210
   const margin = 22
-  const topY = opts.topY ?? 50
-  const bottomY = opts.bottomY ?? 252
+  const topY = opts.topY ?? 78
+  const bottomY = opts.bottomY ?? 244
   let y = topY
 
-  // Document heading
+  // ── Document heading (left) ───────────────────────────────────────────────
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(22)
+  doc.setFontSize(20)
   doc.setTextColor(18, 26, 42)
   doc.text(opts.docType, margin, y)
 
-  // Accent underline
   const titleWidth = doc.getTextWidth(opts.docType)
   doc.setFillColor(32, 200, 255)
-  doc.rect(margin, y + 2.5, Math.min(titleWidth, 80), 0.8, 'F')
+  doc.rect(margin, y + 2.5, Math.min(titleWidth, 90), 0.7, 'F')
 
-  // Right-side info box
-  const boxW = 72
+  // ── Right-side info box ───────────────────────────────────────────────────
+  const boxW = 74
   const boxX = pageW - margin - boxW
-  const boxPad = 5
-  const rowH = 7
-  const boxH = opts.metaRows.length * rowH + boxPad * 2
+  const boxPadX = 6
+  const boxPadY = 5
+  const rowH = 7.5
+  const boxH = opts.metaRows.length * rowH + boxPadY * 2 - 1
   doc.setFillColor(248, 250, 253)
-  doc.roundedRect(boxX, topY - 4, boxW, boxH, 2, 2, 'F')
-  doc.setDrawColor(220, 228, 240)
-  doc.setLineWidth(0.3)
-  doc.roundedRect(boxX, topY - 4, boxW, boxH, 2, 2, 'S')
+  doc.roundedRect(boxX, y - 5, boxW, boxH, 2.5, 2.5, 'F')
+  doc.setDrawColor(215, 225, 240)
+  doc.setLineWidth(0.25)
+  doc.roundedRect(boxX, y - 5, boxW, boxH, 2.5, 2.5, 'S')
 
   opts.metaRows.forEach(([label, value], i) => {
-    const rowY = topY + boxPad - 1 + i * rowH
+    const rowY = y + boxPadY - 2 + i * rowH
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7.5)
-    doc.setTextColor(120, 138, 160)
-    doc.text(label, boxX + boxPad, rowY)
+    doc.setTextColor(130, 148, 168)
+    doc.text(label, boxX + boxPadX, rowY)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7.5)
+    doc.setFontSize(8)
     doc.setTextColor(22, 32, 52)
-    doc.text(value, boxX + boxW - boxPad, rowY, { align: 'right' })
+    doc.text(value, boxX + boxW - boxPadX, rowY, { align: 'right' })
   })
 
-  y = Math.max(y + 16, topY + boxH - 4 + 8)
+  // ── Recipient block ───────────────────────────────────────────────────────
+  y = Math.max(y + 14, y - 5 + boxH + 10)
 
-  // Recipient + greeting
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
+  doc.setFontSize(10.5)
   doc.setTextColor(20, 26, 40)
   doc.text(opts.kundenName, margin, y)
-  y += 7
+  y += 8
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.setTextColor(60, 75, 95)
+  doc.setTextColor(55, 70, 90)
   doc.text('Sehr geehrte Damen und Herren,', margin, y)
-  y += 5.5
+  y += 6
 
-  const introLines = doc.splitTextToSize(opts.introText, pageW - margin * 2 - boxW - 4) as string[]
-  doc.setTextColor(50, 62, 80)
+  // Intro text: only spans left half so it doesn't collide with info box
+  const introMaxW = pageW - margin * 2
+  const introLines = doc.splitTextToSize(opts.introText, introMaxW) as string[]
+  doc.setFontSize(9)
+  doc.setTextColor(50, 65, 82)
   doc.text(introLines, margin, y)
-  y += introLines.length * 4.8 + 6
+  y += introLines.length * 5 + 10
 
-  // Table
-  const colPos = margin
-  const colDesc = margin + 11
-  const colZeitraum = pageW - margin - 58
-  const colBetrag = pageW - margin
+  // ── Table ─────────────────────────────────────────────────────────────────
+  const tableW = pageW - margin * 2
+  const colPosW = 12
+  const colAmtW = 38
+  const colDescX = margin + colPosW
+  const colAmtX = pageW - margin  // right-aligned
 
-  // Table header
+  // Header bar
   doc.setFillColor(16, 24, 40)
-  doc.rect(margin, y, pageW - margin * 2, 9, 'F')
+  doc.rect(margin, y, tableW, 9.5, 'F')
   doc.setFillColor(32, 200, 255)
-  doc.rect(margin, y, 2.5, 9, 'F')
+  doc.rect(margin, y, 2.5, 9.5, 'F')
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
-  doc.setTextColor(205, 218, 235)
-  doc.text('Pos.', colPos + 3, y + 6)
-  doc.text('Leistung / Beschreibung', colDesc, y + 6)
+  doc.setTextColor(210, 222, 238)
+  doc.text('Pos.', margin + 3.5, y + 6.2)
+  doc.text('Leistung / Beschreibung', colDescX, y + 6.2)
+  doc.text('Betrag netto', colAmtX, y + 6.2, { align: 'right' })
+  y += 9.5
 
-  const hasZeitraum = opts.positionen.length === 0 ||
-    opts.docType === 'AUFTRAGSBESTÄTIGUNG' || opts.docType === 'RECHNUNG'
-  if (hasZeitraum) doc.text('Zeitraum', colZeitraum, y + 6)
-  doc.text('Betrag netto', colBetrag, y + 6, { align: 'right' })
-  y += 9
-
-  // Table rows
+  // Rows
   const positions: PDFPosition[] = opts.positionen.length > 0 ? opts.positionen : [{
     id: '1',
     beschreibung: opts.docType === 'ANGEBOT' ? 'Leistungspaket' : 'Ausgeführte Leistung',
@@ -355,36 +356,37 @@ function drawBriefpapierContent(
     einzelpreis: opts.nettoVal,
   }]
 
+  const descMaxW = tableW - colPosW - colAmtW - 4
   positions.forEach((pos, idx) => {
     const posNetto = pos.menge * pos.einzelpreis
-    const descLines = doc.splitTextToSize(pos.beschreibung || '–', colZeitraum - colDesc - 4) as string[]
-    const rowHeight = Math.max(8, descLines.length * 4.5 + 5)
+    const descLines = doc.splitTextToSize(pos.beschreibung || '–', descMaxW) as string[]
+    const rowHeight = Math.max(10, descLines.length * 5 + 6)
 
-    if (idx % 2 === 0) {
-      doc.setFillColor(248, 251, 255)
-    } else {
-      doc.setFillColor(241, 246, 254)
-    }
-    doc.rect(margin, y, pageW - margin * 2, rowHeight, 'F')
+    doc.setFillColor(idx % 2 === 0 ? 248 : 241, idx % 2 === 0 ? 251 : 247, 255)
+    doc.rect(margin, y, tableW, rowHeight, 'F')
 
+    const midY = y + rowHeight / 2 + 1.8
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
+    doc.setFontSize(9)
     doc.setTextColor(35, 45, 62)
-    doc.text(String(idx + 1), colPos + 3, y + rowHeight / 2 + 1.5)
-    doc.text(descLines, colDesc, y + rowHeight / 2 - (descLines.length - 1) * 2.25 + 1.5)
-    doc.text(fmtEuro(posNetto), colBetrag, y + rowHeight / 2 + 1.5, { align: 'right' })
+    doc.text(String(idx + 1), margin + 4, midY)
+    doc.text(descLines, colDescX, y + rowHeight / 2 - (descLines.length - 1) * 2.5 + 1.8)
+    doc.setFont('helvetica', 'bold')
+    doc.text(fmtEuro(posNetto), colAmtX, midY, { align: 'right' })
     y += rowHeight
   })
 
-  // Thin separator
-  doc.setDrawColor(210, 220, 235)
-  doc.setLineWidth(0.3)
+  // Bottom table border
+  doc.setDrawColor(200, 215, 232)
+  doc.setLineWidth(0.4)
   doc.line(margin, y, pageW - margin, y)
-  y += 6
+  y += 8
 
-  // Totals block (right-aligned)
-  const sumW = 72
+  // ── Totals block (flush right, aligned with table) ────────────────────────
+  const sumW = 80
   const sumX = pageW - margin - sumW
+  const sumLabelX = sumX + 5
+  const sumValX = pageW - margin
 
   const sumRows: [string, string][] = [
     ['Nettobetrag', fmtEuro(opts.nettoVal)],
@@ -392,42 +394,50 @@ function drawBriefpapierContent(
   ]
 
   sumRows.forEach(([label, value], i) => {
-    const ry = y + i * 7
+    const ry = y + i * 8
     doc.setFillColor(i % 2 === 0 ? 246 : 251, i % 2 === 0 ? 249 : 253, 255)
-    doc.rect(sumX, ry - 4, sumW, 7, 'F')
+    doc.rect(sumX, ry - 4.5, sumW, 8, 'F')
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
-    doc.setTextColor(95, 112, 132)
-    doc.text(label, sumX + 3, ry)
+    doc.setFontSize(9)
+    doc.setTextColor(100, 118, 138)
+    doc.text(label, sumLabelX, ry)
+    doc.setFont('helvetica', 'bold')
     doc.setTextColor(22, 32, 52)
-    doc.text(value, sumX + sumW - 3, ry, { align: 'right' })
+    doc.text(value, sumValX, ry, { align: 'right' })
   })
 
-  y += sumRows.length * 7 + 2
+  y += sumRows.length * 8 + 2
 
   // Total highlight bar
   doc.setFillColor(16, 24, 40)
-  doc.rect(sumX, y - 4, sumW, 10, 'F')
+  doc.rect(sumX, y - 4.5, sumW, 11, 'F')
   doc.setFillColor(32, 200, 255)
-  doc.rect(sumX, y - 4, 2.5, 10, 'F')
+  doc.rect(sumX, y - 4.5, 2.5, 11, 'F')
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(9.5)
-  doc.setTextColor(205, 218, 235)
-  doc.text(opts.summenLabel, sumX + 5, y + 2.5)
+  doc.setTextColor(210, 225, 242)
+  doc.text(opts.summenLabel, sumX + 6, y + 3)
   doc.setTextColor(32, 200, 255)
-  doc.text(fmtEuro(opts.bruttoVal), sumX + sumW - 3, y + 2.5, { align: 'right' })
-  y += 16
+  doc.text(fmtEuro(opts.bruttoVal), sumValX, y + 3, { align: 'right' })
+  y += 18
 
-  // Signature
-  if (y + 16 < bottomY) {
+  // ── Signature ─────────────────────────────────────────────────────────────
+  if (y + 22 < bottomY) {
+    doc.setDrawColor(215, 225, 238)
+    doc.setLineWidth(0.25)
+    doc.line(margin, y - 4, margin + 60, y - 4)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(75, 90, 110)
     doc.text('Mit freundlichen Grüßen', margin, y)
-    y += 6
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.setTextColor(22, 32, 52)
+    y += 7
+    if (opts.geschaeftsfuehrer) {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9.5)
+      doc.setTextColor(22, 32, 52)
+      doc.text(opts.geschaeftsfuehrer, margin, y)
+      y += 5
+    }
   }
 
   return y
@@ -1000,6 +1010,7 @@ export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: str
       steuerVal,
       bruttoVal,
       summenLabel: 'Gesamtbetrag',
+      geschaeftsfuehrer: company.geschaeftsfuehrer,
     })
 
     if (isPdf) {
@@ -1266,6 +1277,7 @@ export async function generateAuftragsbestaetigungPDF(auftrag: PDFAuftragsbestae
       steuerVal,
       bruttoVal,
       summenLabel: 'Auftragswert',
+      geschaeftsfuehrer: company.geschaeftsfuehrer,
     })
 
     if (isPdf) {
@@ -1496,6 +1508,7 @@ export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string
       steuerVal,
       bruttoVal,
       summenLabel: 'Gesamtbetrag',
+      geschaeftsfuehrer: company.geschaeftsfuehrer,
     })
 
     if (isPdf) {
