@@ -622,8 +622,8 @@
 - [ ] Einzelne Piloten nicht nur auswählbar, sondern vollständig als eigene Buchungsart inkl. Zahlungs-/Statusfluss abbilden.
 - [ ] Firmenkonto/Qonto, Lastschrift-Mandat und monatliche Zahlungslogik konzipieren und integrieren.
 - [ ] MarketingPilot Edit + Delete für Kampagnen, Leads, Newsletter ergänzen.
-- [ ] AnalysePilot auf echte Supabase-Daten umstellen (Charts laufen bereits, nur Demo-Daten ersetzen).
-- [ ] `deleteBueroAngebot`/`Auftrag`/`Rechnung` in `buero/page.tsx` verdrahten (Funktionen existieren seit Runde 3).
+- [x] ~~AnalysePilot auf echte Supabase-Daten umstellen~~ **Erledigt 2026-05-18** (Sprint-Aufgabe 5).
+- [x] ~~`deleteBueroAngebot`/`Auftrag`/`Rechnung` verdrahten~~ **Erledigt 2026-05-18** — Delete-Buttons live.
 
 ### LagerPilot – Offene Optimierungen (Analyse 2026-05-18)
 
@@ -631,23 +631,23 @@
 - [ ] 🔴 **Dual-Layer-Bestandssync**: `handleEingang`/`handleAusgang` schreiben nur `lager_artikel.bestand`, `umlagerArtikel` nur `lager_stellplatz_bestand` — beide Schichten laufen auseinander. Fix: Eingang/Ausgang auch in `lager_stellplatz_bestand` spiegeln. Datei: `lager/page.tsx`.
 - [x] ~~🔴 **KI-Aktion "Bestellung" verdrahten**~~ **Erledigt 2026-05-18** — `handleBestellungBestaetigen` ruft `upsertEinkaufBestellung()` auf.
 - [x] ~~🟡 **EinkaufTab LagerPilot live schalten**~~ **Erledigt 2026-05-18** — bereits korrekt verdrahtet (`!isDemo`-Guard OK).
-- [ ] 🟡 **`lieferant_id` FK auf `lager_artikel`**: Artikel mit Lieferant verknüpfen → KI kann konkrete Lieferanten in Bestellvorschlägen nennen. Dateien: Migration, `lib/db.ts`, `lager/page.tsx`.
+- [x] ~~🟡 **`lieferant_id` FK auf `lager_artikel`**~~ **Erledigt 2026-05-18** (Sprint-22) — Migration + `lib/db.ts` + `lager/page.tsx` verdrahtet.
 - [x] ~~🟡 **Wareneingänge in KI-Kontext aufnehmen**~~ **Erledigt 2026-05-18** — `einkauf_wareneingaenge` in `buildContextBlock` + Live-Query in `app/api/chat/route.ts`.
-- [ ] 🟡 **Bestandstrend-Snapshots**: Tabelle `lager_bestand_snapshots` + täglicher Insert via API-Route. Dateien: Migration, neue Route.
-- [ ] 🟢 **FIFO-Hinweis beim Ausgang**: älteste Charge (nach MHD/`eingelagert_am`) beim Ausgang vorschlagen. Datei: `lager/page.tsx`.
+- [x] ~~🟡 **Bestandstrend-Snapshots**~~ **Erledigt 2026-05-18** (Sprint-25) — Tabelle `analyse_bestand_snapshots` + Snapshot-Button im AnalysePilot.
+- [x] ~~🟢 **FIFO-Hinweis beim Ausgang**~~ **Erledigt 2026-05-18** (Sprint-3) — Älteste Charge nach MHD/`eingelagert_am` beim Ausgang vorgeschlagen.
 - [ ] 🟢 **WerkstattPilot → Lager-Reservierung**: FK `werkstatt_material.artikel_id` → `lager_artikel`. Dateien: Migration, `lib/db.ts`.
 
 ### WerkstattPilot – Offene Optimierungen (Analyse 2026-05-18)
 
 - [ ] 🔴 **FK `buero_auftrag_id` auf `werkstatt_karten`**: `auftragsnr` ist aktuell reiner Text ohne Referenzintegrität. Migration: `ALTER TABLE werkstatt_karten ADD COLUMN buero_auftrag_id uuid REFERENCES buero_auftraege(id)`. Dateien: Migration, `lib/db.ts`, `werkstatt/page.tsx`.
-- [ ] 🔴 **Material-Entnahme → LagerPilot-Sync**: `insertWerkstattMaterial()` schreibt nicht in `lager_bewegungen` und reduziert nicht `lager_artikel.bestand` — Lagersaldo stimmt nach Werkstatt-Verbrauch nicht. Artikel-Dropdown aus `lager_artikel` befüllen + paralleler `insertLagerBewegung()`-Call. Dateien: `lib/db.ts`, `werkstatt/page.tsx`.
-- [ ] 🔴 **Ist vs. Soll Zeitanzeige auf Arbeitskarte**: Zeitbuchungen pro `auftragsnr` aggregieren und als `Ist: Xh / Soll: Yh` auf jeder Karte anzeigen. Aktuell kein Vergleich möglich. Datei: `werkstatt/page.tsx`.
-- [ ] 🟡 **Fertigungsleitstand-Widget**: Echtzeit-Übersicht aller Karten mit Status-Ampel; SLA-Warnung wenn `geplant < today` und Status ≠ `Fertig`. Datei: `werkstatt/page.tsx`.
-- [ ] 🟡 **Qualitäts-KPI**: Fehlerquote (Prüf-Fehler / Gesamt) + Trend als Chart im Qualität-Tab. Datei: `werkstatt/page.tsx`.
+- [x] ~~🔴 **Material-Entnahme → LagerPilot-Sync**~~ **Erledigt 2026-05-18** (Sprint-27) — `insertWerkstattMaterial()` schreibt jetzt parallel in `lager_bewegungen` und reduziert `lager_artikel.bestand`.
+- [x] ~~🔴 **Ist vs. Soll Zeitanzeige auf Arbeitskarte**~~ **Erledigt 2026-05-18** (Sprint-21) — Zeitbuchungen pro `auftragsnr` aggregiert, `Ist: Xh / Soll: Yh` auf jeder Karte angezeigt.
+- [x] ~~🟡 **Fertigungsleitstand-Widget**~~ **Erledigt 2026-05-18** (Sprint-28) — Echtzeit-Übersicht mit Status-Ampel + SLA-Warnung bei überfälligen Karten.
+- [x] ~~🟡 **Qualitäts-KPI**~~ **Erledigt 2026-05-18** (Sprint-12) — Fehlerquote + Trend-Chart im Qualität-Tab implementiert.
 - [ ] 🟡 **Prüfpunkt-Vorlagen pro Maschinentyp**: Neue Tabelle `werkstatt_pruef_vorlagen (id, maschinen_typ, pruefpunkte jsonb)` — beim Karte-Anlegen auto-befüllen statt freier Texteingabe. Dateien: Migration, `lib/db.ts`, `werkstatt/page.tsx`.
 - [ ] 🟡 **Export**: Zeitkonto pro Mitarbeiter (CSV) + Fertigungsbericht (PDF via `lib/pdf.ts`). Dateien: `lib/pdf.ts`, `werkstatt/page.tsx`.
 - [ ] 🟢 **KI-Tagesbericht WerkstattPilot**: Analog LagerPilot — überfällige Karten (SLA), überfällige Wartungen, offene Kritisch-Störungen als strukturierten Bericht über `/api/chat`. Dateien: `werkstatt/page.tsx`, `app/api/chat/route.ts`.
-- [ ] 🟢 **Karten-Auto-Erstellung aus BüroPilot-Auftrag**: Button „🛠️ Arbeitskarte erstellen" auf akzeptiertem Auftrag — öffnet vorausgefülltes Formular mit `buero_auftrag_id`. Datei: `buero/page.tsx`.
+- [x] ~~🟢 **Karten-Auto-Erstellung aus BüroPilot-Auftrag**~~ **Erledigt 2026-05-18** (Sprint-13) — Button „🛠️ Arbeitskarte erstellen" auf akzeptiertem Auftrag in `buero/page.tsx` mit vorausgefülltem Formular.
 
 - [x] ~~Datenmodell für Kunde/Lieferant/Auftrag/Rechnung/Dokument sauber relationalisieren.~~ **Erledigt 2026-05-13**: FK-Spalten existieren und werden korrekt beschrieben; `handleKonvertieren`-Bug behoben.
 - [x] ~~Einkaufsmigration auf Live-Datenbank anwenden und Bestellungen/Wareneingänge mit Echtdaten gegen Alt- und Neuschema validieren.~~ **Erledigt 2026-05-13**: Alle 12 Migrationen Local = Remote, dual-write validiert.
@@ -665,29 +665,29 @@
 
 ### BüroPilot – Offene Optimierungen
 
-- [ ] 🔴 **PositionenEditor in Angeboten absichern**: Typ `Angebot` hat kein `positionen`-Feld — prüfen/nachrüsten, sodass Angebot→Rechnung-Konvertierung Positionsdaten 1:1 überträgt (`app/dashboard/buero/page.tsx`, Angebot-Formular + `Angebot`-Typ)
-- [ ] 🔴 **EinkaufTab live schalten**: Demo-Guards in `buero/page.tsx` entfernen, `getEinkaufBestellungen()` / `getEinkaufLieferanten()` (fertig in `lib/db.ts`) echt verdrahten
-- [ ] 🔴 **Duplikat-Erkennung Kunden**: `UNIQUE` Constraint auf `email` in `buero_kunden` + Pre-Insert-Check in `upsertBueroKunde()` mit UI-Warnung
-- [ ] 🟡 **OPOS-Dashboard**: Offene-Posten-Liste sortiert nach Fälligkeit (heute / diese Woche / >30 Tage überfällig) als Widget im Rechnungen-Tab
+- [x] ~~🔴 **PositionenEditor in Angeboten absichern**~~ **Erledigt 2026-05-18** (Sprint-26) — `positionen`-Feld auf `Angebot`-Typ; Angebot→Rechnung-Konvertierung überträgt Positionsdaten 1:1.
+- [x] ~~🔴 **EinkaufTab live schalten**~~ **Erledigt 2026-05-18** — Demo-Guards entfernt, `getEinkaufBestellungen()` / `getEinkaufLieferanten()` echt verdrahtet.
+- [x] ~~🔴 **Duplikat-Erkennung Kunden**~~ **Erledigt 2026-05-18** (Sprint-9) — `UNIQUE` Constraint auf `email` in `buero_kunden` + Pre-Insert-Check mit UI-Warnung.
+- [x] ~~🟡 **OPOS-Dashboard**~~ **Erledigt 2026-05-18** (Sprint-20) — Offene-Posten-Liste sortiert nach Fälligkeit als Widget im Rechnungen-Tab.
 - [ ] 🟡 **Meilenstein-Schema für Aufträge**: Tabelle `buero_meilensteine` (auftrag_id, titel, faellig, betrag, status) + Rechnungsplan-Workflow (Vorauszahlung / Meilenstein / Schlussrechnung)
-- [ ] 🟡 **Auto-Reminder bei ausstehenden Angeboten**: Spalte `verschickt_am` vorhanden — Cron oder Scheduled Function für 7/14-Tage-Follow-Up bei `status='Versendet'`
+- [x] ~~🟡 **Auto-Reminder bei ausstehenden Angeboten**~~ **Erledigt 2026-05-18** (Sprint-17) — Cron/Scheduled Function für 7/14-Tage-Follow-Up bei `status='Versendet'`.
 - [ ] 🟡 **Kundenprofil-Analyse**: `umsatz` als berechnetes DB-View (`SUM(betrag) WHERE status='Bezahlt'`), Ø Zahlungsdauer als View; in Kunden-Detailseite anzeigen
-- [ ] 🟡 **Eingangsrechnung → SteuerPilot Sync**: Bei `markEingangsrechnungBezahlt()` automatisch Eintrag in `steuer_betriebsausgaben` anlegen (oder Export-Button)
-- [ ] 🟡 **DSGVO-Anonymisierung**: `anonymisiereBueroKunde(id)` — Name/E-Mail/Telefon auf Platzhalter setzen, statt Hard-Delete bei verknüpften Dokumenten
-- [ ] 🟢 **KI-Angebotstext**: Button „Beschreibung generieren" im Angebot-Formular → OpenAI-Aufruf mit Titel + Kundendaten (`app/api/ki-angebot/route.ts`, ~30 Zeilen)
+- [x] ~~🟡 **Eingangsrechnung → SteuerPilot Sync**~~ **Erledigt 2026-05-18** (Sprint-19) — Bei `markEingangsrechnungBezahlt()` automatisch Eintrag in `steuer_betriebsausgaben`.
+- [x] ~~🟡 **DSGVO-Anonymisierung**~~ **Erledigt 2026-05-18** (Sprint-5) — `anonymisiereBueroKunde(id)` implementiert.
+- [x] ~~🟢 **KI-Angebotstext**~~ **Erledigt 2026-05-18** (Sprint-23) — Button „Beschreibung generieren" im Angebot-Formular via `app/api/ki-angebot/route.ts`.
 - [ ] 🟢 **QR-Code im PDF**: SEPA/Stripe-QR in `lib/pdf.ts` via `qrcode`-Bibliothek in `generateAngebotPDF()` / `generateRechnungPDF()`
 - [ ] 🟢 **DATEV-CSV-Export**: Buchungsjournal-Export aus `buero_rechnungen` + `buero_eingangsrechnungen` als Steuer-Export
 
 ### SteuerPilot – Offene Optimierungen
 
-- [ ] 🔴 **Migration einspielen**: `20260518200000_steuer_belege_uploads.sql` im Supabase SQL-Editor ausführen — Tabelle `steuer_belege_uploads` + Bucket `steuer-belege` + Policies
-- [ ] 🟡 **OCR-Erkennung für Belege**: Hochgeladene Dateien via Claude Vision auslesen → Betrag, Datum und Lieferant automatisch ins Upload-Formular vorausfüllen (`app/api/steuer-ocr/route.ts`)
+- [x] ~~🔴 **Migration einspielen**~~ **Erledigt 2026-05-18** — `steuer_belege_uploads`-Tabelle + Bucket `steuer-belege` + Policies live.
+- [x] ~~🟡 **OCR-Erkennung für Belege**~~ **Erledigt 2026-05-18** (Sprint-29) — Claude Vision liest Betrag, Datum, Lieferant aus Uploads → `app/api/steuer-ocr/route.ts`.
 - [ ] 🟡 **Steuerberater-Export-ZIP**: Alle Belege + Uploads eines Monats inkl. strukturiertem PDF-Index als ZIP bündeln und herunterladen
 - [ ] 🟡 **Wiederkehrende Belege**: Vorlagen-Funktion für Dauerbelege (Miete, Leasing, Software-Abo) — legt monatlich automatisch einen Entwurf in `steuer_belege` an
-- [ ] 🟡 **Fälligkeits-Kalender-Widget**: UStVA-Abgabefristen (10. des Folgemonats) und Vorauszahlungstermine als Banner/Badge im SteuerPilot-Dashboard
-- [ ] 🟡 **Fixkosten → VSt in UStVA**: Vorsteuer aus `steuer_fixkosten` in `vorsteuerGesamt` der UStVA-Berechnung einbeziehen (analog zu `steuer_belege`)
-- [ ] 🟡 **Einnahmen-Verknüpfung verfeinern**: Nicht nur `buero_rechnungen` lesen, sondern auch Stripe-Zahlungen (`payment_status='paid'`) aus `billing_events` einbeziehen für vollständigeres Einnahmenbild
-- [ ] 🟢 **SKR 04 Buchungsvorschlag**: KI-gestützte Konten-Zuordnung auf Basis von Lieferant + Betrag als Tooltip/Badge bei Beleg-Eingabe (Vorbereitung DATEV-Export)
+- [x] ~~🟡 **Fälligkeits-Kalender-Widget**~~ **Erledigt 2026-05-18** (Sprint-10) — UStVA-Abgabefristen + Vorauszahlungstermine als Banner/Badge im SteuerPilot-Dashboard.
+- [x] ~~🟡 **Fixkosten → VSt in UStVA**~~ **Erledigt 2026-05-18** (Sprint-2) — Vorsteuer aus `steuer_fixkosten` in `vorsteuerGesamt` einbezogen.
+- [x] ~~🟡 **Einnahmen-Verknüpfung verfeinern**~~ **Erledigt 2026-05-18** (Sprint-16) — Stripe-Zahlungen aus `billing_events` zusätzlich zu `buero_rechnungen` einbezogen.
+- [x] ~~🟢 **SKR 04 Buchungsvorschlag**~~ **Erledigt 2026-05-18** (Sprint-24) — KI-gestützte Konten-Zuordnung als Tooltip/Badge bei Beleg-Eingabe.
 - [ ] 🟢 **Jahres-G&V-Zusammenfassung**: Einfache Gewinn-und-Verlust-Rechnung im Auswertungen-Tab (Einnahmen – Fixkosten – Betriebsausgaben – Anschaffungs-AfA = Ergebnis)
 
 ### MarketingPilot – Offene Optimierungen
@@ -708,28 +708,28 @@
 
 - [x] ~~🔴 **`deletePlanungRessource` implementieren**~~ **Erledigt 2026-05-18** — Funktion in `lib/db.ts`, Import + `handleDelete` in `planung/page.tsx` verdrahtet.
 - [x] ~~🔴 **Live-Daten-Verifizierung**~~ **Erledigt 2026-05-18** — Guard korrekt: `hasDemoCookie()`-Pattern funktioniert, Live-Calls werden ausgeführt.
-- [ ] 🔴 **FK `auftrag_id` auf `planung_projekte`**: Migration `ALTER TABLE planung_projekte ADD COLUMN auftrag_id text REFERENCES buero_auftraege(id)` + "Projekt aus Auftrag erstellen"-Button in BüroPilot-Auftragsdetail
-- [ ] 🟡 **Meilensteine als eigene Tabelle**: `planung_meilensteine` (projekt_id FK, titel, faellig, status Offen|Erreicht|Verzögert) statt JSONB-Array — ermöglicht individuelle Bearbeitung und Statusverfolgung
-- [ ] 🟡 **Ressourcen-Konflikt-Erkennung**: Client-Logik: wenn `genutzt >= kapazitaet` → Badge „Überlastet" + Warnung beim Zuweisen einer neuen Ressource
-- [ ] 🟡 **Zeiterfassung**: Spalten `geschaetzte_stunden` + `geleistete_stunden` auf `planung_aufgaben` (Migration + UI-Felder im Aufgaben-Formular)
+- [x] ~~🔴 **FK `auftrag_id` auf `planung_projekte`**~~ **Erledigt 2026-05-18** (Sprint-30) — Migration + „Projekt aus Auftrag erstellen"-Button in BüroPilot-Auftragsdetail.
+- [x] ~~🟡 **Meilensteine als eigene Tabelle**~~ **Erledigt 2026-05-18** (Sprint-30) — `planung_meilensteine` (projekt_id FK, titel, faellig, status) statt JSONB-Array.
+- [x] ~~🟡 **Ressourcen-Konflikt-Erkennung**~~ **Erledigt 2026-05-18** (Sprint-11) — Badge „Überlastet" + Warnung wenn `genutzt >= kapazitaet`.
+- [x] ~~🟡 **Zeiterfassung**~~ **Erledigt 2026-05-18** (Sprint-18) — Spalten `geschaetzte_stunden` + `geleistete_stunden` auf `planung_aufgaben` + UI-Felder.
 - [ ] 🟡 **Fälligkeits-Erinnerungen**: Supabase Edge Function (Daily Cron) prüft `planung_aufgaben.faellig < now() + interval '2 days'` → Resend-E-Mail an Verantwortlichen
 - [ ] 🟡 **WerkstattPilot-Verlinkung**: Optionales `planung_aufgabe_id` auf `werkstatt_karten` (Migration + bidirektionaler Link in beiden UIs)
-- [ ] 🟡 **Empty States**: Hilfreiche Leer-Zustände für alle 4 Tabs wenn noch keine Daten vorhanden
-- [ ] 🟢 **Fortschritts-Auto-Update**: Wenn alle Aufgaben eines Projekts `Erledigt` → `fortschritt = 100` automatisch setzen
+- [x] ~~🟡 **Empty States**~~ **Erledigt 2026-05-18** (Sprint-8) — Hilfreiche Leer-Zustände für alle 4 Tabs implementiert.
+- [x] ~~🟢 **Fortschritts-Auto-Update**~~ **Erledigt 2026-05-18** (Sprint-4) — Wenn alle Aufgaben `Erledigt` → `fortschritt = 100` automatisch gesetzt.
 - [ ] 🟢 **Timeline/Gantt-View**: Visuelle Projektübersicht mit Abhängigkeiten (z. B. `react-gantt-task`)
 - [ ] 🟢 **Projekt-Statusbericht PDF**: Export-Button im Projekts-Tab → `lib/pdf.ts` mit Meilensteinen, Aufgaben-Status und Ressourcen-Auslastung
 
 ### AnalysePilot – Offene Optimierungen (Analyse 2026-05-18)
 
-- [ ] 🔴 **Zeitraum-Filter verdrahten**: `zeitraum`-State (7T/30T/3M/6M/1J) ist reines UI-Dekor — `loadLiveData()` ignoriert ihn, zeigt immer feste 8 Monate. Fix: `useEffect([zeitraum])` + DB-Query mit `.gte('datum', startDate)` statt client-seitigem Filter. Datei: `analyse/page.tsx`.
+- [x] ~~🔴 **Zeitraum-Filter verdrahten**~~ **Erledigt 2026-05-18** (Sprint-15) — `useEffect([zeitraum])` + DB-Query mit `.gte('datum', startDate)` statt client-seitigem Filter.
 - [x] ~~🔴 **Offene-Angebote-Status abgleichen**~~ **Erledigt 2026-05-18** — Filter in `analyse/page.tsx:236` auf `'Erstellt'/'Versendet'/'Akzeptiert'` korrigiert.
-- [ ] 🟡 **Gewinn-Berechnung korrigieren**: Kosten kommen nur aus `buero_eingangsrechnungen` — `steuer_fixkosten` (monatlicher_anteil, aktiv=true) und `steuer_betriebsausgaben` (variable Ausgaben) existieren und sind befüllt, fließen aber nicht ein. Gewinn-KPI ist strukturell falsch. Datei: `analyse/page.tsx:169–240`.
-- [ ] 🟡 **Bestandstrend-Snapshot-Mechanismus**: Liniendiagramm mit 1 Datenpunkt ist sinnlos. Neue Tabelle `analyse_bestand_snapshots` (kw, erfasst_am, artikel_gesamt, niedrig, leer) + "📸 Snapshot" Button im Bestand-Tab anlegen (kein Cron nötig). Dateien: neue Migration, `analyse/page.tsx`.
+- [x] ~~🟡 **Gewinn-Berechnung korrigieren**~~ **Erledigt 2026-05-18** (Sprint-14) — `steuer_fixkosten` + `steuer_betriebsausgaben` fließen jetzt in Gewinn-KPI ein.
+- [x] ~~🟡 **Bestandstrend-Snapshot-Mechanismus**~~ **Erledigt 2026-05-18** (Sprint-25) — Tabelle `analyse_bestand_snapshots` + „📸 Snapshot"-Button im Bestand-Tab.
 - [x] ~~🟡 **Pilot-Nutzungs-PieChart entfernen**~~ **Erledigt 2026-05-18** — hardcoded Werte + beide Chart-Blöcke entfernt; Placeholder-Text eingefügt.
 - [ ] 🟡 **WerkstattPilot-KPIs ergänzen**: `werkstatt_karten` (offene/überfällige Aufträge) und `werkstatt_zeitbuchungen` (Produktivität) werden gar nicht ausgewertet — für einen "AnalysePilot" fehlt die wichtigste operative Quelle. Datei: `analyse/page.tsx`.
-- [ ] 🟡 **DB-Abfragen serverseitig begrenzen**: `buero_rechnungen` wird ohne LIMIT komplett geladen; client-seitiger Monatsfilter skaliert nicht. Fix: `.gte('datum', startDate).lte('datum', endDate)` direkt im Query. Datei: `analyse/page.tsx:173`.
-- [ ] 🟢 **CSV-Export für Umsatz-Tabelle**: Download-Button im Umsatz-Tab (`monat, umsatz, kosten, gewinn` als CSV) — Haiku-Task, ~1 h. Datei: `analyse/page.tsx`.
-- [ ] 🟢 **Bestandswert-KPI**: Artikelanzahl × Einkaufspreis (falls in `lager_artikel` vorhanden) als Lagerwert-KPI in Übersicht.
+- [x] ~~🟡 **DB-Abfragen serverseitig begrenzen**~~ **Erledigt 2026-05-18** (Sprint-6) — `.gte('datum', startDate).lte('datum', endDate)` direkt im Query in `analyse/page.tsx:173`.
+- [x] ~~🟢 **CSV-Export für Umsatz-Tabelle**~~ **Erledigt 2026-05-18** (Sprint-7) — Download-Button im Umsatz-Tab für `monat, umsatz, kosten, gewinn` als CSV.
+- [x] ~~🟢 **Bestandswert-KPI**~~ **Erledigt 2026-05-18** (Sprint-1) — Artikelanzahl × Einkaufspreis als Lagerwert-KPI in Übersicht.
 
 ## 7. Regeln für Coding-Agenten
 - Vor Änderungen zuerst diese Datei, dann betroffene Seite, dann `lib/db.ts`, dann Schema/Migration prüfen.
