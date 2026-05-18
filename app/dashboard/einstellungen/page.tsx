@@ -89,7 +89,7 @@ const PILOT_LABELS: Record<PilotId, string> = {
 
 export default function EinstellungenPage() {
   const router = useRouter()
-  const [section, setSection] = useState<'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'registrierungen' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
+  const [section, setSection] = useState<'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'registrierungen' | 'kunden-eingerichtet' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
   const [toast, setToast] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [isDemo, setIsDemo] = useState(false)
@@ -108,6 +108,7 @@ export default function EinstellungenPage() {
   const [createForm, setCreateForm] = useState({ email: '', fullName: '', role: 'Mitarbeiter' as AppRole, password: '' })
   const [creatingMode, setCreatingMode] = useState<'invite' | 'create' | ''>('')
   const [newlyCreatedSecret, setNewlyCreatedSecret] = useState<{ email: string; password: string } | null>(null)
+  const [pendingPilotSelections, setPendingPilotSelections] = useState<Record<string, PilotId[]>>({})
 
   // Sync picker with current role once loaded
   useEffect(() => { setSelectedRole(currentRole) }, [currentRole])
@@ -196,7 +197,7 @@ export default function EinstellungenPage() {
   }, [canManageLiveUsers])
 
   useEffect(() => {
-    if ((section === 'rollen' || section === 'registrierungen') && canManageLiveUsers) {
+    if ((section === 'rollen' || section === 'registrierungen' || section === 'kunden-eingerichtet') && canManageLiveUsers) {
       void loadManagedUsers()
     }
   }, [section, canManageLiveUsers, loadManagedUsers])
@@ -320,13 +321,14 @@ export default function EinstellungenPage() {
     }
   }
 
-  const applyRegistrationPreset = async (user: ManagedUser, preset: 'demo7' | 'demo14' | 'standard') => {
+  const applyRegistrationPreset = async (user: ManagedUser, preset: 'demo7' | 'demo14' | 'standard', customPilotIds?: PilotId[]) => {
     const expiresAt = preset === 'standard'
       ? null
       : new Date(Date.now() + (preset === 'demo7' ? 7 : 14) * 24 * 60 * 60 * 1000).toISOString()
-    const pilotIds: PilotId[] = preset === 'standard'
+    const defaultPilotIds: PilotId[] = preset === 'standard'
       ? ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer']
       : ['buero', 'lager', 'analyse']
+    const pilotIds: PilotId[] = customPilotIds ?? defaultPilotIds
     setSavingManagedUserId(user.id)
     try {
       const res = await fetch('/api/admin/users', {
@@ -451,6 +453,7 @@ export default function EinstellungenPage() {
           <NavItem id="billing" icon="💳" label="Buchung & Abonnement" />
           {isInhaberAccount && <NavItem id="kundensteuerung" icon="👑" label="Kundensteuerung" />}
           {isInhaberAccount && <NavItem id="registrierungen" icon="🆕" label="Offene Registrierungen" />}
+          {isInhaberAccount && <NavItem id="kunden-eingerichtet" icon="✅" label="Kunden eingerichtet" />}
           <NavItem id="benachrichtigungen" icon="🔔" label="Benachricht." />
           <NavItem id="rollen" icon="🔑" label="Rollen" />
           <NavItem id="import" icon="📥" label="Import" />
@@ -588,7 +591,9 @@ export default function EinstellungenPage() {
                 <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine offenen Registrierungen vorhanden.</div>
               ) : (
                 <div style={{ display: 'grid', gap: 10 }}>
-                  {managedUsers.filter(user => user.accessStatus === 'pending').map(user => (
+                  {managedUsers.filter(user => user.accessStatus === 'pending').map(user => {
+                    const selectedPilots = pendingPilotSelections[user.id] ?? ['buero', 'lager', 'analyse']
+                    return (
                     <div key={user.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 14, background: 'rgba(255,255,255,.03)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                         <div>
@@ -600,14 +605,46 @@ export default function EinstellungenPage() {
                         </div>
                         <span className="badge badge-orange">Freigabe ausstehend</span>
                       </div>
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Pilot-Auswahl</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {MANAGED_PILOT_OPTIONS.map(pilotId => {
+                            const active = selectedPilots.includes(pilotId)
+                            return (
+                              <button
+                                key={pilotId}
+                                type="button"
+                                onClick={() => setPendingPilotSelections(prev => ({
+                                  ...prev,
+                                  [user.id]: active
+                                    ? selectedPilots.filter(id => id !== pilotId)
+                                    : [...selectedPilots, pilotId],
+                                }))}
+                                disabled={savingManagedUserId === user.id}
+                                style={{
+                                  borderRadius: 999,
+                                  border: `1px solid ${active ? 'rgba(22,132,255,.38)' : 'rgba(255,255,255,.08)'}`,
+                                  background: active ? 'rgba(22,132,255,.14)' : 'rgba(255,255,255,.03)',
+                                  color: active ? '#93c5fd' : '#aeb9c8',
+                                  padding: '5px 9px',
+                                  fontSize: 11,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {PILOT_LABELS[pilotId]}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-                        <button className="pk-btn-ghost" disabled={savingManagedUserId === user.id} onClick={() => void applyRegistrationPreset(user, 'demo7')} style={{ fontWeight: 800 }}>
+                        <button className="pk-btn-ghost" disabled={savingManagedUserId === user.id} onClick={() => void applyRegistrationPreset(user, 'demo7', selectedPilots)} style={{ fontWeight: 800 }}>
                           Demo 7 Tage
                         </button>
-                        <button className="pk-btn-ghost" disabled={savingManagedUserId === user.id} onClick={() => void applyRegistrationPreset(user, 'demo14')} style={{ fontWeight: 800 }}>
+                        <button className="pk-btn-ghost" disabled={savingManagedUserId === user.id} onClick={() => void applyRegistrationPreset(user, 'demo14', selectedPilots)} style={{ fontWeight: 800 }}>
                           Demo 14 Tage
                         </button>
-                        <button className="pk-btn" disabled={savingManagedUserId === user.id} onClick={() => void applyRegistrationPreset(user, 'standard')} style={{ fontWeight: 800 }}>
+                        <button className="pk-btn" disabled={savingManagedUserId === user.id} onClick={() => void applyRegistrationPreset(user, 'standard', selectedPilots)} style={{ fontWeight: 800 }}>
                           Standard freischalten
                         </button>
                         <a className="pk-btn-ghost" href={buildRegistrationMailHref(user, 'pending')} style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', fontWeight: 800 }}>
@@ -615,11 +652,207 @@ export default function EinstellungenPage() {
                         </a>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
           )}
+
+          {section === 'kunden-eingerichtet' && (() => {
+            const activeUsers = managedUsers.filter(user => user.accessStatus === 'active')
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="pk-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>Kunden eingerichtet</h3>
+                      <p style={{ margin: 0, color: '#aeb9c8', fontSize: 13 }}>Alle aktiven Zugänge — Piloten, Testzeitraum und Kontakt verwalten.</p>
+                    </div>
+                    <button className="pk-btn-ghost" onClick={() => void loadManagedUsers()} style={{ fontWeight: 700 }}>
+                      Aktualisieren
+                    </button>
+                  </div>
+
+                  {loadingManagedUsers ? (
+                    <div style={{ color: '#aeb9c8', fontSize: 13 }}>Zugänge werden geladen…</div>
+                  ) : activeUsers.length === 0 ? (
+                    <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine aktiven Zugänge vorhanden.</div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 14 }}>
+                      {activeUsers.map(user => {
+                        const accessDraft = managedAccessDrafts[user.id] ?? {
+                          accessStatus: user.accessStatus,
+                          accessMode: user.accessMode,
+                          accessExpiresAt: user.accessExpiresAt ? user.accessExpiresAt.slice(0, 10) : '',
+                          allowedPilotIds: user.allowedPilotIds,
+                        }
+                        const hasChanges =
+                          accessDraft.accessMode !== user.accessMode
+                          || accessDraft.accessExpiresAt !== (user.accessExpiresAt ? user.accessExpiresAt.slice(0, 10) : '')
+                          || accessDraft.allowedPilotIds.join('|') !== user.allowedPilotIds.join('|')
+
+                        const extendExpiry = (days: number) => {
+                          const base = accessDraft.accessExpiresAt
+                            ? new Date(accessDraft.accessExpiresAt)
+                            : new Date()
+                          base.setDate(base.getDate() + days)
+                          setManagedAccessDrafts(prev => ({
+                            ...prev,
+                            [user.id]: { ...accessDraft, accessExpiresAt: base.toISOString().slice(0, 10) },
+                          }))
+                        }
+
+                        const mailHref = `mailto:${encodeURIComponent(user.email)}?subject=${encodeURIComponent('Ihr Zugang bei Petersen KI')}&body=${encodeURIComponent(`Guten Tag ${user.fullName || ''}`.trim() + `,\n\nhier eine kurze Information zu Ihrem Zugang bei Petersen KI.\n\nZugangsstatus: ${ACCESS_MODE_LABELS[accessDraft.accessMode]}${accessDraft.accessExpiresAt ? `\nGültig bis: ${new Date(accessDraft.accessExpiresAt).toLocaleDateString('de-DE')}` : ''}\nFreigeschaltete Piloten: ${accessDraft.allowedPilotIds.length > 0 ? accessDraft.allowedPilotIds.map(id => PILOT_LABELS[id]).join(', ') : 'Keine'}\n\nLogin: ${user.email}\nPortal: https://petersen-ki-pilot.de/login\n\nViele Grüße`)}`
+
+                        return (
+                          <div key={user.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 16, background: 'rgba(255,255,255,.03)' }}>
+                            {/* Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 14 }}>
+                              <div>
+                                <div style={{ fontWeight: 800, fontSize: 15 }}>{user.fullName || 'Ohne Namen'}</div>
+                                <div style={{ color: '#aeb9c8', fontSize: 12, marginTop: 3 }}>{user.email}</div>
+                                <div style={{ color: '#7f8ea3', fontSize: 11, marginTop: 4 }}>
+                                  Letzter Login: {user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleString('de-DE') : 'Noch nie'}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                <span className="badge badge-green">aktiv</span>
+                                <span className={`badge ${accessDraft.accessMode === 'demo' ? 'badge-orange' : 'badge-blue'}`}>
+                                  {ACCESS_MODE_LABELS[accessDraft.accessMode]}
+                                </span>
+                                {accessDraft.accessExpiresAt && (
+                                  <span className="badge badge-gray">
+                                    bis {new Date(accessDraft.accessExpiresAt).toLocaleDateString('de-DE')}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Pilot readonly overview */}
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Zugewiesene Piloten</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                                {user.allowedPilotIds.length > 0
+                                  ? user.allowedPilotIds.map(pid => (
+                                      <span key={pid} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.28)', color: '#93c5fd', fontWeight: 600 }}>
+                                        {PILOT_LABELS[pid]}
+                                      </span>
+                                    ))
+                                  : <span style={{ color: '#4a5568', fontSize: 12 }}>Keine Piloten zugewiesen</span>
+                                }
+                              </div>
+                            </div>
+
+                            {/* Pilot edit toggles */}
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Piloten bearbeiten</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {MANAGED_PILOT_OPTIONS.map(pilotId => {
+                                  const active = accessDraft.allowedPilotIds.includes(pilotId)
+                                  return (
+                                    <button
+                                      key={pilotId}
+                                      type="button"
+                                      onClick={() => setManagedAccessDrafts(prev => ({
+                                        ...prev,
+                                        [user.id]: {
+                                          ...accessDraft,
+                                          allowedPilotIds: active
+                                            ? accessDraft.allowedPilotIds.filter(id => id !== pilotId)
+                                            : [...accessDraft.allowedPilotIds, pilotId],
+                                        },
+                                      }))}
+                                      disabled={savingManagedUserId === user.id}
+                                      style={{
+                                        borderRadius: 999,
+                                        border: `1px solid ${active ? 'rgba(22,132,255,.38)' : 'rgba(255,255,255,.08)'}`,
+                                        background: active ? 'rgba(22,132,255,.14)' : 'rgba(255,255,255,.03)',
+                                        color: active ? '#93c5fd' : '#aeb9c8',
+                                        padding: '5px 9px',
+                                        fontSize: 11,
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      {PILOT_LABELS[pilotId]}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Testzeitraum verlängern */}
+                            <div style={{ marginBottom: 14 }}>
+                              <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 8, fontWeight: 700, textTransform: 'uppercase' }}>Testzeitraum / Ablaufdatum</div>
+                              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                                <button
+                                  type="button"
+                                  className="pk-btn-ghost"
+                                  onClick={() => extendExpiry(7)}
+                                  disabled={savingManagedUserId === user.id}
+                                  style={{ fontSize: 12, padding: '6px 12px' }}
+                                >
+                                  +7 Tage
+                                </button>
+                                <button
+                                  type="button"
+                                  className="pk-btn-ghost"
+                                  onClick={() => extendExpiry(14)}
+                                  disabled={savingManagedUserId === user.id}
+                                  style={{ fontSize: 12, padding: '6px 12px' }}
+                                >
+                                  +14 Tage
+                                </button>
+                                <button
+                                  type="button"
+                                  className="pk-btn-ghost"
+                                  onClick={() => extendExpiry(30)}
+                                  disabled={savingManagedUserId === user.id}
+                                  style={{ fontSize: 12, padding: '6px 12px' }}
+                                >
+                                  +30 Tage
+                                </button>
+                                <input
+                                  className="pk-input"
+                                  type="date"
+                                  value={accessDraft.accessExpiresAt}
+                                  onChange={e => setManagedAccessDrafts(prev => ({
+                                    ...prev,
+                                    [user.id]: { ...accessDraft, accessExpiresAt: e.target.value },
+                                  }))}
+                                  disabled={savingManagedUserId === user.id}
+                                  style={{ width: 160, fontSize: 13 }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                              <button
+                                className="pk-btn"
+                                onClick={() => void handleManagedUserSave(user)}
+                                disabled={!hasChanges || savingManagedUserId === user.id}
+                                style={{ fontWeight: 700, opacity: !hasChanges || savingManagedUserId === user.id ? .55 : 1 }}
+                              >
+                                {savingManagedUserId === user.id ? 'Speichert…' : 'Änderungen speichern'}
+                              </button>
+                              <a
+                                href={mailHref}
+                                className="pk-btn-ghost"
+                                style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', fontSize: 13 }}
+                              >
+                                ✉️ Kontakt
+                              </a>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
 
           {section === 'benachrichtigungen' && (
             <div className="pk-card">
