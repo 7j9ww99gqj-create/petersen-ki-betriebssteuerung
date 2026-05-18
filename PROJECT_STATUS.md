@@ -31,17 +31,24 @@
 - Wichtigste externe Restpunkte: Stripe-Webhook-URL/Ende-zu-Ende prüfen; E-Mail-Versand bleibt bewusst manuell über das lokale Mailprogramm.
 - Produktivlage: Kernsystem nutzbar, aber noch nicht voll marktreif; Rechte, Integrationen und einige Prozessketten bleiben offene Themen.
 
-### 0.2 Top-Offene Aufgaben
-- Stripe Webhook-URL im Stripe-Dashboard prüfen und echten End-to-End-Test validieren (Buchung → Auftrag → Zahlung → Rechnung).
-- Multi-Positions-Liste in Rechnungen/Angeboten (aktuell nur 1 Pos. hardcoded).
-- Benutzerverwaltung weiter ausbauen: optional Deaktivieren/Löschen, Einladung erneut öffnen, Suche/Filter.
-- Analyse-Bestandstrend auf echte Wochensnapshots umstellen.
-- Weitere produktionsreife Härtung bei Rollen/Rechten, Datenkonsistenz und Integrationen.
-- BüroPilot: Positions-/Leistungsliste in Rechnungen/Angeboten (aktuell nur 1 Pos. hardcoded).
+### 0.2 Top-Offene Aufgaben (Priorisiert)
+- 🔴 **Stripe Webhook-URL** im Stripe-Dashboard prüfen und echten End-to-End-Test validieren (Buchung → Auftrag → Zahlung → Rechnung).
+- 🟡 **Multi-Positions-Rechnungen/-Angebote** im BüroPilot (aktuell nur 1 Pos. hardcoded).
+- 🟡 **SteuerPilot A13: ELSTER-XML-Export** vorbereiten (Formular-Mapping §§ 81/83 UStVA).
+- 🟢 Benutzerverwaltung erweitern: Deaktivieren/Löschen, Einladung erneut öffnen, Suche/Filter.
+- 🟢 Analyse-Bestandstrend auf echte Wochensnapshots umstellen.
+- 🟢 RLS-Policies und Datenkonsistenz-Härtung fortsetzen.
 
 ### 0.3 Aktuelle Blocker
 - Stripe-Ende-zu-Ende-Validierung ist noch nicht vollständig abgeschlossen.
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
+
+### 0.4 Quick Status Summary (für Statusabfragen)
+**Letzter Stand:** 2026-05-18, Commit `ff5af5b` (gepusht & Vercel deployed)  
+**Letzte Session:** SteuerPilot A7–A12 (recharts, Checkliste, Ausgaben-Karte, canViewSteuer)  
+**Nächster Focus:** Stripe End-to-End-Test → Multi-Positionen → ELSTER-Export  
+**Blocker:** Stripe Webhook-URL noch nicht getestet; sonst grün  
+**Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
 ## 1. Kurzüberblick
 - Zweck: modulare Betriebssteuerung/ERP-ähnliche Web-App für Lager, Büro, Werkstatt, Steuer, Planung, Marketing, Dokumente und KI-gestützte Erfassung.
