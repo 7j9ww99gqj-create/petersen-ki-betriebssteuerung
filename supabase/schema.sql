@@ -1392,3 +1392,30 @@ alter table lager_umlagerungen enable row level security;
 
 create policy "lager_umlagerungen_all" on lager_umlagerungen
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ── LAGER BESTAND-SNAPSHOTS (Aufgabe 25) ─────────────────────────────────────
+-- Tägliche/manuelle Snapshots des Gesamtbestands für Trendanalyse in AnalysePilot
+
+create table if not exists lager_bestand_snapshots (
+  id          text primary key,
+  user_id     uuid references auth.users default auth.uid(),
+  datum       date not null default current_date,
+  artikel_ges integer not null default 0,
+  niedrig     integer not null default 0,
+  leer        integer not null default 0,
+  lagerwert   numeric not null default 0,
+  notiz       text,
+  erstellt_am timestamptz default now()
+);
+
+alter table lager_bestand_snapshots enable row level security;
+
+create policy "lager_bestand_snapshots_all" on lager_bestand_snapshots
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Aufgabe 25: planung_aufgaben Zeitspalten
+alter table planung_aufgaben add column if not exists stunden_soll numeric default 0;
+alter table planung_aufgaben add column if not exists stunden_ist  numeric default 0;
+
+-- Aufgabe 25: lager_artikel lieferant_id (falls Aufgabe 22 noch nicht gelaufen)
+alter table lager_artikel add column if not exists lieferant_id text references einkauf_lieferanten(id) on delete set null;

@@ -196,7 +196,7 @@ export default function AnalysePilotPage() {
       const start12Iso = startOf12MonthsAgo.toISOString()
       const todayIso = new Date().toISOString()
 
-      const [rechnungen, eingangsrechnungen, kunden, angebote, artikel, kiDocs, fixkosten, betriebsausgaben] = await Promise.allSettled([
+      const [rechnungen, eingangsrechnungen, kunden, angebote, artikel, kiDocs, fixkosten, betriebsausgaben, snapshots] = await Promise.allSettled([
         supabase.from('buero_rechnungen').select('betrag,summe,datum,status').gte('datum', start12Iso.slice(0, 10)).lte('datum', todayIso.slice(0, 10)).order('datum'),
         supabase.from('buero_eingangsrechnungen').select('betrag_brutto,rechnungsdatum,status').gte('rechnungsdatum', start12Iso.slice(0, 10)),
         supabase.from('buero_kunden').select('status'),
@@ -205,6 +205,7 @@ export default function AnalysePilotPage() {
         supabase.from('buero_dokumente').select('document_type,confidence,created_at').gte('created_at', sevenDaysAgo),
         supabase.from('steuer_fixkosten').select('betrag_brutto,steuersatz,zahlungsintervall,aktiv'),
         supabase.from('steuer_betriebsausgaben').select('betrag_brutto,datum').gte('datum', start12Iso.slice(0, 10)),
+        supabase.from('lager_bestand_snapshots').select('datum,artikel_ges,niedrig,leer').gte('datum', start12Iso.slice(0, 10)).order('datum', { ascending: true }).limit(30),
       ])
 
       // ── Rechnungen ──
@@ -344,17 +345,38 @@ export default function AnalysePilotPage() {
       })
       setUmsatzData(newUmsatz)
 
-      // ── Bestand-Chart: nur aktuellen Snapshot zeigen (kein historisches Logging) ──
-      const gesamtArtikel = artikelRows.length
-      const niedrig = artikelRows.filter(a => a.status === 'niedrig').length
-      const leer = artikelRows.filter(a => a.status === 'leer').length
-      const kw = Math.ceil((now.getDate() + new Date(now.getFullYear(), now.getMonth(), 1).getDay()) / 7)
-      setBestandData([{
-        woche: `KW${String(kw).padStart(2, '0')} (aktuell)`,
-        artikel: gesamtArtikel,
-        niedrig,
-        leer,
-      }])
+      // ── Bestand-Chart: historische Snapshots wenn vorhanden, sonst aktueller Stand ──
+      type SnapshotRow = { datum?: string | null; artikel_ges?: number | null; niedrig?: number | null; leer?: number | null }
+      const snapshotRows = snapshots.status === 'fulfilled' && !snapshots.value.error
+        ? (snapshots.value.data ?? []) as SnapshotRow[]
+        : []
+      if (snapshotRows.length >= 2) {
+        // Historische Snapshots: datum → KW-Label
+        const snapPoints: BestandPoint[] = snapshotRows.map(s => {
+          const d = s.datum ? new Date(s.datum) : new Date()
+          const startOfYear = new Date(d.getFullYear(), 0, 1)
+          const kw = Math.ceil(((d.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7)
+          return {
+            woche: `KW${String(kw).padStart(2, '0')} (${d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })})`,
+            artikel: s.artikel_ges ?? 0,
+            niedrig: s.niedrig ?? 0,
+            leer: s.leer ?? 0,
+          }
+        })
+        setBestandData(snapPoints)
+      } else {
+        // Nur aktuellen Stand zeigen (kein historisches Logging)
+        const gesamtArtikel = artikelRows.length
+        const niedrig = artikelRows.filter(a => a.status === 'niedrig').length
+        const leer = artikelRows.filter(a => a.status === 'leer').length
+        const kw = Math.ceil((now.getDate() + new Date(now.getFullYear(), now.getMonth(), 1).getDay()) / 7)
+        setBestandData([{
+          woche: `KW${String(kw).padStart(2, '0')} (aktuell)`,
+          artikel: gesamtArtikel,
+          niedrig,
+          leer,
+        }])
+      }
 
       // ── KI-Dokumente der letzten 7 Tage ──
       type KiDocRow = { document_type?: string | null; confidence?: number | null; created_at?: string | null }
@@ -585,11 +607,15 @@ export default function AnalysePilotPage() {
         <div>
           {!isDemo && (
             <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.2)', fontSize: 13, color: '#aeb9c8' }}>
-              ● Live – aktueller Lagerbestand. Historische Wochenvergleiche werden noch nicht automatisch gespeichert.
+              {bestandData.length >= 2
+                ? `● Live – ${bestandData.length} gespeicherte Snapshots werden angezeigt.`
+                : '● Live – aktueller Stand. Klicke im LagerPilot → Bestand auf „📸 Bestand-Snapshot", um Trendverläufe aufzubauen.'}
             </div>
           )}
           <div className="pk-card" style={{ marginBottom: 16 }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>📦 Bestandsübersicht – aktuell</h3>
+            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>
+              {bestandData.length >= 2 ? '📦 Bestandstrend – historische Snapshots' : '📦 Bestandsübersicht – aktuell'}
+            </h3>
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={bestandData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <defs>

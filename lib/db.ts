@@ -1105,6 +1105,35 @@ export async function deleteLagerArtikel(id: string) {
   if (error) throw error
 }
 
+// ── LAGER BESTAND-SNAPSHOTS ───────────────────────────────────────────────────
+
+export async function getLagerBestandSnapshots(limit = 30) {
+  const { data, error } = await db()
+    .from('lager_bestand_snapshots')
+    .select('*')
+    .order('datum', { ascending: true })
+    .limit(limit)
+  if (error) throw error
+  return data ?? []
+}
+
+export async function insertLagerBestandSnapshot(s: {
+  id: string
+  datum: string
+  artikel_ges: number
+  niedrig: number
+  leer: number
+  lagerwert: number
+  notiz?: string
+}) {
+  const { data, error } = await db()
+    .from('lager_bestand_snapshots')
+    .upsert(s, { onConflict: 'datum' })
+    .select()
+  if (error) throw error
+  return data
+}
+
 export async function getLagerBewegungen() {
   const { data, error } = await db()
     .from('lager_bewegungen')

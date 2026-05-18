@@ -11,6 +11,7 @@ import {
   upsertLagerStellplatzBestand, deleteLagerStellplatzBestand, umlagerArtikel,
   getAiFeatureSettings, type AiFeatureSettings,
   upsertEinkaufBestellung, getEinkaufLieferanten,
+  insertLagerBestandSnapshot,
 } from '@/lib/db'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
@@ -864,6 +865,9 @@ export default function LagerPilotPage() {
 
   // Lieferanten-State (für Artikel-Stammlieferant)
   const [lieferantenListe, setLieferantenListe] = useState<{ id: string; name: string }[]>([])
+
+  // Bestand-Snapshot State (Aufgabe 25)
+  const [snapshotLoading, setSnapshotLoading] = useState(false)
 
   // Daten laden
   useEffect(() => {
@@ -1923,9 +1927,38 @@ export default function LagerPilotPage() {
             <button
               className="pk-btn-ghost"
               onClick={() => exportCSV(sorted)}
-              style={{ marginLeft: 'auto', fontSize: 13, padding: '7px 14px' }}
+              style={{ fontSize: 13, padding: '7px 14px' }}
             >
               📥 CSV Export
+            </button>
+            <button
+              className="pk-btn-ghost"
+              disabled={snapshotLoading || isDemo}
+              style={{ fontSize: 13, padding: '7px 14px', marginLeft: 'auto' }}
+              onClick={async () => {
+                if (isDemo) { showToast('Im Demo-Modus nicht verfügbar', false); return }
+                setSnapshotLoading(true)
+                try {
+                  const ges = artikel.length
+                  const niedrig = artikel.filter(a => a.status === 'niedrig').length
+                  const leer = artikel.filter(a => a.status === 'leer').length
+                  const lagerwert = artikel.reduce((s, a) => s + (a.bestand ?? 0), 0)
+                  const today = new Date().toISOString().slice(0, 10)
+                  await insertLagerBestandSnapshot({
+                    id: `SNAP-${today}`,
+                    datum: today,
+                    artikel_ges: ges,
+                    niedrig,
+                    leer,
+                    lagerwert,
+                    notiz: 'Manueller Snapshot',
+                  })
+                  showToast(`✅ Snapshot für ${today} gespeichert`, true)
+                } catch { showToast('Fehler beim Speichern des Snapshots', false) }
+                finally { setSnapshotLoading(false) }
+              }}
+            >
+              {snapshotLoading ? '⏳ Speichere…' : '📸 Bestand-Snapshot'}
             </button>
           </div>
           <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
