@@ -47,6 +47,9 @@
 - 🔴 **LagerPilot: Dual-Layer-Bestandssync** — `lager_artikel.bestand` und `lager_stellplatz_bestand` laufen auseinander; KI-Kontext inkonsistent.
 - 🔴 **PlanungPilot: `deletePlanungRessource` fehlt** — Ressourcen-Delete in `lib/db.ts` nicht implementiert; UI-Button läuft ins Leere (siehe 6. → PlanungPilot).
 - 🔴 **PlanungPilot: FK `auftrag_id`** — `planung_projekte` hat keine Verknüpfung zu `buero_auftraege`; BüroPilot ↔ PlanungPilot völlig isoliert (Migration + Button nötig).
+- 🔴 **WerkstattPilot: FK `buero_auftrag_id`** — `auftragsnr` ist freier Text ohne Referenzintegrität; keine echte Karte↔Auftrag-Verknüpfung (Migration + `lib/db.ts`).
+- 🔴 **WerkstattPilot: Material → LagerPilot-Sync** — Materialentnahme reduziert nicht `lager_artikel.bestand`; Lagersaldo nach Werkstatt-Verbrauch falsch.
+- 🔴 **WerkstattPilot: Ist vs. Soll Zeitanzeige** — Zeitbuchungen werden nicht gegen Karten-Soll aggregiert; kein operativer Steuerungswert sichtbar.
 - 🟡 **EinkaufTab**: Demo-State auf echte Supabase-Calls umstellen.
 - 🟡 **KI-Aktion "Bestellung"** ausführbar machen — aktuell nur Toast, kein DB-Insert.
 - 🟡 **Stripe Analytics Integration** (4 h, einfach) — MRR-Verlauf im Marketing-Auswertungs-Tab.
@@ -538,6 +541,18 @@
 - [ ] 🟡 **Bestandstrend-Snapshots**: Tabelle `lager_bestand_snapshots` + täglicher Insert via API-Route. Dateien: Migration, neue Route.
 - [ ] 🟢 **FIFO-Hinweis beim Ausgang**: älteste Charge (nach MHD/`eingelagert_am`) beim Ausgang vorschlagen. Datei: `lager/page.tsx`.
 - [ ] 🟢 **WerkstattPilot → Lager-Reservierung**: FK `werkstatt_material.artikel_id` → `lager_artikel`. Dateien: Migration, `lib/db.ts`.
+
+### WerkstattPilot – Offene Optimierungen (Analyse 2026-05-18)
+
+- [ ] 🔴 **FK `buero_auftrag_id` auf `werkstatt_karten`**: `auftragsnr` ist aktuell reiner Text ohne Referenzintegrität. Migration: `ALTER TABLE werkstatt_karten ADD COLUMN buero_auftrag_id uuid REFERENCES buero_auftraege(id)`. Dateien: Migration, `lib/db.ts`, `werkstatt/page.tsx`.
+- [ ] 🔴 **Material-Entnahme → LagerPilot-Sync**: `insertWerkstattMaterial()` schreibt nicht in `lager_bewegungen` und reduziert nicht `lager_artikel.bestand` — Lagersaldo stimmt nach Werkstatt-Verbrauch nicht. Artikel-Dropdown aus `lager_artikel` befüllen + paralleler `insertLagerBewegung()`-Call. Dateien: `lib/db.ts`, `werkstatt/page.tsx`.
+- [ ] 🔴 **Ist vs. Soll Zeitanzeige auf Arbeitskarte**: Zeitbuchungen pro `auftragsnr` aggregieren und als `Ist: Xh / Soll: Yh` auf jeder Karte anzeigen. Aktuell kein Vergleich möglich. Datei: `werkstatt/page.tsx`.
+- [ ] 🟡 **Fertigungsleitstand-Widget**: Echtzeit-Übersicht aller Karten mit Status-Ampel; SLA-Warnung wenn `geplant < today` und Status ≠ `Fertig`. Datei: `werkstatt/page.tsx`.
+- [ ] 🟡 **Qualitäts-KPI**: Fehlerquote (Prüf-Fehler / Gesamt) + Trend als Chart im Qualität-Tab. Datei: `werkstatt/page.tsx`.
+- [ ] 🟡 **Prüfpunkt-Vorlagen pro Maschinentyp**: Neue Tabelle `werkstatt_pruef_vorlagen (id, maschinen_typ, pruefpunkte jsonb)` — beim Karte-Anlegen auto-befüllen statt freier Texteingabe. Dateien: Migration, `lib/db.ts`, `werkstatt/page.tsx`.
+- [ ] 🟡 **Export**: Zeitkonto pro Mitarbeiter (CSV) + Fertigungsbericht (PDF via `lib/pdf.ts`). Dateien: `lib/pdf.ts`, `werkstatt/page.tsx`.
+- [ ] 🟢 **KI-Tagesbericht WerkstattPilot**: Analog LagerPilot — überfällige Karten (SLA), überfällige Wartungen, offene Kritisch-Störungen als strukturierten Bericht über `/api/chat`. Dateien: `werkstatt/page.tsx`, `app/api/chat/route.ts`.
+- [ ] 🟢 **Karten-Auto-Erstellung aus BüroPilot-Auftrag**: Button „🛠️ Arbeitskarte erstellen" auf akzeptiertem Auftrag — öffnet vorausgefülltes Formular mit `buero_auftrag_id`. Datei: `buero/page.tsx`.
 
 - [x] ~~Datenmodell für Kunde/Lieferant/Auftrag/Rechnung/Dokument sauber relationalisieren.~~ **Erledigt 2026-05-13**: FK-Spalten existieren und werden korrekt beschrieben; `handleKonvertieren`-Bug behoben.
 - [x] ~~Einkaufsmigration auf Live-Datenbank anwenden und Bestellungen/Wareneingänge mit Echtdaten gegen Alt- und Neuschema validieren.~~ **Erledigt 2026-05-13**: Alle 12 Migrationen Local = Remote, dual-write validiert.
