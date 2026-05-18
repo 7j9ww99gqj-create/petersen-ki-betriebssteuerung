@@ -1322,11 +1322,28 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
                               )}
                             </div>
                           )}
-                          {action.type === 'hinweis' && (
-                            <span style={{ fontSize: 11, color: '#aeb9c8', flexShrink: 0, alignSelf: 'center', padding: '2px 7px', borderRadius: 6, border: `1px solid ${cfg.border}`, fontWeight: 600 }}>
-                              Hinweis
-                            </span>
-                          )}
+                          {action.type === 'hinweis' && (() => {
+                            // Leite Hinweise anhand von Schlüsselwörtern auf relevante Tabs/Piloten
+                            const text = `${action.artikel ?? ''} ${action.beschreibung ?? ''}`.toLowerCase()
+                            let href = '/dashboard/lager'
+                            let label = 'LagerPilot'
+                            if (text.includes('rechnung') || text.includes('auftrag') || text.includes('kunde') || text.includes('angebot')) {
+                              href = '/dashboard/buero'; label = 'BüroPilot'
+                            } else if (text.includes('werkstatt') || text.includes('karte') || text.includes('wartung') || text.includes('reparatur')) {
+                              href = '/dashboard/werkstatt'; label = 'WerkstattPilot'
+                            } else if (text.includes('steuer') || text.includes('beleg') || text.includes('ustv')) {
+                              href = '/dashboard/steuer'; label = 'SteuerPilot'
+                            } else if (text.includes('planung') || text.includes('projekt') || text.includes('aufgabe') || text.includes('termin')) {
+                              href = '/dashboard/planung'; label = 'PlanungPilot'
+                            } else if (text.includes('analyse') || text.includes('kpi') || text.includes('bericht')) {
+                              href = '/dashboard/analyse'; label = 'AnalysePilot'
+                            }
+                            return (
+                              <a href={href} style={{ fontSize: 11, color: '#a78bfa', flexShrink: 0, alignSelf: 'center', padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(167,139,250,.35)', fontWeight: 700, textDecoration: 'none', background: 'rgba(167,139,250,.08)', whiteSpace: 'nowrap' }}>
+                                → {label}
+                              </a>
+                            )
+                          })()}
                         </div>
                       )
                     })}
