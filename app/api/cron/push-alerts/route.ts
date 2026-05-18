@@ -36,6 +36,12 @@ export async function GET(req: NextRequest) {
   const supabase = getAdminSupabase()
   const alerts: string[] = []
   const today = new Date()
+
+  // Early return wenn keine Subscriptions vorhanden
+  const { data: subs } = await supabase.from('push_subscriptions').select('id')
+  if (!subs?.length) {
+    return NextResponse.json({ ok: true, alerts: [], ts: new Date().toISOString() })
+  }
   const in7days = new Date(today.getTime() + 7 * 86400000).toISOString().split('T')[0]
   const in30days = new Date(today.getTime() + 30 * 86400000).toISOString().split('T')[0]
 
@@ -72,12 +78,12 @@ export async function GET(req: NextRequest) {
   const vor14tagen = new Date(today.getTime() - 14 * 86400000).toISOString().split('T')[0]
   const { data: rechnungen } = await supabase
     .from('buero_rechnungen')
-    .select('nummer, gesamtbetrag, datum')
+    .select('nummer, summe, datum')
     .eq('status', 'offen')
     .lte('datum', vor14tagen)
 
   if (rechnungen && rechnungen.length > 0) {
-    const summe = rechnungen.reduce((s: number, r: {gesamtbetrag: number}) => s + (r.gesamtbetrag ?? 0), 0)
+    const summe = rechnungen.reduce((s: number, r: {summe: number}) => s + (r.summe ?? 0), 0)
     await sendToAllUsers(supabase, '🧾 Offene Rechnungen', `${rechnungen.length} Rechnung${rechnungen.length > 1 ? 'en' : ''} seit >14 Tagen offen (${summe.toFixed(0)}€)`, '/dashboard/buero')
     alerts.push(`offene_rechnungen: ${rechnungen.length}`)
   }
