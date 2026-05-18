@@ -142,6 +142,7 @@ export default function AnalysePilotPage() {
   const [kiData, setKiData] = useState<KiDayPoint[]>([])
   const [kiDocTypes, setKiDocTypes] = useState<{ type: string; count: number }[]>([])
   const [isDemo, setIsDemo] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     const demo = hasDemoCookie()
@@ -322,8 +323,10 @@ export default function AnalysePilotPage() {
       }
       setKiDocTypes(Array.from(typeMap.entries()).map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count))
     } catch {
-      setUmsatzData(DEMO_UMSATZ)
-      setBestandData(DEMO_BESTAND)
+      setLoadError(true)
+      setKpi(ZERO_KPI)
+      setUmsatzData([])
+      setBestandData([])
     } finally {
       setLoading(false)
     }
@@ -347,9 +350,17 @@ export default function AnalysePilotPage() {
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           {isDemo && <span className="badge badge-orange">Demo</span>}
           {loading && <span className="badge badge-blue">⏳ Lädt…</span>}
-          {!loading && !isDemo && <span className="badge badge-green">● Live</span>}
+          {!loading && !isDemo && !loadError && <span className="badge badge-green">● Live</span>}
+          {loadError && <span className="badge badge-red">⚠️ Ladefehler</span>}
         </div>
       </div>
+
+      {/* Fehler-Banner */}
+      {loadError && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.25)', fontSize: 13, color: '#fb7185' }}>
+          ⚠️ Daten konnten nicht geladen werden. Bitte Seite neu laden oder Verbindung prüfen.
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
