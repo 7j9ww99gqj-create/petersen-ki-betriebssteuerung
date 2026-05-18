@@ -550,6 +550,32 @@
 - [ ] 🟢 **QR-Code im PDF**: SEPA/Stripe-QR in `lib/pdf.ts` via `qrcode`-Bibliothek in `generateAngebotPDF()` / `generateRechnungPDF()`
 - [ ] 🟢 **DATEV-CSV-Export**: Buchungsjournal-Export aus `buero_rechnungen` + `buero_eingangsrechnungen` als Steuer-Export
 
+### SteuerPilot – Offene Optimierungen
+
+- [ ] 🔴 **Migration einspielen**: `20260518200000_steuer_belege_uploads.sql` im Supabase SQL-Editor ausführen — Tabelle `steuer_belege_uploads` + Bucket `steuer-belege` + Policies
+- [ ] 🟡 **OCR-Erkennung für Belege**: Hochgeladene Dateien via Claude Vision auslesen → Betrag, Datum und Lieferant automatisch ins Upload-Formular vorausfüllen (`app/api/steuer-ocr/route.ts`)
+- [ ] 🟡 **Steuerberater-Export-ZIP**: Alle Belege + Uploads eines Monats inkl. strukturiertem PDF-Index als ZIP bündeln und herunterladen
+- [ ] 🟡 **Wiederkehrende Belege**: Vorlagen-Funktion für Dauerbelege (Miete, Leasing, Software-Abo) — legt monatlich automatisch einen Entwurf in `steuer_belege` an
+- [ ] 🟡 **Fälligkeits-Kalender-Widget**: UStVA-Abgabefristen (10. des Folgemonats) und Vorauszahlungstermine als Banner/Badge im SteuerPilot-Dashboard
+- [ ] 🟡 **Fixkosten → VSt in UStVA**: Vorsteuer aus `steuer_fixkosten` in `vorsteuerGesamt` der UStVA-Berechnung einbeziehen (analog zu `steuer_belege`)
+- [ ] 🟡 **Einnahmen-Verknüpfung verfeinern**: Nicht nur `buero_rechnungen` lesen, sondern auch Stripe-Zahlungen (`payment_status='paid'`) aus `billing_events` einbeziehen für vollständigeres Einnahmenbild
+- [ ] 🟢 **SKR 04 Buchungsvorschlag**: KI-gestützte Konten-Zuordnung auf Basis von Lieferant + Betrag als Tooltip/Badge bei Beleg-Eingabe (Vorbereitung DATEV-Export)
+- [ ] 🟢 **Jahres-G&V-Zusammenfassung**: Einfache Gewinn-und-Verlust-Rechnung im Auswertungen-Tab (Einnahmen – Fixkosten – Betriebsausgaben – Anschaffungs-AfA = Ergebnis)
+
+### MarketingPilot – Offene Optimierungen
+
+- [ ] 🔴 **Stripe Analytics Integration** (4 h, einfach): MRR-Verlauf als Line-Chart im Marketing-Auswertungs-Tab; API-Key bereits vorhanden, Pattern aus `/api/billing` wiederverwendbar
+- [ ] 🔴 **Mailchimp API** (5 h, einfach): Echtzeit-Öffnungsraten + Klickraten ersetzen simulierte Werte; Lead → Mailchimp-Subscriber-Automatisierung bei Lead-Anlage
+- [ ] 🟡 **Lead-Scoring-Alerts** (3 h): Wenn Lead-Score ≥ 75, automatisch E-Mail via Resend (bereits integriert) an Betreuer — kein heißer Lead wird mehr übersehen
+- [ ] 🟡 **Pipeline-Conversion-Funnel** (2 h): Durchlaufzeiten je Lead-Stufe + Quellen-Vergleich (Website / Messe / Empfehlung) aus bestehenden `erstellt`-Timestamps ableiten
+- [ ] 🟡 **Kampagnen-ROI-Karte** (2 h): `Kosten pro Konversion` (budget / konversionen) + `Umsatz-ROI` pro Kampagnen-Karte berechnen und anzeigen
+- [ ] 🟡 **Newsletter-Segment-Builder** (4 h): Zielgruppe beim Erstellen wählbar (Nur Qualifizierte Leads / Bestandskunden / Neue Leads <30 Tage) → höhere Öffnungsraten
+- [ ] 🟡 **CRM-Trigger: Auto-Aufgabe bei Statuswechsel** (3 h): Wenn Lead auf „Angebot" gesetzt wird, automatisch Planungs-Aufgabe „Follow-up in 3 Tagen" anlegen
+- [ ] 🟡 **Reaktivierungs-Queue** (3 h): Tab in KI-Suite für verlorene Leads >90 Tage + hohem ursprünglichem Wert + KI-generiertem Reaktivierungstext
+- [ ] 🟡 **UTM-Parameter-Tracking** (4 h): `utm_source` beim Lead-Anlegen speichern (URL-Parameter) → echte Multi-Touch-Attribution
+- [ ] 🟢 **Lead-Import via CSV** (4 h): Spalten-Mapping-Wizard für Messe-Kontakte (Name, E-Mail, Firma, Quelle) — Bulk-Upload statt Einzeleingabe
+- [ ] 🟢 **Kampagnen-Kalender-Ansicht** (3 h): Kampagnen und Postings in Monatsansicht (analog PlanungPilot) — verhindert Lücken im Kanal-Mix
+
 ## 7. Regeln für Coding-Agenten
 - Vor Änderungen zuerst diese Datei, dann betroffene Seite, dann `lib/db.ts`, dann Schema/Migration prüfen.
 - Keine DB-Spalten umbenennen, ohne UI, `lib/db.ts`, `schema.sql` und Migrationen gemeinsam abzugleichen.
