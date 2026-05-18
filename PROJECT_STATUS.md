@@ -55,6 +55,20 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – Inhaber-Dashboard Pilot-Zuteilung + Kunden eingerichtet + BüroPilot Mahnungen/AB-Nummern)**:
+  - **Inhaber-Dashboard → Offene Registrierungen**: Pilot-Auswahl (7 Toggle-Buttons: LagerPilot, BüroPilot, WerkstattPilot, MarketingPilot, AnalysePilot, PlanungPilot, SteuerPilot) pro pending User-Karte; Default `['buero', 'lager', 'analyse']`; beim Klick auf Demo7/Demo14/Standard werden die gewählten Piloten übergeben statt Hardcode.
+  - **Inhaber-Dashboard → Neue Sektion "Kunden eingerichtet"**: Zeigt alle aktiven User; pro Karte: Status-Badge (aktiv/demo/Standard), Pilot-Übersicht (readonly) + editierbare Toggle-Buttons, Testzeitraum-Quick-Buttons (+7/+14/+30 Tage) + manuelles Datum, Save-Button (nutzt `handleManagedUserSave`), mailto-Kontakt-Button mit vorausgefülltem Text.
+  - **BüroPilot → Mahnung öffnet mailto**: `handleMahnung` setzt jetzt Status auf `'Mahnung'` UND öffnet `mailto:` mit vorausgefülltem Mahnungstext (Rechnungsnummer, Betrag, Fälligkeitsdatum, 7-Tage-Frist); kein automatischer Versand; Toast sagt "Mail-Entwurf vorbereitet".
+  - **BüroPilot → 2. Mahnung**: Bei Status `'Mahnung'` erscheint zusätzlich ein "📮 2. Mahnung"-Button.
+  - **BüroPilot → AB-Nummern fortlaufend**: `handleABErstellen` generiert jetzt `AB-YYYY-NNN`-Nummern (z.B. `AB-2026-001`); wird im State, DB (`buero_auftraege.ab_nummer`) und Mail-Betreff (`handleABMailSend`) genutzt; im Demo-Modus: `AB-YYYY-DEMO`.
+  - **BüroPilot → Rechnung sofort sichtbar + Mail-Modal**: Nach Auftrag→Rechnung-Konvertierung wird die neue Rechnung sofort im Rechnungen-State sichtbar und das Mail-Dialog öffnet sich direkt.
+  - **lib/db.ts**: `BueroAuftragRecord` und `upsertBueroAuftrag` um `ab_nummer?: string` erweitert; `normalizeBueroAuftrag` liest `ab_nummer` aus DB.
+  - Betroffene Dateien: `app/dashboard/einstellungen/page.tsx`, `app/dashboard/buero/page.tsx`, `lib/db.ts`.
+  - Offene Punkte:
+    - DB-Migration für `buero_auftraege.ab_nummer`-Spalte per `npx supabase db push` anwenden (Spalte existiert lokal noch nicht in Remote-DB).
+    - Echten End-to-End-Test: Registrierung → Pilot-Zuteilung → Freischaltung → Login → Pilot-Zugang prüfen.
+  - Tests: `npm run lint` grün (nur bekannte Warnungen); `npm run build` grün.
+  - Branch: `feature/owner-dashboard-buero-pilot-v2` (Commits `24bb433`, `7998757`)
 - **Zuletzt erledigt (2026-05-18 – SteuerPilot Massiverweiterung)**:
   - **Neue Navigation**: 9 Tabs (Dashboard, Einnahmen, Belege, Fixkosten, Betriebsausgaben, Anschaffungen, UStVA, Auswertungen, Export) mit Icon + Label.
   - **Fixkosten-Modul**: Vollständiges CRUD mit 16 Kategorien, Zahlungsintervallen (monatlich/quartalsweise/halbjährlich/jährlich), automatischem monatlichem Anteil, Vorsteuerberechnung, Datei-Upload, Kategorie-Balkendiagramm, Aktiv/Inaktiv-Toggle, Suche & Filter.
