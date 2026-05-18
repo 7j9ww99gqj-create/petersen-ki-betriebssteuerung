@@ -3148,7 +3148,7 @@ export default function BueroPilotPage() {
     }
   }, [searchParams])
 
-  const offeneAngebote = isDemo ? demoAngebote.filter(a => a.status === 'Versendet' || a.status === 'Entwurf').length : 0
+  const offeneAngebote = isDemo ? demoAngebote.filter(a => a.status === 'Versendet' || a.status === 'Erstellt' || a.status === 'Entwurf').length : 0
   const offeneRechnungen = isDemo ? demoRechnungen.filter(r => r.status !== 'Bezahlt').length : 0
   const laufendeAuftraege = auftraege.filter(a => a.status === 'In Bearbeitung').length
 
