@@ -1966,6 +1966,24 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
   const sumUeberfaellig = rechnungen.filter(r => r.status === 'Überfällig' || r.status === 'Mahnung').reduce((s, r) => s + parseBetrag(r.betrag), 0)
   const fmtEur = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 
+  // OPOS: Fälligkeits-Aging-Buckets (offene + überfällige Rechnungen)
+  const oposRechnungen = rechnungen.filter(r => r.status === 'Offen' || r.status === 'Überfällig' || r.status === 'Mahnung')
+  const oposBuckets = oposRechnungen.reduce((acc, r) => {
+    if (!r.faellig) { acc.unbekannt += parseBetrag(r.betrag); return acc }
+    const faelligDate = (() => {
+      const parts = r.faellig.split('.')
+      if (parts.length === 3) return new Date(+parts[2], +parts[1] - 1, +parts[0])
+      return new Date(r.faellig)
+    })()
+    if (isNaN(faelligDate.getTime())) { acc.unbekannt += parseBetrag(r.betrag); return acc }
+    const diffDays = Math.ceil((faelligDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    if (diffDays > 30) acc.faelligSpaeter += parseBetrag(r.betrag)
+    else if (diffDays > 0) acc.faelligBald += parseBetrag(r.betrag)
+    else if (diffDays > -30) acc.ueberfaellig30 += parseBetrag(r.betrag)
+    else acc.ueberfaelligAlt += parseBetrag(r.betrag)
+    return acc
+  }, { faelligSpaeter: 0, faelligBald: 0, ueberfaellig30: 0, ueberfaelligAlt: 0, unbekannt: 0 })
+
   const syncDokumentVerknuepfung = async (rechnung: Rechnung, dokumentId: string, previousDokumentId?: string) => {
     if (isDemo) return
     const nextDokumentId = dokumentId || null
@@ -2179,19 +2197,40 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
         </Modal>
       )}
 
-      {/* KPI-Karten */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
-        {[
-          { label: 'Offen', value: fmtEur(sumOffen), icon: '⏳', color: '#20c8ff', bg: 'rgba(32,200,255,.08)', border: 'rgba(32,200,255,.2)' },
-          { label: 'Bezahlt', value: fmtEur(sumBezahlt), icon: '✅', color: '#4ddb7e', bg: 'rgba(37,211,102,.08)', border: 'rgba(37,211,102,.2)' },
-          { label: 'Überfällig / Mahnung', value: fmtEur(sumUeberfaellig), icon: '⚠️', color: '#ffb347', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.2)' },
-        ].map(k => (
-          <button key={k.label} onClick={() => setFilterStatus(k.label === 'Überfällig / Mahnung' ? 'Überfällig' : k.label)} style={{ padding: '14px 16px', borderRadius: 12, background: k.bg, border: `1px solid ${k.border}`, textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
-            <div style={{ fontSize: 20, marginBottom: 4 }}>{k.icon}</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em' }}>{k.label}</div>
-          </button>
-        ))}
+      {/* OPOS-Dashboard */}
+      <div className="pk-card" style={{ marginBottom: 20, padding: 18, border: '1px solid rgba(32,200,255,.15)' }}>
+        <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 14, color: '#20c8ff' }}>📊 OPOS-Dashboard (Offene Posten)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
+          {[
+            { label: 'Offen', value: fmtEur(sumOffen), icon: '⏳', color: '#20c8ff', bg: 'rgba(32,200,255,.08)', border: 'rgba(32,200,255,.2)', filter: 'Offen' },
+            { label: 'Überfällig/Mahnung', value: fmtEur(sumUeberfaellig), icon: '⚠️', color: '#f59e0b', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.2)', filter: 'Überfällig' },
+            { label: 'Bezahlt', value: fmtEur(sumBezahlt), icon: '✅', color: '#4ddb7e', bg: 'rgba(37,211,102,.08)', border: 'rgba(37,211,102,.2)', filter: 'Bezahlt' },
+          ].map(k => (
+            <button key={k.label} onClick={() => setFilterStatus(k.filter as typeof filterStatus)} style={{ padding: '14px 16px', borderRadius: 12, background: k.bg, border: `1px solid ${k.border}`, textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
+              <div style={{ fontSize: 20, marginBottom: 4 }}>{k.icon}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.value}</div>
+              <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em' }}>{k.label}</div>
+            </button>
+          ))}
+        </div>
+        {oposRechnungen.length > 0 && (
+          <div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>Fälligkeits-Aging</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+              {[
+                { label: '> 30T (noch Zeit)', val: oposBuckets.faelligSpaeter, color: '#4ddb7e' },
+                { label: '≤ 30T (bald fällig)', val: oposBuckets.faelligBald, color: '#f59e0b' },
+                { label: '≤ 30T überfällig', val: oposBuckets.ueberfaellig30, color: '#fb7185' },
+                { label: '> 30T überfällig', val: oposBuckets.ueberfaelligAlt, color: '#f43f5e' },
+              ].filter(b => b.val > 0).map(b => (
+                <div key={b.label} style={{ padding: '10px 12px', borderRadius: 10, background: b.color + '10', border: `1px solid ${b.color}30` }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: b.color, fontFamily: 'monospace' }}>{fmtEur(b.val)}</div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{b.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {offenCount > 0 && (
