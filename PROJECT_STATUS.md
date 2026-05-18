@@ -26,8 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `5afd134`.
-- Jüngste Fortschritte: Billing-Workflow geschlossen — Kunde bucht → Owner-Auftrag (Geplant); Kunde zahlt → Owner-Rechnung (Erstellt); kein Auto-Versand; Mail-Modal nach Auftrag→Rechnung-Konvertierung nicht mehr automatisch.
+- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `a8259fd`.
+- Jüngste Fortschritte: SteuerPilot A7–A12 live — recharts BarChart, Ausgaben-Übersicht-Karte, Checkliste erweitert, Aufbewahrungspflicht-Hinweis, canViewSteuer-Permission, Migration Remote bestätigt.
 - Wichtigste externe Restpunkte: Stripe-Webhook-URL/Ende-zu-Ende prüfen; E-Mail-Versand bleibt bewusst manuell über das lokale Mailprogramm.
 - Produktivlage: Kernsystem nutzbar, aber noch nicht voll marktreif; Rechte, Integrationen und einige Prozessketten bleiben offene Themen.
 
@@ -65,7 +65,7 @@
   - **A12 – Migration**: `npx supabase db push` ausgeführt — Remote-DB war bereits aktuell (Migration `20260518150000_add_steuer_erweiterung.sql` bereits angewendet).
   - Betroffene Dateien: `app/dashboard/steuer/page.tsx`, `lib/roles.ts`.
   - Tests: `npm run lint` grün (nur bekannte Warnungen); `npm run build` grün.
-  - Branch: `main` (Commit `5afd134`).
+  - Branch: `main` (Commits `5afd134` Code, `a8259fd` Doku), gepusht und Vercel deployt.
 - **Zuletzt erledigt (2026-05-18 – BüroPilot Workflow-Optimierung: Auftrag bei Buchung, Rechnung bei Zahlung)**:
   - **stripe-link/route.ts**: Nach erfolgreicher Abo-Buchung (Kunde bucht Module) wird jetzt automatisch ein Owner-Auftrag (`AUF-{subscriptionId}`) mit Status `Geplant` im Inhaber-BüroPilot angelegt (Admin-Client, `user_id=ownerUserId`, Idempotenz per Upsert).
   - **stripe-webhook/route.ts**: Nach Stripe-Zahlungsbestätigung (`paymentStatus === 'paid'`) wird eine Owner-Rechnung (Status `Erstellt`) im Inhaber-BüroPilot angelegt; dedupliziert per `payment_link_id` (checkout-session-ID); `genId` importiert.
@@ -128,9 +128,9 @@
   - **lib/db.ts**: Neue Funktionen `getSteuerFixkosten/upsertSteuerFixkosten/deleteSteuerFixkosten`, `getSteuerBetriebsausgaben/upsertSteuerBetriebsausgabe/deleteSteuerBetriebsausgabe`, `getSteuerAnschaffungen/upsertSteuerAnschaffung/deleteSteuerAnschaffung`, `uploadSteuerDokument`.
   - Betroffene Dateien: `app/dashboard/steuer/page.tsx`, `components/steuer/shared.tsx`, `components/steuer/SteuerFixkosten.tsx`, `components/steuer/SteuerBetriebsausgaben.tsx`, `components/steuer/SteuerAnschaffungen.tsx`, `lib/db.ts`, `supabase/migrations/20260518150000_add_steuer_erweiterung.sql`.
   - Offene Punkte:
-    - Migration `20260518150000_add_steuer_erweiterung.sql` per `npx supabase db push` auf Remote anwenden.
-    - Fixkosten/Betriebsausgaben/Anschaffungen in UStVA-VSt-Berechnung einbeziehen (aktuell nur Belege).
-    - Auswertungs-Charts: echte `recharts`- oder `chart.js`-Bibliothek für interaktive Grafiken (aktuell CSS-Balken).
+    - ✅ Migration `20260518150000_add_steuer_erweiterung.sql` — Remote war bereits aktuell (A12, 2026-05-18).
+    - ✅ Fixkosten/Betriebsausgaben/Anschaffungen in UStVA-VSt einbezogen — `vorsteuerGesamt` (A1–4, 2026-05-18).
+    - ✅ Auswertungs-Charts: recharts `BarChart` ersetzt CSS-Balken (A8, 2026-05-18).
   - Tests: `npm run lint` grün (nur bestehende Warnungen); `npm run build` grün.
   - Branch: `main`
 - **Zuletzt erledigt (2026-05-18 – BüroPilot Angebot→Auftrag→Rechnung Vollprozess)**:
@@ -652,8 +652,8 @@
 
 ## 15. Nächste Empfehlung
 - Als NÄCHSTES umsetzen:
-  1. **SteuerPilot: ELSTER-XML-Export vorbereiten** (Aufgabe 13 folgerichtig): Formular-Mapping §§ 81/83 UStVA; schrittweise als Download-Dummy umsetzen.
-  2. **SteuerPilot: Jahres-Zusammenfassung** mit Gewinn-/Verlust-Rechnung (Einnahmen – Ausgaben gesamt) auf Basis der bestehenden Datenlage.
+  1. **SteuerPilot: ELSTER-XML-Export vorbereiten** (Aufgabe 13): Formular-Mapping §§ 81/83 UStVA; schrittweise als Download-Dummy umsetzen.
+  2. **SteuerPilot: Jahres-Zusammenfassung** mit vereinfachter G&V (Einnahmen – Gesamtausgaben) auf Basis der vorhandenen Daten.
   3. **Stripe Webhook-URL** im Stripe-Dashboard prüfen; echter End-to-End-Test Buchung → Auftrag → Zahlung → Rechnung.
-  4. **Autopilot-Marketing mit echter Logik**: Flow „Ziel → Zielgruppe → Kampagne → Funnel → nächster Schritt" aus echten Leads/Kampagnen/SEO ableiten.
-  5. **Rollen/Rechte serverseitig vervollständigen**: RLS-Policies pro Aktion/Datensatz weiter ausbauen; Grundlage für Mehrbenutzer-Launch.
+  4. **Multi-Positions-Rechnungen/-Angebote** im BüroPilot (aktuell nur 1 Position hardcoded).
+  5. **Autopilot-Marketing**: Flow „Ziel → Zielgruppe → Kampagne → Funnel" aus echten Leads/Kampagnen/SEO ableiten.
