@@ -484,3 +484,123 @@ export async function PATCH(req: NextRequest) {
     user: mapManagedUser(updateResult.data.user as AdminAuthUser),
   })
 }
+
+export async function DELETE(req: NextRequest) {
+  const access = await getRouteAccess(req, MANAGER_ROLES)
+  if (access.error) return access.error
+  if (!access.user) {
+    return NextResponse.json({ error: 'Nicht authentifiziert.' }, { status: 401 })
+  }
+  if (!isSupabaseAdminConfigured()) {
+    return NextResponse.json({ error: 'Supabase-Service-Role ist serverseitig nicht konfiguriert.' }, { status: 503 })
+  }
+
+  const body = await req.json().catch(() => null) as { userId?: string } | null
+  const userId = body?.userId?.trim()
+
+  if (!userId) {
+    return NextResponse.json({ error: 'userId fehlt.' }, { status: 400 })
+  }
+  if (access.user.id === userId) {
+    return NextResponse.json({ error: 'Sie koennen sich nicht selbst loeschen.' }, { status: 400 })
+  }
+
+  const admin = createSupabaseAdminClient()
+  const targetResult = await admin.auth.admin.getUserById(userId)
+  if (targetResult.error || !targetResult.data?.user) {
+    return NextResponse.json({ error: 'Benutzer nicht gefunden.' }, { status: 404 })
+  }
+
+  const targetUser = targetResult.data.user as AdminAuthUser
+  if (access.role !== 'Inhaber') {
+    const targetRole = normalizeManagedRole(getMetadataValue(targetUser.app_metadata, 'role') ?? getMetadataValue(targetUser.user_metadata, 'role'))
+    if (targetRole === 'Inhaber') {
+      return NextResponse.json({ error: 'Nur der Inhaber darf ein Inhaber-Konto loeschen.' }, { status: 403 })
+    }
+  }
+
+  const deleteResult = await admin.auth.admin.deleteUser(userId)
+  if (deleteResult.error) {
+    return NextResponse.json({ error: deleteResult.error.message ?? 'Benutzer konnte nicht geloescht werden.' }, { status: 500 })
+  }
+
+  await insertAuditLog(admin, {
+    actorUserId: access.user.id,
+    action: 'user.deleted',
+    targetId: userId,
+    payload: { target_email: targetUser.email ?? null },
+  })
+
+  return NextResponse.json({ ok: true, deletedUserId: userId })
+}
+
+// PUT: custom actions like resend-invite and disable
+export async function PUT(req: NextRequest) {
+  const access = await getRouteAccess(req, MANAGER_ROLES)
+  if (access.error) return access.error
+  if (!access.user) {
+    return NextResponse.json({ error: 'Nicht authentifiziert.' }, { status: 401 })
+  }
+  if (!isSupabaseAdminConfigured()) {
+    return NextResponse.json({ error: 'Supabase-Service-Role ist serverseitig nicht konfiguriert.' }, { status: 503 })
+  }
+
+  const body = await req.json().catch(() => null) as {
+    action?: string
+    userId?: string
+    email?: string
+  } | null
+  const action = body?.action?.trim()
+
+  if (action === 'resend-invite') {
+    const email = body?.email?.trim().toLowerCase()
+    if (!email || !isValidEmail(email)) {
+      return NextResponse.json({ error: 'Bitte eine gueltige E-Mail angeben.' }, { status: 400 })
+    }
+    const admin = createSupabaseAdminClient()
+    const inviteResult = await admin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${req.nextUrl.origin}/auth/callback`,
+    })
+    if (inviteResult.error) {
+      return NextResponse.json({ error: inviteResult.error.message ?? 'Einladung konnte nicht erneut gesendet werden.' }, { status: 500 })
+    }
+    await insertAuditLog(admin, {
+      actorUserId: access.user.id,
+      action: 'user.invite.resent',
+      targetId: inviteResult.data?.user?.id ?? undefined,
+      payload: { email },
+    })
+    return NextResponse.json({ ok: true, email })
+  }
+
+  if (action === 'disable') {
+    const userId = body?.userId?.trim()
+    if (!userId) {
+      return NextResponse.json({ error: 'userId fehlt.' }, { status: 400 })
+    }
+    if (access.user.id === userId) {
+      return NextResponse.json({ error: 'Sie koennen sich nicht selbst deaktivieren.' }, { status: 400 })
+    }
+    const admin = createSupabaseAdminClient()
+    const targetResult = await admin.auth.admin.getUserById(userId)
+    if (targetResult.error || !targetResult.data?.user) {
+      return NextResponse.json({ error: 'Benutzer nicht gefunden.' }, { status: 404 })
+    }
+    const targetUser = targetResult.data.user as AdminAuthUser
+    const appMetadata = { ...(targetUser.app_metadata ?? {}), access_status: 'suspended' }
+    const userMetadata = { ...(targetUser.user_metadata ?? {}), access_status: 'suspended' }
+    const updateResult = await admin.auth.admin.updateUserById(userId, { app_metadata: appMetadata, user_metadata: userMetadata })
+    if (updateResult.error || !updateResult.data?.user) {
+      return NextResponse.json({ error: updateResult.error?.message ?? 'Benutzer konnte nicht deaktiviert werden.' }, { status: 500 })
+    }
+    await insertAuditLog(admin, {
+      actorUserId: access.user.id,
+      action: 'user.disabled',
+      targetId: userId,
+      payload: { target_email: targetUser.email ?? null },
+    })
+    return NextResponse.json({ ok: true, user: mapManagedUser(updateResult.data.user as AdminAuthUser) })
+  }
+
+  return NextResponse.json({ error: 'Unbekannte Aktion.' }, { status: 400 })
+}

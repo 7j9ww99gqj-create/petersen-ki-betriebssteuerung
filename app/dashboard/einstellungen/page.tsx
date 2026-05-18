@@ -111,6 +111,9 @@ export default function EinstellungenPage() {
   const [pendingPilotSelections, setPendingPilotSelections] = useState<Record<string, PilotId[]>>({})
   const [deleteConfirmId, setDeleteConfirmId] = useState('')
   const [expandedCustomerInvoices, setExpandedCustomerInvoices] = useState<string | null>(null)
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [disableConfirmId, setDisableConfirmId] = useState('')
+  const [userActionInProgress, setUserActionInProgress] = useState('')
 
   // Sync picker with current role once loaded
   useEffect(() => { setSelectedRole(currentRole) }, [currentRole])
@@ -320,6 +323,73 @@ export default function EinstellungenPage() {
       showToast(error instanceof Error ? error.message : 'Benutzer konnte nicht erstellt werden.', 'error')
     } finally {
       setCreatingMode('')
+    }
+  }
+
+  const handleDisableUser = async (user: ManagedUser) => {
+    setUserActionInProgress(user.id)
+    setDisableConfirmId('')
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'disable', userId: user.id }),
+      })
+      const data = await res.json().catch(() => null) as { error?: string; user?: ManagedUser } | null
+      if (!res.ok || !data?.user) throw new Error(data?.error || 'Benutzer konnte nicht deaktiviert werden.')
+      setManagedUsers(prev => prev.map(entry => entry.id === data.user!.id ? data.user! : entry))
+      setManagedAccessDrafts(prev => ({
+        ...prev,
+        [data.user!.id]: {
+          accessStatus: data.user!.accessStatus,
+          accessMode: data.user!.accessMode,
+          accessExpiresAt: data.user!.accessExpiresAt ? data.user!.accessExpiresAt.slice(0, 10) : '',
+          allowedPilotIds: data.user!.allowedPilotIds,
+        },
+      }))
+      showToast(`✅ ${data.user.email} wurde deaktiviert`)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Deaktivierung fehlgeschlagen.', 'error')
+    } finally {
+      setUserActionInProgress('')
+    }
+  }
+
+  const handleDeleteUser = async (user: ManagedUser) => {
+    setUserActionInProgress(user.id)
+    setDeleteConfirmId('')
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      })
+      const data = await res.json().catch(() => null) as { error?: string; deletedUserId?: string } | null
+      if (!res.ok) throw new Error(data?.error || 'Benutzer konnte nicht geloescht werden.')
+      setManagedUsers(prev => prev.filter(entry => entry.id !== user.id))
+      showToast(`✅ ${user.email} wurde geloescht`)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Loeschen fehlgeschlagen.', 'error')
+    } finally {
+      setUserActionInProgress('')
+    }
+  }
+
+  const handleResendInvite = async (user: ManagedUser) => {
+    setUserActionInProgress(user.id)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'resend-invite', email: user.email }),
+      })
+      const data = await res.json().catch(() => null) as { error?: string } | null
+      if (!res.ok) throw new Error(data?.error || 'Einladung konnte nicht erneut gesendet werden.')
+      showToast(`✅ Einladung erneut gesendet an ${user.email}`)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Einladung fehlgeschlagen.', 'error')
+    } finally {
+      setUserActionInProgress('')
     }
   }
 
@@ -1201,7 +1271,7 @@ export default function EinstellungenPage() {
                       <div style={{ color: '#aeb9c8', fontSize: 14 }}>Benutzer werden geladen…</div>
                     ) : (
                       <div style={{ display: 'grid', gap: 14 }}>
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                           <span className="badge badge-blue">
                             {managedUsers.filter(user => user.accessStatus === 'pending').length} Registrierungen offen
                           </span>
@@ -1211,6 +1281,13 @@ export default function EinstellungenPage() {
                           <span className="badge badge-gray">
                             {managedUsers.filter(user => user.accessMode === 'demo').length} Demo-Zugänge
                           </span>
+                          <input
+                            className="pk-input"
+                            placeholder="Suche nach Name oder E-Mail…"
+                            value={userSearchQuery}
+                            onChange={e => setUserSearchQuery(e.target.value)}
+                            style={{ marginLeft: 'auto', minWidth: 220, maxWidth: 320 }}
+                          />
                         </div>
                         <div style={{ overflowX: 'auto' }}>
                         <table className="pk-table" style={{ width: '100%', fontSize: 13 }}>
@@ -1226,7 +1303,11 @@ export default function EinstellungenPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {managedUsers.map(user => {
+                            {managedUsers.filter(user => {
+                              if (!userSearchQuery.trim()) return true
+                              const q = userSearchQuery.toLowerCase()
+                              return user.email.toLowerCase().includes(q) || (user.fullName || '').toLowerCase().includes(q)
+                            }).map(user => {
                               const isSelf = user.email.toLowerCase() === profil.email.toLowerCase()
                               const targetIsInhaber = user.role === 'Inhaber' || user.isOwnerAccount
                               const mayEdit = !isSelf && (currentRole === 'Inhaber' || !targetIsInhaber)
@@ -1352,25 +1433,95 @@ export default function EinstellungenPage() {
                                     </div>
                                   </td>
                                   <td style={{ padding: '10px 12px', color: '#aeb9c8' }}>{user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleString('de-DE') : 'Noch nie'}</td>
-                                  <td style={{ padding: '10px 12px' }}>
-                                    <button
-                                      className="pk-btn"
-                                      onClick={() => void handleManagedUserSave(user)}
-                                      disabled={!mayEdit || (!hasChanges && !hasAccessChanges) || savingManagedUserId === user.id}
-                                      style={{ fontWeight: 700, opacity: !mayEdit || (!hasChanges && !hasAccessChanges) || savingManagedUserId === user.id ? .55 : 1 }}
-                                    >
-                                      {savingManagedUserId === user.id ? 'Speichert…' : 'Zugang speichern'}
-                                    </button>
-                                    {!mayEdit && (
-                                      <div style={{ marginTop: 6, color: '#aeb9c8', fontSize: 11 }}>
-                                        {isSelf ? 'Eigene Rolle hier gesperrt' : 'Nur Inhaber darf diesen Benutzer aendern'}
-                                      </div>
-                                    )}
+                                  <td style={{ padding: '10px 12px', minWidth: 200 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                      <button
+                                        className="pk-btn"
+                                        onClick={() => void handleManagedUserSave(user)}
+                                        disabled={!mayEdit || (!hasChanges && !hasAccessChanges) || savingManagedUserId === user.id || userActionInProgress === user.id}
+                                        style={{ fontWeight: 700, opacity: !mayEdit || (!hasChanges && !hasAccessChanges) || savingManagedUserId === user.id || userActionInProgress === user.id ? .55 : 1 }}
+                                      >
+                                        {savingManagedUserId === user.id ? 'Speichert…' : 'Zugang speichern'}
+                                      </button>
+                                      {mayEdit && !isSelf && (
+                                        <>
+                                          <button
+                                            className="pk-btn-ghost"
+                                            onClick={() => void handleResendInvite(user)}
+                                            disabled={userActionInProgress === user.id || savingManagedUserId === user.id}
+                                            style={{ fontWeight: 600, fontSize: 12, opacity: userActionInProgress === user.id ? .6 : 1 }}
+                                          >
+                                            {userActionInProgress === user.id ? '⏳ Läuft…' : '📨 Einladung erneut senden'}
+                                          </button>
+                                          {disableConfirmId === user.id ? (
+                                            <div style={{ display: 'flex', gap: 6 }}>
+                                              <button
+                                                onClick={() => void handleDisableUser(user)}
+                                                disabled={userActionInProgress === user.id}
+                                                style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(255,179,71,.4)', background: 'rgba(255,179,71,.12)', color: '#ffd7a1', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                                              >
+                                                Ja, sperren
+                                              </button>
+                                              <button
+                                                onClick={() => setDisableConfirmId('')}
+                                                style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', color: '#aeb9c8', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+                                              >
+                                                Abbrechen
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <button
+                                              className="pk-btn-ghost"
+                                              onClick={() => setDisableConfirmId(user.id)}
+                                              disabled={user.accessStatus === 'suspended' || userActionInProgress === user.id}
+                                              style={{ fontWeight: 600, fontSize: 12, opacity: user.accessStatus === 'suspended' || userActionInProgress === user.id ? .5 : 1 }}
+                                            >
+                                              🚫 Deaktivieren
+                                            </button>
+                                          )}
+                                          {deleteConfirmId === user.id ? (
+                                            <div style={{ display: 'flex', gap: 6 }}>
+                                              <button
+                                                onClick={() => void handleDeleteUser(user)}
+                                                disabled={userActionInProgress === user.id}
+                                                style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(244,63,94,.4)', background: 'rgba(244,63,94,.12)', color: '#fb7185', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                                              >
+                                                Ja, loeschen
+                                              </button>
+                                              <button
+                                                onClick={() => setDeleteConfirmId('')}
+                                                style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', color: '#aeb9c8', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+                                              >
+                                                Abbrechen
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <button
+                                              className="pk-btn-ghost"
+                                              onClick={() => setDeleteConfirmId(user.id)}
+                                              disabled={userActionInProgress === user.id}
+                                              style={{ fontWeight: 600, fontSize: 12, color: '#fb7185', borderColor: 'rgba(244,63,94,.28)', opacity: userActionInProgress === user.id ? .5 : 1 }}
+                                            >
+                                              🗑️ Loeschen
+                                            </button>
+                                          )}
+                                        </>
+                                      )}
+                                      {!mayEdit && (
+                                        <div style={{ color: '#aeb9c8', fontSize: 11 }}>
+                                          {isSelf ? 'Eigene Rolle hier gesperrt' : 'Nur Inhaber darf diesen Benutzer aendern'}
+                                        </div>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                               )
                             })}
-                            {managedUsers.length === 0 && (
+                            {managedUsers.filter(u => {
+                              if (!userSearchQuery.trim()) return true
+                              const q = userSearchQuery.toLowerCase()
+                              return u.email.toLowerCase().includes(q) || (u.fullName || '').toLowerCase().includes(q)
+                            }).length === 0 && (
                               <tr>
                                 <td colSpan={7} style={{ padding: '14px 12px', color: '#aeb9c8' }}>Keine Benutzer gefunden.</td>
                               </tr>
