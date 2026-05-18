@@ -1514,32 +1514,6 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isD
           })()
         ))}
       </div>
-
-      {auftragMailTarget && (() => {
-        const auftrag = auftraege.find(a => a.id === auftragMailTarget.id)
-        if (!auftrag) return null
-        return (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setAuftragMailTarget(null)}>
-            <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 460 }} onClick={e => e.stopPropagation()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>✉️ Auftragsbestätigung per Mail</h3>
-                <button onClick={() => setAuftragMailTarget(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
-              </div>
-              <div style={{ fontSize: 13, color: '#aeb9c8', marginBottom: 14 }}>
-                <strong style={{ color: '#f8fbff' }}>{auftrag.beschreibung}</strong> — {auftrag.kunde} — {auftrag.wert}
-              </div>
-              <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>E-Mail-Adresse</label>
-              <input className="pk-input" type="email" value={auftragMailTarget.email} onChange={e => setAuftragMailTarget({ ...auftragMailTarget, email: e.target.value })} placeholder="kunde@beispiel.de" style={{ width: '100%', marginBottom: 16 }} />
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button className="pk-btn-ghost" onClick={() => setAuftragMailTarget(null)} disabled={auftragMailSending}>Abbrechen</button>
-                <button className="pk-btn" disabled={auftragMailSending || !auftragMailTarget.email.includes('@')} onClick={() => handleABMailSend(auftragMailTarget.email, auftrag)}>
-                  {auftragMailSending ? '⏳ Sende…' : '✉️ AB verschicken'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
     </div>
   )
 }
@@ -1558,7 +1532,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
 
   // Edit-Modal
   const [editRechnung, setEditRechnung] = useState<Rechnung | null>(null)
-  const [editForm, setEditForm] = useState({ kunde: '', betrag: '', faellig: '', status: 'Erstellt' as Rechnung['status'], dokumentId: '' })
+  const [editForm, setEditForm] = useState({ kunde: '', betrag: '', faellig: '', status: 'Offen' as Rechnung['status'], dokumentId: '' })
 
   // Delete-Bestätigung
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -1604,13 +1578,6 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
         'Viele Gruesse',
       ].filter(Boolean).join('\n')
       window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-      const re = rechnungen.find(r => r.id === rechnung.id)
-      if (re && re.status === 'Erstellt') {
-        if (!isDemo) {
-          try { await upsertBueroRechnung({ ...re, status: 'Offen' }) } catch { /* silent */ }
-        }
-        setRechnungen(prev => prev.map(r => r.id === rechnung.id ? { ...r, status: 'Offen' } : r))
-      }
       showToast(`Mailentwurf fuer ${email} geoeffnet.`)
     } catch {
       showToast('Mailentwurf konnte nicht geoeffnet werden.', true)
@@ -1626,7 +1593,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
   rechnungen.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1 })
 
   // KPI-Summen
-  const sumOffen = rechnungen.filter(r => r.status === 'Offen' || r.status === 'Erstellt').reduce((s, r) => s + parseBetrag(r.betrag), 0)
+  const sumOffen = rechnungen.filter(r => r.status === 'Offen').reduce((s, r) => s + parseBetrag(r.betrag), 0)
   const sumBezahlt = rechnungen.filter(r => r.status === 'Bezahlt').reduce((s, r) => s + parseBetrag(r.betrag), 0)
   const sumUeberfaellig = rechnungen.filter(r => r.status === 'Überfällig' || r.status === 'Mahnung').reduce((s, r) => s + parseBetrag(r.betrag), 0)
   const fmtEur = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
@@ -1692,7 +1659,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
       betrag: form.betrag.includes('€') ? form.betrag : `${form.betrag} €`,
       faellig: form.faellig || fmt(new Date(today.getTime() + firmaDefaults.zahlungsziel_tage * 86400000)),
       erstellt: fmt(today),
-      status: 'Erstellt',
+      status: 'Offen',
     }
     if (!isDemo) {
       try {
@@ -1703,7 +1670,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
     setRechnungen(prev => [newRe, ...prev])
     setForm({ kunde: '', betrag: '', faellig: '', dokumentId: '' })
     setShowForm(false)
-    showToast(`✅ Rechnung ${newRe.nummer || newRe.id} erstellt – bitte verschicken`)
+    showToast(`✅ Rechnung ${newRe.id} wurde erstellt`)
   }
 
   const openEdit = (r: Rechnung) => {
@@ -1832,7 +1799,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {(['Alle', 'Erstellt', 'Offen', 'Überfällig', 'Mahnung', 'Bezahlt'] as const).map(s => (
+          {(['Alle', 'Offen', 'Überfällig', 'Mahnung', 'Bezahlt'] as const).map(s => (
             <button key={s} onClick={() => setFilterStatus(s)} style={{
               padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)',
               background: filterStatus === s ? 'rgba(32,200,255,.15)' : 'transparent',
