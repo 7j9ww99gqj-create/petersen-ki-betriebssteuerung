@@ -26,11 +26,19 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Messaging & Postfach-System live.
-- Letzter Commit: `f35f444` — Empfänger-Auswahl (Alle/Einzeln) im Owner-Postfach.
-- Jüngste Fortschritte (2026-05-18 – Messaging-System): Postfach-Feature vollständig implementiert — Zahnrad-Icon, Postfach-Menüpunkt, User→Owner Support, Owner→User Broadcast/Einzelnachricht.
+- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Multi-Feature Sprint abgeschlossen.
+- Letzter Commit: `02e91a0` — Push-Benachrichtigungen (PWA) implementiert.
+- Jüngste Fortschritte (2026-05-18 – Sprint):
+  - Mobile NotificationBell: fixed position, scrollbar, kein Viewport-Overflow
+  - Dokumenten-Archiv (PilotDocumentArchive) für alle 4 Piloten (Lager/Werkstatt/Analyse/Planung)
+  - SteuerPilot: 3-stufiges Beleg-Erfassungs-Modal, Belege-Tab als read-only Archiv
+  - Bottom-Nav: SteuerPilot Direktzugriff hinzugefügt
+  - PWA Push-Benachrichtigungen: SW, API-Routen, lib/push.ts, Einstellungen-UI
 - Infrastruktur: PreToolUse-Hook konfiguriert — `npx tsc --noEmit` blockiert Push bei TypeScript-Fehlern.
 - ⚠️ Ausstehend: Messaging SQL-Schema manuell im Supabase SQL-Editor ausführen (Tabellen `user_messages`, `broadcast_messages`).
+- ⚠️ Ausstehend: Neue SQL-Schemas ausführen (pilot_documents, tax_receipts, push_subscriptions) — Migration `20260518210000_pilot_documents.sql`.
+- ⚠️ Ausstehend: VAPID Keys in Vercel Env-Vars setzen (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL, NEXT_PUBLIC_VAPID_PUBLIC_KEY).
+- ⚠️ Ausstehend: Supabase Storage Bucket `pilot-documents` manuell im Dashboard erstellen.
 - Produktivlage: Kernsystem vollständig; alle Hauptmodule produktionsreif und erweitert.
 
 ### 0.2 Top-Offene Aufgaben (Priorisiert)
@@ -94,6 +102,14 @@
 - ✅ ~~**Sprint-Aufgabe 28: WerkstattPilot Fertigungsleitstand**~~ **Erledigt 2026-05-18** (Commit `e7e76d4`) — neuer Tab, 3-Spalten-Kanban, SLA-Ampel, Batch-Aktionen.
 - ✅ ~~**Sprint-Aufgabe 29: SteuerPilot OCR-Erkennung**~~ **Erledigt 2026-05-18** (Commit `a5d595c`) — API-Route `ocr-beleg`, KI füllt Felder automatisch.
 - ✅ ~~**Sprint-Aufgabe 30: PlanungPilot auftrag_id FK + Meilensteine**~~ **Erledigt 2026-05-18** (Commit `60be09b`) — FK, Button in BüroPilot, Meilenstein-CRUD.
+- ✅ **Mobile NotificationBell Fix** — Commit `cf8dfd3`: position:fixed, max-height calc(100dvh), scrollbar, Backdrop, Schließen-Button.
+- ✅ **Dokumenten-Archiv alle Piloten** — Commit `322ad68`: PilotDocumentArchive.tsx, Tab in Lager/Werkstatt/Analyse/Planung, SQL-Migration.
+- ✅ **SteuerPilot 3-stufiges Beleg-Modal** — Commit `e63cf8b`: Fixkosten/Betriebsausgaben/Anschaffungen + Kategorie + Details, Belege-Tab read-only.
+- ✅ **Bottom-Nav Steuer** — Commit `f4378a6`: SteuerPilot in Bottom-Navigation hinzugefügt.
+- ✅ **PWA Push-Benachrichtigungen** — Commit `02e91a0`: sw.js, lib/push.ts, API-Routen, Einstellungen-UI.
+- 🔴 **Supabase SQL ausführen** — Migration `20260518210000_pilot_documents.sql` (pilot_documents + tax_receipts + push_subscriptions).
+- 🔴 **VAPID Keys setzen** — Vercel Env-Vars: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL, NEXT_PUBLIC_VAPID_PUBLIC_KEY. Generieren mit `npx web-push generate-vapid-keys`.
+- 🔴 **Supabase Storage Bucket** — `pilot-documents` manuell im Supabase Dashboard erstellen (authenticated read/write, owner delete).
 - 🔴 **Messaging SQL-Schema ausführen** — Tabellen `user_messages` + `broadcast_messages` müssen einmalig manuell im Supabase SQL-Editor eingespielt werden. Bis dahin ist das Postfach nicht funktionsfähig.
 - 🔴 **LagerPilot: Umlagerung atomarisieren** — Datenverlust-Risiko bei Teil-Fehlern (4 Awaits ohne Rollback). Supabase-RPC nötig.
 - 🔴 **LagerPilot: Dual-Layer-Bestandssync** — `lager_artikel.bestand` und `lager_stellplatz_bestand` laufen auseinander; KI-Kontext inkonsistent.
