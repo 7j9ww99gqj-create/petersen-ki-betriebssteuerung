@@ -2135,12 +2135,37 @@ export default function LagerPilotPage() {
                 {newAusgang.artikel && (() => {
                   const found = artikel.find(a => a.name === newAusgang.artikel)
                   if (!found) return null
+                  // FIFO: älteste Charge für diesen Artikel finden
+                  const chargenFuerArtikel = stellplatzBestand.filter(sb =>
+                    sb.menge > 0 && (sb.artikelname === newAusgang.artikel || sb.artikelnummer === found.id)
+                  )
+                  const fifoCharge = chargenFuerArtikel.length > 0
+                    ? chargenFuerArtikel.sort((a, b) => {
+                        const da = a.mhd ?? a.eingelagert_am ?? '9999'
+                        const db2 = b.mhd ?? b.eingelagert_am ?? '9999'
+                        return da < db2 ? -1 : da > db2 ? 1 : 0
+                      })[0]
+                    : null
                   return (
-                    <div style={{ marginTop: 6, fontSize: 12 }}>
-                      Verfügbar: <b style={{ color: found.bestand === 0 ? '#f43f5e' : found.bestand <= (found.mindestbestand ?? 0) ? '#f59e0b' : '#4ddb7e' }}>
-                        {found.bestand} {found.einheit}
-                      </b>
-                    </div>
+                    <>
+                      <div style={{ marginTop: 6, fontSize: 12 }}>
+                        Verfügbar: <b style={{ color: found.bestand === 0 ? '#f43f5e' : found.bestand <= (found.mindestbestand ?? 0) ? '#f59e0b' : '#4ddb7e' }}>
+                          {found.bestand} {found.einheit}
+                        </b>
+                      </div>
+                      {fifoCharge && (
+                        <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, background: 'rgba(37,211,102,.08)', border: '1px solid rgba(37,211,102,.25)', fontSize: 12, color: '#4ddb7e', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span>🟢</span>
+                          <span>
+                            <b>FIFO: Älteste Charge:</b> Stellplatz{' '}
+                            <b>{fifoCharge.lager_stellplaetze?.code ?? fifoCharge.stellplatz_id ?? '—'}</b>
+                            {fifoCharge.mhd && <>, MHD: <b>{new Date(fifoCharge.mhd).toLocaleDateString('de-DE')}</b></>}
+                            {!fifoCharge.mhd && fifoCharge.eingelagert_am && <>, eingelagert: <b>{new Date(fifoCharge.eingelagert_am).toLocaleDateString('de-DE')}</b></>}
+                            {fifoCharge.charge && <>, Charge: <b>{fifoCharge.charge}</b></>}
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )
                 })()}
               </div>
