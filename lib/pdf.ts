@@ -265,7 +265,7 @@ function drawBriefpapierContent(
 ): number {
   const pageW = 210
   const margin = 20          // left margin
-  const rightEdge = 183      // right edge – 27mm buffer keeps content inside briefpapier
+  const rightEdge = 165      // right edge – amount column well inside briefpapier content area
   const topY = opts.topY ?? 78
   const bottomY = opts.bottomY ?? 244
   let y = topY
