@@ -1114,6 +1114,21 @@ export async function deleteBueroKunde(id: string) {
   if (error) throw error
 }
 
+export async function anonymisiereBueroKunde(id: string) {
+  const { error } = await db()
+    .from('buero_kunden')
+    .update({
+      name: '[Anonym]',
+      email: 'anonym@geloescht.de',
+      telefon: '',
+      ort: '',
+      ansprechpartner: '',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+  if (error) throw error
+}
+
 export async function getBueroAngebote() {
   const [{ data, error }, kundenIndex] = await Promise.all([
     db().from('buero_angebote').select('*').order('id', { ascending: false }),

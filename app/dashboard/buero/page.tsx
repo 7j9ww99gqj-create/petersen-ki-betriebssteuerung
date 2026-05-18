@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
 import {
-  getBueroKunden, upsertBueroKunde, deleteBueroKunde,
+  getBueroKunden, upsertBueroKunde, deleteBueroKunde, anonymisiereBueroKunde,
   getBueroAngebote, upsertBueroAngebot, deleteBueroAngebot,
   getBueroAuftraege, upsertBueroAuftrag, deleteBueroAuftrag,
   getBueroRechnungen, upsertBueroRechnung, deleteBueroRechnung, getNextInvoiceNumber, getNextAngebotNumber,
@@ -18,7 +18,7 @@ import { generateRechnungPDF, generateAngebotPDF, generateAuftragsbestaetigungPD
 import { createSupabaseClient } from '@/lib/supabase'
 import { normalizeDocumentStoragePath, type StoredDocumentLink } from '@/lib/documents'
 import { genId } from '@/lib/ids'
-import { useRole } from '@/lib/roles'
+import { useRole, PERMISSIONS } from '@/lib/roles'
 import { PACKAGE_PRICING, EMPLOYEE_TIERS, type PackageId, type EmployeeTierId } from '@/lib/pricingConfig'
 import DocumentPreviewModal from '@/components/DocumentPreviewModal'
 
@@ -417,6 +417,8 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
   const [retryKey, setRetryKey] = useState(0)
   const [form, setForm] = useState({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '' })
   const [cockpitTab, setCockpitTab] = useState<'angebote' | 'auftraege' | 'rechnungen'>('auftraege')
+  const [anonConfirm, setAnonConfirm] = useState<string | null>(null)
+  const { role } = useRole()
 
   useEffect(() => {
     if (isDemo) return
@@ -454,6 +456,21 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
     setForm({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '' })
     setShowForm(false)
     showToast(`✅ Kunde "${newKunde.name}" wurde erfolgreich angelegt (${newKunde.id})`)
+  }
+
+  const handleAnonymize = async (id: string) => {
+    if (isDemo) {
+      setKunden(prev => prev.map(k => k.id === id ? { ...k, name: '[Anonym]', email: 'anonym@geloescht.de', telefon: '', ansprechpartner: '', ort: '' } : k))
+      if (selected?.id === id) setSelected(prev => prev ? { ...prev, name: '[Anonym]', email: 'anonym@geloescht.de', telefon: '', ansprechpartner: '', ort: '' } : null)
+      setAnonConfirm(null); showToast('🔒 Kunde anonymisiert'); return
+    }
+    try {
+      await anonymisiereBueroKunde(id)
+      const anon: Partial<Kunde> = { name: '[Anonym]', email: 'anonym@geloescht.de', telefon: '', ansprechpartner: '', ort: '' }
+      setKunden(prev => prev.map(k => k.id === id ? { ...k, ...anon } : k))
+      if (selected?.id === id) setSelected(prev => prev ? { ...prev, ...anon } as Kunde : null)
+      setAnonConfirm(null); showToast('🔒 Kunde DSGVO-konform anonymisiert')
+    } catch { showToast('Fehler beim Anonymisieren', true) }
   }
 
   if (loading) return (
@@ -506,6 +523,17 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
               <div style={{ color: '#aeb9c8', fontSize: 12, marginTop: 2 }}>{selected.ansprechpartner} · {selected.email} · {selected.telefon}</div>
             </div>
             <span className={`badge ${selected.status === 'Aktiv' ? 'badge-green' : 'badge-gray'}`}>{selected.status}</span>
+            {PERMISSIONS.canDelete(role) && (
+              anonConfirm === selected.id ? (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: '#f59e0b' }}>Wirklich anonymisieren?</span>
+                  <button onClick={() => handleAnonymize(selected.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.12)', color: '#ff8080', cursor: 'pointer', fontWeight: 700 }}>Ja, anonymisieren</button>
+                  <button onClick={() => setAnonConfirm(null)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Abbrechen</button>
+                </div>
+              ) : (
+                <button onClick={() => setAnonConfirm(selected.id)} style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,80,80,.3)', background: 'rgba(255,80,80,.08)', color: '#ff8080', cursor: 'pointer', fontWeight: 600 }}>🔒 Anonymisieren</button>
+              )
+            )}
           </div>
           {/* KPI-Zeile */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginTop: 16 }}>
