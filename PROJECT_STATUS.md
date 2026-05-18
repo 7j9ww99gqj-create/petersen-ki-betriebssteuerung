@@ -26,11 +26,12 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Quick-Win-Sprint.
-- Jüngste Fortschritte (2026-05-18 Quick-Win-Sprint): 7 schnelle Fixes deployed — deletePlanungRessource, AnalysePilot-Status-Filter, PieChart-Bereinigung, LagerPilot Bestellung→DB, Wareneingänge im KI-Kontext.
-- Aktueller lokaler Stand (Branch `feature/briefpapier-firmendaten`): Inhaber-Briefpapier/Firmendaten erweitert; Petersen Brand für Angebote, Auftragsbestätigungen und Rechnungen integriert.
-- Wichtigste externe Restpunkte: Alle Migrations sind eingespielt (`Remote database is up to date`). Keine ausstehenden SQL-Migrationen mehr.
-- Produktivlage: Kernsystem weitgehend vollständig; Hauptmodule produktionsreif.
+- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, 30-Aufgaben-Sprint vollständig deployed.
+- Letzter Commit: `2b068fc` — Sprint-Migration 18/22/25/26/30 eingespielt.
+- Jüngste Fortschritte (2026-05-18 – 30-Aufgaben-Sprint): Alle 30 Aufgaben implementiert, committed, gepusht und live auf Vercel. Migrations `20260518210000` für Aufgaben 18/22/25/26/30 nachträglich eingespielt.
+- Infrastruktur: PreToolUse-Hook konfiguriert — `npx tsc --noEmit` blockiert ab sofort jeden Push bei TypeScript-Fehlern (`.claude/settings.json`).
+- Alle Migrations eingespielt: Remote-DB ist up to date (`20260518210000` ist neueste Migration).
+- Produktivlage: Kernsystem vollständig; alle Hauptmodule produktionsreif und erweitert.
 
 ### 0.2 Top-Offene Aufgaben (Priorisiert)
 - ✅ ~~**Stripe Webhook-URL** im Stripe-Dashboard prüfen und echten End-to-End-Test validieren.~~ **Erledigt 2026-05-18**.
@@ -47,18 +48,15 @@
 - ✅ ~~**AnalysePilot: Pilot-Nutzungs-PieChart hardcoded**~~ **Erledigt 2026-05-18** — hardcoded Werte + Chart entfernt, Placeholder-Text eingefügt; Import `PieChart/Pie/Cell` + `fmtPct` bereinigt.
 - ✅ ~~**LagerPilot: EinkaufTab / Bestellung nur Toast**~~ **Erledigt 2026-05-18** — `handleBestellungBestaetigen` ruft jetzt `upsertEinkaufBestellung()` auf; `genId` importiert.
 - ✅ ~~**LagerPilot: Wareneingänge nicht im KI-Kontext**~~ **Erledigt 2026-05-18** — `einkauf_wareneingaenge` in `buildContextBlock` + Live-Query in `app/api/chat/route.ts` ergänzt.
-- 🔴 **BüroPilot: PositionenEditor in Angeboten** — Typ `Angebot` hat kein `positionen`-Feld; Angebot→Rechnung-Konvertierung verliert Positionsdaten (siehe 6. Offene Aufgaben → BüroPilot).
-- 🔴 **LagerPilot: Umlagerung atomarisieren** — Datenverlust-Risiko bei Teil-Fehlern (4 Awaits ohne Rollback). Supabase-RPC nötig (siehe 6. → LagerPilot).
-- 🔴 **LagerPilot: Dual-Layer-Bestandssync** — `lager_artikel.bestand` und `lager_stellplatz_bestand` laufen auseinander; KI-Kontext inkonsistent.
-- 🔴 **PlanungPilot: FK `auftrag_id`** — `planung_projekte` hat keine Verknüpfung zu `buero_auftraege`; BüroPilot ↔ PlanungPilot völlig isoliert (Migration + Button nötig).
-- 🔴 **WerkstattPilot: FK `buero_auftrag_id`** — `auftragsnr` ist freier Text ohne Referenzintegrität; keine echte Karte↔Auftrag-Verknüpfung (Migration + `lib/db.ts`).
-- 🔴 **WerkstattPilot: Material → LagerPilot-Sync** — Materialentnahme reduziert nicht `lager_artikel.bestand`; Lagersaldo nach Werkstatt-Verbrauch falsch.
-- 🔴 **WerkstattPilot: Ist vs. Soll Zeitanzeige** — Zeitbuchungen werden nicht gegen Karten-Soll aggregiert; kein operativer Steuerungswert sichtbar.
-- 🟡 **Stripe Analytics Integration** (4 h, einfach) — MRR-Verlauf im Marketing-Auswertungs-Tab.
-- 🟡 **Mailchimp API** (5 h, einfach) — Echtzeit-Öffnungsraten + Lead→Subscriber-Automatisierung.
-- 🔴 **AnalysePilot: Zeitraum-Filter verdrahten** — UI-Buttons (7T/30T/3M/6M/1J) sind funktionslos; DB-Queries ignorieren den State.
-- 🔴 **AnalysePilot: Gewinn-KPI korrigieren** — steuer_fixkosten/betriebsausgaben nicht einbezogen; Gewinn strukturell falsch.
-- 🟢 Analyse-Bestandstrend auf echte Wochensnapshots umstellen.
+- ✅ ~~**BüroPilot: PositionenEditor in Angeboten**~~ **Erledigt 2026-05-18** (Aufgabe 26, Commit `7033146`) — `positionen` JSONB in `buero_angebote`, Zeileneditor, Konvertierung überträgt Positionen 1:1.
+- ✅ ~~**WerkstattPilot: Material → LagerPilot-Sync**~~ **Erledigt 2026-05-18** (Aufgabe 27, Commit `ae1b821`) — Materialentnahme reduziert `lager_artikel.bestand` + schreibt Lager-Bewegung.
+- ✅ ~~**WerkstattPilot: Ist vs. Soll Zeitanzeige**~~ **Erledigt 2026-05-18** (Aufgabe 21, Commit `8e50d12`) — Zeitbuchungen aggregiert, Pill-Badge pro Karte, Ampelfarbe.
+- ✅ ~~**PlanungPilot: FK `auftrag_id`**~~ **Erledigt 2026-05-18** (Aufgabe 30, Commit `60be09b`) — `planung_projekte.auftrag_id` FK, Button in BüroPilot, Formular-Vorausfüllung.
+- ✅ ~~**AnalysePilot: Zeitraum-Filter verdrahten**~~ **Erledigt 2026-05-18** (Aufgabe 15, Commit `ccc6217`) — useEffect an [zeitraum], alle DB-Queries gefiltert.
+- ✅ ~~**AnalysePilot: Gewinn-KPI korrigieren**~~ **Erledigt 2026-05-18** (Aufgabe 14, Commit `148bfbe`) — steuer_fixkosten + betriebsausgaben in Gesamtkosten einbezogen.
+- ✅ ~~**Analyse-Bestandstrend auf echte Snapshots umstellen**~~ **Erledigt 2026-05-18** (Aufgabe 25, Commit `5c639d7`) — Tabelle `lager_bestand_snapshots`, Snapshot-Button, Liniendiagramm.
+- ✅ ~~**Owner-Sprint #7: Positions-Übernahme Angebot→Rechnung**~~ **Erledigt 2026-05-18** (Aufgabe 26, Commit `7033146`).
+- ✅ ~~**Owner-Sprint #8: BüroPilot↔PlanungPilot FK**~~ **Erledigt 2026-05-18** (Aufgabe 30, Commit `60be09b`).
 - ✅ ~~**Task 6: Benutzerverwaltung Deaktivieren/Löschen/Suche**~~ **Erledigt 2026-05-18** (Commit `80e0f8c`).
 - ✅ ~~**Task 7: RLS-Policies vollständig**~~ **Erledigt 2026-05-18** (Commit `7aee934`).
 - ✅ ~~**Task 8: Pipeline-Widget 3 KPIs**~~ **Erledigt 2026-05-18** (Commit `dadb045`).
@@ -66,21 +64,24 @@
 - ✅ ~~**Owner-Sprint #3: Kunden-Cockpit**~~ **Erledigt 2026-05-18** (Commit `021d2fc`).
 - ✅ ~~**Owner-Sprint #4: Zahlungs-Alert-Center**~~ **Erledigt 2026-05-18** (Commit `1fce336`).
 - ✅ ~~**Owner-Sprint #5: AnalysePilot Zeitraum-Filter**~~ **Erledigt 2026-05-18** (Commit `9a9b0ad`).
-- ✅ ~~**Einkauf-Tabellen in Supabase**~~ — Bereits in Migration `20260510213000` angewendet; EinkaufTab ist vollständig live.
+- ✅ ~~**Einkauf-Tabellen in Supabase**~~ Bereits in Migration `20260510213000` angewendet.
+- 🔴 **LagerPilot: Umlagerung atomarisieren** — Datenverlust-Risiko bei Teil-Fehlern (4 Awaits ohne Rollback). Supabase-RPC nötig.
+- 🔴 **LagerPilot: Dual-Layer-Bestandssync** — `lager_artikel.bestand` und `lager_stellplatz_bestand` laufen auseinander; KI-Kontext inkonsistent.
+- 🔴 **WerkstattPilot: FK `buero_auftrag_id`** — `auftragsnr` ist freier Text ohne Referenzintegrität; echte Karte↔Auftrag-FK fehlt noch.
 - 🟡 **Owner-Sprint #6: Pipeline-Kanban-View** — horizontale Spalten Anfrage/Angebot/Auftrag/Rechnung/Bezahlt (5h, Opus-Modell empfohlen).
-- 🟡 **Owner-Sprint #7: Positions-Übernahme Angebot→Rechnung** — Positionen gehen bei Direktkonvertierung verloren, 1-Zeiler Fix (1h).
-- 🟡 **Owner-Sprint #8: BüroPilot↔PlanungPilot FK** — `planung_projekte.auftrag_id` Migration + „Als Projekt anlegen"-Button (4h).
 - 🟡 **Owner-Sprint #9: Zahlungsmoral-Report** — Ø Zahlungsverzug + Mahnung-Rate je Kunde (2h).
+- 🟡 **Stripe Analytics Integration** (4h) — MRR-Verlauf im Marketing-Auswertungs-Tab.
+- 🟡 **Mailchimp API** (5h) — Echtzeit-Öffnungsraten + Lead→Subscriber-Automatisierung.
 
 ### 0.3 Aktuelle Blocker
 - Keine kritischen Blocker. Stripe E2E validiert.
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-18, Commit `9a9b0ad`  
-**Letzte Session:** Owner-Dashboard-Sprint + lokales Inhaber-Briefpapier-Update — Petersen Brand, Firmendaten-Struktur, AB-PDF
-**Nächster Focus:** Pipeline-Kanban (5h, Opus) → Positions-Übernahme Angebot→Rechnung (1h) → BüroPilot↔PlanungPilot FK (4h)  
-**Blocker:** Keine — alle Migrations eingespielt (`db push` sauber)  
+**Letzter Stand:** 2026-05-18, Commit `2b068fc`  
+**Letzte Session:** 30-Aufgaben-Sprint vollständig deployed + Sprint-Migration nachgezogen + PreToolUse-Hook für TypeScript-Check vor Push eingerichtet  
+**Nächster Focus:** Pipeline-Kanban (5h, Opus) → Zahlungsmoral-Report (2h) → LagerPilot Umlagerung atomarisieren (Supabase-RPC)  
+**Blocker:** Keine — alle Migrations eingespielt (`20260518210000` ist neueste), Build + TSC grün, Vercel Ready  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
 ## 1. Kurzüberblick
@@ -96,6 +97,39 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – 30-Aufgaben-Sprint, Commits `5de7454`–`2b068fc`):**
+  - **Aufgabe 1** (`5de7454`): AnalysePilot Lagerwert-KPI (💰 Bestand × Einkaufspreis, Demo-Fallback). `analyse/page.tsx`
+  - **Aufgabe 2** (`828bb19`): SteuerPilot VSt Fixkosten als separate UStVA-Zeile. `steuer/page.tsx`
+  - **Aufgabe 3** (`3f888fa`): LagerPilot FIFO-Hinweis beim Warenausgang (älteste Charge aus `lager_stellplatz_bestand`). `lager/page.tsx`
+  - **Aufgabe 4** (`7a47b1a`): PlanungPilot Auto-Fortschritt 100% wenn alle Aufgaben erledigt. `planung/page.tsx`
+  - **Aufgabe 5** (`12d72fe`): BüroPilot DSGVO-Anonymisierung (Admin-only, 2-Klick). `buero/page.tsx`, `lib/db.ts`
+  - **Aufgabe 6** (`225e967`): AnalysePilot DB-Queries serverseitig auf 12 Monate begrenzt. `analyse/page.tsx`
+  - **Aufgabe 7** (`3c8337e`): AnalysePilot CSV-Export Umsatz-Tabelle (Blob-Download). `analyse/page.tsx`
+  - **Aufgabe 8** (`14398cf`): PlanungPilot Empty States für alle 4 Tabs mit CTA-Button. `planung/page.tsx`
+  - **Aufgabe 9** (`42f7e07`): BüroPilot Duplikat-Erkennung Kunden via E-Mail-Check. `buero/page.tsx`, `lib/db.ts`
+  - **Aufgabe 10** (`c518952`): SteuerPilot Fälligkeits-Kalender-Widget + Dauerfristverlängerung-Toggle. `steuer/page.tsx`
+  - **Aufgabe 11** (`fe81c66`): PlanungPilot Ressourcen-Überlastet-Badge + Formular-Warnung. `planung/page.tsx`
+  - **Aufgabe 12** (`b63ac0e`): WerkstattPilot Qualitäts-KPI (Fehlerquote, Sparkline-Trend 8 Wochen). `werkstatt/page.tsx`
+  - **Aufgabe 13** (`d498b72`): BüroPilot→WerkstattPilot Karten-Auto-Erstellung via URL-Params. `buero/page.tsx`, `werkstatt/page.tsx`
+  - **Aufgabe 14** (`148bfbe`): AnalysePilot Gewinn-KPI strukturell korrigiert (+ Fixkosten + Betriebsausgaben). `analyse/page.tsx`
+  - **Aufgabe 15+16** (`ccc6217`): Zeitraum-Filter verifiziert + SteuerPilot Stripe-Zahlungen als separate Einnahmen-Zeile. `analyse/page.tsx`, `steuer/page.tsx`
+  - **Aufgabe 17** (`5558c75`): BüroPilot Angebots-Reminder — Alters-Badge (7/14+ Tage) + Filter-Button. `buero/page.tsx`
+  - **Aufgabe 18** (`c64eb68`): PlanungPilot Zeiterfassung — `stunden_soll`/`stunden_ist` + Fortschrittsbalken. `planung/page.tsx`, `supabase/schema.sql`
+  - **Aufgabe 19** (`8529482`): BüroPilot Eingangsrechnung → SteuerPilot-Beleg-Sync bei Bezahlung. `buero/page.tsx`, `lib/db.ts`
+  - **Aufgabe 20** (`a677a44`): BüroPilot OPOS-Dashboard — Fälligkeits-Aging-Buckets (heute/diese Woche/>30 Tage). `buero/page.tsx`
+  - **Aufgabe 21** (`8e50d12`): WerkstattPilot Ist vs. Soll Zeitanzeige pro Karte (Pill-Badge, Ampelfarbe). `werkstatt/page.tsx`
+  - **Aufgabe 22** (`a2762c0`): LagerPilot `lieferant_id` FK auf `einkauf_lieferanten` + Dropdown. `lager/page.tsx`, `lib/db.ts`, `supabase/schema.sql`
+  - **Aufgabe 23** (`159da86`): BüroPilot KI-Angebotstext (✨ Button, API-Route `generate-angebot`). `buero/page.tsx`, `app/api/generate-angebot/route.ts`
+  - **Aufgabe 24** (`cd7a1b1`): SteuerPilot SKR04-Buchungsvorschlag im Beleg-Modal (KI-Badge). `steuer/page.tsx`
+  - **Aufgabe 25** (`5c639d7`): Bestandstrend-Snapshots — Tabelle `lager_bestand_snapshots`, 📸-Button, AnalysePilot-Liniendiagramm. `lager/page.tsx`, `analyse/page.tsx`, `lib/db.ts`
+  - **Aufgabe 26** (`7033146`): BüroPilot Positionen-Editor in Angeboten (JSONB, Konvertierung überträgt Positionen). `buero/page.tsx`, `lib/db.ts`
+  - **Aufgabe 27** (`ae1b821`): WerkstattPilot Material-Entnahme → LagerPilot-Sync (Bestand −, Bewegungslog). `werkstatt/page.tsx`, `lib/db.ts`
+  - **Aufgabe 28** (`e7e76d4`): WerkstattPilot Fertigungsleitstand — neuer Tab, 3-Spalten-Kanban, SLA-Ampel, Batch-Aktionen. `werkstatt/page.tsx`
+  - **Aufgabe 29** (`a5d595c`): SteuerPilot OCR-Erkennung — API-Route `ocr-beleg`, KI füllt Beleg-Felder automatisch. `steuer/page.tsx`, `app/api/ocr-beleg/route.ts`
+  - **Aufgabe 30** (`60be09b`): PlanungPilot `auftrag_id` FK + Meilenstein-CRUD (Tabelle `planung_meilensteine`). `planung/page.tsx`, `lib/db.ts`
+  - **Sprint-Migration** (`2b068fc`): `20260518210000_sprint_aufgaben_18_22_25_26_30.sql` — alle fehlenden Spalten/Tabellen in Remote-DB eingespielt.
+  - **PreToolUse-Hook** (`f65d7b0`): `.claude/settings.json` — `npx tsc --noEmit` blockiert Push bei TypeScript-Fehlern.
+  - Tests: Build ✅, TSC ✅, alle Vercel-Deployments ✅ Ready.
 - **Zuletzt erledigt (2026-05-18 – Inhaber-Briefpapier & Firmendaten, Branch `feature/briefpapier-firmendaten`)**:
   - **Briefpapier/PDF** (`lib/pdf.ts`): Template `petersen-brand` optisch näher am neuen Briefpapier ausgerichtet (heller Header, Kontaktblock, dezentes Wasserzeichen, dunkler Footer mit Diagonalfläche/Logo), Firmen-/Steuer-/Bankdaten werden sauberer genutzt.
   - **Auftragsbestätigung-PDF**: Neue Funktion `generateAuftragsbestaetigungPDF()` ergänzt; BüroPilot-Aufträge zeigen jetzt `AB-PDF` und das AB-Mail-Modal bietet PDF-Erstellung wie Angebote/Rechnungen.
