@@ -2242,6 +2242,7 @@ function InfoSection({ isDemo }: { isDemo: boolean }) {
               <p style={{ margin: 0 }}>
                 Verantwortlicher im Sinne der DSGVO ist:<br />
                 <strong style={{ color: '#f8fbff' }}>Carsten Petersen</strong><br />
+                Im Sträßchen 14, 40789 Monheim am Rhein<br />
                 E-Mail: <a href="mailto:info@petersen-ki-pilot.de" style={{ color: '#6cb6ff' }}>info@petersen-ki-pilot.de</a><br />
                 Telefon: +49 176 56392975
               </p>
@@ -2322,7 +2323,9 @@ function InfoSection({ isDemo }: { isDemo: boolean }) {
               <p style={{ margin: 0 }}>
                 <strong style={{ color: '#f8fbff' }}>Carsten Petersen</strong><br />
                 Inhaber und Betreiber<br />
-                Petersen KI Betriebssteuerung
+                Petersen KI Betriebssteuerung<br />
+                Im Sträßchen 14<br />
+                40789 Monheim am Rhein
               </p>
             </div>
             <div>
@@ -2330,20 +2333,19 @@ function InfoSection({ isDemo }: { isDemo: boolean }) {
               <p style={{ margin: 0 }}>
                 Telefon: <a href="tel:+4917656392975" style={{ color: '#6cb6ff' }}>+49 176 56392975</a><br />
                 E-Mail: <a href="mailto:info@petersen-ki-pilot.de" style={{ color: '#6cb6ff' }}>info@petersen-ki-pilot.de</a><br />
-                Web: <a href="https://petersen-ki-pilot.de" target="_blank" rel="noopener noreferrer" style={{ color: '#6cb6ff' }}>petersen-ki-pilot.de</a>
+                Web: <a href="https://www.petersen-ki-pilot.de" target="_blank" rel="noopener noreferrer" style={{ color: '#6cb6ff' }}>www.petersen-ki-pilot.de</a>
               </p>
             </div>
             <div>
               <h4 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: '#f8fbff' }}>Steuerliche Angaben</h4>
               <p style={{ margin: 0 }}>
-                Steuernummer: [Steuernummer eintragen]<br />
-                USt-IdNr.: [USt-IdNr. eintragen]
+                Steuernummer: 5332/5130/4970
               </p>
             </div>
             <div>
               <h4 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: '#f8fbff' }}>Inhaltlich Verantwortlicher</h4>
               <p style={{ margin: 0 }}>Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV:<br />
-              Carsten Petersen (Anschrift wie oben)</p>
+              Carsten Petersen, Im Sträßchen 14, 40789 Monheim am Rhein</p>
             </div>
             <div>
               <h4 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: '#f8fbff' }}>Haftungsausschluss</h4>
