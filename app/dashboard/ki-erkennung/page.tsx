@@ -6,6 +6,7 @@ import {
   getBueroDokumentById, getBueroDokumente, getDokumentUrl, insertBueroDokument, updateBueroDokument, uploadDokument,
   upsertBueroEingangsrechnung, upsertBueroRechnung, upsertBueroAngebot,
   insertEinkaufWareneingang, getAiFeatureSettings, type AiFeatureSettings,
+  upsertEinkaufBestellung, getEinkaufLieferanten,
 } from '@/lib/db'
 import { hasDemoCookie } from '@/lib/auth'
 import { createSupabaseClient } from '@/lib/supabase'
@@ -648,6 +649,41 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     }
   }
 
+  async function executeBestellung(action: KiAction, msgIdx: number, actionIdx: number) {
+    const key = `${msgIdx}-${actionIdx}`
+    setActionLoading(key)
+    const showToast = (msg: string, type: 'success' | 'error') => {
+      setActionToast({ msg, type })
+      setTimeout(() => setActionToast(null), 4500)
+    }
+    try {
+      if (hasDemoCookie()) {
+        await new Promise(r => setTimeout(r, 700))
+        showToast(`Demo: Bestellung für „${action.artikel}" simuliert`, 'success')
+      } else {
+        const lieferanten = await getEinkaufLieferanten()
+        const lieferant = lieferanten[0] as { id: string; name: string } | undefined
+        await upsertEinkaufBestellung({
+          id: `BS-${Date.now().toString(36).toUpperCase()}`,
+          lieferant_id: lieferant?.id ?? '',
+          status: 'Offen',
+          artikel: action.artikel ?? 'Unbekannter Artikel',
+          menge: action.menge ?? 1,
+          einkaufspreis: '0',
+          gesamt: '0',
+          bestellt_am: new Date().toISOString().slice(0, 10),
+          notiz: action.beschreibung ? `KI-Vorschlag: ${action.beschreibung}` : 'KI-Vorschlag',
+        })
+        showToast(`Bestellung für „${action.artikel}" erstellt`, 'success')
+      }
+      setConfirmAction(null)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Fehler bei der Bestellung', 'error')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   // ── Demo-Chat ──────────────────────────────────────────────────────────────
 
   async function sendChat() {
@@ -1260,9 +1296,35 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
                             )}
                           </div>
 
-                          {action.type !== 'umlagerung' && (
+                          {action.type === 'bestellung' && (
+                            <div style={{ marginTop: 8 }}>
+                              {isConfirming ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: 12, color: '#f8fbff', fontWeight: 600 }}>Bestellung wirklich anlegen?</span>
+                                  <button
+                                    onClick={() => executeBestellung(action, i, ai)}
+                                    disabled={isRunning}
+                                    style={{ fontSize: 12, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 700, background: '#f59e0b', border: 'none', color: '#fff', opacity: isRunning ? .6 : 1 }}
+                                  >
+                                    {isRunning ? '⏳ Wird angelegt…' : '✓ Ja, bestellen'}
+                                  </button>
+                                  <button onClick={() => setConfirmAction(null)} disabled={isRunning} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', color: '#aeb9c8' }}>
+                                    Abbrechen
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setConfirmAction({ msgIdx: i, actionIdx: ai })}
+                                  style={{ fontSize: 12, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.35)', color: '#fbbf24' }}
+                                >
+                                  Bestellung anlegen →
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {action.type === 'hinweis' && (
                             <span style={{ fontSize: 11, color: '#aeb9c8', flexShrink: 0, alignSelf: 'center', padding: '2px 7px', borderRadius: 6, border: `1px solid ${cfg.border}`, fontWeight: 600 }}>
-                              Vorschlag
+                              Hinweis
                             </span>
                           )}
                         </div>
