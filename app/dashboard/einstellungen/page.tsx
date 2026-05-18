@@ -89,7 +89,7 @@ const PILOT_LABELS: Record<PilotId, string> = {
 
 export default function EinstellungenPage() {
   const router = useRouter()
-  const [section, setSection] = useState<'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'registrierungen' | 'kunden-eingerichtet' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
+  const [section, setSection] = useState<'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'registrierungen' | 'kunden-eingerichtet' | 'aktivitaetslog' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
   const [toast, setToast] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [isDemo, setIsDemo] = useState(false)
@@ -109,6 +109,8 @@ export default function EinstellungenPage() {
   const [creatingMode, setCreatingMode] = useState<'invite' | 'create' | ''>('')
   const [newlyCreatedSecret, setNewlyCreatedSecret] = useState<{ email: string; password: string } | null>(null)
   const [pendingPilotSelections, setPendingPilotSelections] = useState<Record<string, PilotId[]>>({})
+  const [deleteConfirmId, setDeleteConfirmId] = useState('')
+  const [expandedCustomerInvoices, setExpandedCustomerInvoices] = useState<string | null>(null)
 
   // Sync picker with current role once loaded
   useEffect(() => { setSelectedRole(currentRole) }, [currentRole])
@@ -454,6 +456,7 @@ export default function EinstellungenPage() {
           {isInhaberAccount && <NavItem id="kundensteuerung" icon="👑" label="Kundensteuerung" />}
           {isInhaberAccount && <NavItem id="registrierungen" icon="🆕" label="Offene Registrierungen" />}
           {isInhaberAccount && <NavItem id="kunden-eingerichtet" icon="✅" label="Kunden eingerichtet" />}
+          {isInhaberAccount && <NavItem id="aktivitaetslog" icon="📋" label="Aktivitätslog" />}
           <NavItem id="benachrichtigungen" icon="🔔" label="Benachricht." />
           <NavItem id="rollen" icon="🔑" label="Rollen" />
           <NavItem id="import" icon="📥" label="Import" />
@@ -660,7 +663,7 @@ export default function EinstellungenPage() {
           )}
 
           {section === 'kunden-eingerichtet' && (() => {
-            const activeUsers = managedUsers.filter(user => user.accessStatus === 'active')
+            const activeUsers = managedUsers.filter(user => user.accessStatus === 'active' && !user.isOwnerAccount)
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div className="pk-card">
@@ -781,8 +784,21 @@ export default function EinstellungenPage() {
                               </div>
                             </div>
 
+                            {/* Rechnungsübersicht */}
+                            {expandedCustomerInvoices === user.id ? (
+                              <CustomerInvoicePreview userId={user.id} userEmail={user.email} onClose={() => setExpandedCustomerInvoices(null)} />
+                            ) : (
+                              <button
+                                className="pk-btn-ghost"
+                                style={{ fontSize: 12, marginTop: 8 }}
+                                onClick={() => setExpandedCustomerInvoices(user.id)}
+                              >
+                                📄 Rechnungen anzeigen
+                              </button>
+                            )}
+
                             {/* Testzeitraum verlängern */}
-                            <div style={{ marginBottom: 14 }}>
+                            <div style={{ marginBottom: 14, marginTop: 12 }}>
                               <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 8, fontWeight: 700, textTransform: 'uppercase' }}>Testzeitraum / Ablaufdatum</div>
                               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                                 <button
@@ -844,6 +860,45 @@ export default function EinstellungenPage() {
                                 ✉️ Kontakt
                               </a>
                             </div>
+                            {deleteConfirmId === user.id ? (
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                                <span style={{ fontSize: 12, color: '#fb7185' }}>Wirklich sperren?</span>
+                                <button
+                                  className="pk-btn-ghost"
+                                  style={{ fontSize: 12, color: '#fb7185', borderColor: 'rgba(244,63,94,.3)' }}
+                                  onClick={async () => {
+                                    setDeleteConfirmId('')
+                                    setSavingManagedUserId(user.id)
+                                    try {
+                                      const res = await fetch('/api/admin/users', {
+                                        method: 'PATCH',
+                                        headers: { 'content-type': 'application/json' },
+                                        body: JSON.stringify({ userId: user.id, role: user.role, accessStatus: 'suspended', accessMode: user.accessMode, accessExpiresAt: null, allowedPilotIds: [] }),
+                                      })
+                                      const data = await res.json().catch(() => null) as { error?: string; user?: ManagedUser } | null
+                                      if (!res.ok) throw new Error(data?.error || 'Fehler')
+                                      setManagedUsers(prev => prev.map(u => u.id === user.id ? { ...u, accessStatus: 'suspended', allowedPilotIds: [] } : u))
+                                      showToast(`🚫 ${user.email} wurde gesperrt`)
+                                    } catch (e) {
+                                      showToast(e instanceof Error ? e.message : 'Fehler', 'error')
+                                    } finally {
+                                      setSavingManagedUserId('')
+                                    }
+                                  }}
+                                >
+                                  Ja, sperren
+                                </button>
+                                <button className="pk-btn-ghost" style={{ fontSize: 12 }} onClick={() => setDeleteConfirmId('')}>Abbrechen</button>
+                              </div>
+                            ) : (
+                              <button
+                                className="pk-btn-ghost"
+                                style={{ fontSize: 12, color: '#fb7185', borderColor: 'rgba(244,63,94,.3)', marginTop: 8 }}
+                                onClick={() => setDeleteConfirmId(user.id)}
+                              >
+                                🚫 Kunden sperren
+                              </button>
+                            )}
                           </div>
                         )
                       })}
@@ -853,6 +908,19 @@ export default function EinstellungenPage() {
               </div>
             )
           })()}
+
+          {section === 'aktivitaetslog' && (
+            <div className="pk-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>📋 Aktivitätslog</h3>
+                  <p style={{ margin: 0, color: '#aeb9c8', fontSize: 13 }}>Letzte Systemereignisse und Buchungsaktivitäten.</p>
+                </div>
+                <button className="pk-btn-ghost" onClick={() => void loadManagedUsers()} style={{ fontWeight: 700 }}>Aktualisieren</button>
+              </div>
+              <AuditLogSection isInhaber={isInhaberAccount} showToast={showToast} />
+            </div>
+          )}
 
           {section === 'benachrichtigungen' && (
             <div className="pk-card">
@@ -1368,6 +1436,113 @@ export default function EinstellungenPage() {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function AuditLogSection({ isInhaber, showToast }: { isInhaber: boolean; showToast: (msg: string, type?: 'error') => void }) {
+  const [logs, setLogs] = useState<{ id: string; action: string; actor_email?: string; target_email?: string; created_at: string; details?: string }[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!isInhaber) return
+    const supabase = createSupabaseClient()
+    supabase
+      .from('audit_logs')
+      .select('id, action, actor_email, target_email, created_at, details')
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data, error }) => {
+        if (!error && data) setLogs(data)
+        setLoading(false)
+      })
+  }, [isInhaber])
+
+  if (loading) return <div style={{ color: '#aeb9c8', fontSize: 13 }}>Wird geladen…</div>
+  if (logs.length === 0) return <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine Einträge vorhanden.</div>
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table className="pk-table" style={{ width: '100%', fontSize: 13 }}>
+        <thead>
+          <tr>
+            <th style={{ padding: '10px 12px', textAlign: 'left' }}>Zeitpunkt</th>
+            <th style={{ padding: '10px 12px', textAlign: 'left' }}>Aktion</th>
+            <th style={{ padding: '10px 12px', textAlign: 'left' }}>Durchgeführt von</th>
+            <th style={{ padding: '10px 12px', textAlign: 'left' }}>Betrifft</th>
+            <th style={{ padding: '10px 12px', textAlign: 'left' }}>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {logs.map(log => (
+            <tr key={log.id}>
+              <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: '#aeb9c8' }}>
+                {new Date(log.created_at).toLocaleString('de-DE')}
+              </td>
+              <td style={{ padding: '10px 12px', fontWeight: 700 }}>{log.action}</td>
+              <td style={{ padding: '10px 12px', color: '#aeb9c8' }}>{log.actor_email || '–'}</td>
+              <td style={{ padding: '10px 12px', color: '#aeb9c8' }}>{log.target_email || '–'}</td>
+              <td style={{ padding: '10px 12px', color: '#aeb9c8', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }}>{log.details || '–'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function CustomerInvoicePreview({ userId, userEmail, onClose }: { userId: string; userEmail: string; onClose: () => void }) {
+  const [rechnungen, setRechnungen] = useState<{ id: string; nummer?: string; betrag: string; status: string; faellig: string; erstellt: string; kunde: string }[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const supabase = createSupabaseClient()
+    supabase
+      .from('buero_rechnungen')
+      .select('id, nummer, betrag, status, faellig, erstellt, kunde')
+      .eq('user_id', userId)
+      .order('erstellt', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (data) setRechnungen(data)
+        setLoading(false)
+      })
+  }, [userId])
+
+  return (
+    <div style={{ marginTop: 12, padding: 12, borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, alignItems: 'center' }}>
+        <div style={{ fontWeight: 700, fontSize: 13 }}>📄 Rechnungen – {userEmail}</div>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aeb9c8', cursor: 'pointer', fontSize: 16 }}>✕</button>
+      </div>
+      {loading ? (
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Wird geladen…</div>
+      ) : rechnungen.length === 0 ? (
+        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine Rechnungen vorhanden.</div>
+      ) : (
+        <table className="pk-table" style={{ width: '100%', fontSize: 12 }}>
+          <thead>
+            <tr>
+              <th style={{ padding: '8px 10px', textAlign: 'left' }}>Nummer</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left' }}>Betrag</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left' }}>Status</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left' }}>Fällig</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rechnungen.map(r => (
+              <tr key={r.id}>
+                <td style={{ padding: '8px 10px' }}>{r.nummer || r.id}</td>
+                <td style={{ padding: '8px 10px' }}>{r.betrag}</td>
+                <td style={{ padding: '8px 10px' }}>
+                  <span className={`badge badge-${r.status === 'Bezahlt' ? 'green' : r.status === 'Überfällig' || r.status === 'Mahnung' ? 'orange' : 'blue'}`}>{r.status}</span>
+                </td>
+                <td style={{ padding: '8px 10px', color: '#aeb9c8' }}>{r.faellig}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }
