@@ -1113,7 +1113,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
 
 // ── Aufträge-Tab ────────────────────────────────────────────────────────────
 
-function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isDemo: boolean; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; kunden: Kunde[]; setTab: (tab: Tab) => void }) {
+function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isDemo: boolean; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; kunden: Kunde[]; setTab: (tab: string) => void }) {
   const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [toast, setToast] = useState('')
@@ -1250,7 +1250,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isD
       try { await upsertBueroRechnung(newRe) } catch { showToast('Fehler beim Erstellen der Rechnung', true); return }
     }
     showToast(`✅ Rechnung ${newRe.nummer || newRe.id} erstellt`)
-    setTab('rechnungen' as Tab)
+    setTab('rechnungen')
   }
 
   const handleNeuSave = async () => {
