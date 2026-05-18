@@ -100,11 +100,14 @@ type BueroAngebotRecord = {
   datum?: string | null
   gueltig?: string | null
   status?: string | null
+  nummer?: string | null
+  verschickt_am?: string | null
 }
 
 type BueroAuftragRecord = {
   id: string
   kunde_id?: string | null
+  billing_subscription_id?: string | null
   kunde?: string | null
   beschreibung?: string | null
   wert?: string | null
@@ -112,6 +115,8 @@ type BueroAuftragRecord = {
   ende?: string | null
   status?: string | null
   fortschritt?: number | null
+  angebot_id?: string | null
+  ab_verschickt_am?: string | null
 }
 
 type BueroRechnungRecord = {
@@ -456,6 +461,8 @@ function normalizeBueroAngebot(
     ...row,
     kunde_id: row.kunde_id ?? undefined,
     kunde: firstText(row.kunde, row.kunde_id ? kundenById.get(row.kunde_id)?.name ?? '' : ''),
+    nummer: firstText(row.nummer) || undefined,
+    verschickt_am: firstText(row.verschickt_am) || undefined,
   }
 }
 
@@ -466,7 +473,10 @@ function normalizeBueroAuftrag(
   return {
     ...row,
     kunde_id: row.kunde_id ?? undefined,
+    billing_subscription_id: row.billing_subscription_id ?? undefined,
     kunde: firstText(row.kunde, row.kunde_id ? kundenById.get(row.kunde_id)?.name ?? '' : ''),
+    angebot_id: firstText(row.angebot_id) || undefined,
+    ab_verschickt_am: firstText(row.ab_verschickt_am) || undefined,
   }
 }
 
@@ -801,6 +811,16 @@ export async function listBillingPaymentsBySubscription(subscriptionId: string) 
   return ((data ?? []) as BillingPaymentRow[]).map(normalizeBillingPayment)
 }
 
+export async function listBillingPaymentsByInvoice(invoiceId: string) {
+  const { data, error } = await db()
+    .from('billing_payments')
+    .select('*')
+    .eq('invoice_id', invoiceId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return ((data ?? []) as BillingPaymentRow[]).map(normalizeBillingPayment)
+}
+
 export async function listBillingPayments(limit = 100) {
   const { data, error } = await db()
     .from('billing_payments')
@@ -886,6 +906,13 @@ export async function getNextInvoiceNumber() {
   if (error) throw error
   if (typeof data !== 'string' || !data.trim()) throw new Error('Rechnungsnummer konnte nicht erzeugt werden.')
   return data.trim()
+}
+
+export async function getNextAngebotNumber() {
+  const { data, error } = await db().rpc('pk_next_angebot_number')
+  if (error || !data) throw new Error('Angebotsnummer konnte nicht erzeugt werden.')
+  if (typeof data !== 'string' || !data.trim()) throw new Error('Angebotsnummer konnte nicht erzeugt werden.')
+  return data as string
 }
 
 function describeAuditAction(item: AuditLogRecord): { title: string; description: string; source: OwnerRecentActivity['source']; severity: OwnerRecentActivity['severity']; linkUrl?: string } {
@@ -1094,7 +1121,7 @@ export async function getBueroAngebote() {
 
 export async function upsertBueroAngebot(a: {
   id: string; kunde_id?: string; kunde?: string; titel?: string; betrag?: string
-  datum?: string; gueltig?: string; status?: string
+  datum?: string; gueltig?: string; status?: string; nummer?: string; verschickt_am?: string
 }) {
   const kundenIndex = await listBueroKundenIndex()
   const kundeRecord = a.kunde_id
@@ -1135,8 +1162,8 @@ export async function getBueroAuftraege() {
 }
 
 export async function upsertBueroAuftrag(a: {
-  id: string; kunde_id?: string; kunde?: string; beschreibung?: string; wert?: string
-  start?: string; ende?: string; status?: string; fortschritt?: number
+  id: string; kunde_id?: string; billing_subscription_id?: string; kunde?: string; beschreibung?: string; wert?: string
+  start?: string; ende?: string; status?: string; fortschritt?: number; angebot_id?: string; ab_verschickt_am?: string
 }) {
   const kundenIndex = await listBueroKundenIndex()
   const kundeRecord = a.kunde_id
@@ -1442,6 +1469,92 @@ export async function getBueroKundeDetailContext(id: string) {
     auftraege: relatedAuftraege,
     rechnungen: relatedRechnungen,
     dokumente: relatedDokumente,
+  }
+}
+
+export async function getBueroAngebotDetailContext(id: string) {
+  const [angebot, kunden, auftraege, rechnungen, dokumente] = await Promise.all([
+    getBueroAngebotById(id),
+    getBueroKunden(),
+    getBueroAuftraege(),
+    getBueroRechnungen(),
+    getBueroDokumente(),
+  ])
+  if (!angebot) return null
+  const kundeName = firstText(angebot.kunde)
+  const kunde = angebot.kunde_id
+    ? (kunden ?? []).find(row => row.id === angebot.kunde_id) ?? null
+    : (kunden ?? []).find(row => firstText(row.name).toLowerCase() === kundeName.toLowerCase()) ?? null
+  const relatedAuftraege = (auftraege ?? []).filter(row => row.kunde_id === angebot.kunde_id || (!!kundeName && firstText(row.kunde).toLowerCase() === kundeName.toLowerCase()))
+  const relatedRechnungen = (rechnungen ?? []).filter(row => row.kunde_id === angebot.kunde_id || (!!kundeName && firstText(row.kunde).toLowerCase() === kundeName.toLowerCase()))
+  const relatedDokumente = ((dokumente ?? []) as Array<Record<string, unknown>>).filter(doc => {
+    if (String(doc.angebot_id ?? '') === id) return true
+    const bezug = firstText(doc.bezug as string | undefined).toLowerCase()
+    return (!!kundeName && bezug === kundeName.toLowerCase())
+      || bezug === firstText(angebot.titel).toLowerCase()
+  })
+
+  return {
+    angebot,
+    kunde,
+    auftraege: relatedAuftraege,
+    rechnungen: relatedRechnungen,
+    dokumente: relatedDokumente,
+  }
+}
+
+export async function getBueroAuftragDetailContext(id: string) {
+  const [auftrag, kunden, rechnungen, dokumente] = await Promise.all([
+    getBueroAuftragById(id),
+    getBueroKunden(),
+    getBueroRechnungen(),
+    getBueroDokumente(),
+  ])
+  if (!auftrag) return null
+  const kundeName = firstText(auftrag.kunde)
+  const kunde = auftrag.kunde_id
+    ? (kunden ?? []).find(row => row.id === auftrag.kunde_id) ?? null
+    : (kunden ?? []).find(row => firstText(row.name).toLowerCase() === kundeName.toLowerCase()) ?? null
+  const relatedRechnungen = (rechnungen ?? []).filter(row => row.kunde_id === auftrag.kunde_id || (!!kundeName && firstText(row.kunde).toLowerCase() === kundeName.toLowerCase()))
+  const relatedDokumente = ((dokumente ?? []) as Array<Record<string, unknown>>).filter(doc => {
+    if (String(doc.auftrag_id ?? '') === id) return true
+    const bezug = firstText(doc.bezug as string | undefined).toLowerCase()
+    return (!!kundeName && bezug === kundeName.toLowerCase())
+      || bezug === firstText(auftrag.beschreibung).toLowerCase()
+  })
+
+  return {
+    auftrag,
+    kunde,
+    rechnungen: relatedRechnungen,
+    dokumente: relatedDokumente,
+  }
+}
+
+export async function getBueroRechnungDetailContext(id: string) {
+  const [rechnung, kunden, dokumente, payments] = await Promise.all([
+    getBueroRechnungById(id),
+    getBueroKunden(),
+    getBueroDokumente(),
+    listBillingPaymentsByInvoice(id),
+  ])
+  if (!rechnung) return null
+  const kundeName = firstText(rechnung.kunde)
+  const kunde = rechnung.kunde_id
+    ? (kunden ?? []).find(row => row.id === rechnung.kunde_id) ?? null
+    : (kunden ?? []).find(row => firstText(row.name).toLowerCase() === kundeName.toLowerCase()) ?? null
+  const relatedDokumente = ((dokumente ?? []) as Array<Record<string, unknown>>).filter(doc => {
+    if (String(doc.rechnung_id ?? '') === id) return true
+    const bezug = firstText(doc.bezug as string | undefined).toLowerCase()
+    return (!!kundeName && bezug === kundeName.toLowerCase())
+      || bezug === firstText(rechnung.nummer).toLowerCase()
+  })
+
+  return {
+    rechnung,
+    kunde,
+    dokumente: relatedDokumente,
+    payments,
   }
 }
 

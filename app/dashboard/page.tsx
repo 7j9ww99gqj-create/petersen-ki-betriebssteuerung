@@ -1,10 +1,13 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
+import { getAccessProfile } from '@/lib/access'
+import { createSupabaseClient } from '@/lib/supabase'
 import { getLagerArtikel, getBueroRechnungen, getBueroAuftraege, getFirmaEinstellungen, getOwnerDashboardSnapshot, type FirmaEinstellungen, type OwnerDashboardSnapshot } from '@/lib/db'
 import { loadRole, type AppRole } from '@/lib/roles'
 import { OwnerAiControlPanel } from '@/components/billing/OwnerAiControlPanel'
+import type { PilotId } from '@/lib/pricingConfig'
 
 const pilots = [
   { id: 'lager', label: 'LagerPilot', icon: '📦', desc: 'Wareneingang, Bestände, Lagerplätze, Inventur', href: '/dashboard/lager', color: '#1684ff', status: 'AKTIV' },
@@ -23,6 +26,14 @@ type KpiData = {
   rechnungenWert: string
   laufendeAuftraege: number
   ueberfaelligeRechnungen: number
+}
+
+type PendingRegistration = {
+  id: string
+  email: string
+  fullName: string
+  createdAt: string
+  accessStatus?: string
 }
 
 const demoKpis: KpiData = {
@@ -178,13 +189,18 @@ function PilotCard({ pilot, delay }: { pilot: typeof pilots[0]; delay: number })
 
 export default function DashboardPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null)
   const [headerVisible, setHeaderVisible] = useState(false)
   const [kpi, setKpi] = useState<KpiData>({ lagerArtikel: 0, kritischeBestände: 0, offeneRechnungen: 0, rechnungenWert: '0 €', laufendeAuftraege: 0, ueberfaelligeRechnungen: 0 })
   const [kpiLoaded, setKpiLoaded] = useState(false)
   const [firma, setFirma] = useState<FirmaEinstellungen | null>(null)
   const [role, setRole] = useState<AppRole>('Admin')
+  const [allowedPilotIds, setAllowedPilotIds] = useState<string[]>(pilots.map(pilot => pilot.id))
   const [ownerSnapshot, setOwnerSnapshot] = useState<OwnerDashboardSnapshot | null>(null)
+  const [ownerPendingRegistrations, setOwnerPendingRegistrations] = useState(0)
+  const [pendingRegistrations, setPendingRegistrations] = useState<PendingRegistration[]>([])
+  const [savingRegistrationId, setSavingRegistrationId] = useState('')
 
   const loadOwnerSnapshot = () => {
     getOwnerDashboardSnapshot()
@@ -210,10 +226,32 @@ export default function DashboardPage() {
           if (data) localStorage.setItem('pk_firma_einstellungen', JSON.stringify(data))
         })
         .catch(() => setFirma(null))
+      createSupabaseClient().auth.getUser()
+        .then(({ data: { user } }) => {
+          if (user) {
+            setAllowedPilotIds(getAccessProfile(user).allowedPilotIds)
+          }
+        })
+        .catch(() => {})
       loadRole()
         .then(r => {
           setRole(r)
-          if (r === 'Inhaber') loadOwnerSnapshot()
+          if (r === 'Inhaber') {
+            loadOwnerSnapshot()
+            fetch('/api/admin/users', { cache: 'no-store' })
+              .then(async res => {
+                if (!res.ok) return null
+                return await res.json() as { users?: PendingRegistration[] }
+              })
+              .then(data => {
+                if (data?.users) {
+                  const pending = data.users.filter(item => item.accessStatus === 'pending') as PendingRegistration[]
+                  setPendingRegistrations(pending)
+                  setOwnerPendingRegistrations(pending.length)
+                }
+              })
+              .catch(() => {})
+          }
         })
         .catch(() => setRole('Admin'))
     }
@@ -254,13 +292,69 @@ export default function DashboardPage() {
     .join('')
 
   const kpiCards = [
-    { label: 'Artikel im Lager', value: String(kpi.lagerArtikel), icon: '📦', color: '#1684ff', href: '/dashboard/lager?tab=bestand&status=Alle', delta: `${kpi.kritischeBestände} kritisch` },
-    { label: 'Kritische Bestände', value: String(kpi.kritischeBestände), icon: '⚠️', color: kpi.kritischeBestände > 0 ? '#f59e0b' : '#10b981', href: '/dashboard/lager?tab=bestand&status=niedrig', delta: kpi.kritischeBestände > 0 ? 'Nachbestellung nötig' : 'Alles OK' },
-    { label: 'Offene Rechnungen', value: String(kpi.offeneRechnungen), icon: '💶', color: kpi.ueberfaelligeRechnungen > 0 ? '#f43f5e' : '#f59e0b', href: '/dashboard/buero?tab=rechnungen&filter=Offen', delta: kpi.rechnungenWert },
-    { label: 'Überfällige Zahlungen', value: String(kpi.ueberfaelligeRechnungen), icon: '🚨', color: kpi.ueberfaelligeRechnungen > 0 ? '#f43f5e' : '#10b981', href: '/dashboard/buero?tab=rechnungen&filter=%C3%9Cberf%C3%A4llig', delta: kpi.ueberfaelligeRechnungen > 0 ? 'Mahnung prüfen' : 'Alles beglichen' },
-    { label: 'Laufende Aufträge', value: String(kpi.laufendeAuftraege), icon: '✅', color: '#10b981', href: '/dashboard/buero?tab=auftraege', delta: 'In Bearbeitung' },
-    { label: 'Cloud-Sync', value: '100%', icon: '☁️', color: '#20c8ff', href: '/dashboard/cloud', delta: 'Aktuell' },
+    { label: 'Artikel im Lager', value: String(kpi.lagerArtikel), icon: '📦', color: '#1684ff', href: '/dashboard/lager?tab=bestand&status=Alle', delta: `${kpi.kritischeBestände} kritisch`, pilotId: 'lager' },
+    { label: 'Kritische Bestände', value: String(kpi.kritischeBestände), icon: '⚠️', color: kpi.kritischeBestände > 0 ? '#f59e0b' : '#10b981', href: '/dashboard/lager?tab=bestand&status=niedrig', delta: kpi.kritischeBestände > 0 ? 'Nachbestellung nötig' : 'Alles OK', pilotId: 'lager' },
+    { label: 'Offene Rechnungen', value: String(kpi.offeneRechnungen), icon: '💶', color: kpi.ueberfaelligeRechnungen > 0 ? '#f43f5e' : '#f59e0b', href: '/dashboard/buero?tab=rechnungen&filter=Offen', delta: kpi.rechnungenWert, pilotId: 'buero' },
+    { label: 'Überfällige Zahlungen', value: String(kpi.ueberfaelligeRechnungen), icon: '🚨', color: kpi.ueberfaelligeRechnungen > 0 ? '#f43f5e' : '#10b981', href: '/dashboard/buero?tab=rechnungen&filter=%C3%9Cberf%C3%A4llig', delta: kpi.ueberfaelligeRechnungen > 0 ? 'Mahnung prüfen' : 'Alles beglichen', pilotId: 'buero' },
+    { label: 'Laufende Aufträge', value: String(kpi.laufendeAuftraege), icon: '✅', color: '#10b981', href: '/dashboard/buero?tab=auftraege', delta: 'In Bearbeitung', pilotId: 'buero' },
+    { label: 'Cloud-Sync', value: '100%', icon: '☁️', color: '#20c8ff', href: '/dashboard/cloud', delta: 'Aktuell', pilotId: 'general' },
   ]
+  const visiblePilots = pilots.filter(pilot => allowedPilotIds.includes(pilot.id))
+  const visibleKpiCards = kpiCards.filter(card => card.pilotId === 'general' ? allowedPilotIds.length > 0 : allowedPilotIds.includes(card.pilotId))
+  const visibleQuickActions = [
+    { label: 'KI-Assistent', desc: 'Dokumente & Fotos automatisch erfassen', icon: '🧠', href: '/dashboard/ki-erkennung', color: '#a78bfa', requiresPilot: true },
+    { label: 'Cloud & Sync', desc: 'Datensicherung & Cloud-Status', icon: '☁️', href: '/dashboard/cloud', color: '#20c8ff', requiresPilot: true },
+    { label: 'Archiv', desc: 'Alle gespeicherten Dokumente & Vorgänge', icon: '🗂️', href: '/dashboard/archiv', color: '#f59e0b', requiresPilot: true },
+    { label: 'Einstellungen', desc: 'Profil, Benachrichtigungen, App-Info', icon: '⚙️', href: '/dashboard/einstellungen', color: '#aeb9c8', requiresPilot: false },
+  ].filter(item => !item.requiresPilot || allowedPilotIds.length > 0)
+
+  const applyRegistrationPreset = async (user: PendingRegistration, preset: 'demo7' | 'demo14' | 'standard') => {
+    const expiresAt = preset === 'standard'
+      ? null
+      : new Date(Date.now() + (preset === 'demo7' ? 7 : 14) * 24 * 60 * 60 * 1000).toISOString()
+    const pilotIds: PilotId[] = preset === 'standard'
+      ? ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer']
+      : ['buero', 'lager', 'analyse']
+    setSavingRegistrationId(user.id)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          accessStatus: 'active',
+          accessMode: preset === 'standard' ? 'standard' : 'demo',
+          accessExpiresAt: expiresAt,
+          allowedPilotIds: pilotIds,
+        }),
+      })
+      if (!res.ok) throw new Error('Freigabe konnte nicht gespeichert werden.')
+      setPendingRegistrations(current => current.filter(entry => entry.id !== user.id))
+      setOwnerPendingRegistrations(current => Math.max(0, current - 1))
+    } finally {
+      setSavingRegistrationId('')
+    }
+  }
+
+  const buildRegistrationMailHref = (user: PendingRegistration, preset: 'demo7' | 'demo14' | 'standard' | 'pending') => {
+    const subject = preset === 'pending'
+      ? 'Ihre Registrierung bei Petersen KI'
+      : 'Ihr Zugang bei Petersen KI wurde freigeschaltet'
+    const body = [
+      `Guten Tag ${user.fullName || ''}`.trim() + ',',
+      '',
+      preset === 'pending'
+        ? 'vielen Dank fuer Ihre Registrierung. Ihr Zugang wird aktuell geprueft.'
+        : preset === 'standard'
+          ? 'Ihr Standard-Zugang wurde freigeschaltet.'
+          : `Ihr Demo-Zugang wurde fuer ${preset === 'demo7' ? '7' : '14'} Tage freigeschaltet.`,
+      preset === 'pending' ? '' : `Login: ${user.email}`,
+      preset === 'pending' ? '' : 'Portal: https://petersen-ki-pilot.de/login',
+      '',
+      'Viele Gruesse',
+    ].filter(Boolean).join('\n')
+    return `mailto:${encodeURIComponent(user.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  }
 
   return (
     <div>
@@ -309,14 +403,32 @@ export default function DashboardPage() {
               {firma?.slogan && <div style={{ fontSize: 11, color: '#7f8da3', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{firma.slogan}</div>}
             </div>
           </div>
-          <button className="pk-btn-ghost" onClick={() => router.push('/dashboard/ki-erkennung')} style={{ fontSize: 13 }}>
-            🧠 KI-Assistent
-          </button>
-          <button className="pk-btn" onClick={() => router.push('/dashboard/cloud')} style={{ fontSize: 13 }}>
-            ☁️ Cloud Sync
-          </button>
+          {allowedPilotIds.length > 0 && (
+            <button className="pk-btn-ghost" onClick={() => router.push('/dashboard/ki-erkennung')} style={{ fontSize: 13 }}>
+              🧠 KI-Assistent
+            </button>
+          )}
+          {allowedPilotIds.length > 0 && (
+            <button className="pk-btn" onClick={() => router.push('/dashboard/cloud')} style={{ fontSize: 13 }}>
+              ☁️ Cloud Sync
+            </button>
+          )}
         </div>
       </div>
+
+      {searchParams.get('access') === 'restricted' && (
+        <div style={{
+          marginBottom: 16,
+          padding: '12px 14px',
+          borderRadius: 14,
+          background: 'rgba(245,158,11,.08)',
+          border: '1px solid rgba(245,158,11,.22)',
+          color: '#fcd34d',
+          fontSize: 13,
+        }}>
+          Dieser Bereich ist für Ihren Account noch nicht freigeschaltet. Die Zuteilung erfolgt im Inhaber-Dashboard.
+        </div>
+      )}
 
       {/* Echte KPI-Karten */}
       <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -324,7 +436,7 @@ export default function DashboardPage() {
         {!kpiLoaded && <div style={{ width: 16, height: 16, border: '2px solid rgba(22,132,255,.3)', borderTopColor: '#1684ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />}
       </div>
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
-        {kpiCards.map((s, i) => (
+        {visibleKpiCards.map((s, i) => (
           <button
             key={s.label}
             onClick={() => router.push(s.href)}
@@ -369,6 +481,7 @@ export default function DashboardPage() {
               { label: 'Umsatz gesamt', value: `${ownerSnapshot.revenueTotal.toLocaleString('de-DE')} €`, icon: '💶', color: '#10b981', href: '/dashboard/buero?tab=rechnungen', delta: `MRR ${ownerSnapshot.monthlyRecurringRevenue.toLocaleString('de-DE')} €` },
               { label: 'Umsatz 30 Tage', value: `${ownerSnapshot.revenueLast30Days.toLocaleString('de-DE')} €`, icon: '📈', color: '#34d399', href: '/dashboard/buero?tab=rechnungen&filter=Bezahlt', delta: 'Bezahlt letzte 30 T' },
               { label: 'Freischaltungen offen', value: ownerSnapshot.pendingActivations.toLocaleString('de-DE'), icon: '⏳', color: '#f59e0b', href: '/dashboard/einstellungen', delta: `${ownerSnapshot.pendingApprovals} Pending / Beleg` },
+              { label: 'Registrierungen offen', value: ownerPendingRegistrations.toLocaleString('de-DE'), icon: '🆕', color: '#60a5fa', href: '/dashboard/einstellungen', delta: 'Warten auf Erstfreigabe' },
               { label: 'Offene Rechnungen', value: ownerSnapshot.openInvoices.toLocaleString('de-DE'), icon: '🧾', color: '#f43f5e', href: '/dashboard/buero?tab=rechnungen&filter=Offen', delta: `${ownerSnapshot.overdueInvoices} überfällig >14 T` },
               { label: 'Fehler-Zahlungen', value: ownerSnapshot.failedPayments.toLocaleString('de-DE'), icon: '💥', color: '#ef4444', href: '/dashboard/einstellungen', delta: 'Stripe / Billing' },
               { label: 'Ungelesen', value: ownerSnapshot.unreadNotifications.toLocaleString('de-DE'), icon: '🔔', color: '#a78bfa', href: '/dashboard/einstellungen', delta: 'Owner-Hinweise' },
@@ -418,6 +531,29 @@ export default function DashboardPage() {
                   </button>
                 </div>
               )}
+              {ownerPendingRegistrations > 0 && (
+                <div style={{
+                  padding: '14px 18px', borderRadius: 14,
+                  background: 'rgba(96,165,250,.08)', border: '1px solid rgba(96,165,250,.28)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 14, color: '#93c5fd' }}>
+                      🆕 {ownerPendingRegistrations} neue Registrierungen warten auf Freigabe
+                    </div>
+                    <div style={{ fontSize: 12, color: '#bfdbfe', marginTop: 3, opacity: .85 }}>
+                      Rollen, Demo-Laufzeit und Pilot-Zuweisung bitte im Inhaber-Bereich festlegen.
+                    </div>
+                  </div>
+                  <button
+                    className="pk-btn-ghost"
+                    onClick={() => router.push('/dashboard/einstellungen?section=rollen')}
+                    style={{ fontSize: 13, fontWeight: 800, flexShrink: 0 }}
+                  >
+                    Jetzt bearbeiten →
+                  </button>
+                </div>
+              )}
               {ownerSnapshot.failedPayments > 0 && (
                 <div style={{
                   padding: '14px 18px', borderRadius: 14,
@@ -441,6 +577,50 @@ export default function DashboardPage() {
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {pendingRegistrations.length > 0 && (
+            <div style={{
+              marginTop: 16,
+              border: '1px solid rgba(96,165,250,.24)',
+              borderRadius: 20,
+              background: 'rgba(96,165,250,.05)',
+              padding: 18,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900 }}>Offene Registrierungen</h3>
+                  <div style={{ fontSize: 12, color: '#bfdbfe', marginTop: 4 }}>Demo-Zugang oder Standard-Zugang direkt freischalten und Mailtext manuell öffnen.</div>
+                </div>
+                <button className="pk-btn-ghost" onClick={() => router.push('/dashboard/einstellungen?section=registrierungen')} style={{ fontSize: 12, padding: '6px 12px' }}>
+                  Alle öffnen
+                </button>
+              </div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {pendingRegistrations.slice(0, 4).map(item => (
+                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: '12px 14px', background: 'rgba(255,255,255,.03)' }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 800 }}>{item.fullName || 'Ohne Namen'}</div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>{item.email}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button className="pk-btn-ghost" disabled={savingRegistrationId === item.id} onClick={() => void applyRegistrationPreset(item, 'demo7')} style={{ fontSize: 12, fontWeight: 800 }}>
+                        Demo 7 Tage
+                      </button>
+                      <button className="pk-btn-ghost" disabled={savingRegistrationId === item.id} onClick={() => void applyRegistrationPreset(item, 'demo14')} style={{ fontSize: 12, fontWeight: 800 }}>
+                        Demo 14 Tage
+                      </button>
+                      <button className="pk-btn" disabled={savingRegistrationId === item.id} onClick={() => void applyRegistrationPreset(item, 'standard')} style={{ fontSize: 12, fontWeight: 800 }}>
+                        Standard freischalten
+                      </button>
+                      <a className="pk-btn-ghost" href={buildRegistrationMailHref(item, 'pending')} style={{ fontSize: 12, fontWeight: 800, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+                        Mailtext
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -503,21 +683,22 @@ export default function DashboardPage() {
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>KI-Piloten</h2>
-          <span style={{ fontSize: 12, color: '#aeb9c8' }}>{pilots.length} Piloten verfügbar</span>
+          <span style={{ fontSize: 12, color: '#aeb9c8' }}>{visiblePilots.length} Piloten freigeschaltet</span>
         </div>
-        <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
-          {pilots.map((p, i) => <PilotCard key={p.id} pilot={p} delay={200 + i * 60} />)}
-        </div>
+        {visiblePilots.length === 0 ? (
+          <div className="pk-card" style={{ color: '#aeb9c8', fontSize: 14 }}>
+            Ihrem Account wurden noch keine Piloten zugewiesen. Die Freigabe erfolgt zentral im Inhaber-Dashboard.
+          </div>
+        ) : (
+          <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+            {visiblePilots.map((p, i) => <PilotCard key={p.id} pilot={p} delay={200 + i * 60} />)}
+          </div>
+        )}
       </div>
 
       {/* Quick actions */}
       <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-        {[
-          { label: 'KI-Assistent', desc: 'Dokumente & Fotos automatisch erfassen', icon: '🧠', href: '/dashboard/ki-erkennung', color: '#a78bfa' },
-          { label: 'Cloud & Sync', desc: 'Datensicherung & Cloud-Status', icon: '☁️', href: '/dashboard/cloud', color: '#20c8ff' },
-          { label: 'Archiv', desc: 'Alle gespeicherten Dokumente & Vorgänge', icon: '🗂️', href: '/dashboard/archiv', color: '#f59e0b' },
-          { label: 'Einstellungen', desc: 'Profil, Benachrichtigungen, App-Info', icon: '⚙️', href: '/dashboard/einstellungen', color: '#aeb9c8' },
-        ].map(item => (
+        {visibleQuickActions.map(item => (
           <button
             key={item.href}
             onClick={() => router.push(item.href)}

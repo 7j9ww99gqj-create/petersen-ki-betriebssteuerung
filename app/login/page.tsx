@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { DEMO_EMAIL, DEMO_PASSWORD, setDemoCookie } from '@/lib/auth'
+import { getAccessProfile } from '@/lib/access'
 
 function parseError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e)
@@ -29,6 +30,9 @@ export default function LoginPage() {
     if (params.get('error') === 'auth_callback_failed') {
       setError('E-Mail-Bestätigung fehlgeschlagen. Bitte erneut registrieren oder einloggen.')
     }
+    if (params.get('pending_approval') === '1') {
+      setError('Ihr Account wartet noch auf Freischaltung durch den Inhaber.')
+    }
   }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -53,6 +57,13 @@ export default function LoginPage() {
       const supabase = createSupabaseClient()
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
       if (authError) { setError(authError.message); return }
+      const { data: { user } } = await supabase.auth.getUser()
+      const profile = getAccessProfile(user ?? {})
+      if (!profile.canAccessDashboard) {
+        router.push('/freischaltung')
+        router.refresh()
+        return
+      }
       router.push('/dashboard')
       router.refresh()
     } catch (err) {

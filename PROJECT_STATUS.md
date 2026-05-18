@@ -8,6 +8,40 @@
 > Entferne veraltete Infos.
 > Ziel: minimale Tokens, maximaler Kontext.
 
+## 0. Schnellzugriff
+- **Empfohlene Lesereihenfolge fuer Agenten**:
+  1. `0. Schnellzugriff`
+  2. `2. Aktueller Arbeitsstand`
+  3. `5. Bekannte Probleme`
+  4. `6. Offene Aufgaben`
+  5. `15. Nächste Empfehlung`
+- **Nur bei Bedarf lesen**:
+  - `3. Wichtige technische Verknüpfungen`
+  - `4. Relevante Dateien und Ordner`
+  - `8. Änderungsverlauf`
+  - `9.-14.` Analyse-, Roadmap- und Bewertungsabschnitte
+- **Nicht jedes Mal komplett lesen, wenn nicht nötig**:
+  - Der vollständige Verlauf bleibt absichtlich erhalten.
+  - Für schnelle Statusfragen reichen meistens `0`, `2`, `5`, `6`, `15`.
+
+### 0.1 Aktueller Kurzstatus
+- Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
+- Letzter dokumentierter Live-Stand: `2026-05-15`, `main`, Commit `30f0e47`, deployed.
+- Jüngste Fortschritte: AnalysePilot auf Live-Daten umgestellt, zentrale Benutzerverwaltung inkl. Einladen/Anlegen mit Abo-/Seat-Limit ergänzt.
+- Wichtigste externe Restpunkte: Stripe-Webhook-URL/Ende-zu-Ende prüfen; E-Mail-Versand bleibt bewusst manuell über das lokale Mailprogramm.
+- Produktivlage: Kernsystem nutzbar, aber noch nicht voll marktreif; Rechte, Integrationen und einige Prozessketten bleiben offene Themen.
+
+### 0.2 Top-Offene Aufgaben
+- Stripe Webhook-URL im Stripe-Dashboard prüfen und echten End-to-End-Test validieren.
+- Manuellen Billing-Prozess weiter härten: Buchung -> Auftrag -> Rechnung -> Mailentwurf -> Freigabe.
+- Benutzerverwaltung weiter ausbauen: optional Deaktivieren/Löschen, Einladung erneut öffnen, Suche/Filter.
+- Analyse-Bestandstrend auf echte Wochensnapshots umstellen.
+- Weitere produktionsreife Härtung bei Rollen/Rechten, Datenkonsistenz und Integrationen.
+
+### 0.3 Aktuelle Blocker
+- Stripe-Ende-zu-Ende-Validierung ist noch nicht vollständig abgeschlossen.
+- Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
+
 ## 1. Kurzüberblick
 - Zweck: modulare Betriebssteuerung/ERP-ähnliche Web-App für Lager, Büro, Werkstatt, Steuer, Planung, Marketing, Dokumente und KI-gestützte Erfassung.
 - Stack: `Next.js 14 App Router`, `React 18`, `TypeScript`, `Supabase Auth/Postgres/Storage`, `OpenAI` für Dokument-KI und Lager-/Chat-KI.
@@ -21,6 +55,32 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – Manueller Registrierungs-/Billing-Prozess ohne automatischen Mailversand)**:
+  - **Automatischen Mailversand aus dem Zielprozess entfernt**: keine automatische Rechnungs-/Angebotsmail mehr; vorhandene Mail-Aktionen öffnen nur noch einen lokalen `mailto:`-Entwurf.
+  - **Registrierung läuft serverseitig ohne Bestätigungsmail**: neue Route `app/api/auth/register/route.ts` erstellt Supabase-Auth-User per Admin API, setzt `access_status = pending` und legt im Inhaber-BüroPilot automatisch einen Kunden aus den Registrierungsdaten an.
+  - **Eigener Tab `Offene Registrierungen` ergänzt**: Inhaber können Registrierungen direkt als `Demo 7 Tage`, `Demo 14 Tage` oder `Standard` freischalten und passende Mail-Textbausteine öffnen.
+  - **Inhaber-Dashboard erweitert**: offene Registrierungen erscheinen direkt im Inhaber-Cockpit mit Schnellbuttons und Mailtext.
+  - **Billing-Prozess manuell strukturiert**: Kundenbuchung erzeugt keine Rechnung mehr automatisch; Billing-Sync legt Kunden- und Auftragskontext im Inhaber-BüroPilot an. Die Rechnung wird erst per Inhaber-Klick erstellt und erscheint danach im BüroPilot unter Rechnungen.
+  - **DB-Fundament ergänzt**: neue Migration `20260518103000_manual_registration_billing_flow.sql` verknüpft `buero_auftraege` mit `billing_subscription_id` und synchronisiert Billing-Buchungen als Owner-Aufträge; `20260518120000_add_buero_workflow_columns.sql` ergänzt Angebots-/Auftragsworkflow-Felder.
+  - Betroffene Dateien: `app/api/auth/register/route.ts`, `app/register/page.tsx`, `app/dashboard/page.tsx`, `app/dashboard/einstellungen/page.tsx`, `components/billing/OwnerCustomerControlPanel.tsx`, `app/dashboard/buero/page.tsx`, `lib/billing.ts`, `lib/db.ts`, `supabase/schema.sql`, `supabase/migrations/20260518103000_manual_registration_billing_flow.sql`, `supabase/migrations/20260518120000_add_buero_workflow_columns.sql`, `.env.example`, `package.json`, `package-lock.json`, `PROJECT_STATUS.md`.
+  - Remote-DB: Migrationen `20260518103000_manual_registration_billing_flow.sql` und `20260518120000_add_buero_workflow_columns.sql` am `2026-05-18` per `npx supabase db push` angewendet. Remote geprüft: `buero_auftraege.billing_subscription_id`, `buero_auftraege.angebot_id`, `buero_auftraege.ab_verschickt_am`, `buero_angebote.nummer`, `buero_angebote.verschickt_am` existieren; Trigger `trg_sync_billing_subscription_to_owner_customer` ist vorhanden.
+  - Offene Punkte:
+    - Echten Registrierungs-/Buchungsdurchlauf testen.
+    - Optional spaeter: Rechnungs-PDF-Erzeugung/Download direkt im manuellen Mailprozess komfortabler machen.
+  - Tests: `npm run lint` gruen (nur bekannte Warnungen); `npm run build` gruen.
+  - Branch: `feature/manual-registration-billing-flow`
+- **Zuletzt erledigt (2026-05-18 – Registrierungsfreigabe + Pilot-Zuteilung)**:
+  - **Neue Registrierungen starten jetzt gesperrt**: `register` schreibt neue Accounts mit `access_status = pending`, ohne Demo-Freigabe und ohne zugewiesene Piloten.
+  - **Dashboard-Zugang serverseitig abgesichert**: `middleware.ts` blockiert nicht freigeschaltete, gesperrte oder abgelaufene Zugänge und leitet auf `/freischaltung` um; direkte Pilot-URLs werden nur noch bei expliziter Zuteilung zugelassen.
+  - **Inhaber-Steuerung erweitert**: `Einstellungen -> Rollen` kann jetzt pro Benutzer Freigabestatus, Zugangsart (`standard` / `demo`), Ablaufdatum und erlaubte Piloten speichern; zusätzlich gibt es einen vorbereiteten `mailto:`-Kontaktlink.
+  - **Navigation und Dashboard gefiltert**: Sidebar, Mobile-Navigation und Dashboard zeigen nur noch freigegebene Piloten; ohne Zuteilung erscheint ein klarer Hinweis statt Modulen.
+  - **Owner-Dashboard ergänzt**: Inhaber sehen offene Registrierungen jetzt direkt als Kennzahl und Hinweisblock im Dashboard.
+  - Betroffene Dateien: `app/register/page.tsx`, `app/login/page.tsx`, `app/freischaltung/page.tsx`, `middleware.ts`, `app/api/admin/users/route.ts`, `app/dashboard/page.tsx`, `app/dashboard/layout.tsx`, `components/Sidebar.tsx`, `app/dashboard/einstellungen/page.tsx`, `lib/access.ts`, `PROJECT_STATUS.md`.
+  - Offene Punkte:
+    - Optional spaeter: separate E-Mail-Textbaustein-Auswahl je Freigabetyp, Einladung erneut öffnen und echte Deaktivieren/Loeschen-Aktionen fuer Benutzer.
+    - Optional spaeter: eigene Historie/Benachrichtigung nur fuer Registrierungsfreigaben statt reiner Benutzerlisten-Auswertung.
+  - Tests: `npm run lint` gruen (nur bekannte Warnungen); `npm run build` gruen.
+  - Branch: `main`
 - Stand `2026-05-15` — Branch: `main` (Commit `30f0e47`), Vercel Production deployed und Ready.
 - **Zuletzt erledigt (2026-05-15 – Demo-Daten bereinigt + AnalysePilot live)**:
   - **Dashboard Fake-KPIs entfernt**: `kpi`-Initialstate war `demoKpis` (8 Artikel, 3 kritisch…) — jetzt Nullwerte; echte User sehen keine Fake-Zahlen mehr vor dem Laden.
@@ -34,7 +94,6 @@
   - Betroffene Dateien: `app/dashboard/page.tsx`, `app/dashboard/analyse/page.tsx`, `PROJECT_STATUS.md`.
   - Offene Punkte:
     - Analyse-Bestandstrend: Wochensnapshots in eigener Tabelle für echten Verlauf (optional später).
-    - Resend Domain `petersen-ki-pilot.de` muss verifiziert werden.
     - Stripe Webhook-URL in Stripe-Dashboard prüfen.
   - Tests: `npm run build` grün. Auf `main` gemergt + deployed.
 - **Zuletzt erledigt (2026-05-15 – Benutzer-Einladung/Anlage mit Abo-Limit)**:
@@ -45,7 +104,7 @@
   - **UI erweitert**: `Einstellungen -> Rollen` zeigt jetzt Seat-Auslastung, Begruendung bei Blockierung, Invite-Form und Direktanlage-Form.
   - Betroffene Dateien: `app/api/admin/users/route.ts`, `app/dashboard/einstellungen/page.tsx`, `PROJECT_STATUS.md`.
   - Offene Punkte:
-    - Optional spaeter: Benutzer deaktivieren/loeschen, Invite-Resend, Such-/Filterfunktionen.
+    - Optional spaeter: Benutzer deaktivieren/loeschen, Einladung erneut öffnen, Such-/Filterfunktionen.
   - Tests: `npm run lint` gruen (nur bekannte Warnungen); `npm run build` gruen.
 - **Zuletzt erledigt (2026-05-15 – Live-Benutzerverwaltung / Rollen serverseitig)**:
   - **Zentrale Live-Benutzerverwaltung eingebaut**: neue Admin-Route `app/api/admin/users/route.ts` listet echte Supabase-Auth-Benutzer serverseitig und speichert Rollen serverseitig per Admin API statt lokal im Browser.
@@ -58,13 +117,12 @@
   - Tests: `npm run lint` gruen (nur bekannte Warnungen); `npm run build` gruen.
 - **Zuletzt erledigt (2026-05-15 – Infra-Validierung + Produktiv-Haertung)**:
   - **Remote-Supabase geprueft**: `supabase migration list` zeigt, dass `20260514040000_add_stripe_webhook_events.sql` und `20260515090000_add_owner_ai_feature_toggles.sql` bereits remote angewendet sind; die alten "offen"-Hinweise waren veraltet.
-  - **Live-Mailversand real validiert**: `vercel curl` auf `app/api/mail/send-document` liefert produktiv sauber den Resend-Fehler `domain is not verified`; technischer Versandpfad lebt, aber `petersen-ki-pilot.de` ist in Resend noch nicht verifiziert.
+  - **Alter automatischer Mailversand validiert**: Der fruehere serverseitige Versandpfad wurde technisch geprueft, ist aber durch den neuen manuellen Mailprozess abgeloest.
   - **Stripe-Webhook live geprueft**: `vercel curl` auf `app/api/billing/stripe-webhook` antwortet auf unsignierten Request korrekt mit `Stripe-Webhook konnte nicht verifiziert werden.`; Route ist aktiv, Signaturpruefung greift.
   - **Rollen produktionsnah gehaertet**: Self-Service-Rollenwechsel im Live-Betrieb entfernt; Rollen koennen nur noch im Demo-Modus lokal gewechselt werden. Die Einstellungen-UI zeigt produktiv jetzt klar, dass Rollen zentral ueber Inhaber/Admin vergeben werden muessen.
   - **Büro-Detailansichten erweitert**: Angebote, Auftraege und Rechnungen haben jetzt echte verknuepfte Detailkontexte mit Kundenbezug, Dokumenten, Folgeobjekten bzw. Zahlungsverlauf statt nur generischer Feldlisten.
   - Betroffene Dateien: `lib/roles.ts`, `app/dashboard/einstellungen/page.tsx`, `lib/db.ts`, `app/dashboard/buero/[entity]/[id]/page.tsx`, `PROJECT_STATUS.md`.
   - Offene Punkte:
-    - Resend-Domain `petersen-ki-pilot.de` muss in Resend verifiziert werden; erst dann funktioniert echter Versand von `rechnungen@petersen-ki-pilot.de`.
     - Vollstaendige Stripe-Ende-zu-Ende-Zahlung konnte in dieser Session nicht simuliert werden, weil die echten Secret-Werte lokal nicht verfuegbar sind und das Deployment hinter Vercel Protection liegt.
     - Zentrale Live-Benutzerverwaltung fuer vorhandene Auth-Benutzer ist jetzt implementiert; Einladungen/Neuanlage fehlen noch.
   - Tests: `npm run lint` gruen (nur bekannte Warnungen); `npm run build` gruen.
@@ -85,23 +143,20 @@
   - Betroffene Dateien: `app/api/chat/route.ts`, `PROJECT_STATUS.md`.
   - Tests: `npm run lint` gruen (nur bekannte Warnungen); `npm run build` gruen.
 - Aktueller Branch: `feature/infra-validation-and-hardening`
-- **Zuletzt erledigt (2026-05-14 – Welle 7 / Resend Mail-Integration)**:
-  - **Resend angebunden**: `lib/mail.ts` kapselt `sendDocumentMail()`, graceful fallback wenn `RESEND_API_KEY` fehlt.
-  - **Server-Route** `app/api/mail/send-document/route.ts`: Auth-Guard (alle Rollen außer Lager), empfängt PDF als Base64, sendet via Resend mit Anhang, schreibt Audit-Log.
+- **Zuletzt erledigt (2026-05-14 – Welle 7 / alte automatische Mail-Integration, inzwischen abgeloest)**:
+  - **Automatischer Versand angebunden**: frueherer serverseitiger Dokumentversand mit PDF-Anhang und Audit-Log.
   - **PDF-Funktionen erweitert**: `generateRechnungPDF` und `generateAngebotPDF` haben optionalen `returnBase64`-Parameter; Download-Verhalten unveraendert.
   - **BueroePilot**: `✉️ Mail`-Button neben PDF bei Rechnungen und Angeboten; oeffnet Modal mit vorausgefuellter Kunden-Email (aus `buero_kunden`), editierbar; Toast-Feedback; Audit-Log bei Versand.
-  - **Env**: `.env.example` um `RESEND_API_KEY` und `MAIL_FROM_ADDRESS` ergaenzt.
-  - Betroffene Dateien: `lib/mail.ts` (neu), `app/api/mail/send-document/route.ts` (neu), `lib/pdf.ts`, `app/dashboard/buero/page.tsx`, `.env.example`, `package.json`.
+  - **Env**: fruehere Mail-Variablen wurden mit dem manuellen Prozess wieder entfernt.
+  - Betroffene Dateien damals: `lib/pdf.ts`, `app/dashboard/buero/page.tsx`, `.env.example`, `package.json`.
   - Tests: lint gruen (keine neuen Fehler); build gruen.
 - **Vercel Env-Stand (2026-05-14, nach Session-Ende)**:
-  - ✅ `RESEND_API_KEY` gesetzt (Production)
-  - ✅ `MAIL_FROM_ADDRESS` = `rechnungen@petersen-ki-pilot.de` gesetzt
   - ✅ `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` gesetzt
   - ✅ `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` gesetzt
   - ✅ `OPENAI_API_KEY` gesetzt
   - ℹ️ `ANTHROPIC_API_KEY` fuer die aktive KI-Schiene nicht mehr noetig, da Lager-/Chat-KI jetzt ebenfalls ueber OpenAI laeuft
 - **Naechster Schritt morgen**:
-  - 🔴 Resend Domain-Verifikation: resend.com → Domains → `petersen-ki-pilot.de` hinzufuegen → 3 DNS-Eintraege beim Domain-Provider setzen. Dann kommen Mails von `rechnungen@petersen-ki-pilot.de` statt `onboarding@resend.dev`.
+  - Hinweis: Dieser automatische Versandpfad ist nicht mehr Teil des aktuellen Zielprozesses.
   - 🟡 Sicherstellen, dass `OPENAI_API_KEY` gesetzt bleibt; optional `OPENAI_CHAT_MODEL` definieren
   - 🟢 Mail-Versand testen: BueroPilot → Rechnung → ✉️ Mail → Test-Mail an eigene Adresse
   - 🟢 Naechste Features: Stripe Customer Portal Link, Mahnwesen/Dunning, Onboarding-Mail bei Freischaltung
@@ -345,6 +400,9 @@
 - Bei Dokumentfunktionen immer drei Ebenen prüfen: DB-Metadaten, Storage-Pfad, Preview/Download.
 - Große Seiten (`lager`, `buero`, `werkstatt`) vorsichtig ändern; sie bündeln viel Logik und State.
 - Jede relevante Erkenntnis kurz im Änderungsverlauf ergänzen.
+
+> Ab hier folgen Detail-, Verlauf- und Langzeitabschnitte.
+> Diese Bereiche nicht automatisch komplett auswerten, wenn nur ein schneller Projektstatus benötigt wird.
 
 ## 8. Änderungsverlauf
 | Datum | Agent | Änderungen | Betroffene Dateien | Nächste Schritte |

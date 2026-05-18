@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { hasDemoCookie, performLogout } from '@/lib/auth'
+import { getAccessProfile } from '@/lib/access'
 
 const pilots = [
   { id: 'lager',     label: 'LagerPilot',     icon: '📦', href: '/dashboard/lager' },
@@ -32,13 +33,18 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [isDemo, setIsDemo] = useState(false)
+  const [allowedPilotIds, setAllowedPilotIds] = useState<string[]>(pilots.map(pilot => pilot.id))
 
   useEffect(() => {
-    if (hasDemoCookie()) { setIsDemo(true); return }
+    if (hasDemoCookie()) { setIsDemo(true); setAllowedPilotIds(pilots.map(pilot => pilot.id)); return }
     if (!isSupabaseConfigured()) return
     try {
-      createSupabaseClient().auth.getSession().then(({ data: { session } }) => {
-        setIsDemo((session?.user?.email ?? '').toLowerCase() === 'demo@petersen-ki.de')
+      createSupabaseClient().auth.getUser().then(({ data: { user } }) => {
+        setIsDemo((user?.email ?? '').toLowerCase() === 'demo@petersen-ki.de')
+        if (user) {
+          const profile = getAccessProfile(user)
+          setAllowedPilotIds(profile.allowedPilotIds)
+        }
       }).catch(() => {})
     } catch {}
   }, [])
@@ -52,6 +58,13 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
+
+  const hasAnyPilotAccess = allowedPilotIds.length > 0
+  const visiblePilots = pilots.filter(pilot => allowedPilotIds.includes(pilot.id))
+  const visibleNavItems = navItems.filter(item => {
+    if (item.href === '/dashboard' || item.href === '/dashboard/einstellungen') return true
+    return hasAnyPilotAccess
+  })
 
   const navBtnStyle = (active: boolean): React.CSSProperties => ({
     width: '100%', display: 'flex', alignItems: 'center', gap: 10,
@@ -86,7 +99,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       {/* Nav */}
       <div style={{ padding: '10px 10px 4px' }}>
         <div style={{ fontSize: 10, color: '#4a5568', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: 700, padding: '4px 8px', marginBottom: 4 }}>Navigation</div>
-        {navItems.map(item => (
+        {visibleNavItems.map(item => (
           <button key={item.href} onClick={() => navigate(item.href)} style={navBtnStyle(isActive(item.href))}
             onMouseEnter={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.05)' }}
             onMouseLeave={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
@@ -98,7 +111,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       {/* Pilots */}
       <div style={{ padding: '4px 10px', flex: 1 }}>
         <div style={{ fontSize: 10, color: '#4a5568', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: 700, padding: '4px 8px', marginBottom: 4 }}>KI-Piloten</div>
-        {pilots.map(pilot => (
+        {visiblePilots.map(pilot => (
           <button key={pilot.id} onClick={() => navigate(pilot.href)}
             style={{ ...navBtnStyle(isActive(pilot.href)), color: isActive(pilot.href) ? '#6cb6ff' : '#d0d9e8' }}
             onMouseEnter={e => { if (!isActive(pilot.href)) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.05)' }}

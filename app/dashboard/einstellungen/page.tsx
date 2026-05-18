@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
 import { genId } from '@/lib/ids'
 import { isDemoUser, hasDemoCookie, performLogout } from '@/lib/auth'
+import { type AccessMode, type AccessStatus } from '@/lib/access'
 import { type AppRole, APP_ROLES, INHABER_EMAIL, ROLE_LABELS, ROLE_PILOTS, PERMISSIONS, normalizeRole, useRole } from '@/lib/roles'
 import {
   parseCsvFile, validateImportRows, autoMapColumns, buildImportRows,
@@ -22,15 +23,73 @@ import {
 import { PricingSettingsPage } from '@/components/billing/PricingSettingsPage'
 import { OwnerAiControlPanel } from '@/components/billing/OwnerAiControlPanel'
 import { OwnerCustomerControlPanel } from '@/components/billing/OwnerCustomerControlPanel'
+import type { PilotId } from '@/lib/pricingConfig'
 
 type NotifSettings = {
   wareneingaenge: boolean; niedrigerBestand: boolean; auftraege: boolean
   rechnungen: boolean; cloudSync: boolean; kiErkennungen: boolean
 }
 
+type ManagedUser = {
+  id: string
+  email: string
+  fullName: string
+  role: AppRole
+  accessStatus: AccessStatus
+  accessMode: AccessMode
+  accessExpiresAt: string | null
+  allowedPilotIds: PilotId[]
+  createdAt: string
+  lastSignInAt: string
+  isOwnerAccount: boolean
+}
+
+type ManagedUserAccessDraft = {
+  accessStatus: AccessStatus
+  accessMode: AccessMode
+  accessExpiresAt: string
+  allowedPilotIds: PilotId[]
+}
+
+type ManagedUsersEntitlement = {
+  subscriptionId?: string
+  ownerUserId?: string
+  ownerEmail?: string
+  employeeTier?: string
+  maxSeats: number
+  usedSeats: number
+  remainingSeats: number
+  hasActiveSubscription: boolean
+  canCreateUsers: boolean
+  reason: string
+}
+
+const ACCESS_STATUS_OPTIONS: AccessStatus[] = ['pending', 'active', 'suspended']
+const ACCESS_MODE_OPTIONS: AccessMode[] = ['standard', 'demo']
+const MANAGED_PILOT_OPTIONS: PilotId[] = ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer']
+const ACCESS_STATUS_LABELS: Record<AccessStatus, string> = {
+  pending: 'Freigabe ausstehend',
+  active: 'Aktiv',
+  suspended: 'Gesperrt',
+}
+const ACCESS_MODE_LABELS: Record<AccessMode, string> = {
+  standard: 'Standard',
+  demo: 'Demo',
+}
+const PILOT_LABELS: Record<PilotId, string> = {
+  lager: 'LagerPilot',
+  buero: 'BüroPilot',
+  werkstatt: 'WerkstattPilot',
+  marketing: 'MarketingPilot',
+  analyse: 'AnalysePilot',
+  planung: 'PlanungPilot',
+  steuer: 'SteuerPilot',
+  custom: 'Custom',
+}
+
 export default function EinstellungenPage() {
   const router = useRouter()
-  const [section, setSection] = useState<'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
+  const [section, setSection] = useState<'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'registrierungen' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
   const [toast, setToast] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [isDemo, setIsDemo] = useState(false)
@@ -38,6 +97,17 @@ export default function EinstellungenPage() {
   const { role: currentRole, setRole: applyRole } = useRole()
   const [selectedRole, setSelectedRole] = useState<AppRole>('Admin')
   const [paymentBanner, setPaymentBanner] = useState<{ type: 'success' | 'cancelled'; invoiceId?: string } | null>(null)
+  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([])
+  const [managedRoleDrafts, setManagedRoleDrafts] = useState<Record<string, AppRole>>({})
+  const [managedAccessDrafts, setManagedAccessDrafts] = useState<Record<string, ManagedUserAccessDraft>>({})
+  const [loadingManagedUsers, setLoadingManagedUsers] = useState(false)
+  const [savingManagedUserId, setSavingManagedUserId] = useState('')
+  const [managedUsersError, setManagedUsersError] = useState('')
+  const [managedUsersEntitlement, setManagedUsersEntitlement] = useState<ManagedUsersEntitlement | null>(null)
+  const [inviteForm, setInviteForm] = useState({ email: '', fullName: '', role: 'Mitarbeiter' as AppRole })
+  const [createForm, setCreateForm] = useState({ email: '', fullName: '', role: 'Mitarbeiter' as AppRole, password: '' })
+  const [creatingMode, setCreatingMode] = useState<'invite' | 'create' | ''>('')
+  const [newlyCreatedSecret, setNewlyCreatedSecret] = useState<{ email: string; password: string } | null>(null)
 
   // Sync picker with current role once loaded
   useEffect(() => { setSelectedRole(currentRole) }, [currentRole])
@@ -50,7 +120,9 @@ export default function EinstellungenPage() {
     const payment = params.get('payment')
     const invoice = params.get('invoice')
 
-    if (sectionParam === 'kundensteuerung') {
+    if (sectionParam === 'registrierungen') {
+      setSection('registrierungen')
+    } else if (sectionParam === 'kundensteuerung') {
       setSection('kundensteuerung')
     } else if (sectionParam === 'billing' || payment === 'success' || payment === 'cancelled') {
       setSection('billing')
@@ -96,6 +168,38 @@ export default function EinstellungenPage() {
   }, [])
 
   const isInhaberAccount = profil.email.toLowerCase() === INHABER_EMAIL || currentRole === 'Inhaber'
+  const canManageLiveUsers = !isDemo && PERMISSIONS.canManageUsers(currentRole)
+
+  const loadManagedUsers = useCallback(async () => {
+    if (!canManageLiveUsers) return
+    setLoadingManagedUsers(true)
+    setManagedUsersError('')
+    try {
+      const res = await fetch('/api/admin/users', { cache: 'no-store' })
+      const data = await res.json().catch(() => null) as { error?: string; users?: ManagedUser[]; entitlement?: ManagedUsersEntitlement } | null
+      if (!res.ok) throw new Error(data?.error || 'Benutzer konnten nicht geladen werden.')
+      const users = Array.isArray(data?.users) ? data.users : []
+      setManagedUsers(users)
+      setManagedRoleDrafts(Object.fromEntries(users.map(user => [user.id, user.role])))
+      setManagedAccessDrafts(Object.fromEntries(users.map(user => [user.id, {
+        accessStatus: user.accessStatus,
+        accessMode: user.accessMode,
+        accessExpiresAt: user.accessExpiresAt ? user.accessExpiresAt.slice(0, 10) : '',
+        allowedPilotIds: user.allowedPilotIds,
+      }])))
+      setManagedUsersEntitlement(data?.entitlement ?? null)
+    } catch (error) {
+      setManagedUsersError(error instanceof Error ? error.message : 'Benutzer konnten nicht geladen werden.')
+    } finally {
+      setLoadingManagedUsers(false)
+    }
+  }, [canManageLiveUsers])
+
+  useEffect(() => {
+    if ((section === 'rollen' || section === 'registrierungen') && canManageLiveUsers) {
+      void loadManagedUsers()
+    }
+  }, [section, canManageLiveUsers, loadManagedUsers])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast(msg); setToastType(type)
@@ -128,6 +232,160 @@ export default function EinstellungenPage() {
   }
 
   const handleLogout = () => performLogout()
+
+  const handleManagedUserSave = async (user: ManagedUser) => {
+    const nextRole = managedRoleDrafts[user.id] ?? user.role
+    const accessDraft = managedAccessDrafts[user.id] ?? {
+      accessStatus: user.accessStatus,
+      accessMode: user.accessMode,
+      accessExpiresAt: user.accessExpiresAt ? user.accessExpiresAt.slice(0, 10) : '',
+      allowedPilotIds: user.allowedPilotIds,
+    }
+    setSavingManagedUserId(user.id)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          role: nextRole,
+          accessStatus: accessDraft.accessStatus,
+          accessMode: accessDraft.accessMode,
+          accessExpiresAt: accessDraft.accessExpiresAt || null,
+          allowedPilotIds: accessDraft.allowedPilotIds,
+        }),
+      })
+      const data = await res.json().catch(() => null) as { error?: string; user?: ManagedUser } | null
+      if (!res.ok || !data?.user) throw new Error(data?.error || 'Rolle konnte nicht gespeichert werden.')
+      setManagedUsers(prev => prev.map(entry => entry.id === data.user!.id ? data.user! : entry))
+      setManagedRoleDrafts(prev => ({ ...prev, [data.user!.id]: data.user!.role }))
+      setManagedAccessDrafts(prev => ({
+        ...prev,
+        [data.user!.id]: {
+          accessStatus: data.user!.accessStatus,
+          accessMode: data.user!.accessMode,
+          accessExpiresAt: data.user!.accessExpiresAt ? data.user!.accessExpiresAt.slice(0, 10) : '',
+          allowedPilotIds: data.user!.allowedPilotIds,
+        },
+      }))
+      showToast(`✅ Zugang aktualisiert: ${data.user.email}`)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Zugang konnte nicht gespeichert werden.', 'error')
+    } finally {
+      setSavingManagedUserId('')
+    }
+  }
+
+  const handleManagedUserCreate = async (mode: 'invite' | 'create') => {
+    const form = mode === 'invite' ? inviteForm : createForm
+    setCreatingMode(mode)
+    setNewlyCreatedSecret(null)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          mode,
+          email: form.email,
+          fullName: form.fullName,
+          role: form.role,
+          password: mode === 'create' ? createForm.password : undefined,
+        }),
+      })
+      const data = await res.json().catch(() => null) as {
+        error?: string
+        user?: ManagedUser
+        entitlement?: ManagedUsersEntitlement
+        temporaryPassword?: string | null
+      } | null
+      if (!res.ok || !data?.user) throw new Error(data?.error || 'Benutzer konnte nicht erstellt werden.')
+
+      setManagedUsers(prev => [data.user!, ...prev])
+      setManagedRoleDrafts(prev => ({ ...prev, [data.user!.id]: data.user!.role }))
+      setManagedUsersEntitlement(data?.entitlement ?? managedUsersEntitlement)
+      if (mode === 'invite') {
+        setInviteForm({ email: '', fullName: '', role: 'Mitarbeiter' })
+        showToast(`✅ Einladung gesendet: ${data.user.email}`)
+      } else {
+        setCreateForm({ email: '', fullName: '', role: 'Mitarbeiter', password: '' })
+        if (data.temporaryPassword) {
+          setNewlyCreatedSecret({ email: data.user.email, password: data.temporaryPassword })
+        }
+        showToast(`✅ Benutzer angelegt: ${data.user.email}`)
+      }
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Benutzer konnte nicht erstellt werden.', 'error')
+    } finally {
+      setCreatingMode('')
+    }
+  }
+
+  const applyRegistrationPreset = async (user: ManagedUser, preset: 'demo7' | 'demo14' | 'standard') => {
+    const expiresAt = preset === 'standard'
+      ? null
+      : new Date(Date.now() + (preset === 'demo7' ? 7 : 14) * 24 * 60 * 60 * 1000).toISOString()
+    const pilotIds: PilotId[] = preset === 'standard'
+      ? ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer']
+      : ['buero', 'lager', 'analyse']
+    setSavingManagedUserId(user.id)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          role: user.role,
+          accessStatus: 'active',
+          accessMode: preset === 'standard' ? 'standard' : 'demo',
+          accessExpiresAt: expiresAt,
+          allowedPilotIds: pilotIds,
+        }),
+      })
+      const data = await res.json().catch(() => null) as { error?: string; user?: ManagedUser } | null
+      if (!res.ok || !data?.user) throw new Error(data?.error || 'Freigabe konnte nicht gespeichert werden.')
+      setManagedUsers(prev => prev.map(entry => entry.id === data.user!.id ? data.user! : entry))
+      setManagedRoleDrafts(prev => ({ ...prev, [data.user!.id]: data.user!.role }))
+      setManagedAccessDrafts(prev => ({
+        ...prev,
+        [data.user!.id]: {
+          accessStatus: data.user!.accessStatus,
+          accessMode: data.user!.accessMode,
+          accessExpiresAt: data.user!.accessExpiresAt ? data.user!.accessExpiresAt.slice(0, 10) : '',
+          allowedPilotIds: data.user!.allowedPilotIds,
+        },
+      }))
+      showToast(`✅ ${data.user.email} wurde freigeschaltet`)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Freigabe konnte nicht gespeichert werden.', 'error')
+    } finally {
+      setSavingManagedUserId('')
+    }
+  }
+
+  const buildRegistrationMailHref = (user: ManagedUser, preset: 'demo7' | 'demo14' | 'standard' | 'pending') => {
+    const subject = preset === 'pending'
+      ? 'Ihre Registrierung bei Petersen KI'
+      : 'Ihr Zugang bei Petersen KI wurde freigeschaltet'
+    const label = preset === 'demo7'
+      ? 'Demo-Zugang fuer 7 Tage'
+      : preset === 'demo14'
+        ? 'Demo-Zugang fuer 14 Tage'
+        : preset === 'standard'
+          ? 'Standard-Zugang'
+          : 'Registrierung in Pruefung'
+    const body = [
+      `Guten Tag ${user.fullName || ''}`.trim() + ',',
+      '',
+      preset === 'pending'
+        ? 'vielen Dank fuer Ihre Registrierung. Ihr Zugang wird aktuell geprueft.'
+        : `Ihr ${label} wurde freigeschaltet.`,
+      preset === 'pending' ? '' : `Login: ${user.email}`,
+      preset === 'pending' ? '' : 'Portal: https://petersen-ki-pilot.de/login',
+      '',
+      'Viele Gruesse',
+    ].filter(Boolean).join('\n')
+    return `mailto:${encodeURIComponent(user.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  }
 
   const NavItem = ({ id, icon, label }: { id: typeof section; icon: string; label: string }) => (
     <button onClick={() => setSection(id)} data-active={section === id} style={{
@@ -192,6 +450,7 @@ export default function EinstellungenPage() {
           <NavItem id="firma" icon="🏢" label="Firmendaten" />
           <NavItem id="billing" icon="💳" label="Buchung & Abonnement" />
           {isInhaberAccount && <NavItem id="kundensteuerung" icon="👑" label="Kundensteuerung" />}
+          {isInhaberAccount && <NavItem id="registrierungen" icon="🆕" label="Offene Registrierungen" />}
           <NavItem id="benachrichtigungen" icon="🔔" label="Benachricht." />
           <NavItem id="rollen" icon="🔑" label="Rollen" />
           <NavItem id="import" icon="📥" label="Import" />
@@ -311,6 +570,57 @@ export default function EinstellungenPage() {
             </div>
           )}
 
+          {section === 'registrierungen' && (
+            <div className="pk-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>Offene Registrierungen</h3>
+                  <p style={{ margin: 0, color: '#aeb9c8', fontSize: 13 }}>Neue Accounts bleiben gesperrt, bis Sie Demo oder Standard freischalten.</p>
+                </div>
+                <button className="pk-btn-ghost" onClick={() => void loadManagedUsers()} style={{ fontWeight: 700 }}>
+                  Aktualisieren
+                </button>
+              </div>
+
+              {loadingManagedUsers ? (
+                <div style={{ color: '#aeb9c8', fontSize: 13 }}>Registrierungen werden geladen…</div>
+              ) : managedUsers.filter(user => user.accessStatus === 'pending').length === 0 ? (
+                <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine offenen Registrierungen vorhanden.</div>
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {managedUsers.filter(user => user.accessStatus === 'pending').map(user => (
+                    <div key={user.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 14, background: 'rgba(255,255,255,.03)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ fontWeight: 800 }}>{user.fullName || 'Ohne Namen'}</div>
+                          <div style={{ color: '#aeb9c8', fontSize: 12, marginTop: 3 }}>{user.email}</div>
+                          <div style={{ color: '#7f8ea3', fontSize: 11, marginTop: 4 }}>
+                            Registriert am {user.createdAt ? new Date(user.createdAt).toLocaleString('de-DE') : 'unbekannt'}
+                          </div>
+                        </div>
+                        <span className="badge badge-orange">Freigabe ausstehend</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                        <button className="pk-btn-ghost" disabled={savingManagedUserId === user.id} onClick={() => void applyRegistrationPreset(user, 'demo7')} style={{ fontWeight: 800 }}>
+                          Demo 7 Tage
+                        </button>
+                        <button className="pk-btn-ghost" disabled={savingManagedUserId === user.id} onClick={() => void applyRegistrationPreset(user, 'demo14')} style={{ fontWeight: 800 }}>
+                          Demo 14 Tage
+                        </button>
+                        <button className="pk-btn" disabled={savingManagedUserId === user.id} onClick={() => void applyRegistrationPreset(user, 'standard')} style={{ fontWeight: 800 }}>
+                          Standard freischalten
+                        </button>
+                        <a className="pk-btn-ghost" href={buildRegistrationMailHref(user, 'pending')} style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', fontWeight: 800 }}>
+                          Mailtext öffnen
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {section === 'benachrichtigungen' && (
             <div className="pk-card">
               <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>🔔 Benachrichtigungen</h3>
@@ -337,6 +647,9 @@ export default function EinstellungenPage() {
               Lager: 'Nur Lagerverwaltung und KI-Assistent',
             }
             const allRoles = isInhaberAccount ? APP_ROLES : APP_ROLES.filter(role => role !== 'Inhaber')
+            const managedRoleOptions = currentRole === 'Inhaber'
+              ? APP_ROLES
+              : APP_ROLES.filter(role => role !== 'Inhaber')
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* Aktuelle Rolle */}
@@ -403,41 +716,371 @@ export default function EinstellungenPage() {
 
                   {/* Rolle wechseln */}
                   <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', paddingTop: 20 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>{isDemo ? 'Rolle wechseln (Demo)' : 'Eigene Rolle im System speichern'}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                      <select
-                        value={selectedRole}
-                        onChange={e => setSelectedRole(e.target.value as AppRole)}
-                        className="pk-input"
-                        style={{ width: 'auto', minWidth: 180 }}
-                      >
-                        {allRoles.map(r => (
-                          <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                        ))}
-                      </select>
-                      <button
-                        className="pk-btn"
-                        style={{ fontWeight: 700 }}
-                        onClick={async () => {
-                          try {
-                            const nextRole = await applyRole(selectedRole)
-                            setProfil(prev => ({ ...prev, role: isDemo ? 'Demo Admin' : ROLE_LABELS[nextRole] }))
-                            showToast(`✅ Rolle gesetzt: ${ROLE_LABELS[nextRole]}`)
-                          } catch (error) {
-                            showToast(error instanceof Error ? error.message : 'Rolle konnte nicht gespeichert werden.', 'error')
-                          }
-                        }}
-                      >
-                        Speichern
-                      </button>
-                    </div>
-                    <p style={{ margin: '12px 0 0', fontSize: 12, color: '#4a5568', lineHeight: 1.6 }}>
-                      {isDemo
-                        ? 'Im Produktivbetrieb werden Rollen serverseitig an den Benutzer gebunden.'
-                        : 'Die Rolle wird jetzt in den Benutzer-Metadaten gespeichert und bei API-Zugriffen mitverwendet.'}
-                    </p>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>{isDemo ? 'Rolle wechseln (Demo)' : 'Rollenvergabe im Produktivbetrieb'}</div>
+                    {isDemo ? (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                          <select
+                            value={selectedRole}
+                            onChange={e => setSelectedRole(e.target.value as AppRole)}
+                            className="pk-input"
+                            style={{ width: 'auto', minWidth: 180 }}
+                          >
+                            {allRoles.map(r => (
+                              <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                            ))}
+                          </select>
+                          <button
+                            className="pk-btn"
+                            style={{ fontWeight: 700 }}
+                            onClick={async () => {
+                              try {
+                                const nextRole = await applyRole(selectedRole)
+                                setProfil(prev => ({ ...prev, role: 'Demo Admin' }))
+                                showToast(`✅ Rolle gesetzt: ${ROLE_LABELS[nextRole]}`)
+                              } catch (error) {
+                                showToast(error instanceof Error ? error.message : 'Rolle konnte nicht gespeichert werden.', 'error')
+                              }
+                            }}
+                          >
+                            Speichern
+                          </button>
+                        </div>
+                        <p style={{ margin: '12px 0 0', fontSize: 12, color: '#4a5568', lineHeight: 1.6 }}>
+                          Im Produktivbetrieb werden Rollen serverseitig an den Benutzer gebunden.
+                        </p>
+                      </>
+                    ) : (
+                      <div style={{ padding: 14, borderRadius: 14, background: 'rgba(255,179,71,.08)', border: '1px solid rgba(255,179,71,.18)', color: '#ffd7a1', fontSize: 13, lineHeight: 1.6 }}>
+                        Rollen koennen live nicht mehr vom Benutzer selbst geaendert werden. Vergabe und Aenderungen muessen zentral ueber Inhaber/Admin erfolgen.
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {canManageLiveUsers && (
+                  <div className="pk-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+                      <div>
+                        <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>👥 Live-Benutzerverwaltung</h3>
+                        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Rollen werden serverseitig per Supabase Admin API am Benutzerkonto gespeichert.</div>
+                      </div>
+                      <button className="pk-btn-ghost" onClick={() => void loadManagedUsers()} style={{ fontWeight: 700 }}>
+                        Aktualisieren
+                      </button>
+                    </div>
+
+                    {managedUsersEntitlement && (
+                      <div style={{
+                        marginBottom: 16,
+                        padding: '14px 16px',
+                        borderRadius: 14,
+                        background: managedUsersEntitlement.canCreateUsers ? 'rgba(22,132,255,.08)' : 'rgba(255,179,71,.08)',
+                        border: managedUsersEntitlement.canCreateUsers ? '1px solid rgba(22,132,255,.22)' : '1px solid rgba(255,179,71,.18)',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: 14 }}>
+                              Seat-Limit: {managedUsersEntitlement.usedSeats} / {managedUsersEntitlement.maxSeats || 0} belegt
+                            </div>
+                            <div style={{ color: '#aeb9c8', fontSize: 12, marginTop: 4 }}>
+                              {managedUsersEntitlement.employeeTier ? `Abo ${managedUsersEntitlement.employeeTier}` : 'Kein zugeordnetes Abo'} · {managedUsersEntitlement.reason}
+                            </div>
+                          </div>
+                          <span className={managedUsersEntitlement.canCreateUsers ? 'badge badge-green' : 'badge badge-orange'}>
+                            {managedUsersEntitlement.remainingSeats} freie Plaetze
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {newlyCreatedSecret && (
+                      <div style={{
+                        marginBottom: 16, padding: '14px 16px', borderRadius: 12,
+                        background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.22)',
+                      }}>
+                        <div style={{ fontWeight: 800, color: '#4ddb7e', marginBottom: 8 }}>Temporäres Passwort nur jetzt sichtbar</div>
+                        <div style={{ fontSize: 13, color: '#dbe4ef', marginBottom: 6 }}>{newlyCreatedSecret.email}</div>
+                        <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 14, fontWeight: 700 }}>{newlyCreatedSecret.password}</div>
+                      </div>
+                    )}
+
+                    {managedUsersError && (
+                      <div style={{ marginBottom: 14, padding: 12, borderRadius: 12, background: 'rgba(244,63,94,.12)', border: '1px solid rgba(244,63,94,.28)', color: '#fb7185', fontSize: 13 }}>
+                        {managedUsersError}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 18 }}>
+                      <div style={{ padding: 14, borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+                        <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>📨 Benutzer einladen</div>
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          <input
+                            className="pk-input"
+                            placeholder="E-Mail"
+                            value={inviteForm.email}
+                            onChange={e => setInviteForm(prev => ({ ...prev, email: e.target.value }))}
+                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                          />
+                          <input
+                            className="pk-input"
+                            placeholder="Name (optional)"
+                            value={inviteForm.fullName}
+                            onChange={e => setInviteForm(prev => ({ ...prev, fullName: e.target.value }))}
+                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                          />
+                          <select
+                            className="pk-input"
+                            value={inviteForm.role}
+                            onChange={e => setInviteForm(prev => ({ ...prev, role: e.target.value as AppRole }))}
+                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                          >
+                            {managedRoleOptions.map(role => (
+                              <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                            ))}
+                          </select>
+                          <button
+                            className="pk-btn"
+                            onClick={() => void handleManagedUserCreate('invite')}
+                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                            style={{ fontWeight: 700, opacity: !managedUsersEntitlement?.canCreateUsers || creatingMode !== '' ? .6 : 1 }}
+                          >
+                            {creatingMode === 'invite' ? 'Einladung wird gesendet…' : 'Einladung senden'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ padding: 14, borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+                        <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>👤 Benutzer direkt anlegen</div>
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          <input
+                            className="pk-input"
+                            placeholder="E-Mail"
+                            value={createForm.email}
+                            onChange={e => setCreateForm(prev => ({ ...prev, email: e.target.value }))}
+                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                          />
+                          <input
+                            className="pk-input"
+                            placeholder="Name (optional)"
+                            value={createForm.fullName}
+                            onChange={e => setCreateForm(prev => ({ ...prev, fullName: e.target.value }))}
+                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                          />
+                          <select
+                            className="pk-input"
+                            value={createForm.role}
+                            onChange={e => setCreateForm(prev => ({ ...prev, role: e.target.value as AppRole }))}
+                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                          >
+                            {managedRoleOptions.map(role => (
+                              <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                            ))}
+                          </select>
+                          <input
+                            className="pk-input"
+                            placeholder="Temporäres Passwort (leer = automatisch)"
+                            value={createForm.password}
+                            onChange={e => setCreateForm(prev => ({ ...prev, password: e.target.value }))}
+                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                          />
+                          <button
+                            className="pk-btn"
+                            onClick={() => void handleManagedUserCreate('create')}
+                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                            style={{ fontWeight: 700, opacity: !managedUsersEntitlement?.canCreateUsers || creatingMode !== '' ? .6 : 1 }}
+                          >
+                            {creatingMode === 'create' ? 'Benutzer wird angelegt…' : 'Benutzer anlegen'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {loadingManagedUsers ? (
+                      <div style={{ color: '#aeb9c8', fontSize: 14 }}>Benutzer werden geladen…</div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: 14 }}>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          <span className="badge badge-blue">
+                            {managedUsers.filter(user => user.accessStatus === 'pending').length} Registrierungen offen
+                          </span>
+                          <span className="badge badge-green">
+                            {managedUsers.filter(user => user.accessStatus === 'active').length} Zugänge aktiv
+                          </span>
+                          <span className="badge badge-gray">
+                            {managedUsers.filter(user => user.accessMode === 'demo').length} Demo-Zugänge
+                          </span>
+                        </div>
+                        <div style={{ overflowX: 'auto' }}>
+                        <table className="pk-table" style={{ width: '100%', fontSize: 13 }}>
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: 'left', padding: '10px 12px' }}>Benutzer</th>
+                              <th style={{ textAlign: 'left', padding: '10px 12px' }}>Aktuelle Rolle</th>
+                              <th style={{ textAlign: 'left', padding: '10px 12px' }}>Neue Rolle</th>
+                              <th style={{ textAlign: 'left', padding: '10px 12px' }}>Freigabe</th>
+                              <th style={{ textAlign: 'left', padding: '10px 12px' }}>Piloten</th>
+                              <th style={{ textAlign: 'left', padding: '10px 12px' }}>Letzter Login</th>
+                              <th style={{ textAlign: 'left', padding: '10px 12px' }}>Aktion</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {managedUsers.map(user => {
+                              const isSelf = user.email.toLowerCase() === profil.email.toLowerCase()
+                              const targetIsInhaber = user.role === 'Inhaber' || user.isOwnerAccount
+                              const mayEdit = !isSelf && (currentRole === 'Inhaber' || !targetIsInhaber)
+                              const hasChanges = (managedRoleDrafts[user.id] ?? user.role) !== user.role
+                              const accessDraft = managedAccessDrafts[user.id] ?? {
+                                accessStatus: user.accessStatus,
+                                accessMode: user.accessMode,
+                                accessExpiresAt: user.accessExpiresAt ? user.accessExpiresAt.slice(0, 10) : '',
+                                allowedPilotIds: user.allowedPilotIds,
+                              }
+                              const hasAccessChanges =
+                                accessDraft.accessStatus !== user.accessStatus
+                                || accessDraft.accessMode !== user.accessMode
+                                || accessDraft.accessExpiresAt !== (user.accessExpiresAt ? user.accessExpiresAt.slice(0, 10) : '')
+                                || accessDraft.allowedPilotIds.join('|') !== user.allowedPilotIds.join('|')
+                              return (
+                                <tr key={user.id}>
+                                  <td style={{ padding: '10px 12px' }}>
+                                    <div style={{ fontWeight: 700 }}>{user.fullName || 'Ohne Namen'}</div>
+                                    <div style={{ color: '#aeb9c8', fontSize: 12 }}>{user.email}</div>
+                                    {user.isOwnerAccount && (
+                                      <span style={{ display: 'inline-block', marginTop: 6, fontSize: 10, padding: '2px 6px', borderRadius: 999, background: 'rgba(255,179,71,.16)', color: '#ffd7a1', fontWeight: 700 }}>Owner-Konto</span>
+                                    )}
+                                    {!user.isOwnerAccount && user.email && (
+                                      <a
+                                        href={`mailto:${encodeURIComponent(user.email)}?subject=${encodeURIComponent('Freischaltung Ihres Zugangs bei Petersen KI')}&body=${encodeURIComponent(`Guten Tag,\n\nihr Zugang bei Petersen KI wurde bearbeitet.\n\nStatus: ${ACCESS_STATUS_LABELS[accessDraft.accessStatus]}\nZugangsart: ${ACCESS_MODE_LABELS[accessDraft.accessMode]}\nPiloten: ${accessDraft.allowedPilotIds.length > 0 ? accessDraft.allowedPilotIds.map(id => PILOT_LABELS[id]).join(', ') : 'Noch keine'}${accessDraft.accessExpiresAt ? `\nGueltig bis: ${accessDraft.accessExpiresAt}` : ''}\n\nViele Gruesse`)}`}
+                                        style={{ display: 'inline-block', marginTop: 6, fontSize: 11, color: '#6cb6ff', textDecoration: 'none' }}
+                                      >
+                                        Mail vorbereiten
+                                      </a>
+                                    )}
+                                  </td>
+                                  <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{ROLE_LABELS[user.role]}</td>
+                                  <td style={{ padding: '10px 12px' }}>
+                                    <select
+                                      value={managedRoleDrafts[user.id] ?? user.role}
+                                      onChange={e => setManagedRoleDrafts(prev => ({ ...prev, [user.id]: e.target.value as AppRole }))}
+                                      className="pk-input"
+                                      disabled={!mayEdit || savingManagedUserId === user.id}
+                                      style={{ minWidth: 170, opacity: mayEdit ? 1 : .6 }}
+                                    >
+                                      {managedRoleOptions.map(role => (
+                                        <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td style={{ padding: '10px 12px', minWidth: 220 }}>
+                                    <div style={{ display: 'grid', gap: 8 }}>
+                                      <select
+                                        value={accessDraft.accessStatus}
+                                        onChange={e => setManagedAccessDrafts(prev => ({ ...prev, [user.id]: { ...accessDraft, accessStatus: e.target.value as AccessStatus } }))}
+                                        className="pk-input"
+                                        disabled={!mayEdit || savingManagedUserId === user.id}
+                                        style={{ opacity: mayEdit ? 1 : .6 }}
+                                      >
+                                        {ACCESS_STATUS_OPTIONS.map(status => (
+                                          <option key={status} value={status}>{ACCESS_STATUS_LABELS[status]}</option>
+                                        ))}
+                                      </select>
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8 }}>
+                                        <select
+                                          value={accessDraft.accessMode}
+                                          onChange={e => setManagedAccessDrafts(prev => ({ ...prev, [user.id]: { ...accessDraft, accessMode: e.target.value as AccessMode } }))}
+                                          className="pk-input"
+                                          disabled={!mayEdit || savingManagedUserId === user.id}
+                                          style={{ opacity: mayEdit ? 1 : .6 }}
+                                        >
+                                          {ACCESS_MODE_OPTIONS.map(mode => (
+                                            <option key={mode} value={mode}>{ACCESS_MODE_LABELS[mode]}</option>
+                                          ))}
+                                        </select>
+                                        <input
+                                          className="pk-input"
+                                          type="date"
+                                          value={accessDraft.accessExpiresAt}
+                                          onChange={e => setManagedAccessDrafts(prev => ({ ...prev, [user.id]: { ...accessDraft, accessExpiresAt: e.target.value } }))}
+                                          disabled={!mayEdit || savingManagedUserId === user.id}
+                                          style={{ opacity: mayEdit ? 1 : .6 }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '10px 12px', minWidth: 260 }}>
+                                    <div style={{ display: 'grid', gap: 8 }}>
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {MANAGED_PILOT_OPTIONS.map(pilotId => {
+                                          const active = accessDraft.allowedPilotIds.includes(pilotId)
+                                          return (
+                                            <button
+                                              key={pilotId}
+                                              type="button"
+                                              onClick={() => setManagedAccessDrafts(prev => ({
+                                                ...prev,
+                                                [user.id]: {
+                                                  ...accessDraft,
+                                                  allowedPilotIds: active
+                                                    ? accessDraft.allowedPilotIds.filter(id => id !== pilotId)
+                                                    : [...accessDraft.allowedPilotIds, pilotId],
+                                                },
+                                              }))}
+                                              disabled={!mayEdit || savingManagedUserId === user.id}
+                                              style={{
+                                                borderRadius: 999,
+                                                border: `1px solid ${active ? 'rgba(22,132,255,.38)' : 'rgba(255,255,255,.08)'}`,
+                                                background: active ? 'rgba(22,132,255,.14)' : 'rgba(255,255,255,.03)',
+                                                color: active ? '#93c5fd' : '#aeb9c8',
+                                                padding: '5px 9px',
+                                                fontSize: 11,
+                                                cursor: mayEdit ? 'pointer' : 'default',
+                                                opacity: mayEdit ? 1 : .6,
+                                              }}
+                                            >
+                                              {PILOT_LABELS[pilotId]}
+                                            </button>
+                                          )
+                                        })}
+                                      </div>
+                                      <div style={{ fontSize: 11, color: '#8ba0b8' }}>
+                                        {accessDraft.allowedPilotIds.length > 0
+                                          ? `${accessDraft.allowedPilotIds.length} Pilot(en) zugewiesen`
+                                          : 'Noch keine Piloten zugewiesen'}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '10px 12px', color: '#aeb9c8' }}>{user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleString('de-DE') : 'Noch nie'}</td>
+                                  <td style={{ padding: '10px 12px' }}>
+                                    <button
+                                      className="pk-btn"
+                                      onClick={() => void handleManagedUserSave(user)}
+                                      disabled={!mayEdit || (!hasChanges && !hasAccessChanges) || savingManagedUserId === user.id}
+                                      style={{ fontWeight: 700, opacity: !mayEdit || (!hasChanges && !hasAccessChanges) || savingManagedUserId === user.id ? .55 : 1 }}
+                                    >
+                                      {savingManagedUserId === user.id ? 'Speichert…' : 'Zugang speichern'}
+                                    </button>
+                                    {!mayEdit && (
+                                      <div style={{ marginTop: 6, color: '#aeb9c8', fontSize: 11 }}>
+                                        {isSelf ? 'Eigene Rolle hier gesperrt' : 'Nur Inhaber darf diesen Benutzer aendern'}
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                            {managedUsers.length === 0 && (
+                              <tr>
+                                <td colSpan={7} style={{ padding: '14px 12px', color: '#aeb9c8' }}>Keine Benutzer gefunden.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })()}
