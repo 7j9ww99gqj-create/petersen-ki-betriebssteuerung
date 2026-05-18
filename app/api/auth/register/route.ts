@@ -16,12 +16,20 @@ export async function POST(req: NextRequest) {
     password?: string
     fullName?: string
     company?: string
+    strasse?: string
+    plz?: string
+    stadt?: string
+    interessiertePiloten?: string[]
   } | null
 
   const email = body?.email?.trim().toLowerCase() ?? ''
   const password = body?.password ?? ''
   const fullName = body?.fullName?.trim() || email.split('@')[0] || 'Neuer Kunde'
   const company = body?.company?.trim() ?? ''
+  const strasse = body?.strasse?.trim() ?? ''
+  const plz = body?.plz?.trim() ?? ''
+  const stadt = body?.stadt?.trim() ?? ''
+  const interessiertePiloten: string[] = Array.isArray(body?.interessiertePiloten) ? body.interessiertePiloten : []
 
   if (!email || !isValidEmail(email)) {
     return NextResponse.json({ error: 'Bitte eine gueltige E-Mail angeben.' }, { status: 400 })
@@ -66,6 +74,14 @@ export async function POST(req: NextRequest) {
 
   if (ownerUserId) {
     const customerId = `REG-${user.id}`
+
+    const adresse = strasse || undefined
+    const ort = plz && stadt ? `${plz} ${stadt}` : (stadt || plz || undefined)
+
+    const pilotenNotiz = interessiertePiloten.length > 0
+      ? `Interesse: ${interessiertePiloten.join(', ')}`
+      : undefined
+
     await admin.from('buero_kunden').upsert({
       id: customerId,
       user_id: ownerUserId,
@@ -75,6 +91,9 @@ export async function POST(req: NextRequest) {
       typ: 'Registrierung',
       ansprechpartner: fullName,
       email,
+      adresse,
+      ort,
+      notizen: pilotenNotiz,
       status: 'In Prüfung',
       software_enabled: false,
       updated_at: new Date().toISOString(),
@@ -95,6 +114,9 @@ export async function POST(req: NextRequest) {
         email,
         full_name: fullName,
         company,
+        adresse,
+        ort,
+        interessierte_piloten: interessiertePiloten,
         customer_id: customerId,
       },
     })
