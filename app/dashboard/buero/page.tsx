@@ -4,9 +4,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
 import {
   getBueroKunden, upsertBueroKunde, deleteBueroKunde,
-  getBueroAngebote, upsertBueroAngebot,
-  getBueroAuftraege, upsertBueroAuftrag,
-  getBueroRechnungen, upsertBueroRechnung, getNextInvoiceNumber, getNextAngebotNumber,
+  getBueroAngebote, upsertBueroAngebot, deleteBueroAngebot,
+  getBueroAuftraege, upsertBueroAuftrag, deleteBueroAuftrag,
+  getBueroRechnungen, upsertBueroRechnung, deleteBueroRechnung, getNextInvoiceNumber, getNextAngebotNumber,
   getBueroEingangsrechnungen, upsertBueroEingangsrechnung, deleteBueroEingangsrechnung,
   markEingangsrechnungBezahlt, updateEingangsrechnungStatus,
   getBueroDokumente, getBueroDokumentById, getDokumentUrl, insertBueroDokument, updateBueroDokument, deleteBueroDokument, uploadDokument,
@@ -816,17 +816,12 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
 
   const handleDelete = async (id: string) => {
     setDeleteId(null)
-    // Kein eigener DB-Call für Angebote-Delete in der lib – wir entfernen nur lokal (Demo) oder rufen ggf. einen generischen Delete auf
     if (!isDemo) {
-      // Angebote haben ggf. keinen expliziten deleteBueroAngebot – wir aktualisieren den Status auf Abgelehnt als Soft-Delete-Alternative
-      const ang = angebote.find(a => a.id === id)
-      if (ang) {
-        try {
-          const linkedDokument = getLinkedDokument(dokumente, 'angebot_id', id)
-          if (linkedDokument) await updateBueroDokument(linkedDokument.id, { angebot_id: null })
-          await upsertBueroAngebot({ ...ang, status: 'Abgelehnt' })
-        } catch { showToast('Fehler beim Löschen', true); return }
-      }
+      try {
+        const linkedDokument = getLinkedDokument(dokumente, 'angebot_id', id)
+        if (linkedDokument) await updateBueroDokument(linkedDokument.id, { angebot_id: null })
+        await deleteBueroAngebot(id)
+      } catch { showToast('Fehler beim Löschen', true); return }
     }
     setAngebote(prev => prev.filter(a => a.id !== id))
     setDokumente(prev => prev.map(doc => doc.angebot_id === id ? { ...doc, angebot_id: undefined } : doc))
@@ -1367,14 +1362,11 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
   const handleDelete = async (id: string) => {
     setDeleteId(null)
     if (!isDemo) {
-      const a = auftraege.find(x => x.id === id)
-      if (a) {
-        try {
-          const linkedDokument = getLinkedDokument(dokumente, 'auftrag_id', id)
-          if (linkedDokument) await updateBueroDokument(linkedDokument.id, { auftrag_id: null })
-          await upsertBueroAuftrag({ ...a, status: 'Abgeschlossen' })
-        } catch { showToast('Fehler beim Löschen', true); return }
-      }
+      try {
+        const linkedDokument = getLinkedDokument(dokumente, 'auftrag_id', id)
+        if (linkedDokument) await updateBueroDokument(linkedDokument.id, { auftrag_id: null })
+        await deleteBueroAuftrag(id)
+      } catch { showToast('Fehler beim Löschen', true); return }
     }
     setAuftraege(prev => prev.filter(a => a.id !== id))
     setDokumente(prev => prev.map(doc => doc.auftrag_id === id ? { ...doc, auftrag_id: undefined } : doc))
@@ -1798,14 +1790,11 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
   const handleDelete = async (id: string) => {
     setDeleteId(null)
     if (!isDemo) {
-      const r = rechnungen.find(x => x.id === id)
-      if (r) {
-        try {
-          const linkedDokument = getLinkedDokument(dokumente, 'rechnung_id', id)
-          if (linkedDokument) await updateBueroDokument(linkedDokument.id, { rechnung_id: null })
-          await upsertBueroRechnung({ ...r, status: 'Bezahlt' })
-        } catch { showToast('Fehler beim Löschen', true); return }
-      }
+      try {
+        const linkedDokument = getLinkedDokument(dokumente, 'rechnung_id', id)
+        if (linkedDokument) await updateBueroDokument(linkedDokument.id, { rechnung_id: null })
+        await deleteBueroRechnung(id)
+      } catch { showToast('Fehler beim Löschen', true); return }
     }
     setRechnungen(prev => prev.filter(r => r.id !== id))
     setDokumente(prev => prev.map(doc => doc.rechnung_id === id ? { ...doc, rechnung_id: undefined } : doc))
