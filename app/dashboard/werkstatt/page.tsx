@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { trackVisit } from '@/lib/recent'
+import { useSwipeTabs } from '@/hooks/useSwipeTabs'
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
 import SkeletonCard from '@/components/SkeletonCard'
 import EmptyState from '@/components/EmptyState'
@@ -2156,6 +2157,8 @@ export default function WerkstattPilotPage() {
     params.set('tab', newTab)
     router.replace(`?${params.toString()}`, { scroll: false })
   }
+  const WERKSTATT_TABS: Tab[] = ['karten', 'zeit', 'material', 'qualitaet', 'wartung', 'stoerungen', 'mitarbeiter', 'bereiche']
+  useSwipeTabs(WERKSTATT_TABS, tab, (t) => setTab(t as Tab))
   const [newKarteParams, setNewKarteParams] = useState<NewKarteParams | undefined>(undefined)
   const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
   const [zeitbuchungen, setZeitbuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])

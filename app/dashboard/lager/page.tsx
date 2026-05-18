@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { trackVisit } from '@/lib/recent'
 import { generateLagerberichtPDF } from '@/lib/pdf'
+import { useSwipeTabs } from '@/hooks/useSwipeTabs'
 import SkeletonCard from '@/components/SkeletonCard'
 import EmptyState from '@/components/EmptyState'
 import { hasDemoCookie } from '@/lib/auth'
@@ -823,6 +824,8 @@ export default function LagerPilotPage() {
     params.set('tab', newTab)
     router.replace(`?${params.toString()}`, { scroll: false })
   }
+  const LAGER_TABS: LagerTab[] = ['tagesbericht', 'bestand', 'bewegungen', 'eingang', 'ausgang', 'inventur', 'bestellung', 'historie', 'stellplaetze', 'lagerbelegung', 'umlagerung', 'kommissionierung']
+  useSwipeTabs(LAGER_TABS, tab, (t) => setTab(t as LagerTab))
   const [search, setSearch] = useState('')
   const [filterKat, setFilterKat] = useState('Alle')
   const [bestandStatusFilter, setBestandStatusFilter] = useState<'Alle' | 'ok' | 'niedrig' | 'leer'>('Alle')

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
 import { trackVisit } from '@/lib/recent'
+import { useSwipeTabs } from '@/hooks/useSwipeTabs'
 import { getBueroKunden, getBueroAngebote, getBueroAuftraege, getBueroRechnungen } from '@/lib/db'
 import { useRole } from '@/lib/roles'
 import { TabBar } from '@/components/buero/shared'
@@ -35,6 +36,8 @@ export default function BueroPilotPage() {
     params.set('tab', newTab)
     router.replace(`?${params.toString()}`, { scroll: false })
   }
+  const BUERO_TABS: Tab[] = ['kunden', 'angebote', 'auftraege', 'rechnungen', 'eingangsrechnungen', 'dokumente', 'einkauf']
+  useSwipeTabs(BUERO_TABS, tab, (t) => setTab(t as Tab))
   const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
   const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
   const [auftraege, setAuftraege] = useState<Auftrag[]>(isDemo ? demoAuftraege : [])
