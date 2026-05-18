@@ -55,6 +55,19 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – Großes Feature-Paket: Inhaber-Dashboard + BüroPilot vollständig ausgebaut)**:
+  - **Inhaber-Dashboard → Kunden eingerichtet**: Inhaber-User herausgefiltert (`!isOwnerAccount`); "🚫 Kunden sperren"-Button mit 2-Klick-Bestätigung (setzt `suspended`, löscht Pilot-Zuteilung); "📄 Rechnungen anzeigen"-Klapppanel pro Kunde (liest `buero_rechnungen` gefiltert nach `user_id`).
+  - **Inhaber-Dashboard → Aktivitätslog**: Neue Sektion `aktivitaetslog` (nur Inhaber) mit `AuditLogSection`-Komponente, die `audit_logs` Tabelle ausließt (Zeitpunkt, Aktion, Durchgeführt von, Betrifft, Details).
+  - **BüroPilot → PDF im Mail-Modal**: "📄 PDF erstellen & herunterladen"-Button direkt über dem Mail-Senden-Button im Rechnungs-Mail-Modal.
+  - **BüroPilot → Mahnung-Stufen 1/2/3**: `handleMahnung` inkrementiert `mahnung_count` pro Rechnung; stufengerechte Mahntexte (freundlich / dringend / letztmalig) mit unterschiedlichen Formulierungen; Badge "N. Mahnung" in der Rechnungs-Liste; dynamischer Button-Label für Folge-Mahnungen.
+  - **BüroPilot → Angebots-Gültigkeits-Reminder**: Gelber Warn-Banner oben im Angebote-Tab mit Anzahl abgelaufener/reminder-fälliger Angebote; "Abgelaufen"-Badge (badge-red) pro Angebots-Karte.
+  - **Datenbereinigungs-Migration vorbereitet**: `20260518170000_cleanup_all_demo_data.sql` löscht alle Demo-/Testdaten aus allen Tabellen + Test-User aus `auth.users` (Inhaber + Demo bleiben). Muss manuell im Supabase SQL Editor ausgeführt werden (CLI-Auth temporär nicht verfügbar).
+  - Betroffene Dateien: `app/dashboard/einstellungen/page.tsx`, `app/dashboard/buero/page.tsx`, `lib/db.ts`, `supabase/migrations/20260518170000_cleanup_all_demo_data.sql`.
+  - Offene Punkte:
+    - **Datenbereinigung manuell ausführen**: SQL-Inhalt von `supabase/migrations/20260518170000_cleanup_all_demo_data.sql` im Supabase SQL Editor (`https://supabase.com/dashboard/project/cchmjrnzaqvowqihcdte/sql`) ausführen.
+    - Mahnung-Zähler-Spalte `mahnung_count` in `buero_rechnungen` ist noch nicht via Migration angelegt (Spalte fehlt remote) — separate Migration nötig.
+  - Tests: `npm run build` grün.
+  - Branch: `main` (Commits `435eaed`, `787ab12`, `0fe61f6`)
 - **Zuletzt erledigt (2026-05-18 – Inhaber-Dashboard Pilot-Zuteilung + Kunden eingerichtet + BüroPilot Mahnungen/AB-Nummern)**:
   - **Inhaber-Dashboard → Offene Registrierungen**: Pilot-Auswahl (7 Toggle-Buttons: LagerPilot, BüroPilot, WerkstattPilot, MarketingPilot, AnalysePilot, PlanungPilot, SteuerPilot) pro pending User-Karte; Default `['buero', 'lager', 'analyse']`; beim Klick auf Demo7/Demo14/Standard werden die gewählten Piloten übergeben statt Hardcode.
   - **Inhaber-Dashboard → Neue Sektion "Kunden eingerichtet"**: Zeigt alle aktiven User; pro Karte: Status-Badge (aktiv/demo/Standard), Pilot-Übersicht (readonly) + editierbare Toggle-Buttons, Testzeitraum-Quick-Buttons (+7/+14/+30 Tage) + manuelles Datum, Save-Button (nutzt `handleManagedUserSave`), mailto-Kontakt-Button mit vorausgefülltem Text.
