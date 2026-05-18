@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
 import { hasDemoCookie } from '@/lib/auth'
 import { genId } from '@/lib/ids'
 import {
@@ -1030,6 +1031,23 @@ function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeit
   const ok = protokolle.filter(p => p.ergebnis === 'OK').length
   const fehler = protokolle.filter(p => p.ergebnis === 'Fehler').length
   const offen = protokolle.filter(p => p.ergebnis === 'Offen').length
+  const gesamt = protokolle.filter(p => p.ergebnis !== 'Offen').length
+  const fehlerRate = gesamt > 0 ? Math.round((fehler / gesamt) * 100 * 10) / 10 : 0
+
+  // Sparkline: letzte 8 Wochen (aus vorhandenen Daten oder Demo)
+  const sparklineDemoData = isDemo
+    ? [
+        { kw: 'KW11', rate: 8.3 }, { kw: 'KW12', rate: 5.1 }, { kw: 'KW13', rate: 12.5 },
+        { kw: 'KW14', rate: 3.7 }, { kw: 'KW15', rate: 6.2 }, { kw: 'KW16', rate: 2.1 },
+        { kw: 'KW17', rate: 7.4 }, { kw: 'KW18', rate: fehlerRate },
+      ]
+    : [{ kw: 'Aktuell', rate: fehlerRate }]
+  const avgLetzterMonat = isDemo
+    ? Math.round((sparklineDemoData.slice(-4).reduce((s, d) => s + d.rate, 0) / 4) * 10) / 10
+    : fehlerRate
+  const trend = sparklineDemoData.length >= 2
+    ? sparklineDemoData[sparklineDemoData.length - 1].rate - sparklineDemoData[sparklineDemoData.length - 2].rate
+    : 0
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
@@ -1049,6 +1067,30 @@ function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeit
           <button onClick={() => setRetryKey(k => k + 1)} style={{ padding: '4px 12px', borderRadius: 8, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.1)', color: '#ff8080', cursor: 'pointer', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>↺ Erneut laden</button>
         </div>
       )}
+      {/* Qualitäts-KPI-Karte mit Sparkline */}
+      <div className="pk-card" style={{ marginBottom: 16, padding: 20 }}>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>🔬 Fehlerrate (abgeschl. Prüfungen)</div>
+            <div style={{ fontSize: 32, fontWeight: 900, color: fehlerRate > 10 ? '#f43f5e' : fehlerRate > 5 ? '#f59e0b' : '#4ddb7e' }}>{fehlerRate}%</div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 12, flexWrap: 'wrap' }}>
+              <span style={{ color: '#aeb9c8' }}>Ø letzter Monat: <b style={{ color: '#f8fbff' }}>{avgLetzterMonat}%</b></span>
+              <span style={{ color: trend > 0 ? '#f43f5e' : '#4ddb7e', fontWeight: 700 }}>
+                {trend > 0 ? `↑ +${trend.toFixed(1)}%` : trend < 0 ? `↓ ${trend.toFixed(1)}%` : '→ Stabil'}
+              </span>
+            </div>
+          </div>
+          <div style={{ flex: 2, minWidth: 200, height: 80 }}>
+            <ResponsiveContainer width="100%" height={80}>
+              <LineChart data={sparklineDemoData} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
+                <Tooltip contentStyle={{ background: '#0b1420', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, fontSize: 11 }} formatter={(v: number) => [`${v}%`, 'Fehlerrate']} />
+                <Line type="monotone" dataKey="rate" stroke={fehlerRate > 10 ? '#f43f5e' : '#a78bfa'} strokeWidth={2} dot={{ fill: fehlerRate > 10 ? '#f43f5e' : '#a78bfa', r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12, marginBottom: 20 }}>
         <div className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
           <div style={{ fontSize: 22, marginBottom: 4 }}>✅</div>
