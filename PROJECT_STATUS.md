@@ -26,9 +26,9 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `9c24845`.
-- Jüngste Fortschritte: SteuerPilot Betrag-Bug fix + Beleg-Upload-System mit Kategorien/Filter/Inline-Delete; MarketingPilot Demo→Live-Calls, Edit+Delete vollständig verdrahtet.
-- Wichtigste externe Restpunkte: E-Mail-Versand bleibt bewusst manuell über das lokale Mailprogramm. Migration `20260518200000_steuer_belege_uploads.sql` im Supabase SQL-Editor ausführen.
+- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `9a9b0ad`.
+- Jüngste Fortschritte (2026-05-18 Owner-Dashboard-Sprint): MTD/YTD-KPIs, Kunden-Cockpit, Alerts-Tab, AnalysePilot Zeitraum-Filter live — alle 5 geplanten Tasks deployed.
+- Wichtigste externe Restpunkte: Migration `20260518200000_steuer_belege_uploads.sql` im Supabase SQL-Editor ausführen. Einkauf-Tabellen im Supabase SQL-Editor ausführen (Code ist live-ready).
 - Produktivlage: Kernsystem weitgehend vollständig; Hauptmodule produktionsreif.
 
 ### 0.2 Top-Offene Aufgaben (Priorisiert)
@@ -60,16 +60,25 @@
 - ✅ ~~**Task 6: Benutzerverwaltung Deaktivieren/Löschen/Suche**~~ **Erledigt 2026-05-18** (Commit `80e0f8c`).
 - ✅ ~~**Task 7: RLS-Policies vollständig**~~ **Erledigt 2026-05-18** (Commit `7aee934`).
 - ✅ ~~**Task 8: Pipeline-Widget 3 KPIs**~~ **Erledigt 2026-05-18** (Commit `dadb045`).
+- ✅ ~~**Owner-Sprint #2: MTD/YTD-KPIs**~~ **Erledigt 2026-05-18** (Commit `03ea362`).
+- ✅ ~~**Owner-Sprint #3: Kunden-Cockpit**~~ **Erledigt 2026-05-18** (Commit `021d2fc`).
+- ✅ ~~**Owner-Sprint #4: Zahlungs-Alert-Center**~~ **Erledigt 2026-05-18** (Commit `1fce336`).
+- ✅ ~~**Owner-Sprint #5: AnalysePilot Zeitraum-Filter**~~ **Erledigt 2026-05-18** (Commit `9a9b0ad`).
+- 🔴 **Einkauf-Tabellen in Supabase ausführen** — Code ist live-ready, Tabellen fehlen noch: `einkauf_lieferanten`, `einkauf_bestellungen`, `einkauf_wareneingaenge`.
+- 🟡 **Owner-Sprint #6: Pipeline-Kanban-View** — horizontale Spalten Anfrage/Angebot/Auftrag/Rechnung/Bezahlt (5h, Opus-Modell empfohlen).
+- 🟡 **Owner-Sprint #7: Positions-Übernahme Angebot→Rechnung** — Positionen gehen bei Direktkonvertierung verloren, 1-Zeiler Fix (1h).
+- 🟡 **Owner-Sprint #8: BüroPilot↔PlanungPilot FK** — `planung_projekte.auftrag_id` Migration + „Als Projekt anlegen"-Button (4h).
+- 🟡 **Owner-Sprint #9: Zahlungsmoral-Report** — Ø Zahlungsverzug + Mahnung-Rate je Kunde (2h).
 
 ### 0.3 Aktuelle Blocker
 - Keine kritischen Blocker. Stripe E2E validiert.
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-18, Commit `9c24845`  
-**Letzte Session:** SteuerPilot Betrag-Bug fix + Beleg-Upload-System (Kategorie/Filter/Inline-Delete); MarketingPilot Demo→Live + Edit/Delete komplett verdrahtet  
-**Nächster Focus:** Supabase-Migration `steuer_belege_uploads` einspielen → Stripe Analytics Integration → Mailchimp API  
-**Blocker:** Migration `20260518200000_steuer_belege_uploads.sql` muss manuell im SQL-Editor ausgeführt werden  
+**Letzter Stand:** 2026-05-18, Commit `9a9b0ad`  
+**Letzte Session:** Owner-Dashboard-Sprint — 5 Tasks deployed: MTD/YTD-KPIs, Kunden-Cockpit, Alerts-Tab, AnalysePilot Zeitraum-Filter  
+**Nächster Focus:** Pipeline-Kanban (5h, Opus) → Positions-Übernahme Angebot→Rechnung (1h) → BüroPilot↔PlanungPilot FK (4h)  
+**Blocker:** `20260518200000_steuer_belege_uploads.sql` + Einkauf-Tabellen manuell im SQL-Editor ausführen  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
 ## 1. Kurzüberblick
@@ -85,6 +94,13 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – Owner-Dashboard-Sprint, Commits `03ea362`–`9a9b0ad`)**:
+  - **Task #1 — Einkauf-Tab live**: Analyse ergab, Code ist bereits live-fähig (`!isDemo`-Guards korrekt, db.ts-Funktionen fertig). Kein Code-Commit nötig. Fehlende Supabase-Tabellen müssen noch ausgeführt werden.
+  - **Task #2 — MTD/YTD Umsatz-KPIs** (`03ea362`): Neue Finanzkennzahlen-Zeile im BüroPilot-Header — Umsatz MTD, Umsatz YTD (aus bezahlten Rechnungen), Überfällig/Mahnung-Counter klickbar. Datei: `buero/page.tsx`.
+  - **Task #3 — Kunden-Cockpit** (`021d2fc`): Kunden-Detailansicht zu vollem Cockpit erweitert. KPI-Zeile: Umsatz bezahlt, Angebote, Aufträge, offene Rechnungen. Tabs: Angebote / Aufträge / Rechnungen. Matching per `kunde_id` mit Namens-Fallback. Datei: `buero/page.tsx`.
+  - **Task #4 — Zahlungs-Alert-Center** (`1fce336`): Neuer Tab `⚠️ Alerts` im BüroPilot — überfällige Rechnungen (mit Tage-Counter), bald fällig (≤14 Tage), inaktive Kunden (>90 Tage). Überfällig-KPI-Kachel verlinkt direkt. Datei: `buero/page.tsx`.
+  - **Task #5 — AnalysePilot Zeitraum-Filter** (`9a9b0ad`): `useEffect` hängt jetzt an `[zeitraum]`, lädt bei Änderung neu. `loadLiveData(zr)` berechnet `zeitraumStart` + `chartMonate` — KPI-Filter und Chart-Fenster reagieren auf 7T/30T/3M/6M/1J. Datei: `analyse/page.tsx`.
+  - Tests: lint + build grün für alle Commits.
 - **Zuletzt erledigt (2026-05-18 – SteuerPilot + MarketingPilot parallel, Commits `ec0b705` + `9c24845`)**:
   - **SteuerPilot — Betrag-Bug fix**: Input von `type="number"` auf `type="text" inputMode="decimal"` umgestellt; onChange normalisiert Komma→Punkt, kein `|| 0`-Override mehr. Datei: `steuer/page.tsx`.
   - **SteuerPilot — Beleg-Upload-System**: Neues Formular (Kategorie-Select: Fixkosten/Betriebsausgaben/Anschaffung/Sonstiges, Betrag, Datum, Notiz, Datei-Upload) → Upload in Bucket `steuer-belege`. Dateien: `steuer/page.tsx`, `lib/db.ts`.
