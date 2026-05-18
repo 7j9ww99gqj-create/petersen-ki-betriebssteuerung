@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
 import { getServerAiFeatureSettings } from '@/lib/ai-settings'
+
+const ChatRequestSchema = z.object({
+  messages: z.array(z.object({
+    role: z.string(),
+    content: z.unknown(),
+  })),
+  system: z.string().optional(),
+  context: z.string().optional(),
+  structuredOutput: z.boolean().optional(),
+})
 
 // ── Demo-Kontext (spiegelt die Demo-Daten aus lager/page.tsx wider) ──────────
 
@@ -127,7 +138,22 @@ function pickOutputText(data: Record<string, unknown>): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, system, context, structuredOutput } = await req.json()
+    let body: unknown
+    try {
+      body = await req.json()
+    } catch {
+      return NextResponse.json({ error: 'Ungültiger JSON-Body' }, { status: 400 })
+    }
+
+    const parsed = ChatRequestSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Ungültige Anfrage', details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      )
+    }
+
+    const { messages, system, context, structuredOutput } = parsed.data
     const access = await getRouteAccess(req, ['Admin', 'Mitarbeiter', 'Lager', 'Werkstatt'])
     if (access.error) return access.error
 
