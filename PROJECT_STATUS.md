@@ -62,10 +62,10 @@
   - **DB-Migration**: `20260518120000_add_buero_workflow_columns.sql` – Spalten `buero_angebote.nummer`, `buero_angebote.verschickt_am`, `buero_auftraege.angebot_id`, `buero_auftraege.ab_verschickt_am`, Funktion `pk_next_angebot_number()`.
   - Betroffene Dateien: `supabase/migrations/20260518120000_add_buero_workflow_columns.sql`, `lib/db.ts`, `app/dashboard/buero/page.tsx`.
   - Offene Punkte:
-    - Migration `20260518120000_add_buero_workflow_columns.sql` muss per `npx supabase db push` auf Remote-Supabase angewendet werden (falls noch nicht geschehen).
-    - Branch `feature/buero-workflow` noch nicht in `main` gemergt – kein Auto-Deploy bisher.
+    - Echten End-to-End-Durchlauf testen: Angebot erstellen → freigeben → verschicken → Auftrag → AB → Rechnung.
+  - Remote-DB: Migration `20260518120000_add_buero_workflow_columns.sql` per `npx supabase db push` angewendet; Local = Remote.
   - Tests: `npm run lint` grün (bekannte Warnungen); `npm run build` grün.
-  - Branch: `feature/buero-workflow` (Commit `905f2e5`)
+  - Branch: `main` (Merge-Commit `0ecb4fc`, zuvor `feature/buero-workflow`), Vercel deployt automatisch.
 - **Zuletzt erledigt (2026-05-18 – Manueller Registrierungs-/Billing-Prozess ohne automatischen Mailversand)**:
   - **Automatischen Mailversand aus dem Zielprozess entfernt**: keine automatische Rechnungs-/Angebotsmail mehr; vorhandene Mail-Aktionen öffnen nur noch einen lokalen `mailto:`-Entwurf.
   - **Registrierung läuft serverseitig ohne Bestätigungsmail**: neue Route `app/api/auth/register/route.ts` erstellt Supabase-Auth-User per Admin API, setzt `access_status = pending` und legt im Inhaber-BüroPilot automatisch einen Kunden aus den Registrierungsdaten an.
