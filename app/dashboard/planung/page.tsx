@@ -896,9 +896,12 @@ function RessourcenTab({ isDemo }: { isDemo: boolean }) {
                   {typIcon[r.typ]}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 700, fontSize: 14 }}>{r.name}</span>
                     <span className={`badge ${statusBadge[r.status]}`}>{r.status}</span>
+                    {r.genutzt >= r.kapazitaet && (
+                      <span className="badge badge-red">⚠️ Überlastet</span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ flex: 1, maxWidth: 200, height: 6, borderRadius: 999, background: 'rgba(255,255,255,.08)' }}>
@@ -960,6 +963,7 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
   const [editForm, setEditForm] = useState<AufgabeFormState & { status: AufgabeStatus }>(
     { ...emptyAufgabeForm, status: 'Offen' }
   )
+  const [ressourcen, setRessourcen] = useState<Ressource[]>(isDemo ? demoRessourcen : [])
 
   useEffect(() => {
     if (isDemo) return
@@ -967,6 +971,9 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
       .then(data => setAufgaben(data as Aufgabe[]))
       .catch(() => showToast('Fehler beim Laden der Aufgaben', true))
       .finally(() => setLoading(false))
+    getPlanungRessourcen()
+      .then(data => setRessourcen(data as Ressource[]))
+      .catch(() => { /* ignore */ })
   }, [isDemo])
 
   const showToast = (msg: string, error = false) => {
@@ -1089,7 +1096,6 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
             </div>
             {([
               { k: 'projekt', label: 'Projekt', placeholder: 'PRJ-XXX' },
-              { k: 'verantwortlich', label: 'Verantwortlich', placeholder: 'Mitarbeitername' },
               { k: 'faellig', label: 'Fällig am', placeholder: 'TT.MM.JJJJ' },
             ] as const).map(f => (
               <div key={f.k}>
@@ -1097,6 +1103,18 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
                 <input className="pk-input" placeholder={f.placeholder} value={form[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))} />
               </div>
             ))}
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Verantwortlich</label>
+              <input className="pk-input" placeholder="Mitarbeitername" value={form.verantwortlich} onChange={e => setForm(p => ({ ...p, verantwortlich: e.target.value }))} list="ressourcen-list" />
+              <datalist id="ressourcen-list">{ressourcen.map(r => <option key={r.id} value={r.name} />)}</datalist>
+              {form.verantwortlich && (() => {
+                const res = ressourcen.find(r => r.name === form.verantwortlich)
+                if (res && res.genutzt >= res.kapazitaet) {
+                  return <div style={{ marginTop: 4, padding: '5px 10px', borderRadius: 8, background: 'rgba(244,63,94,.1)', border: '1px solid rgba(244,63,94,.3)', color: '#fb7185', fontSize: 12 }}>⚠️ Ressource {res.name} ist überlastet ({res.genutzt}/{res.kapazitaet}h)</div>
+                }
+                return null
+              })()}
+            </div>
             <div>
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Priorität</label>
               <select className="pk-input" value={form.prioritaet} onChange={e => setForm(p => ({ ...p, prioritaet: e.target.value }))} style={{ cursor: 'pointer' }}>
