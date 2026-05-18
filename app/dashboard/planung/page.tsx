@@ -495,8 +495,13 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
           </div>
         ))}
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#4a5568', fontSize: 14 }}>
-            Keine Projekte gefunden.
+          <div className="pk-card fade-in" style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🗂️</div>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>Noch keine Projekte vorhanden</div>
+            <div style={{ color: '#aeb9c8', fontSize: 13, marginBottom: 18 }}>Erstelle dein erstes Projekt, um Aufgaben, Termine und Ressourcen zu verwalten.</div>
+            <button className="pk-btn" style={{ background: 'linear-gradient(135deg, #e11d48, #9f1239)', fontSize: 13 }} onClick={() => setShowCreateForm(true)}>
+              🗂️ Erstes Projekt anlegen
+            </button>
           </div>
         )}
       </div>
@@ -684,7 +689,14 @@ function KalenderTab({ isDemo }: { isDemo: boolean }) {
           </div>
         ))}
         {sorted.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#4a5568', fontSize: 14 }}>Keine Termine vorhanden.</div>
+          <div className="pk-card fade-in" style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>Noch keine Termine vorhanden</div>
+            <div style={{ color: '#aeb9c8', fontSize: 13, marginBottom: 18 }}>Trage Meetings, Deadlines, Lieferungen und Wartungstermine ein.</div>
+            <button className="pk-btn" style={{ background: 'linear-gradient(135deg, #e11d48, #9f1239)', fontSize: 13 }} onClick={() => setShowForm(true)}>
+              📅 Ersten Eintrag anlegen
+            </button>
+          </div>
         )}
       </div>
 
@@ -864,6 +876,16 @@ function RessourcenTab({ isDemo }: { isDemo: boolean }) {
         </div>
       )}
 
+      {ressourcen.length === 0 && !showForm && (
+        <div className="pk-card fade-in" style={{ textAlign: 'center', padding: '40px 20px', marginBottom: 16 }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>👤</div>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>Noch keine Ressourcen vorhanden</div>
+          <div style={{ color: '#aeb9c8', fontSize: 13, marginBottom: 18 }}>Verwalte Personal, Maschinen und Fahrzeuge und behalte die Auslastung im Blick.</div>
+          <button className="pk-btn" style={{ background: 'linear-gradient(135deg, #e11d48, #9f1239)', fontSize: 13 }} onClick={() => setShowForm(true)}>
+            👤 Ersten Eintrag anlegen
+          </button>
+        </div>
+      )}
       {[{ titel: '👤 Personal', items: personen }, { titel: '⚙️ Maschinen & Fahrzeuge', items: maschinen }].map(group => (
         <div key={group.titel} style={{ marginBottom: 20 }}>
           <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>{group.titel}</h3>
@@ -1100,6 +1122,20 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
             </tr>
           </thead>
           <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ padding: 0 }}>
+                  <div style={{ textAlign: 'center', padding: '32px 20px' }}>
+                    <div style={{ fontSize: 36, marginBottom: 10 }}>✅</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>Keine Aufgaben vorhanden</div>
+                    <div style={{ color: '#aeb9c8', fontSize: 12, marginBottom: 14 }}>Erstelle deine erste Aufgabe und weise sie einem Projekt zu.</div>
+                    <button className="pk-btn" style={{ background: 'linear-gradient(135deg, #e11d48, #9f1239)', fontSize: 12 }} onClick={() => setShowForm(true)}>
+                      ✅ Ersten Eintrag anlegen
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )}
             {filtered.map(a => (
               <tr key={a.id}>
                 <td style={{ fontWeight: 600, maxWidth: 240 }}>{a.titel}</td>
