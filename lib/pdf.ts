@@ -27,7 +27,7 @@ export type PDFAngebot = {
   status: string
 }
 
-export type PDFTemplate = 'modern-dark' | 'classic-light' | 'elegant-minimal'
+export type PDFTemplate = 'modern-dark' | 'classic-light' | 'elegant-minimal' | 'petersen-brand'
 
 export type PDFCompanySettings = {
   firmenname?: string
@@ -151,6 +151,14 @@ function getHintStyle(template: PDFTemplate, accent: [number, number, number]): 
       titleColor: null,
       textColor: [45, 60, 80],
       subtextColor: [95, 115, 140],
+    }
+    case 'petersen-brand': return {
+      bg: [5, 14, 30],
+      borderMode: 'none',
+      accentBar: [21, 96, 232] as [number, number, number],
+      titleColor: [100, 168, 255] as [number, number, number],
+      textColor: [150, 198, 248],
+      subtextColor: [95, 152, 210],
     }
     default: return {
       bg: [12, 22, 36],
@@ -399,12 +407,210 @@ function drawFooterElegantMinimal(doc: DocType, company: PDFCompanySettings, acc
   doc.text(`Seite 1  ·  erstellt am ${heuteFormatiert()}`, pageW / 2, 284, { align: 'center' })
 }
 
+// ── Template 4: Petersen Brand ────────────────────────────────────────────────
+
+function drawClouds(doc: DocType, side: 'left' | 'right', baseY: number, pageW: number): void {
+  const cx = side === 'left' ? 1 : -1
+  const bx = side === 'left' ? 0 : pageW
+
+  // Deep background layer
+  doc.setFillColor(5, 28, 90)
+  doc.ellipse(bx + cx * 22, baseY + 1, 22, 8, 'F')
+  doc.ellipse(bx + cx * 12, baseY + 3, 15, 7, 'F')
+  doc.ellipse(bx + cx * 38, baseY, 18, 7, 'F')
+  doc.setFillColor(6, 22, 72)
+  doc.ellipse(bx + cx * 8, baseY + 2, 11, 6, 'F')
+  doc.ellipse(bx + cx * 32, baseY + 2, 14, 7, 'F')
+
+  // Mid-tone layer
+  doc.setFillColor(8, 42, 155)
+  doc.ellipse(bx + cx * 18, baseY - 1, 17, 6, 'F')
+  doc.ellipse(bx + cx * 30, baseY - 0.5, 15, 6, 'F')
+  doc.setFillColor(10, 54, 188)
+  doc.ellipse(bx + cx * 22, baseY - 3, 13, 5.5, 'F')
+  doc.ellipse(bx + cx * 36, baseY - 2, 12, 5, 'F')
+  doc.ellipse(bx + cx * 10, baseY - 1.5, 10, 5, 'F')
+
+  // Bright highlight layer
+  doc.setFillColor(14, 70, 222)
+  doc.ellipse(bx + cx * 20, baseY - 5, 10, 4, 'F')
+  doc.ellipse(bx + cx * 32, baseY - 4.5, 9, 3.5, 'F')
+  doc.setFillColor(18, 88, 240)
+  doc.ellipse(bx + cx * 24, baseY - 7, 8, 3.5, 'F')
+}
+
+function drawHeaderPetersenBrand(doc: DocType, company: PDFCompanySettings, logoData: string | null, accent: [number, number, number]): void {
+  const pageW = 210
+  const margin = 20
+  const hH = 30
+
+  // Base dark background
+  doc.setFillColor(4, 12, 26)
+  doc.rect(0, 0, pageW, hH, 'F')
+
+  // Cloud clusters at bottom of header
+  drawClouds(doc, 'left', hH - 2, pageW)
+  drawClouds(doc, 'right', hH - 2, pageW)
+
+  // Center atmospheric glow
+  doc.setFillColor(8, 30, 100)
+  doc.ellipse(pageW / 2, hH + 2, 55, 12, 'F')
+  doc.setFillColor(5, 18, 65)
+  doc.ellipse(pageW / 2, hH, 38, 8, 'F')
+
+  // Top accent line (gradient simulation)
+  doc.setFillColor(18, 65, 195)
+  doc.rect(0, 0, pageW * 0.3, 0.6, 'F')
+  doc.setFillColor(...accent)
+  doc.rect(pageW * 0.3, 0, pageW * 0.4, 0.7, 'F')
+  doc.setFillColor(18, 65, 195)
+  doc.rect(pageW * 0.7, 0, pageW * 0.3, 0.6, 'F')
+
+  // Bottom accent line
+  doc.setFillColor(18, 65, 195)
+  doc.rect(0, hH - 0.8, pageW * 0.3, 0.8, 'F')
+  doc.setFillColor(...accent)
+  doc.rect(pageW * 0.3, hH - 1, pageW * 0.4, 1, 'F')
+  doc.setFillColor(18, 65, 195)
+  doc.rect(pageW * 0.7, hH - 0.8, pageW * 0.3, 0.8, 'F')
+
+  // Logo image (user-uploaded)
+  if (logoData) {
+    try { doc.addImage(logoData, imageFormat(logoData), margin, 4.5, 20, 20) } catch {}
+  }
+  const nameX = logoData ? margin + 24 : margin
+
+  // Company name — white, bold
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.setTextColor(255, 255, 255)
+  doc.text((company.firmenname || FALLBACK_COMPANY.firmenname!).toUpperCase(), nameX, 13.5)
+
+  // Tagline
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(6.5)
+  doc.setTextColor(85, 150, 220)
+  doc.text('DIGITALE BETRIEBSSTEUERUNG  ·  KI-GESTÜTZT', nameX, 20)
+
+  // Contact right column
+  const contactParts: string[] = []
+  if (company.website) contactParts.push(company.website)
+  if (company.email) contactParts.push(company.email)
+  if (company.telefon) contactParts.push(company.telefon)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(130, 182, 235)
+  if (contactParts.length) doc.text(contactParts.join('  ·  '), pageW - margin, 12, { align: 'right' })
+
+  const adressParts: string[] = []
+  if (company.adresse) adressParts.push(company.adresse)
+  if (company.plz || company.ort) adressParts.push([company.plz, company.ort].filter(Boolean).join(' '))
+  if (adressParts.length) {
+    doc.setFontSize(7.5)
+    doc.setTextColor(100, 150, 210)
+    doc.text(adressParts.join(', '), pageW - margin, 18, { align: 'right' })
+  }
+
+  const taxParts: string[] = []
+  if (company.briefpapier_layout?.showUstId !== false && company.ust_id) taxParts.push(`USt-ID: ${company.ust_id}`)
+  if (company.briefpapier_layout?.showSteuernummer !== false && company.steuernummer) taxParts.push(`St.-Nr.: ${company.steuernummer}`)
+  if (taxParts.length) {
+    doc.setFontSize(7)
+    doc.setTextColor(80, 125, 190)
+    doc.text(taxParts.join('  ·  '), pageW - margin, 24, { align: 'right' })
+  }
+}
+
+function drawFooterPetersenBrand(doc: DocType, company: PDFCompanySettings, accent: [number, number, number]): void {
+  const pageW = 210
+  const margin = 20
+  const footerY = 265
+  const pageH = 297
+
+  // Full footer background
+  doc.setFillColor(4, 12, 26)
+  doc.rect(0, footerY, pageW, pageH - footerY, 'F')
+
+  // Diagonal cut: white triangle masks top-left corner
+  // Line goes from (0, footerY+11) to (pageW, footerY)
+  doc.setFillColor(255, 255, 255)
+  doc.triangle(0, footerY, pageW, footerY, 0, footerY + 11, 'F')
+
+  // Cloud clusters at bottom
+  drawClouds(doc, 'left', pageH - 5, pageW)
+  drawClouds(doc, 'right', pageH - 5, pageW)
+
+  // Center glow
+  doc.setFillColor(5, 18, 65)
+  doc.ellipse(pageW / 2, pageH, 45, 10, 'F')
+
+  // Content starts at footerY + 16 (below diagonal cut zone)
+  const contentY = footerY + 17
+
+  // Col 1: Company
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8.5)
+  doc.setTextColor(215, 232, 255)
+  doc.text(company.firmenname || FALLBACK_COMPANY.firmenname!, margin, contentY)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(110, 162, 218)
+  const addrParts: string[] = []
+  if (company.adresse) addrParts.push(company.adresse)
+  if (company.plz || company.ort) addrParts.push([company.plz, company.ort].filter(Boolean).join(' '))
+  addrParts.forEach((line, i) => doc.text(line, margin, contentY + 5 + i * 4.5))
+
+  // Col 2: Contact
+  const col2X = pageW / 2 - 22
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(110, 162, 218)
+  const contactLines: string[] = []
+  if (company.website) contactLines.push(company.website)
+  if (company.email) contactLines.push(company.email)
+  if (company.telefon) contactLines.push(company.telefon)
+  contactLines.forEach((line, i) => doc.text(line, col2X, contentY + i * 4.8))
+
+  // Col 3: Bank
+  if (company.briefpapier_layout?.showBankdaten !== false) {
+    const col3X = pageW - margin - 52
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7.5)
+    doc.setTextColor(185, 215, 248)
+    doc.text('Bankverbindung', col3X, contentY)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.setTextColor(100, 150, 208)
+    const bankLines: string[] = []
+    if (company.bankname) bankLines.push(company.bankname)
+    if (company.iban) bankLines.push(`IBAN ${company.iban}`)
+    if (company.bic) bankLines.push(`BIC ${company.bic}`)
+    bankLines.forEach((line, i) => doc.text(line, col3X, contentY + 5 + i * 4))
+  }
+
+  // Bottom accent line
+  doc.setFillColor(18, 65, 195)
+  doc.rect(0, pageH - 2.5, pageW * 0.3, 1.5, 'F')
+  doc.setFillColor(...accent)
+  doc.rect(pageW * 0.3, pageH - 3, pageW * 0.4, 2, 'F')
+  doc.setFillColor(18, 65, 195)
+  doc.rect(pageW * 0.7, pageH - 2.5, pageW * 0.3, 1.5, 'F')
+
+  // Page info
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(6.5)
+  doc.setTextColor(60, 105, 162)
+  doc.text(`Seite 1  ·  erstellt am ${heuteFormatiert()}`, pageW / 2, pageH - 5.5, { align: 'center' })
+}
+
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
 function drawHeader(doc: DocType, company: PDFCompanySettings, logoData: string | null, accent: [number, number, number]): void {
   const t = company.briefpapier_layout?.template ?? 'modern-dark'
   if (t === 'classic-light') return drawHeaderClassicLight(doc, company, logoData, accent)
   if (t === 'elegant-minimal') return drawHeaderElegantMinimal(doc, company, logoData, accent)
+  if (t === 'petersen-brand') return drawHeaderPetersenBrand(doc, company, logoData, accent)
   return drawHeaderModernDark(doc, company, logoData, accent)
 }
 
@@ -412,6 +618,7 @@ function drawFooter(doc: DocType, company: PDFCompanySettings, accent: [number, 
   const t = company.briefpapier_layout?.template ?? 'modern-dark'
   if (t === 'classic-light') return drawFooterClassicLight(doc, company, accent)
   if (t === 'elegant-minimal') return drawFooterElegantMinimal(doc, company, accent)
+  if (t === 'petersen-brand') return drawFooterPetersenBrand(doc, company, accent)
   return drawFooterModernDark(doc, company, accent)
 }
 

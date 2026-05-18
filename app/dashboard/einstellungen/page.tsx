@@ -1808,6 +1808,61 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
                   </div>
                 ),
               },
+            ...(currentRole === 'Inhaber' ? [{
+              id: 'petersen-brand',
+              name: 'Petersen Brand',
+              desc: 'Exklusiv · Nur Inhaber',
+              preview: (
+                <div style={{ width: '100%', aspectRatio: '0.707', background: '#ffffff', borderRadius: 4, overflow: 'hidden', position: 'relative', fontSize: 0 }}>
+                  {/* Dark header with cloud glow */}
+                  <div style={{ background: '#040c1a', height: '14%', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', paddingLeft: 6, gap: 5 }}>
+                    {/* Mini 3D cube */}
+                    <svg width="10" height="11" viewBox="0 0 100 110" fill="none">
+                      <defs>
+                        <linearGradient id="pt" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#90c0ff"/><stop offset="100%" stopColor="#1a5ae0"/></linearGradient>
+                        <linearGradient id="pl" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#05194a"/><stop offset="100%" stopColor="#0a2878"/></linearGradient>
+                        <linearGradient id="pr" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#1048cc"/><stop offset="100%" stopColor="#1e6aff"/></linearGradient>
+                      </defs>
+                      <polygon points="50,6 90,28 50,50 10,28" fill="url(#pt)"/>
+                      <polygon points="10,28 50,50 50,94 10,72" fill="url(#pl)"/>
+                      <polygon points="90,28 90,72 50,94 50,50" fill="url(#pr)"/>
+                      <polygon points="50,24 77,38 50,52 23,38" fill="#030a1e" opacity="0.9"/>
+                      <polygon points="23,38 50,52 50,76 23,62" fill="#020814" opacity="0.88"/>
+                      <polygon points="77,38 77,62 50,76 50,52" fill="#060e2a" opacity="0.85"/>
+                      <polygon points="50,33 67,42 50,51 33,42" fill="url(#pt)" opacity="0.85"/>
+                      <polygon points="33,42 50,51 50,67 33,58" fill="url(#pl)" opacity="0.8"/>
+                      <polygon points="67,42 67,58 50,67 50,51" fill="url(#pr)" opacity="0.82"/>
+                    </svg>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <div style={{ width: 32, height: 2, background: '#ffffff', borderRadius: 1 }} />
+                      <div style={{ width: 22, height: 1.5, background: 'rgba(100,170,255,0.5)', borderRadius: 1 }} />
+                    </div>
+                    {/* Cloud glow bottom-left */}
+                    <div style={{ position: 'absolute', bottom: -4, left: 0, width: 30, height: 10, background: 'radial-gradient(ellipse at 30% 80%, rgba(20,80,240,0.7) 0%, transparent 70%)', filter: 'blur(2px)' }} />
+                    <div style={{ position: 'absolute', bottom: -4, right: 0, width: 30, height: 10, background: 'radial-gradient(ellipse at 70% 80%, rgba(20,80,240,0.6) 0%, transparent 70%)', filter: 'blur(2px)' }} />
+                  </div>
+                  {/* Gradient separator */}
+                  <div style={{ height: 1.5, background: 'linear-gradient(90deg, #1048cc, #20c8ff 50%, #1048cc)' }} />
+                  {/* Body */}
+                  <div style={{ padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <div style={{ width: '45%', height: 2.5, background: '#0a1a3a', borderRadius: 1 }} />
+                    <div style={{ width: '30%', height: 2, background: '#e0e8f5', borderRadius: 1 }} />
+                    <div style={{ marginTop: 2, width: '100%', height: 5, background: '#060e20', borderRadius: 1 }} />
+                    <div style={{ width: '100%', height: 3, background: '#f3f6fa', borderRadius: 1 }} />
+                    <div style={{ width: '100%', height: 3, background: '#f8fafc', borderRadius: 1 }} />
+                    <div style={{ marginTop: 1, width: '55%', height: 4, background: '#060e20', borderRadius: 1, alignSelf: 'flex-end' }} />
+                    <div style={{ marginTop: 2, width: '100%', height: 8, background: '#050e1e', borderRadius: 2 }} />
+                  </div>
+                  {/* Dark footer with diagonal */}
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '11%', background: '#040c1a', clipPath: 'polygon(0 40%, 100% 0%, 100% 100%, 0% 100%)' }} />
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, #1048cc, #20c8ff 50%, #1048cc)' }} />
+                  {/* Footer cloud glow */}
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, width: 30, height: 15, background: 'radial-gradient(ellipse at 20% 90%, rgba(20,80,240,0.5) 0%, transparent 70%)', filter: 'blur(3px)' }} />
+                  {/* Inhaber badge */}
+                  <div style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(32,200,255,0.15)', border: '1px solid rgba(32,200,255,0.3)', borderRadius: 3, padding: '1px 4px', fontSize: 5.5, color: '#20c8ff', fontFamily: 'sans-serif', fontWeight: 700, letterSpacing: 0.5 }}>INHABER</div>
+                </div>
+              ),
+            }] : []),
             ] as Array<{ id: string; name: string; desc: string; preview: React.ReactNode }>).map(tpl => {
               const isSelected = (layout.template ?? 'modern-dark') === tpl.id
               const accentColor = String(layout.akzentfarbe ?? '#20c8ff')
