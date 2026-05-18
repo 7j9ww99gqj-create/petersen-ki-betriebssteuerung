@@ -45,6 +45,8 @@
 - 🔴 **BüroPilot: EinkaufTab live schalten** — Demo-Guards entfernen, `lib/db.ts`-Funktionen sind fertig.
 - 🔴 **LagerPilot: Umlagerung atomarisieren** — Datenverlust-Risiko bei Teil-Fehlern (4 Awaits ohne Rollback). Supabase-RPC nötig (siehe 6. → LagerPilot).
 - 🔴 **LagerPilot: Dual-Layer-Bestandssync** — `lager_artikel.bestand` und `lager_stellplatz_bestand` laufen auseinander; KI-Kontext inkonsistent.
+- 🔴 **PlanungPilot: `deletePlanungRessource` fehlt** — Ressourcen-Delete in `lib/db.ts` nicht implementiert; UI-Button läuft ins Leere (siehe 6. → PlanungPilot).
+- 🔴 **PlanungPilot: FK `auftrag_id`** — `planung_projekte` hat keine Verknüpfung zu `buero_auftraege`; BüroPilot ↔ PlanungPilot völlig isoliert (Migration + Button nötig).
 - 🟡 **EinkaufTab**: Demo-State auf echte Supabase-Calls umstellen.
 - 🟡 **KI-Aktion "Bestellung"** ausführbar machen — aktuell nur Toast, kein DB-Insert.
 - 🟡 **Stripe Analytics Integration** (4 h, einfach) — MRR-Verlauf im Marketing-Auswertungs-Tab.
@@ -589,6 +591,21 @@
 - [ ] 🟡 **UTM-Parameter-Tracking** (4 h): `utm_source` beim Lead-Anlegen speichern (URL-Parameter) → echte Multi-Touch-Attribution
 - [ ] 🟢 **Lead-Import via CSV** (4 h): Spalten-Mapping-Wizard für Messe-Kontakte (Name, E-Mail, Firma, Quelle) — Bulk-Upload statt Einzeleingabe
 - [ ] 🟢 **Kampagnen-Kalender-Ansicht** (3 h): Kampagnen und Postings in Monatsansicht (analog PlanungPilot) — verhindert Lücken im Kanal-Mix
+
+### PlanungPilot – Offene Optimierungen (Analyse 2026-05-18)
+
+- [ ] 🔴 **`deletePlanungRessource` implementieren**: Funktion fehlt komplett in `lib/db.ts` — UI-Delete läuft ins Leere; analog zu `deletePlanungProjekt` ergänzen
+- [ ] 🔴 **Live-Daten-Verifizierung**: In `planung/page.tsx` prüfen ob `hasDemoCookie()`-Guard korrekt weicht und echte Supabase-Calls (`getPlanungProjekte` etc.) tatsächlich ausgeführt werden
+- [ ] 🔴 **FK `auftrag_id` auf `planung_projekte`**: Migration `ALTER TABLE planung_projekte ADD COLUMN auftrag_id text REFERENCES buero_auftraege(id)` + "Projekt aus Auftrag erstellen"-Button in BüroPilot-Auftragsdetail
+- [ ] 🟡 **Meilensteine als eigene Tabelle**: `planung_meilensteine` (projekt_id FK, titel, faellig, status Offen|Erreicht|Verzögert) statt JSONB-Array — ermöglicht individuelle Bearbeitung und Statusverfolgung
+- [ ] 🟡 **Ressourcen-Konflikt-Erkennung**: Client-Logik: wenn `genutzt >= kapazitaet` → Badge „Überlastet" + Warnung beim Zuweisen einer neuen Ressource
+- [ ] 🟡 **Zeiterfassung**: Spalten `geschaetzte_stunden` + `geleistete_stunden` auf `planung_aufgaben` (Migration + UI-Felder im Aufgaben-Formular)
+- [ ] 🟡 **Fälligkeits-Erinnerungen**: Supabase Edge Function (Daily Cron) prüft `planung_aufgaben.faellig < now() + interval '2 days'` → Resend-E-Mail an Verantwortlichen
+- [ ] 🟡 **WerkstattPilot-Verlinkung**: Optionales `planung_aufgabe_id` auf `werkstatt_karten` (Migration + bidirektionaler Link in beiden UIs)
+- [ ] 🟡 **Empty States**: Hilfreiche Leer-Zustände für alle 4 Tabs wenn noch keine Daten vorhanden
+- [ ] 🟢 **Fortschritts-Auto-Update**: Wenn alle Aufgaben eines Projekts `Erledigt` → `fortschritt = 100` automatisch setzen
+- [ ] 🟢 **Timeline/Gantt-View**: Visuelle Projektübersicht mit Abhängigkeiten (z. B. `react-gantt-task`)
+- [ ] 🟢 **Projekt-Statusbericht PDF**: Export-Button im Projekts-Tab → `lib/pdf.ts` mit Meilensteinen, Aufgaben-Status und Ressourcen-Auslastung
 
 ## 7. Regeln für Coding-Agenten
 - Vor Änderungen zuerst diese Datei, dann betroffene Seite, dann `lib/db.ts`, dann Schema/Migration prüfen.
