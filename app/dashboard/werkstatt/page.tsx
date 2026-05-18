@@ -314,7 +314,9 @@ function EditKarteModal({ karte, onClose, onSave, mitarbeiterNamen, bereichNamen
 
 // ── Arbeitskarten-Tab ─────────────────────────────────────────────────────────
 
-function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen }: { isDemo: boolean; mitarbeiterNamen: string[]; bereichNamen: string[] }) {
+type NewKarteParams = { auftragsnr?: string; beschreibung?: string }
+
+function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKarteParams }: { isDemo: boolean; mitarbeiterNamen: string[]; bereichNamen: string[]; newKarteParams?: NewKarteParams }) {
   const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
@@ -340,6 +342,14 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen }: { isDemo:
       .catch(() => setErrorMsg('Arbeitskarten konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
   }, [isDemo, retryKey])
+
+  useEffect(() => {
+    if (newKarteParams?.auftragsnr || newKarteParams?.beschreibung) {
+      setForm(f => ({ ...f, auftragsnr: newKarteParams.auftragsnr ?? f.auftragsnr, beschreibung: newKarteParams.beschreibung ?? f.beschreibung }))
+      setShowForm(true)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newKarteParams?.auftragsnr, newKarteParams?.beschreibung])
 
   const showToast = (msg: string, error = false) => {
     setToast(msg); setToastError(error)
@@ -1813,6 +1823,7 @@ type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet' | 'wartung' | 'stoerunge
 export default function WerkstattPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
   const [tab, setTab] = useState<Tab>('karten')
+  const [newKarteParams, setNewKarteParams] = useState<NewKarteParams | undefined>(undefined)
   const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
   const [zeitbuchungen, setZeitbuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])
   const [mitarbeiter, setMitarbeiter] = useState<Mitarbeiter[]>(isDemo ? demoMitarbeiter : [])
@@ -1821,6 +1832,16 @@ export default function WerkstattPilotPage() {
   const [stoerungen, setStoerungen] = useState<WerkstattStoerung[]>(isDemo ? demoStoerungen : [])
   const [loading, setLoading] = useState(!isDemo)
   const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('new') === '1') {
+        setNewKarteParams({ auftragsnr: params.get('auftragsnr') ?? '', beschreibung: params.get('titel') ?? '' })
+        setTab('karten')
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (isDemo) return
@@ -1914,7 +1935,7 @@ export default function WerkstattPilotPage() {
         ))}
       </div>
 
-      {tab === 'karten' && <ArbeitskartentTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} bereichNamen={bereichNamen} />}
+      {tab === 'karten' && <ArbeitskartentTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} bereichNamen={bereichNamen} newKarteParams={newKarteParams} />}
       {tab === 'zeit' && <ZeiterfassungTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
       {tab === 'material' && <MaterialverbrauchTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
       {tab === 'qualitaet' && <QualitaetTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}

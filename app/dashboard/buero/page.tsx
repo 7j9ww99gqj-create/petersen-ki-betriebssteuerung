@@ -1730,6 +1730,15 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
                   ✅ Abschließen
                 </button>
               )}
+              {(a.status === 'In Bearbeitung' || a.status === 'AB erstellt') && (
+                <button onClick={e => {
+                  e.stopPropagation()
+                  const params = new URLSearchParams({ new: '1', auftragsnr: a.ab_nummer || a.id, kunde: a.kunde || '', titel: a.beschreibung || '' })
+                  window.open(`/dashboard/werkstatt?${params.toString()}`, '_blank')
+                }} style={{ fontSize: 12, padding: '6px 16px', borderRadius: 999, border: '1px solid rgba(167,139,250,.35)', background: 'rgba(167,139,250,.1)', color: '#a78bfa', cursor: 'pointer', fontWeight: 700 }}>
+                  🛠️ Arbeitskarte erstellen
+                </button>
+              )}
               <button onClick={e => { e.stopPropagation(); openEdit(a) }} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(32,200,255,.3)', background: 'transparent', color: '#20c8ff', cursor: 'pointer' }}>
                 ✏️ Bearbeiten
               </button>
