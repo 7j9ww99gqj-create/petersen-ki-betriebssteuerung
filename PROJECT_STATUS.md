@@ -41,6 +41,8 @@
 - ✅ ~~**SteuerPilot: Betrag-Input Bug + Beleg-Upload mit Kategorie/Filter/Inline-Delete**~~ **Erledigt 2026-05-18** (Commit `ec0b705`).
 - ✅ ~~**MarketingPilot: Demo→Live-Calls + Edit/Delete verdrahtet**~~ **Erledigt 2026-05-18** (Commit `9c24845`).
 - 🔴 **Supabase-Migration ausführen**: `20260518200000_steuer_belege_uploads.sql` im SQL-Editor einspielen (neue Tabelle + Storage-Bucket).
+- 🔴 **BüroPilot: PositionenEditor in Angeboten** — Typ `Angebot` hat kein `positionen`-Feld; Angebot→Rechnung-Konvertierung verliert Positionsdaten (siehe 6. Offene Aufgaben → BüroPilot).
+- 🔴 **BüroPilot: EinkaufTab live schalten** — Demo-Guards entfernen, `lib/db.ts`-Funktionen sind fertig.
 - 🟡 **EinkaufTab**: Demo-State auf echte Supabase-Calls umstellen.
 - 🟡 **KI-Aktion "Bestellung"** ausführbar machen (analog zu Umlagerung).
 - 🟡 **Stripe Analytics Integration** (4 h, einfach) — MRR-Verlauf im Marketing-Auswertungs-Tab.
@@ -49,9 +51,6 @@
 - ✅ ~~**Task 6: Benutzerverwaltung Deaktivieren/Löschen/Suche**~~ **Erledigt 2026-05-18** (Commit `80e0f8c`).
 - ✅ ~~**Task 7: RLS-Policies vollständig**~~ **Erledigt 2026-05-18** (Commit `7aee934`).
 - ✅ ~~**Task 8: Pipeline-Widget 3 KPIs**~~ **Erledigt 2026-05-18** (Commit `dadb045`).
-- 🟡 **EinkaufTab**: Demo-State auf echte Supabase-Calls umstellen.
-- 🟡 **KI-Aktion "Bestellung"** ausführbar machen (analog zu Umlagerung).
-- 🟢 Analyse-Bestandstrend auf echte Wochensnapshots umstellen.
 
 ### 0.3 Aktuelle Blocker
 - Keine kritischen Blocker. Stripe E2E validiert.
@@ -535,6 +534,21 @@
 - [x] ~~Importpfade für weitere Datentypen vervollständigen.~~ **Erledigt 2026-05-13**: Werkstatt-Zeitbuchungen und -Material als neue Import-Typen in Wizard/Importer/db.
 - [x] ~~Löschlogik für Storage-Dateien ergänzen, nicht nur DB-Zeilen löschen.~~ **Erledigt 2026-05-13**: `deleteSteuerBeleg` liest jetzt `datei_url` und entfernt die Datei aus Storage vor dem DB-Delete (analog zu `deleteBueroDokument`).
 - [x] ~~Einheitliche IDs, Nummernkreise und Referenzfelder definieren.~~ **Erledigt 2026-05-13**: `lib/ids.ts` mit `genId(prefix)` eingeführt (Format: `PREFIX-TIMESTAMP36-RANDOM4`); 6 lokale Kopien und 8 length-basierte Muster in buero/werkstatt/steuer/planung/ki-erkennung/einstellungen ersetzt; Präfix-Konvention vollständig dokumentiert.
+
+### BüroPilot – Offene Optimierungen
+
+- [ ] 🔴 **PositionenEditor in Angeboten absichern**: Typ `Angebot` hat kein `positionen`-Feld — prüfen/nachrüsten, sodass Angebot→Rechnung-Konvertierung Positionsdaten 1:1 überträgt (`app/dashboard/buero/page.tsx`, Angebot-Formular + `Angebot`-Typ)
+- [ ] 🔴 **EinkaufTab live schalten**: Demo-Guards in `buero/page.tsx` entfernen, `getEinkaufBestellungen()` / `getEinkaufLieferanten()` (fertig in `lib/db.ts`) echt verdrahten
+- [ ] 🔴 **Duplikat-Erkennung Kunden**: `UNIQUE` Constraint auf `email` in `buero_kunden` + Pre-Insert-Check in `upsertBueroKunde()` mit UI-Warnung
+- [ ] 🟡 **OPOS-Dashboard**: Offene-Posten-Liste sortiert nach Fälligkeit (heute / diese Woche / >30 Tage überfällig) als Widget im Rechnungen-Tab
+- [ ] 🟡 **Meilenstein-Schema für Aufträge**: Tabelle `buero_meilensteine` (auftrag_id, titel, faellig, betrag, status) + Rechnungsplan-Workflow (Vorauszahlung / Meilenstein / Schlussrechnung)
+- [ ] 🟡 **Auto-Reminder bei ausstehenden Angeboten**: Spalte `verschickt_am` vorhanden — Cron oder Scheduled Function für 7/14-Tage-Follow-Up bei `status='Versendet'`
+- [ ] 🟡 **Kundenprofil-Analyse**: `umsatz` als berechnetes DB-View (`SUM(betrag) WHERE status='Bezahlt'`), Ø Zahlungsdauer als View; in Kunden-Detailseite anzeigen
+- [ ] 🟡 **Eingangsrechnung → SteuerPilot Sync**: Bei `markEingangsrechnungBezahlt()` automatisch Eintrag in `steuer_betriebsausgaben` anlegen (oder Export-Button)
+- [ ] 🟡 **DSGVO-Anonymisierung**: `anonymisiereBueroKunde(id)` — Name/E-Mail/Telefon auf Platzhalter setzen, statt Hard-Delete bei verknüpften Dokumenten
+- [ ] 🟢 **KI-Angebotstext**: Button „Beschreibung generieren" im Angebot-Formular → OpenAI-Aufruf mit Titel + Kundendaten (`app/api/ki-angebot/route.ts`, ~30 Zeilen)
+- [ ] 🟢 **QR-Code im PDF**: SEPA/Stripe-QR in `lib/pdf.ts` via `qrcode`-Bibliothek in `generateAngebotPDF()` / `generateRechnungPDF()`
+- [ ] 🟢 **DATEV-CSV-Export**: Buchungsjournal-Export aus `buero_rechnungen` + `buero_eingangsrechnungen` als Steuer-Export
 
 ## 7. Regeln für Coding-Agenten
 - Vor Änderungen zuerst diese Datei, dann betroffene Seite, dann `lib/db.ts`, dann Schema/Migration prüfen.
