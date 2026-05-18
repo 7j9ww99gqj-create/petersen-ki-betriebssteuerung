@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
-import { getBueroRechnungen, getSteuerBelege, upsertSteuerBeleg, deleteSteuerBeleg, getSteuerUstva, upsertSteuerUstva, uploadSteuerBeleg, getSteuerFixkosten, getSteuerBetriebsausgaben, getSteuerAnschaffungen } from '@/lib/db'
+import { getBueroRechnungen, getSteuerBelege, upsertSteuerBeleg, deleteSteuerBeleg, getSteuerUstva, upsertSteuerUstva, uploadSteuerBeleg, getSteuerFixkosten, getSteuerBetriebsausgaben, getSteuerAnschaffungen, getSteuerBelegUploads, upsertSteuerBelegUpload, deleteSteuerBelegUpload, uploadSteuerBelegFile, type SteuerBelegUpload } from '@/lib/db'
 import { genId } from '@/lib/ids'
 import { createSupabaseClient } from '@/lib/supabase'
 import { getSteuerWarnings, type Warning } from '@/lib/warnings'
@@ -191,10 +191,17 @@ export default function SteuerPilotPage() {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('Alle')
   const fileRef = useRef<HTMLInputElement>(null)
+  const uploadFileRef = useRef<HTMLInputElement>(null)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [fixkosten, setFixkosten] = useState<FixkostenMin[]>([])
   const [betriebsausgaben, setBetriebsausgaben] = useState<BetriebsausgabeMin[]>([])
   const [anschaffungen, setAnschaffungen] = useState<AnschaffungMin[]>([])
+  const [belegUploads, setBelegUploads] = useState<SteuerBelegUpload[]>([])
+  const [filterKategorie, setFilterKategorie] = useState<string>('Alle')
+  const [deleteUploadConfirm, setDeleteUploadConfirm] = useState<string | null>(null)
+  const [uploadForm, setUploadForm] = useState<{ kategorie: string; betrag: string; datum: string; notiz: string }>({ kategorie: 'Sonstiges', betrag: '', datum: new Date().toISOString().split('T')[0], notiz: '' })
+  const [uploadFile2, setUploadFile2] = useState<File | null>(null)
+  const [uploadSaving, setUploadSaving] = useState(false)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast(msg); setToastType(type)
@@ -211,9 +218,10 @@ export default function SteuerPilotPage() {
         setLoading(false); return
       }
       try {
-        const [b, u, w, r, fk, ba, ans] = await Promise.all([
+        const [b, u, w, r, fk, ba, ans, bu] = await Promise.all([
           getSteuerBelege(), getSteuerUstva(), getSteuerWarnings(false), getBueroRechnungen(),
           getSteuerFixkosten(), getSteuerBetriebsausgaben(), getSteuerAnschaffungen(),
+          getSteuerBelegUploads(),
         ])
         setBelege(b as Beleg[])
         setUstva(u as Ustva[])
@@ -222,6 +230,7 @@ export default function SteuerPilotPage() {
         setFixkosten((fk ?? []) as FixkostenMin[])
         setBetriebsausgaben((ba ?? []) as BetriebsausgabeMin[])
         setAnschaffungen((ans ?? []) as AnschaffungMin[])
+        setBelegUploads(bu)
       } catch { showToast('Daten konnten nicht geladen werden', 'error') }
       finally { setLoading(false) }
     }
@@ -261,8 +270,8 @@ export default function SteuerPilotPage() {
   // ── CRUD Belege ───────────────────────────────────────────────────────────────
 
   const handleSaveBeleg = async () => {
-    if (!editBeleg?.lieferant || editBeleg.betrag == null) {
-      showToast('Bitte Lieferant und Betrag eingeben', 'error'); return
+    if (!editBeleg?.lieferant || editBeleg.betrag == null || !Number.isFinite(Number(editBeleg.betrag))) {
+      showToast('Bitte Lieferant und gültigen Betrag eingeben', 'error'); return
     }
     setSaving(true)
     const toSave: Beleg = {
@@ -675,6 +684,145 @@ export default function SteuerPilotPage() {
               <option value="exportiert">Exportiert</option>
             </select>
           </div>
+
+          {/* ── Beleg-Upload mit Kategorie ──────────────────────────────────────── */}
+          {(() => {
+            const KATEGORIEN = ['Fixkosten', 'Betriebsausgaben', 'Anschaffung', 'Sonstiges'] as const
+
+            const handleUploadSave = async () => {
+              if (!uploadFile2) { showToast('Bitte eine Datei auswählen', 'error'); return }
+              setUploadSaving(true)
+              try {
+                const supabase = createSupabaseClient()
+                const { data: { session } } = await supabase.auth.getSession()
+                const userId = session?.user.id ?? 'anon'
+                let dateiUrl: string | undefined
+                if (!isDemo) {
+                  dateiUrl = await uploadSteuerBelegFile(uploadFile2, userId)
+                }
+                const entry: SteuerBelegUpload = {
+                  id: `BU-${Date.now().toString(36).toUpperCase()}`,
+                  kategorie: uploadForm.kategorie as SteuerBelegUpload['kategorie'],
+                  datei_url: dateiUrl,
+                  betrag: uploadForm.betrag ? parseFloat(uploadForm.betrag.replace(',', '.')) : null,
+                  datum: uploadForm.datum || null,
+                  notiz: uploadForm.notiz || null,
+                }
+                if (!isDemo) {
+                  await upsertSteuerBelegUpload(entry)
+                  setBelegUploads(await getSteuerBelegUploads())
+                } else {
+                  setBelegUploads(prev => [entry, ...prev])
+                }
+                setUploadForm({ kategorie: 'Sonstiges', betrag: '', datum: new Date().toISOString().split('T')[0], notiz: '' })
+                setUploadFile2(null)
+                if (uploadFileRef.current) uploadFileRef.current.value = ''
+                showToast('Beleg hochgeladen')
+              } catch { showToast('Upload fehlgeschlagen', 'error') }
+              finally { setUploadSaving(false) }
+            }
+
+            const handleDeleteUpload = async (id: string) => {
+              if (isDemo) { setBelegUploads(prev => prev.filter(u => u.id !== id)); setDeleteUploadConfirm(null); showToast('Beleg gelöscht'); return }
+              try {
+                await deleteSteuerBelegUpload(id)
+                setBelegUploads(prev => prev.filter(u => u.id !== id))
+                setDeleteUploadConfirm(null); showToast('Beleg gelöscht')
+              } catch { showToast('Fehler beim Löschen', 'error') }
+            }
+
+            const filteredUploads = belegUploads.filter(u => filterKategorie === 'Alle' || u.kategorie === filterKategorie)
+
+            return (
+              <div style={{ marginTop: 24 }}>
+                {/* Upload-Formular */}
+                <div className="pk-card" style={{ padding: 20, marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>📎 Beleg hochladen</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Kategorie</label>
+                      <select className="pk-input" value={uploadForm.kategorie} onChange={e => setUploadForm(p => ({ ...p, kategorie: e.target.value }))}>
+                        {KATEGORIEN.map(k => <option key={k} value={k}>{k}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Betrag (€)</label>
+                      <input className="pk-input" type="text" inputMode="decimal" placeholder="0,00" value={uploadForm.betrag} onChange={e => setUploadForm(p => ({ ...p, betrag: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Datum</label>
+                      <input className="pk-input" type="date" value={uploadForm.datum} onChange={e => setUploadForm(p => ({ ...p, datum: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Notiz</label>
+                      <input className="pk-input" placeholder="Optional" value={uploadForm.notiz} onChange={e => setUploadForm(p => ({ ...p, notiz: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Datei *</label>
+                      <input ref={uploadFileRef} type="file" accept="image/*,application/pdf" className="pk-input" style={{ fontSize: 12 }} onChange={e => setUploadFile2(e.target.files?.[0] ?? null)} />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
+                    <button className="pk-btn" onClick={handleUploadSave} disabled={uploadSaving} style={{ fontSize: 13 }}>{uploadSaving ? 'Hochladen…' : '⬆ Hochladen'}</button>
+                  </div>
+                </div>
+
+                {/* Kategorie-Filter */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+                  {['Alle', 'Fixkosten', 'Betriebsausgaben', 'Anschaffung', 'Sonstiges'].map(k => (
+                    <button
+                      key={k}
+                      onClick={() => setFilterKategorie(k)}
+                      style={{
+                        padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: filterKategorie === k ? 700 : 500,
+                        background: filterKategorie === k ? 'rgba(245,158,11,.15)' : 'rgba(255,255,255,.05)',
+                        color: filterKategorie === k ? STEUER_COLOR : '#aeb9c8',
+                      }}
+                    >{k} {k !== 'Alle' && `(${belegUploads.filter(u => u.kategorie === k).length})`}</button>
+                  ))}
+                </div>
+
+                {/* Upload-Tabelle */}
+                <div className="pk-card" style={{ padding: 0 }}>
+                  <div className="pk-table-wrap">
+                    <table className="pk-table">
+                      <thead>
+                        <tr><th>Datum</th><th>Kategorie</th><th>Betrag</th><th>Notiz</th><th>Datei</th><th></th></tr>
+                      </thead>
+                      <tbody>
+                        {filteredUploads.map(u => (
+                          <tr key={u.id}>
+                            <td style={{ fontSize: 12 }}>{u.datum ? new Date(u.datum).toLocaleDateString('de-DE') : '—'}</td>
+                            <td><span className="badge badge-orange">{u.kategorie}</span></td>
+                            <td style={{ fontFamily: 'monospace' }}>{u.betrag != null ? fmt(u.betrag) : '—'}</td>
+                            <td style={{ fontSize: 12, color: '#aeb9c8', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.notiz ?? '—'}</td>
+                            <td>
+                              {u.datei_url
+                                ? <a href={u.datei_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#1684ff' }}>📎 Ansehen</a>
+                                : <span style={{ fontSize: 12, color: '#4a5568' }}>—</span>}
+                            </td>
+                            <td>
+                              {deleteUploadConfirm === u.id ? (
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                  <button onClick={() => handleDeleteUpload(u.id)} style={{ fontSize: 11, padding: '3px 8px', background: 'rgba(255,80,80,.15)', border: '1px solid rgba(255,80,80,.35)', color: '#ff8080', borderRadius: 6, cursor: 'pointer' }}>Ja</button>
+                                  <button onClick={() => setDeleteUploadConfirm(null)} className="pk-btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }}>Nein</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => setDeleteUploadConfirm(u.id)} className="pk-btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }}>🗑️</button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {filteredUploads.length === 0 && (
+                          <tr><td colSpan={6} style={{ textAlign: 'center', color: '#aeb9c8', padding: 28 }}>Noch keine Uploads in dieser Kategorie</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
 
           <div className="pk-card" style={{ padding: 0 }}>
             <div className="pk-table-wrap">
@@ -1090,16 +1238,25 @@ export default function SteuerPilotPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Bruttobetrag (€) *</label>
-                <input className="pk-input" type="number" step="0.01" min="0" value={editBeleg.betrag ?? ''} onChange={e => {
-                  const brutto = parseFloat(e.target.value) || 0
-                  const satz = Number(editBeleg.steuersatz ?? 19)
-                  const steuer = satz > 0 ? Math.round(brutto / (1 + satz / 100) * (satz / 100) * 100) / 100 : 0
-                  setEditBeleg(p => ({ ...p, betrag: brutto, steuerbetrag: steuer }))
+                <input className="pk-input" type="text" inputMode="decimal" placeholder="0,00" value={editBeleg.betrag != null ? String(editBeleg.betrag) : ''} onChange={e => {
+                  const raw = e.target.value
+                  setEditBeleg(p => {
+                    const normalized = raw.replace(',', '.')
+                    const brutto = parseFloat(normalized)
+                    const validBrutto = Number.isFinite(brutto) ? brutto : undefined
+                    const satz = Number(p?.steuersatz ?? 19)
+                    const steuer = validBrutto != null && satz > 0 ? Math.round(validBrutto / (1 + satz / 100) * (satz / 100) * 100) / 100 : (p?.steuerbetrag ?? 0)
+                    return { ...p, betrag: validBrutto, steuerbetrag: validBrutto != null ? steuer : p?.steuerbetrag }
+                  })
                 }} />
               </div>
               <div>
                 <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Steuerbetrag (€)</label>
-                <input className="pk-input" type="number" step="0.01" min="0" value={editBeleg.steuerbetrag ?? ''} onChange={e => setEditBeleg(p => ({ ...p, steuerbetrag: parseFloat(e.target.value) || 0 }))} />
+                <input className="pk-input" type="text" inputMode="decimal" placeholder="0,00" value={editBeleg.steuerbetrag != null ? String(editBeleg.steuerbetrag) : ''} onChange={e => {
+                  const normalized = e.target.value.replace(',', '.')
+                  const val = parseFloat(normalized)
+                  setEditBeleg(p => ({ ...p, steuerbetrag: Number.isFinite(val) ? val : undefined }))
+                }} />
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

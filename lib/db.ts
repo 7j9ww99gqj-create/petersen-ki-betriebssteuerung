@@ -1964,6 +1964,46 @@ export async function upsertMarketingIntegrationItem(i: {
   return data
 }
 
+export async function deleteMarketingKampagne(id: string) {
+  const { error } = await db().from('marketing_kampagnen').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteMarketingLead(id: string) {
+  const { error } = await db().from('marketing_leads').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteMarketingNewsletter(id: string) {
+  const { error } = await db().from('marketing_newsletter').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteMarketingSeoKeyword(id: string) {
+  const { error } = await db().from('marketing_seo_keywords').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteMarketingContentIdea(id: string) {
+  const { error } = await db().from('marketing_content_ideas').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteMarketingPostingPlan(id: string) {
+  const { error } = await db().from('marketing_posting_plans').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteMarketingAutomationRule(id: string) {
+  const { error } = await db().from('marketing_automation_rules').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteMarketingIntegrationItem(id: string) {
+  const { error } = await db().from('marketing_integration_items').delete().eq('id', id)
+  if (error) throw error
+}
+
 // ── PLANUNG ──────────────────────────────────────────────────────────────────
 
 export async function getPlanungProjekte() {
@@ -2697,4 +2737,57 @@ export async function umlagerArtikel(params: {
     notiz: params.notiz,
     datum: new Date().toISOString(),
   })
+}
+
+// ── Steuer Beleg-Uploads (mit Kategorie) ──────────────────────────────────────
+
+export type SteuerBelegUpload = {
+  id: string
+  user_id?: string | null
+  kategorie: 'Fixkosten' | 'Betriebsausgaben' | 'Anschaffung' | 'Sonstiges'
+  datei_url?: string | null
+  betrag?: number | null
+  datum?: string | null
+  notiz?: string | null
+  created_at?: string | null
+}
+
+export async function getSteuerBelegUploads() {
+  const { data, error } = await db()
+    .from('steuer_belege_uploads')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as SteuerBelegUpload[]
+}
+
+export async function upsertSteuerBelegUpload(u: {
+  id: string
+  kategorie: string
+  datei_url?: string | null
+  betrag?: number | null
+  datum?: string | null
+  notiz?: string | null
+}) {
+  const { data, error } = await db()
+    .from('steuer_belege_uploads')
+    .upsert(u)
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteSteuerBelegUpload(id: string) {
+  const { error } = await db().from('steuer_belege_uploads').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function uploadSteuerBelegFile(file: File, userId: string): Promise<string> {
+  const supabase = createSupabaseClient()
+  const ext = file.name.split('.').pop() ?? 'bin'
+  const path = `${userId}/${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('steuer-belege').upload(path, file, { upsert: true })
+  if (error) throw error
+  const { data } = supabase.storage.from('steuer-belege').getPublicUrl(path)
+  return data.publicUrl
 }
