@@ -1,59 +1,135 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { hasDemoCookie } from '@/lib/auth'
+import { createSupabaseClient } from '@/lib/supabase'
 
 type SearchResult = {
   id: string; titel: string; sub: string; kategorie: string; href: string; icon: string; color: string
 }
 
-// Alle durchsuchbaren Datensätze aus allen Piloten
-const searchData: SearchResult[] = [
-  // Lager
-  { id: 'L1', titel: 'Stahlrohr 40x40', sub: 'ART-001 · Lagerplatz A-01-03 · 142 Stk', kategorie: 'LagerPilot', href: '/dashboard/lager', icon: '📦', color: '#1684ff' },
-  { id: 'L2', titel: 'Schrauben M8x30', sub: 'ART-002 · Lagerplatz B-02-01 · 1.840 Stk', kategorie: 'LagerPilot', href: '/dashboard/lager', icon: '📦', color: '#1684ff' },
-  { id: 'L3', titel: 'Hydrauliköl HLP46', sub: 'ART-003 · Lagerplatz C-01-02 · NIEDRIGER BESTAND (8 Liter)', kategorie: 'LagerPilot', href: '/dashboard/lager', icon: '⚠️', color: '#f59e0b' },
-  { id: 'L4', titel: 'Schweißdraht 1.0mm', sub: 'ART-004 · Lagerplatz B-03-04 · 24 Rollen', kategorie: 'LagerPilot', href: '/dashboard/lager', icon: '📦', color: '#1684ff' },
-  { id: 'L5', titel: 'Aluminiumplatte 200x300', sub: 'ART-005 · Lagerplatz A-02-01 · LEER', kategorie: 'LagerPilot', href: '/dashboard/lager', icon: '❌', color: '#f43f5e' },
-  { id: 'L6', titel: 'Dichtungsring 50mm', sub: 'ART-006 · Lagerplatz B-01-05 · 360 Stk', kategorie: 'LagerPilot', href: '/dashboard/lager', icon: '📦', color: '#1684ff' },
-  // Kunden
-  { id: 'K1', titel: 'Müller Bau GmbH', sub: 'K-001 · Thomas Müller · Hamburg · 84.200 €', kategorie: 'BüroPilot', href: '/dashboard/buero', icon: '🏢', color: '#20c8ff' },
-  { id: 'K2', titel: 'Schmidt & Partner', sub: 'K-002 · Anna Schmidt · Berlin · 31.500 €', kategorie: 'BüroPilot', href: '/dashboard/buero', icon: '🏢', color: '#20c8ff' },
-  { id: 'K3', titel: 'Technik Nord AG', sub: 'K-003 · Lars Brandt · Hannover · 127.800 €', kategorie: 'BüroPilot', href: '/dashboard/buero', icon: '🏢', color: '#20c8ff' },
-  { id: 'K4', titel: 'Delta Logistik KG', sub: 'K-005 · Sandra Koch · Düsseldorf · 56.100 €', kategorie: 'BüroPilot', href: '/dashboard/buero', icon: '🏢', color: '#20c8ff' },
-  // Aufträge / Rechnungen
-  { id: 'A1', titel: 'Auftrag A-2025-034', sub: 'Technik Nord AG · Wartungsvertrag · In Bearbeitung', kategorie: 'BüroPilot', href: '/dashboard/buero', icon: '✅', color: '#20c8ff' },
-  { id: 'A2', titel: 'Auftrag A-2025-033', sub: 'Müller Bau GmbH · Stahlträger Charge 1 · In Bearbeitung', kategorie: 'BüroPilot', href: '/dashboard/buero', icon: '✅', color: '#20c8ff' },
-  { id: 'R1', titel: 'Rechnung RE-2025-077', sub: 'Schmidt & Partner · 2.700 € · ÜBERFÄLLIG', kategorie: 'BüroPilot', href: '/dashboard/buero', icon: '⚠️', color: '#f59e0b' },
-  { id: 'R2', titel: 'Rechnung RE-2025-078', sub: 'Delta Logistik KG · 4.400 € · Offen', kategorie: 'BüroPilot', href: '/dashboard/buero', icon: '💶', color: '#20c8ff' },
-  // Arbeitskarten
-  { id: 'W1', titel: 'AK-2025-041 – Hydraulikpresse', sub: 'Wartung HP-Station-3 · K. Meier · In Arbeit', kategorie: 'WerkstattPilot', href: '/dashboard/werkstatt', icon: '⚙️', color: '#a78bfa' },
-  { id: 'W2', titel: 'AK-2025-040 – Schweißnahtprüfung', sub: 'Stahlträger Charge 1 · M. Fischer · In Arbeit', kategorie: 'WerkstattPilot', href: '/dashboard/werkstatt', icon: '⚙️', color: '#a78bfa' },
-  { id: 'W3', titel: 'AK-2025-038 – Förderband Segment 2', sub: 'Instandhaltung · K. Meier · Fertig', kategorie: 'WerkstattPilot', href: '/dashboard/werkstatt', icon: '✅', color: '#a78bfa' },
-  // Dokumente
-  { id: 'D1', titel: 'Wartungsvertrag_TechnikNord_2025.pdf', sub: 'Vertrag · 1,2 MB · 28.04.2025', kategorie: 'Archiv', href: '/dashboard/archiv', icon: '📝', color: '#f59e0b' },
-  { id: 'D2', titel: 'Rechnung_RE-2025-078.pdf', sub: 'Rechnung · 198 KB · 10.04.2025', kategorie: 'Archiv', href: '/dashboard/archiv', icon: '💶', color: '#f59e0b' },
-  { id: 'D3', titel: 'Angebot_ANG-2025-042.pdf', sub: 'Angebot · 284 KB · 02.05.2025', kategorie: 'Archiv', href: '/dashboard/archiv', icon: '📋', color: '#f59e0b' },
+// Static demo data (when no Supabase connection)
+const staticSearchData: SearchResult[] = [
+  { id: 'L1', titel: 'Stahlrohr 40x40', sub: 'ART-001 · Lagerplatz A-01-03 · 142 Stk', kategorie: '📦 Lager', href: '/dashboard/lager?tab=bestand', icon: '📦', color: '#1684ff' },
+  { id: 'L2', titel: 'Schrauben M8x30', sub: 'ART-002 · Lagerplatz B-02-01 · 1.840 Stk', kategorie: '📦 Lager', href: '/dashboard/lager?tab=bestand', icon: '📦', color: '#1684ff' },
+  { id: 'K1', titel: 'Müller Bau GmbH', sub: 'K-001 · Hamburg · 84.200 €', kategorie: '🧾 Büro', href: '/dashboard/buero?tab=kunden', icon: '🏢', color: '#20c8ff' },
+  { id: 'K2', titel: 'Schmidt & Partner', sub: 'K-002 · Berlin · 31.500 €', kategorie: '🧾 Büro', href: '/dashboard/buero?tab=kunden', icon: '🏢', color: '#20c8ff' },
+  { id: 'R1', titel: 'Rechnung RE-2025-077', sub: 'Schmidt & Partner · 2.700 € · ÜBERFÄLLIG', kategorie: '🧾 Büro', href: '/dashboard/buero?tab=rechnungen', icon: '⚠️', color: '#f59e0b' },
+  { id: 'W1', titel: 'AK-2025-041 – Hydraulikpresse', sub: 'Wartung HP-Station-3 · In Arbeit', kategorie: '🔧 Werkstatt', href: '/dashboard/werkstatt', icon: '⚙️', color: '#a78bfa' },
+  { id: 'D1', titel: 'Wartungsvertrag_TechnikNord_2025.pdf', sub: 'Vertrag · 28.04.2025', kategorie: 'Archiv', href: '/dashboard/archiv', icon: '📝', color: '#f59e0b' },
 ]
 
 const kategorienColors: Record<string, string> = {
-  LagerPilot: '#1684ff', BüroPilot: '#20c8ff', WerkstattPilot: '#a78bfa',
-  AnalysePilot: '#10b981', Archiv: '#f59e0b',
+  '📦 Lager': '#1684ff', '🧾 Büro': '#20c8ff', '🔧 Werkstatt': '#a78bfa',
+  'AnalysePilot': '#10b981', 'Archiv': '#f59e0b',
 }
 
 export default function GlobalSearch() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [searching, setSearching] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const results = query.trim().length >= 2
-    ? searchData.filter(d =>
-        d.titel.toLowerCase().includes(query.toLowerCase()) ||
-        d.sub.toLowerCase().includes(query.toLowerCase()) ||
-        d.kategorie.toLowerCase().includes(query.toLowerCase())
-      ).slice(0, 12)
-    : []
+  const isDemo = typeof window !== 'undefined' ? hasDemoCookie() : false
+
+  const doSearch = useCallback(async (q: string) => {
+    if (q.trim().length < 2) { setResults([]); return }
+
+    if (isDemo) {
+      const lower = q.toLowerCase()
+      setResults(staticSearchData.filter(d =>
+        d.titel.toLowerCase().includes(lower) || d.sub.toLowerCase().includes(lower)
+      ).slice(0, 12))
+      return
+    }
+
+    setSearching(true)
+    try {
+      const supabase = createSupabaseClient()
+      const lower = `%${q}%`
+      const MAX = 3
+
+      const [artikelRes, kundenRes, rechnungenRes, kartenRes] = await Promise.allSettled([
+        supabase.from('lager_artikel').select('id,name,kategorie,lagerplatz,bestand,einheit,status').or(`name.ilike.${lower},kategorie.ilike.${lower},lagerplatz.ilike.${lower}`).limit(MAX),
+        supabase.from('buero_kunden').select('id,name,email,status').or(`name.ilike.${lower},email.ilike.${lower}`).limit(MAX),
+        supabase.from('buero_rechnungen').select('id,nummer,kunde,betrag,status').or(`nummer.ilike.${lower},kunde.ilike.${lower}`).limit(MAX),
+        supabase.from('werkstatt_karten').select('id,auftragsnr,titel,beschreibung,status').or(`titel.ilike.${lower},beschreibung.ilike.${lower},auftragsnr.ilike.${lower}`).limit(MAX),
+      ])
+
+      const found: SearchResult[] = []
+
+      if (artikelRes.status === 'fulfilled' && artikelRes.value.data) {
+        for (const a of artikelRes.value.data) {
+          const statusIcon = a.status === 'leer' ? '❌' : a.status === 'niedrig' ? '⚠️' : '📦'
+          found.push({
+            id: `a-${a.id}`, titel: a.name,
+            sub: `${a.kategorie || ''}${a.lagerplatz ? ' · ' + a.lagerplatz : ''} · ${a.bestand ?? 0} ${a.einheit || 'Stk'}`,
+            kategorie: '📦 Lager',
+            href: `/dashboard/lager?tab=bestand&search=${encodeURIComponent(a.name)}`,
+            icon: statusIcon, color: '#1684ff',
+          })
+        }
+      }
+
+      if (kundenRes.status === 'fulfilled' && kundenRes.value.data) {
+        for (const k of kundenRes.value.data) {
+          found.push({
+            id: `k-${k.id}`, titel: k.name,
+            sub: k.email || '',
+            kategorie: '🧾 Büro',
+            href: '/dashboard/buero?tab=kunden',
+            icon: '🏢', color: '#20c8ff',
+          })
+        }
+      }
+
+      if (rechnungenRes.status === 'fulfilled' && rechnungenRes.value.data) {
+        for (const r of rechnungenRes.value.data) {
+          const icon = r.status === 'Überfällig' ? '⚠️' : '💶'
+          found.push({
+            id: `r-${r.id}`, titel: r.nummer || r.id,
+            sub: `${r.kunde || ''} · ${r.betrag || ''} · ${r.status || ''}`,
+            kategorie: '🧾 Büro',
+            href: '/dashboard/buero?tab=rechnungen',
+            icon, color: '#20c8ff',
+          })
+        }
+      }
+
+      if (kartenRes.status === 'fulfilled' && kartenRes.value.data) {
+        for (const w of kartenRes.value.data) {
+          const icon = w.status === 'Fertig' ? '✅' : '⚙️'
+          found.push({
+            id: `w-${w.id}`, titel: w.auftragsnr ? `${w.auftragsnr} – ${w.titel || ''}` : (w.titel || w.id),
+            sub: `${w.beschreibung ? w.beschreibung.slice(0, 60) : ''} · ${w.status || ''}`,
+            kategorie: '🔧 Werkstatt',
+            href: '/dashboard/werkstatt',
+            icon, color: '#a78bfa',
+          })
+        }
+      }
+
+      setResults(found)
+    } catch {
+      // Fallback to static
+      const lower = q.toLowerCase()
+      setResults(staticSearchData.filter(d =>
+        d.titel.toLowerCase().includes(lower) || d.sub.toLowerCase().includes(lower)
+      ).slice(0, 12))
+    } finally {
+      setSearching(false)
+    }
+  }, [isDemo])
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => { void doSearch(query) }, 300)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [query, doSearch])
 
   const grouped = results.reduce<Record<string, SearchResult[]>>((acc, r) => {
     if (!acc[r.kategorie]) acc[r.kategorie] = []
@@ -139,12 +215,12 @@ export default function GlobalSearch() {
           }}>
             {/* Input */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
-              <span style={{ fontSize: 18, flexShrink: 0 }}>🔍</span>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>{searching ? '⏳' : '🔍'}</span>
               <input
                 ref={inputRef}
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Artikel, Kunden, Aufträge, Dokumente durchsuchen…"
+                placeholder="Artikel, Kunden, Rechnungen, Arbeitskarten…"
                 style={{
                   flex: 1, background: 'transparent', border: 'none', outline: 'none',
                   color: '#f8fbff', fontSize: 16, fontWeight: 500,
@@ -165,11 +241,11 @@ export default function GlobalSearch() {
                 <div style={{ padding: '28px 20px', textAlign: 'center', color: '#4a5568' }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
                   <div style={{ fontSize: 14 }}>Mindestens 2 Zeichen eingeben…</div>
-                  <div style={{ fontSize: 12, marginTop: 6 }}>Durchsucht: Artikel, Kunden, Aufträge, Rechnungen, Arbeitskarten, Dokumente</div>
+                  <div style={{ fontSize: 12, marginTop: 6 }}>Durchsucht: Artikel, Kunden, Rechnungen, Arbeitskarten</div>
                 </div>
               )}
 
-              {query.trim().length >= 2 && results.length === 0 && (
+              {query.trim().length >= 2 && !searching && results.length === 0 && (
                 <div style={{ padding: '28px 20px', textAlign: 'center', color: '#4a5568' }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>🤷</div>
                   <div style={{ fontSize: 14 }}>Keine Ergebnisse für &quot;{query}&quot;</div>
