@@ -264,36 +264,29 @@ function drawBriefpapierContent(
   }
 ): number {
   const pageW = 210
-  const margin = 22
+  const margin = 20          // left margin
+  const rightEdge = 183      // right edge – 27mm buffer keeps content inside briefpapier
   const topY = opts.topY ?? 78
   const bottomY = opts.bottomY ?? 244
   let y = topY
 
-  // ── Document heading (left) ───────────────────────────────────────────────
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(20)
-  doc.setTextColor(18, 26, 42)
-  doc.text(opts.docType, margin, y)
-
-  const titleWidth = doc.getTextWidth(opts.docType)
-  doc.setFillColor(32, 200, 255)
-  doc.rect(margin, y + 2.5, Math.min(titleWidth, 90), 0.7, 'F')
-
-  // ── Right-side info box ───────────────────────────────────────────────────
-  const boxW = 74
-  const boxX = pageW - margin - boxW
+  // ── Right-side info box: anchored top-right, independent of title ─────────
+  const boxW = 72
+  const boxRightMargin = 10              // tight to right edge
+  const boxX = pageW - boxRightMargin - boxW   // x ≈ 128
   const boxPadX = 6
-  const boxPadY = 5
-  const rowH = 7.5
-  const boxH = opts.metaRows.length * rowH + boxPadY * 2 - 1
+  const rowH = 8
+  const boxH = opts.metaRows.length * rowH + 10
+  const boxStartY = topY - 20           // higher than title – sits at top of content zone
+
   doc.setFillColor(248, 250, 253)
-  doc.roundedRect(boxX, y - 5, boxW, boxH, 2.5, 2.5, 'F')
-  doc.setDrawColor(215, 225, 240)
+  doc.roundedRect(boxX, boxStartY, boxW, boxH, 2.5, 2.5, 'F')
+  doc.setDrawColor(210, 222, 238)
   doc.setLineWidth(0.25)
-  doc.roundedRect(boxX, y - 5, boxW, boxH, 2.5, 2.5, 'S')
+  doc.roundedRect(boxX, boxStartY, boxW, boxH, 2.5, 2.5, 'S')
 
   opts.metaRows.forEach(([label, value], i) => {
-    const rowY = y + boxPadY - 2 + i * rowH
+    const rowY = boxStartY + 7 + i * rowH
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7.5)
     doc.setTextColor(130, 148, 168)
@@ -304,8 +297,18 @@ function drawBriefpapierContent(
     doc.text(value, boxX + boxW - boxPadX, rowY, { align: 'right' })
   })
 
+  // ── Document heading (left, same level as info box) ───────────────────────
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(20)
+  doc.setTextColor(18, 26, 42)
+  doc.text(opts.docType, margin, y)
+
+  const titleWidth = doc.getTextWidth(opts.docType)
+  doc.setFillColor(32, 200, 255)
+  doc.rect(margin, y + 2.5, Math.min(titleWidth, 90), 0.7, 'F')
+
   // ── Recipient block ───────────────────────────────────────────────────────
-  y = Math.max(y + 14, y - 5 + boxH + 10)
+  y = Math.max(y + 14, boxStartY + boxH + 8)
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10.5)
@@ -319,8 +322,7 @@ function drawBriefpapierContent(
   doc.text('Sehr geehrte Damen und Herren,', margin, y)
   y += 6
 
-  // Intro text: only spans left half so it doesn't collide with info box
-  const introMaxW = pageW - margin * 2
+  const introMaxW = rightEdge - margin
   const introLines = doc.splitTextToSize(opts.introText, introMaxW) as string[]
   doc.setFontSize(9)
   doc.setTextColor(50, 65, 82)
@@ -328,11 +330,10 @@ function drawBriefpapierContent(
   y += introLines.length * 5 + 10
 
   // ── Table ─────────────────────────────────────────────────────────────────
-  const tableW = pageW - margin * 2
-  const colPosW = 12
-  const colAmtW = 38
+  const tableW = rightEdge - margin      // content width: 163mm
+  const colPosW = 11
   const colDescX = margin + colPosW
-  const colAmtX = pageW - margin  // right-aligned
+  const colAmtX = rightEdge             // right-aligned at safe right edge
 
   // Header bar
   doc.setFillColor(16, 24, 40)
@@ -356,7 +357,7 @@ function drawBriefpapierContent(
     einzelpreis: opts.nettoVal,
   }]
 
-  const descMaxW = tableW - colPosW - colAmtW - 4
+  const descMaxW = tableW - colPosW - 36   // 36mm reserved for amount column
   positions.forEach((pos, idx) => {
     const posNetto = pos.menge * pos.einzelpreis
     const descLines = doc.splitTextToSize(pos.beschreibung || '–', descMaxW) as string[]
@@ -369,7 +370,7 @@ function drawBriefpapierContent(
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(35, 45, 62)
-    doc.text(String(idx + 1), margin + 4, midY)
+    doc.text(String(idx + 1), margin + 3.5, midY)
     doc.text(descLines, colDescX, y + rowHeight / 2 - (descLines.length - 1) * 2.5 + 1.8)
     doc.setFont('helvetica', 'bold')
     doc.text(fmtEuro(posNetto), colAmtX, midY, { align: 'right' })
@@ -379,14 +380,14 @@ function drawBriefpapierContent(
   // Bottom table border
   doc.setDrawColor(200, 215, 232)
   doc.setLineWidth(0.4)
-  doc.line(margin, y, pageW - margin, y)
+  doc.line(margin, y, rightEdge, y)
   y += 8
 
-  // ── Totals block (flush right, aligned with table) ────────────────────────
-  const sumW = 80
-  const sumX = pageW - margin - sumW
+  // ── Totals block (flush right, within safe right edge) ────────────────────
+  const sumW = 76
+  const sumX = rightEdge - sumW
   const sumLabelX = sumX + 5
-  const sumValX = pageW - margin
+  const sumValX = rightEdge
 
   const sumRows: [string, string][] = [
     ['Nettobetrag', fmtEuro(opts.nettoVal)],
