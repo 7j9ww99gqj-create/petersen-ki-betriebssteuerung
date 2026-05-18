@@ -2213,15 +2213,15 @@ export default function WerkstattPilotPage() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 22 }}>
         {[
-          { label: 'Offene Karten', value: String(offeneKarten), icon: '🛠️', color: '#a78bfa' },
-          { label: 'Kritisch', value: String(kritisch), icon: '🔴', color: '#f43f5e' },
-          { label: 'Stunden heute', value: `${heuteStunden}h`, icon: '⏱️', color: '#10b981' },
-          { label: 'Mitarbeiter', value: String(aktiveMitarbeiter.length), icon: '👷', color: '#f59e0b' },
-          { label: 'Bereiche', value: String(bereichNamen.length), icon: '🏭', color: '#38bdf8' },
-          { label: 'Wartung fällig', value: String(faelligeWartungen), icon: '🧰', color: faelligeWartungen > 0 ? '#f59e0b' : '#10b981' },
-          { label: 'Störungen offen', value: String(offeneStoerungen), icon: '🚨', color: offeneStoerungen > 0 ? '#f43f5e' : '#10b981' },
+          { label: 'Offene Karten', value: String(offeneKarten), icon: '🛠️', color: '#a78bfa', tab: 'karten' as Tab },
+          { label: 'Kritisch', value: String(kritisch), icon: '🔴', color: '#f43f5e', tab: 'karten' as Tab },
+          { label: 'Stunden heute', value: `${heuteStunden}h`, icon: '⏱️', color: '#10b981', tab: 'zeit' as Tab },
+          { label: 'Mitarbeiter', value: String(aktiveMitarbeiter.length), icon: '👷', color: '#f59e0b', tab: 'mitarbeiter' as Tab },
+          { label: 'Bereiche', value: String(bereichNamen.length), icon: '🏭', color: '#38bdf8', tab: 'bereiche' as Tab },
+          { label: 'Wartung fällig', value: String(faelligeWartungen), icon: '🧰', color: faelligeWartungen > 0 ? '#f59e0b' : '#10b981', tab: 'wartung' as Tab },
+          { label: 'Störungen offen', value: String(offeneStoerungen), icon: '🚨', color: offeneStoerungen > 0 ? '#f43f5e' : '#10b981', tab: 'stoerungen' as Tab },
         ].map(s => (
-          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
+          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px', cursor: 'pointer' }} onClick={() => setTab(s.tab)}>
             <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>

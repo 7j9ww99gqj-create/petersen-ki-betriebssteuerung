@@ -799,10 +799,10 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
           </div>
 
           <div className="stats-grid" style={{ marginBottom: 24 }}>
-            <KpiCard label="Einnahmen brutto" value={fmt(einnahmenMonat)} sub={`${rechnungenMonat.length} Rechnungen`} color="#4ddb7e" />
-            <KpiCard label="Stripe-Zahlungen" value={fmt(stripeMonatSumme)} sub={`${stripeMonat.length} Zahlung${stripeMonat.length !== 1 ? 'en' : ''}`} color="#a78bfa" />
-            <KpiCard label="Umsatzsteuer" value={fmt(umsatzsteuerRechnungen)} sub="§ 18 UStG zu zahlen" color="#ff8080" />
-            <KpiCard label="Offen / Bezahlt" value={`${rechnungenMonat.filter(r => r.status !== 'bezahlt').length} / ${rechnungenMonat.filter(r => r.status === 'bezahlt').length}`} sub="Rechnungen" />
+            <KpiCard label="Einnahmen brutto" value={fmt(einnahmenMonat)} sub={`${rechnungenMonat.length} Rechnungen`} color="#4ddb7e" onClick={() => setTab('einnahmen')} />
+            <KpiCard label="Stripe-Zahlungen" value={fmt(stripeMonatSumme)} sub={`${stripeMonat.length} Zahlung${stripeMonat.length !== 1 ? 'en' : ''}`} color="#a78bfa" onClick={() => setTab('einnahmen')} />
+            <KpiCard label="Umsatzsteuer" value={fmt(umsatzsteuerRechnungen)} sub="§ 18 UStG zu zahlen" color="#ff8080" onClick={() => setTab('ustva')} />
+            <KpiCard label="Offen / Bezahlt" value={`${rechnungenMonat.filter(r => r.status !== 'bezahlt').length} / ${rechnungenMonat.filter(r => r.status === 'bezahlt').length}`} sub="Rechnungen" onClick={() => setTab('belege')} />
           </div>
 
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Rechnungen {monthLabel(selectedMonat)}</div>

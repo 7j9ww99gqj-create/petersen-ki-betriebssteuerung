@@ -113,11 +113,11 @@ function exportUmsatzCsv(data: UmsatzPoint[]) {
 
 // ── KPI Card ───────────────────────────────────────────────────────────────────
 
-function KPICard({ icon, label, value, delta, color, sub }: {
-  icon: string; label: string; value: string; delta?: string; color: string; sub?: string
+function KPICard({ icon, label, value, delta, color, sub, onClick }: {
+  icon: string; label: string; value: string; delta?: string; color: string; sub?: string; onClick?: () => void
 }) {
   return (
-    <div className="pk-card" style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+    <div className="pk-card" style={{ display: 'flex', gap: 14, alignItems: 'center', cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
       <div style={{
         width: 48, height: 48, borderRadius: 14, flexShrink: 0,
         background: color + '18', border: `1px solid ${color}30`,
@@ -525,20 +525,20 @@ export default function AnalysePilotPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 24 }}>
             {loading && <SkeletonCard count={6} />}
             {!loading && <>
-              <KPICard icon="💶" label="Umsatz (lfd. Monat)" value={fmtK(kpi.umsatzMonat)} color="#10b981" />
-              <KPICard icon="📈" label="Gewinn (lfd. Monat)" value={fmtK(kpi.gewinnMonat)} color="#1684ff" />
+              <KPICard icon="💶" label="Umsatz (lfd. Monat)" value={fmtK(kpi.umsatzMonat)} color="#10b981" onClick={() => setTab('umsatz')} />
+              <KPICard icon="📈" label="Gewinn (lfd. Monat)" value={fmtK(kpi.gewinnMonat)} color="#1684ff" onClick={() => setTab('umsatz')} />
               <KPICard icon="📦" label="Artikel im Lager" value={kpi.artikelGesamt.toLocaleString('de-DE')} color="#f59e0b"
-                sub={kpi.artikelNiedrig > 0 ? `Davon ${kpi.artikelNiedrig} niedrig` : 'Alle ausreichend'} />
-              <KPICard icon="✅" label="Ø Lagerauslastung" value={kpi.artikelLeer > 0 ? `${Math.round((1 - kpi.artikelLeer / Math.max(kpi.artikelGesamt, 1)) * 100)}%` : '100%'} color="#10b981" sub="Artikel mit Bestand > 0" />
-              <KPICard icon="👥" label="Aktive Kunden" value={String(kpi.aktivKunden)} color="#20c8ff" />
+                sub={kpi.artikelNiedrig > 0 ? `Davon ${kpi.artikelNiedrig} niedrig` : 'Alle ausreichend'} onClick={() => setTab('bestand')} />
+              <KPICard icon="✅" label="Ø Lagerauslastung" value={kpi.artikelLeer > 0 ? `${Math.round((1 - kpi.artikelLeer / Math.max(kpi.artikelGesamt, 1)) * 100)}%` : '100%'} color="#10b981" sub="Artikel mit Bestand > 0" onClick={() => setTab('bestand')} />
+              <KPICard icon="👥" label="Aktive Kunden" value={String(kpi.aktivKunden)} color="#20c8ff" onClick={() => setTab('zahlungsmoral')} />
               <KPICard icon="📋" label="Offene Angebote" value={String(kpi.offeneAngebote)} color="#f59e0b"
-                sub={kpi.offeneAngeboteSumme > 0 ? `Wert: ${fmtK(kpi.offeneAngeboteSumme)}` : undefined} />
+                sub={kpi.offeneAngeboteSumme > 0 ? `Wert: ${fmtK(kpi.offeneAngeboteSumme)}` : undefined} onClick={() => setTab('umsatz')} />
               <KPICard icon="💶" label="Offene Rechnungen" value={String(kpi.offeneRechnungen)} color="#f43f5e"
-                sub={kpi.offeneRechnungenSumme > 0 ? `Gesamt: ${fmtK(kpi.offeneRechnungenSumme)}` : undefined} />
+                sub={kpi.offeneRechnungenSumme > 0 ? `Gesamt: ${fmtK(kpi.offeneRechnungenSumme)}` : undefined} onClick={() => setTab('zahlungsmoral')} />
               <KPICard icon="⚠️" label="Kritische Artikel" value={String(kpi.artikelNiedrig + kpi.artikelLeer)} color="#f59e0b"
-                sub={`${kpi.artikelLeer} leer · ${kpi.artikelNiedrig} niedrig`} />
+                sub={`${kpi.artikelLeer} leer · ${kpi.artikelNiedrig} niedrig`} onClick={() => setTab('bestand')} />
               <KPICard icon="💰" label="Lagerwert" value={kpi.lagerwertHinweis ? `${kpi.lagerwert.toLocaleString('de-DE')} Stk` : `${kpi.lagerwert.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`} color="#f59e0b"
-                sub={kpi.lagerwertHinweis || 'Bestand × Einkaufspreis'} />
+                sub={kpi.lagerwertHinweis || 'Bestand × Einkaufspreis'} onClick={() => setTab('bestand')} />
             </>}
           </div>
 
@@ -777,7 +777,7 @@ export default function AnalysePilotPage() {
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
               <div className="pk-card">
                 <h3 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 800 }}>🥧 Pilot-Nutzungsverteilung</h3>
                 <div style={{ fontSize: 12, color: '#8ba0b8', padding: '24px 0', textAlign: 'center' }}>

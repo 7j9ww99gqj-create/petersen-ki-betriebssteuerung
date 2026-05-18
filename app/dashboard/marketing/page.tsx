@@ -1670,7 +1670,7 @@ function NewsletterTab({
                   {item.vorschau.substring(0, 80)}... · 📅 {item.datum} · 👥 {item.empfaenger} Empfaenger
                 </div>
                 {item.status === 'Versendet' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10 }}>
                     <div>
                       <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 3 }}>Oeffnungsrate</div>
                       <PctBar value={item.oeffnungsrate} color={COLOR} />
@@ -1980,7 +1980,7 @@ function ContentTab({
                   {['Idee', 'In Arbeit', 'Freigabe', 'Fertig'].map(status => <option key={status}>{status}</option>)}
                 </select>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10 }}>
                 <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.04)' }}>
                   <div style={{ fontSize: 11, color: '#aeb9c8' }}>Hook</div>
                   <div style={{ marginTop: 4, fontSize: 13 }}>{item.hook || 'Noch kein Hook hinterlegt'}</div>
@@ -2587,12 +2587,12 @@ export default function MarketingPilotPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 22 }}>
         {[
-          { label: 'Aktive Kampagnen', value: String(activeCampaigns), icon: '📣', color: COLOR },
-          { label: 'Neue Leads', value: String(newLeads), icon: '🎯', color: '#f43f5e' },
-          { label: 'Leads gesamt', value: String(totalLeads), icon: '👥', color: '#1684ff' },
-          { label: 'E-Mails versendet', value: sentEmails.toLocaleString('de-DE'), icon: '✉️', color: '#10b981' },
+          { label: 'Aktive Kampagnen', value: String(activeCampaigns), icon: '📣', color: COLOR, tab: 'kampagnen' as Tab },
+          { label: 'Neue Leads', value: String(newLeads), icon: '🎯', color: '#f43f5e', tab: 'leads' as Tab },
+          { label: 'Leads gesamt', value: String(totalLeads), icon: '👥', color: '#1684ff', tab: 'leads' as Tab },
+          { label: 'E-Mails versendet', value: sentEmails.toLocaleString('de-DE'), icon: '✉️', color: '#10b981', tab: 'newsletter' as Tab },
         ].map(item => (
-          <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
+          <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px', cursor: 'pointer' }} onClick={() => setTab(item.tab)}>
             <div style={{ fontSize: 22, marginBottom: 4 }}>{item.icon}</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: item.color }}>{item.value}</div>
             <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>

@@ -1388,13 +1388,13 @@ export default function PlanungPilotPage() {
       {/* KPI-Karten */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 22 }}>
         {[
-          { label: 'Aktive Projekte', value: String(aktiveProjekte), icon: '📁', color: COLOR },
-          { label: 'Termine gesamt', value: String(termine.length), icon: '📅', color: '#1684ff' },
-          { label: 'Offene Aufgaben', value: String(offeneAufgaben), icon: '✏️', color: '#f59e0b' },
-          { label: '🔴 Kritisch', value: String(kritischeAufgaben), icon: '⚠️', color: kritischeAufgaben > 0 ? '#f43f5e' : '#4a5568' },
-          { label: 'Team-Auslastung', value: `${kapazitaet}%`, icon: '⚡', color: kapazitaet > 85 ? '#f43f5e' : '#10b981' },
+          { label: 'Aktive Projekte', value: String(aktiveProjekte), icon: '📁', color: COLOR, tab: 'projekte' as Tab },
+          { label: 'Termine gesamt', value: String(termine.length), icon: '📅', color: '#1684ff', tab: 'kalender' as Tab },
+          { label: 'Offene Aufgaben', value: String(offeneAufgaben), icon: '✏️', color: '#f59e0b', tab: 'aufgaben' as Tab },
+          { label: '🔴 Kritisch', value: String(kritischeAufgaben), icon: '⚠️', color: kritischeAufgaben > 0 ? '#f43f5e' : '#4a5568', tab: 'aufgaben' as Tab },
+          { label: 'Team-Auslastung', value: `${kapazitaet}%`, icon: '⚡', color: kapazitaet > 85 ? '#f43f5e' : '#10b981', tab: 'ressourcen' as Tab },
         ].map(s => (
-          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
+          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px', cursor: 'pointer' }} onClick={() => setTab(s.tab)}>
             <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>
