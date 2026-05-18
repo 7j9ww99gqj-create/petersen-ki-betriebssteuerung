@@ -144,10 +144,20 @@ function fmtEuro(n: number): string {
 }
 
 function parseEuroValue(value: string): number {
-  const normalized = value
-    .replace(/[^\d,.-]/g, '')
-    .replace(/\./g, '')
-    .replace(',', '.')
+  const s = String(value).replace(/[^\d,.-]/g, '').trim()
+  if (!s) return 0
+  const lastDot = s.lastIndexOf('.')
+  const lastComma = s.lastIndexOf(',')
+  let normalized: string
+  if (lastDot > lastComma) {
+    // US/international format: 2,950.00 → remove comma separators
+    normalized = s.replace(/,/g, '')
+  } else if (lastComma > lastDot) {
+    // German format: 2.950,00 → remove dot separators, comma → dot
+    normalized = s.replace(/\./g, '').replace(',', '.')
+  } else {
+    normalized = s
+  }
   return parseFloat(normalized) || 0
 }
 
@@ -931,7 +941,6 @@ export async function generateAuftragsbestaetigungPDF(auftrag: PDFAuftragsbestae
     ['AB-Nr.:', auftrag.ab_nummer || auftrag.id],
     ['Auftrag:', auftrag.id],
     ['Leistungszeit:', [auftrag.start, auftrag.ende].filter(Boolean).join(' bis ')],
-    ['Status:', auftrag.status],
   ]
   metaRows.forEach(([label, value], i) => {
     const y = 38 + i * 6.2
@@ -1106,7 +1115,6 @@ export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string
     ['Datum:', heuteFormatiert()],
     ['Angebots-Nr.:', angebot.id],
     ['Gültig bis:', angebot.gueltig],
-    ['Status:', angebot.status],
   ]
   metaRows.forEach(([label, value], i) => {
     const y = 38 + i * 6.5
