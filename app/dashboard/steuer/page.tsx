@@ -202,6 +202,7 @@ export default function SteuerPilotPage() {
   const [uploadForm, setUploadForm] = useState<{ kategorie: string; betrag: string; datum: string; notiz: string }>({ kategorie: 'Sonstiges', betrag: '', datum: new Date().toISOString().split('T')[0], notiz: '' })
   const [uploadFile2, setUploadFile2] = useState<File | null>(null)
   const [uploadSaving, setUploadSaving] = useState(false)
+  const [dauerfristVerlaengerung, setDauerfristVerlaengerung] = useState(false)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast(msg); setToastType(type)
@@ -516,6 +517,40 @@ export default function SteuerPilotPage() {
               )}
             </div>
           </div>
+
+          {/* Fälligkeits-Kalender */}
+          {(() => {
+            const now = new Date()
+            const dueDates = [0, 1, 2].map(i => {
+              const d = new Date(now.getFullYear(), now.getMonth() - i + 1 + (dauerfristVerlaengerung ? 1 : 0), 10)
+              const monat = new Date(now.getFullYear(), now.getMonth() - i, 1)
+                .toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+              const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+              const color = diffDays < 7 ? '#f43f5e' : diffDays < 14 ? '#f59e0b' : '#4ddb7e'
+              const label = diffDays < 0 ? 'Überfällig' : diffDays < 7 ? `${diffDays}T (kritisch)` : diffDays < 14 ? `${diffDays}T (bald)` : `${diffDays}T`
+              return { monat, datum: d.toLocaleDateString('de-DE'), color, label }
+            })
+            return (
+              <div className="pk-card" style={{ padding: 20, marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ fontWeight: 700 }}>📅 UStVA-Fälligkeiten (nächste 3 Monate)</div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#aeb9c8', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={dauerfristVerlaengerung} onChange={e => setDauerfristVerlaengerung(e.target.checked)} />
+                    Dauerfristverlängerung (+1 Monat)
+                  </label>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+                  {dueDates.map(d => (
+                    <div key={d.monat} style={{ padding: '12px 16px', borderRadius: 10, background: d.color + '12', border: `1px solid ${d.color}40` }}>
+                      <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>UStVA {d.monat}</div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: d.color }}>📌 {d.datum}</div>
+                      <div style={{ fontSize: 11, marginTop: 4, color: d.color, fontWeight: 600 }}>{d.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Schnellzugriff */}
           <div className="pk-card" style={{ padding: 20 }}>
