@@ -1709,3 +1709,268 @@ export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string
   if (returnBase64) return doc.output('datauristring').split(',')[1]
   doc.save(`Angebot_${angebot.id}.pdf`)
 }
+
+// ── AnalysePilot PDF-Bericht ───────────────────────────────────────────────
+
+export type AnalyseKpi = {
+  label: string
+  value: string
+}
+
+export type AnalyseTop5Artikel = {
+  name: string
+  bestand: number
+  einheit?: string
+  lagerplatz?: string
+}
+
+export async function generateAnalysePDF(opts: {
+  kpis: AnalyseKpi[]
+  top5?: AnalyseTop5Artikel[]
+  firmenname?: string
+  zeitraum?: string
+}) {
+  const { default: jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const margin = 20
+  const pageW = 210
+  const now = new Date()
+  const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const monthStr = `${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`
+  const firma = opts.firmenname || 'Petersen KI Betriebssteuerung'
+
+  // ── Seite 1: Deckblatt ───────────────────────────────────────────────────
+  doc.setFillColor(5, 7, 11)
+  doc.rect(0, 0, 210, 297, 'F')
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(28)
+  doc.setTextColor(22, 132, 255)
+  doc.text('Betriebsanalyse', margin, 80)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(16)
+  doc.setTextColor(248, 251, 255)
+  doc.text(dateStr, margin, 92)
+
+  if (opts.zeitraum) {
+    doc.setFontSize(12)
+    doc.setTextColor(174, 185, 200)
+    doc.text(`Zeitraum: ${opts.zeitraum}`, margin, 104)
+  }
+
+  doc.setFontSize(10)
+  doc.setTextColor(174, 185, 200)
+  doc.text(firma, margin, 250)
+  doc.text('Petersen KI Betriebssteuerung · Carsten Petersen', margin, 258)
+
+  // ── Seite 2: KPI-Tabelle ─────────────────────────────────────────────────
+  doc.addPage()
+  doc.setFillColor(5, 7, 11)
+  doc.rect(0, 0, 210, 297, 'F')
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(16)
+  doc.setTextColor(22, 132, 255)
+  doc.text('KPI-Übersicht', margin, 30)
+
+  doc.setFontSize(9)
+  doc.setTextColor(174, 185, 200)
+  doc.text(dateStr, pageW - margin - 30, 30)
+
+  let y = 45
+  const colW = (pageW - margin * 2) / 2
+  doc.setFillColor(16, 26, 40)
+  doc.rect(margin, y - 5, pageW - margin * 2, 8, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(22, 132, 255)
+  doc.text('Kennzahl', margin + 2, y)
+  doc.text('Wert', margin + colW + 2, y)
+  y += 6
+
+  for (const kpi of opts.kpis) {
+    doc.setFillColor(y % 12 === 0 ? 14 : 11, y % 12 === 0 ? 22 : 18, y % 12 === 0 ? 36 : 28)
+    doc.rect(margin, y - 4, pageW - margin * 2, 8, 'F')
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(248, 251, 255)
+    doc.text(kpi.label, margin + 2, y)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(32, 200, 255)
+    doc.text(kpi.value, margin + colW + 2, y)
+    y += 8
+    if (y > 270) { doc.addPage(); doc.setFillColor(5, 7, 11); doc.rect(0, 0, 210, 297, 'F'); y = 20 }
+  }
+
+  // ── Seite 3: Top 5 Artikel ───────────────────────────────────────────────
+  if (opts.top5 && opts.top5.length > 0) {
+    doc.addPage()
+    doc.setFillColor(5, 7, 11)
+    doc.rect(0, 0, 210, 297, 'F')
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(16)
+    doc.setTextColor(22, 132, 255)
+    doc.text('Top 5 Artikel nach Bestand', margin, 30)
+
+    let ay = 50
+    doc.setFillColor(16, 26, 40)
+    doc.rect(margin, ay - 5, pageW - margin * 2, 8, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(22, 132, 255)
+    doc.text('Artikel', margin + 2, ay)
+    doc.text('Bestand', margin + 100, ay)
+    doc.text('Lagerplatz', margin + 130, ay)
+    ay += 8
+
+    for (const a of opts.top5) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(248, 251, 255)
+      doc.text(a.name.slice(0, 38), margin + 2, ay)
+      doc.setTextColor(32, 200, 255)
+      doc.text(`${a.bestand} ${a.einheit || 'Stk'}`, margin + 100, ay)
+      doc.setTextColor(174, 185, 200)
+      doc.text(a.lagerplatz || '—', margin + 130, ay)
+      ay += 8
+    }
+  }
+
+  // Footer on all pages
+  const totalPages = (doc as unknown as { getNumberOfPages: () => number }).getNumberOfPages?.() ?? 1
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(60, 75, 90)
+    doc.text('Petersen KI Betriebssteuerung · Carsten Petersen', margin, 290)
+    doc.text(`Seite ${i} / ${totalPages}`, pageW - margin - 20, 290)
+  }
+
+  doc.save(`analyse-bericht-${monthStr}.pdf`)
+}
+
+// ── LagerPilot PDF-Bericht ─────────────────────────────────────────────────
+
+export type LagerArtikelPDF = {
+  name: string
+  bestand: number
+  mindestbestand?: number
+  status?: string
+  lagerplatz?: string
+  einheit?: string
+}
+
+export async function generateLagerberichtPDF(opts: {
+  artikel: LagerArtikelPDF[]
+  firmenname?: string
+}) {
+  const { default: jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const margin = 15
+  const pageW = 210
+  const now = new Date()
+  const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const fileDateStr = now.toISOString().split('T')[0]
+  const firma = opts.firmenname || 'Petersen KI Betriebssteuerung'
+
+  // ── Seite 1: Deckblatt ───────────────────────────────────────────────────
+  doc.setFillColor(5, 7, 11)
+  doc.rect(0, 0, 210, 297, 'F')
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(26)
+  doc.setTextColor(22, 132, 255)
+  doc.text('Lagerbericht', margin, 80)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(14)
+  doc.setTextColor(248, 251, 255)
+  doc.text(dateStr, margin, 92)
+
+  doc.setFontSize(11)
+  doc.setTextColor(174, 185, 200)
+  doc.text(`Artikel gesamt: ${opts.artikel.length}`, margin, 106)
+  const kritisch = opts.artikel.filter(a => a.status === 'leer' || a.status === 'niedrig').length
+  doc.text(`Kritische Bestände: ${kritisch}`, margin, 116)
+
+  doc.setFontSize(10)
+  doc.setTextColor(174, 185, 200)
+  doc.text(firma, margin, 250)
+  doc.text('Petersen KI Betriebssteuerung · Carsten Petersen', margin, 258)
+
+  // ── Seite 2+: Artikel-Tabelle ─────────────────────────────────────────────
+  doc.addPage()
+  doc.setFillColor(5, 7, 11)
+  doc.rect(0, 0, 210, 297, 'F')
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(14)
+  doc.setTextColor(22, 132, 255)
+  doc.text('Artikelbestand', margin, 22)
+  doc.setFontSize(9)
+  doc.setTextColor(174, 185, 200)
+  doc.text(dateStr, pageW - margin - 30, 22)
+
+  let y = 32
+  // Header
+  doc.setFillColor(16, 26, 40)
+  doc.rect(margin, y - 4, pageW - margin * 2, 7, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(22, 132, 255)
+  doc.text('Artikel', margin + 1, y)
+  doc.text('Bestand', margin + 85, y)
+  doc.text('Min.', margin + 110, y)
+  doc.text('Lagerplatz', margin + 130, y)
+  doc.text('Status', margin + 165, y)
+  y += 7
+
+  for (const a of opts.artikel) {
+    // Kritische Artikel hervorheben
+    const isCrit = a.status === 'leer' || a.status === 'niedrig'
+    if (isCrit) {
+      doc.setFillColor(80, 20, 20)
+    } else {
+      doc.setFillColor(y % 14 < 7 ? 11 : 14, y % 14 < 7 ? 18 : 22, y % 14 < 7 ? 28 : 36)
+    }
+    doc.rect(margin, y - 4, pageW - margin * 2, 7, 'F')
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(isCrit ? 255 : 248, isCrit ? 180 : 251, isCrit ? 180 : 255)
+    doc.text(a.name.slice(0, 40), margin + 1, y)
+    doc.setTextColor(32, 200, 255)
+    doc.text(`${a.bestand} ${a.einheit || 'Stk'}`, margin + 85, y)
+    doc.setTextColor(174, 185, 200)
+    doc.text(a.mindestbestand !== undefined ? String(a.mindestbestand) : '—', margin + 110, y)
+    doc.text((a.lagerplatz || '—').slice(0, 15), margin + 130, y)
+
+    const statusColor: [number, number, number] = a.status === 'leer' ? [255, 80, 80] : a.status === 'niedrig' ? [245, 158, 11] : [16, 185, 129]
+    doc.setTextColor(...statusColor)
+    doc.text(a.status || 'ok', margin + 165, y)
+
+    y += 7
+    if (y > 280) {
+      doc.addPage()
+      doc.setFillColor(5, 7, 11)
+      doc.rect(0, 0, 210, 297, 'F')
+      y = 20
+    }
+  }
+
+  // Footer
+  const totalPages = (doc as unknown as { getNumberOfPages: () => number }).getNumberOfPages?.() ?? 1
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(60, 75, 90)
+    doc.text('Petersen KI Betriebssteuerung · Carsten Petersen', margin, 292)
+    doc.text(`Seite ${i} / ${totalPages}`, pageW - margin - 20, 292)
+  }
+
+  doc.save(`lagerbericht-${fileDateStr}.pdf`)
+}

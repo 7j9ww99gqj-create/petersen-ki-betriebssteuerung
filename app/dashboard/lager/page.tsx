@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { trackVisit } from '@/lib/recent'
+import { generateLagerberichtPDF } from '@/lib/pdf'
 import SkeletonCard from '@/components/SkeletonCard'
 import EmptyState from '@/components/EmptyState'
 import { hasDemoCookie } from '@/lib/auth'
@@ -1793,6 +1794,14 @@ export default function LagerPilotPage() {
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           <button className="pk-btn-ghost" onClick={() => setScanModal(true)} style={{ fontSize: 13 }}>📷 Scan</button>
+          <button className="pk-btn-ghost" onClick={() => {
+            void generateLagerberichtPDF({
+              artikel: artikel.map(a => ({
+                name: a.name, bestand: a.bestand, mindestbestand: a.mindestbestand,
+                status: a.status, lagerplatz: a.lagerplatz, einheit: a.einheit,
+              }))
+            })
+          }} style={{ fontSize: 13 }}>📄 Lagerbericht</button>
           <button className="pk-btn" onClick={() => setModal('new')} style={{ fontSize: 13 }}>+ Artikel anlegen</button>
           <span className="badge badge-green">● AKTIV</span>
         </div>

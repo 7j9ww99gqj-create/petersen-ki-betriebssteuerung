@@ -8,6 +8,7 @@ import {
 import { hasDemoCookie } from '@/lib/auth'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { trackVisit } from '@/lib/recent'
+import { generateAnalysePDF } from '@/lib/pdf'
 import PilotDocumentArchive from '@/components/PilotDocumentArchive'
 import SkeletonCard from '@/components/SkeletonCard'
 
@@ -492,7 +493,20 @@ export default function AnalysePilotPage() {
           {loading && <span className="badge badge-blue">⏳ Lädt…</span>}
           {!loading && !isDemo && !loadError && <span className="badge badge-green">● Live</span>}
           {loadError && <span className="badge badge-red">⚠️ Ladefehler</span>}
-
+          <button className="pk-btn-ghost" style={{ fontSize: 13 }} onClick={() => {
+            const kpis = [
+              { label: 'Umsatz (Monat)', value: fmtK(kpi.umsatzMonat) },
+              { label: 'Gewinn (Monat)', value: fmtK(kpi.gewinnMonat) },
+              { label: 'Aktive Kunden', value: String(kpi.aktivKunden) },
+              { label: 'Offene Angebote', value: String(kpi.offeneAngebote) },
+              { label: 'Offene Rechnungen', value: `${kpi.offeneRechnungen} (${fmtK(kpi.offeneRechnungenSumme)})` },
+              { label: 'Lagerwert', value: kpi.lagerwert > 0 ? fmtK(kpi.lagerwert) : '—' },
+              { label: 'Artikel gesamt', value: String(kpi.artikelGesamt) },
+              { label: 'Artikel niedrig', value: String(kpi.artikelNiedrig) },
+              { label: 'Artikel leer', value: String(kpi.artikelLeer) },
+            ]
+            void generateAnalysePDF({ kpis, zeitraum })
+          }}>📄 Bericht exportieren</button>
         </div>
       </div>
 
