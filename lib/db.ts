@@ -2824,67 +2824,19 @@ export async function umlagerArtikel(params: {
 }) {
   const supabase = db()
 
-  // 1. Quell-Bestand laden
-  const { data: von, error: vonErr } = await supabase
-    .from('lager_stellplatz_bestand')
-    .select('*')
-    .eq('id', params.vonBestandId)
-    .single()
-  if (vonErr || !von) throw new Error('Quell-Bestand nicht gefunden')
-  if (von.menge < params.menge) throw new Error(`Nur ${von.menge} ${von.einheit ?? 'Stk'} verfügbar`)
-
-  // 2. Quell-Menge reduzieren oder Datensatz löschen
-  if (von.menge === params.menge) {
-    await supabase.from('lager_stellplatz_bestand').delete().eq('id', params.vonBestandId)
-  } else {
-    await supabase.from('lager_stellplatz_bestand')
-      .update({ menge: von.menge - params.menge })
-      .eq('id', params.vonBestandId)
-  }
-
-  // 3. Ziel-Bestand suchen (gleicher Artikel+Charge+MHD am Ziel-Stellplatz)
-  const { data: zielRows } = await supabase
-    .from('lager_stellplatz_bestand')
-    .select('*')
-    .eq('stellplatz_id', params.nachStellplatzId)
-    .eq('artikelnummer', von.artikelnummer ?? '')
-    .eq('charge', params.charge ?? von.charge ?? '')
-
-  if (zielRows && zielRows.length > 0) {
-    await supabase.from('lager_stellplatz_bestand')
-      .update({ menge: zielRows[0].menge + params.menge })
-      .eq('id', zielRows[0].id)
-  } else {
-    await supabase.from('lager_stellplatz_bestand').insert({
-      id: crypto.randomUUID(),
-      stellplatz_id: params.nachStellplatzId,
-      artikel_id: von.artikel_id,
-      artikelnummer: von.artikelnummer,
-      artikelname: von.artikelname,
-      charge: params.charge ?? von.charge,
-      mhd: params.mhd ?? von.mhd,
-      menge: params.menge,
-      einheit: von.einheit,
-      status: 'Verfügbar',
-      eingelagert_am: new Date().toISOString().slice(0, 10),
-    })
-  }
-
-  // 4. Umlagerung dokumentieren
-  await supabase.from('lager_umlagerungen').insert({
-    id: `UML-${Date.now().toString(36).toUpperCase()}`,
-    artikel_id: von.artikel_id,
-    artikelnummer: von.artikelnummer,
-    artikelname: von.artikelname,
-    von_stellplatz_id: von.stellplatz_id,
-    nach_stellplatz_id: params.nachStellplatzId,
-    charge: params.charge ?? von.charge,
-    mhd: params.mhd ?? von.mhd,
-    menge: params.menge,
-    grund: params.grund,
-    notiz: params.notiz,
-    datum: new Date().toISOString(),
+  // Atomare 4-Schritt-Transaktion via Supabase RPC (kein Datenverlust bei Teilfehlern)
+  const { data, error } = await supabase.rpc('umlager_artikel', {
+    p_von_bestand_id: params.vonBestandId,
+    p_nach_stellplatz_id: params.nachStellplatzId,
+    p_menge: params.menge,
+    p_charge: params.charge ?? null,
+    p_mhd: params.mhd ?? null,
+    p_grund: params.grund ?? null,
+    p_notiz: params.notiz ?? null,
   })
+
+  if (error) throw new Error(error.message)
+  return data
 }
 
 // ── Steuer Beleg-Uploads (mit Kategorie) ──────────────────────────────────────
