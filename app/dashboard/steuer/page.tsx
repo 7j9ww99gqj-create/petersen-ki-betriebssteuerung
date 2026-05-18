@@ -35,6 +35,7 @@ type Rechnung = {
 type FixkostenMin = { id: string; betrag_brutto: number; steuersatz: number; zahlungsintervall: string; aktiv: boolean }
 type BetriebsausgabeMin = { id: string; betrag_brutto: number; steuersatz: number; datum: string }
 type AnschaffungMin = { id: string; betrag_brutto: number; steuersatz: number; kaufdatum: string }
+type StripeZahlung = { id: string; amount: number; booked_at: string | null; provider_ref: string | null }
 
 function faktorForIntervall(intervall: string): number {
   const m: Record<string, number> = { monatlich: 1, quartalsweise: 1 / 3, halbjährlich: 1 / 6, jährlich: 1 / 12 }
@@ -99,6 +100,11 @@ const demoBetriebsausgaben: BetriebsausgabeMin[] = [
 const demoAnschaffungen: AnschaffungMin[] = [
   { id: 'ANS-001', betrag_brutto: 2499.00, steuersatz: 19, kaufdatum: '2025-04-10' },
   { id: 'ANS-002', betrag_brutto: 249.99, steuersatz: 19, kaufdatum: '2025-03-15' },
+]
+const demoStripeZahlungen: StripeZahlung[] = [
+  { id: 'SP-001', amount: 119.00, booked_at: '2025-04-08T10:30:00Z', provider_ref: 'pi_demo_001' },
+  { id: 'SP-002', amount: 59.00, booked_at: '2025-04-15T14:20:00Z', provider_ref: 'pi_demo_002' },
+  { id: 'SP-003', amount: 239.00, booked_at: '2025-04-22T09:10:00Z', provider_ref: 'pi_demo_003' },
 ]
 
 // ── Hilfsfunktionen ────────────────────────────────────────────────────────────
@@ -203,6 +209,7 @@ export default function SteuerPilotPage() {
   const [uploadFile2, setUploadFile2] = useState<File | null>(null)
   const [uploadSaving, setUploadSaving] = useState(false)
   const [dauerfristVerlaengerung, setDauerfristVerlaengerung] = useState(false)
+  const [stripeZahlungen, setStripeZahlungen] = useState<StripeZahlung[]>([])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast(msg); setToastType(type)
@@ -215,14 +222,18 @@ export default function SteuerPilotPage() {
       if (isDemo) {
         setBelege(demoBelege); setUstva(demoUstva); setRechnungen(demoRechnungen)
         setFixkosten(demoFixkosten); setBetriebsausgaben(demoBetriebsausgaben); setAnschaffungen(demoAnschaffungen)
+        setStripeZahlungen(demoStripeZahlungen)
         setWarnings(await getSteuerWarnings(true))
         setLoading(false); return
       }
       try {
-        const [b, u, w, r, fk, ba, ans, bu] = await Promise.all([
+        const supabase = createSupabaseClient()
+        const start12 = new Date(); start12.setFullYear(start12.getFullYear() - 1)
+        const [b, u, w, r, fk, ba, ans, bu, stripeResult] = await Promise.all([
           getSteuerBelege(), getSteuerUstva(), getSteuerWarnings(false), getBueroRechnungen(),
           getSteuerFixkosten(), getSteuerBetriebsausgaben(), getSteuerAnschaffungen(),
           getSteuerBelegUploads(),
+          supabase.from('billing_payments').select('id,amount,booked_at,provider_ref').eq('status', 'paid').gte('booked_at', start12.toISOString()),
         ])
         setBelege(b as Beleg[])
         setUstva(u as Ustva[])
@@ -232,6 +243,7 @@ export default function SteuerPilotPage() {
         setBetriebsausgaben((ba ?? []) as BetriebsausgabeMin[])
         setAnschaffungen((ans ?? []) as AnschaffungMin[])
         setBelegUploads(bu)
+        if (!stripeResult.error) setStripeZahlungen((stripeResult.data ?? []) as StripeZahlung[])
       } catch { showToast('Daten konnten nicht geladen werden', 'error') }
       finally { setLoading(false) }
     }
@@ -247,6 +259,8 @@ export default function SteuerPilotPage() {
   const belegeMonat = belege.filter(b => b.datum.startsWith(selectedMonat))
   const rechnungenMonat = rechnungen.filter(r => (r.erstellt ?? '').startsWith(selectedMonat))
   const aktuellUstva = ustva.find(u => u.monat === selectedMonat)
+  const stripeMonat = stripeZahlungen.filter(s => (s.booked_at ?? '').startsWith(selectedMonat))
+  const stripeMonatSumme = stripeMonat.reduce((s, z) => s + (z.amount ?? 0), 0)
 
   const vorsteuerBelege = belegeMonat.reduce((s, b) => s + (b.steuerbetrag ?? 0), 0)
   const betriebsausgabenMonat = betriebsausgaben.filter(b => b.datum.startsWith(selectedMonat))
@@ -641,7 +655,7 @@ export default function SteuerPilotPage() {
 
           <div className="stats-grid" style={{ marginBottom: 24 }}>
             <KpiCard label="Einnahmen brutto" value={fmt(einnahmenMonat)} sub={`${rechnungenMonat.length} Rechnungen`} color="#4ddb7e" />
-            <KpiCard label="Einnahmen netto" value={fmt(rechnungenMonat.reduce((s, r) => s + (r.netto ?? 0), 0))} sub="ohne USt" color="#f8fbff" />
+            <KpiCard label="Stripe-Zahlungen" value={fmt(stripeMonatSumme)} sub={`${stripeMonat.length} Zahlung${stripeMonat.length !== 1 ? 'en' : ''}`} color="#a78bfa" />
             <KpiCard label="Umsatzsteuer" value={fmt(umsatzsteuerRechnungen)} sub="§ 18 UStG zu zahlen" color="#ff8080" />
             <KpiCard label="Offen / Bezahlt" value={`${rechnungenMonat.filter(r => r.status !== 'bezahlt').length} / ${rechnungenMonat.filter(r => r.status === 'bezahlt').length}`} sub="Rechnungen" />
           </div>
@@ -683,6 +697,42 @@ export default function SteuerPilotPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+          {/* Stripe-Zahlungen */}
+          {stripeMonat.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                💳 Stripe-Zahlungen {monthLabel(selectedMonat)}
+                <span className="badge badge-purple">{stripeMonat.length}</span>
+              </div>
+              <div className="pk-card" style={{ padding: 0 }}>
+                <div className="pk-table-wrap">
+                  <table className="pk-table">
+                    <thead>
+                      <tr><th>Datum</th><th>Referenz</th><th>Betrag</th></tr>
+                    </thead>
+                    <tbody>
+                      {stripeMonat.map(z => (
+                        <tr key={z.id}>
+                          <td style={{ fontSize: 12 }}>{z.booked_at ? new Date(z.booked_at).toLocaleDateString('de-DE') : '—'}</td>
+                          <td style={{ fontSize: 12, color: '#aeb9c8', fontFamily: 'monospace' }}>{z.provider_ref ?? z.id}</td>
+                          <td style={{ fontFamily: 'monospace', color: '#a78bfa', fontWeight: 700 }}>{fmt(z.amount)}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: 'rgba(167,139,250,.05)', fontWeight: 700 }}>
+                        <td colSpan={2}>Gesamt Stripe {monthLabel(selectedMonat)}</td>
+                        <td style={{ fontFamily: 'monospace', color: '#a78bfa' }}>{fmt(stripeMonatSumme)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+          {stripeZahlungen.length === 0 && (
+            <div style={{ marginTop: 14, padding: '8px 12px', borderRadius: 8, background: 'rgba(167,139,250,.06)', border: '1px solid rgba(167,139,250,.2)', fontSize: 12, color: '#a78bfa' }}>
+              💳 Keine Stripe-Zahlungen verknüpft. Zahlungen erscheinen hier sobald Stripe-Integration aktiv ist.
             </div>
           )}
           <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'rgba(37,211,102,.06)', border: '1px solid rgba(37,211,102,.2)', fontSize: 12, color: '#4ddb7e' }}>
