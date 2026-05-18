@@ -26,9 +26,17 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, 7-Task-Sprint abgeschlossen.
-- Letzter Commit: `ef0d045` — BüroPilot in Tab-Komponenten aufgeteilt (Refactoring).
-- Jüngste Fortschritte (2026-05-19 – Sprint):
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, Marketing-KI Sprint abgeschlossen.
+- Letzter Commit: siehe unten — Marketing-KI Module + Feature-Flags eingebaut.
+- Jüngste Fortschritte (2026-05-19 – Marketing-KI Sprint):
+  - **Marketing-KI Module (offline by default):** 3 neue OpenAI-gestützte KI-Suite-Kacheln live eingebaut
+    - `📊 Was soll ich morgen posten?` → `/api/marketing/content-daily`
+    - `🚀 Autopilot-Marketing` → `/api/marketing/autopilot`
+    - `🗣️ KI-Vertriebsassistent` → `/api/marketing/sales-assistant`
+  - **Feature-Flag-System:** 3 neue Spalten in `firma_einstellungen` (default `false`) — Migration eingespielt
+  - **Owner-Dashboard:** `OwnerAiControlPanel` um „Marketing-KI Module" Sektion erweitert (3 Toggles)
+  - **MarketingPilot KI-Suite:** `DemoLabTab` zeigt „✨ KI jetzt ausführen" Button für die 3 aktiven Module mit strukturierter Ergebnis-Anzeige
+  - **Sicherheit:** Alle Routen prüfen Auth + Feature-Flag vor OpenAI-Aufruf — kein API-Kosten ohne Aktivierung
   - Aufgabe 2: cron push-alerts Spaltenfehler behoben (summe statt gesamtbetrag) + early-return ohne Subscriptions — Commit `ef5c142`
   - Aufgabe 3: Zod-Validierung für /api/chat — 400 Bad Request bei malformed Body — Commit `2ab7b25`
   - Aufgabe 6: DB-Indexes für Status/Faellig/MHD-Spalten (8 Indexes) + Migration eingespielt — Commit `01ebdce`
@@ -957,8 +965,26 @@
 
 ## 15. Nächste Empfehlung
 - Als NÄCHSTES umsetzen:
-  1. **SteuerPilot: ELSTER-XML-Export vorbereiten** (Aufgabe 13): Formular-Mapping §§ 81/83 UStVA; schrittweise als Download-Dummy umsetzen.
-  2. **SteuerPilot: Jahres-Zusammenfassung** mit vereinfachter G&V (Einnahmen – Gesamtausgaben) auf Basis der vorhandenen Daten.
-  3. **Stripe Webhook-URL** im Stripe-Dashboard prüfen; echter End-to-End-Test Buchung → Auftrag → Zahlung → Rechnung.
-  4. **Multi-Positions-Rechnungen/-Angebote** im BüroPilot (aktuell nur 1 Position hardcoded).
-  5. **Autopilot-Marketing**: Flow „Ziel → Zielgruppe → Kampagne → Funnel" aus echten Leads/Kampagnen/SEO ableiten.
+  1. **Marketing-KI testen + live schalten**: In Einstellungen → KI-Funktionen → Marketing-KI die 3 Module einzeln aktivieren und testen. Dann für Kunden freigeben.
+  2. **SteuerPilot: ELSTER-XML-Export vorbereiten** (Aufgabe 13): Formular-Mapping §§ 81/83 UStVA; schrittweise als Download-Dummy umsetzen.
+  3. **SteuerPilot: Jahres-Zusammenfassung** mit vereinfachter G&V (Einnahmen – Gesamtausgaben) auf Basis der vorhandenen Daten.
+  4. **Stripe Webhook-URL** im Stripe-Dashboard prüfen; echter End-to-End-Test Buchung → Auftrag → Zahlung → Rechnung.
+  5. **Multi-Positions-Rechnungen/-Angebote** im BüroPilot (aktuell nur 1 Position hardcoded).
+
+### Marketing-KI Aktivierungs-Anleitung (Owner)
+1. Login als `info@petersen-ki-pilot.de`
+2. Einstellungen → KI-Funktionen → Marketing-KI Module
+3. Toggle für gewünschtes Modul einschalten (je ~0,01–0,02 € / Run)
+4. Im MarketingPilot → KI-Suite → Modul auswählen → „✨ KI jetzt ausführen"
+
+### Marketing-KI Neue Dateien (2026-05-19)
+| Datei | Funktion |
+|---|---|
+| `app/api/marketing/content-daily/route.ts` | GPT-4o → tägl. Content-Idee |
+| `app/api/marketing/autopilot/route.ts` | GPT-4o → Strategie + Funnel-Plan |
+| `app/api/marketing/sales-assistant/route.ts` | GPT-4o → Lead-Priorisierung + Follow-up |
+| `supabase/migrations/20260519200000_marketing_ki_features.sql` | 3 neue Spalten in firma_einstellungen |
+| `lib/db.ts` | `MarketingKiSettings` Typ + `getMarketingKiSettings()` + `updateMarketingKiSettings()` |
+| `lib/ai-settings.ts` | `getServerMarketingKiSettings(userId)` (server-only) |
+| `components/billing/OwnerAiControlPanel.tsx` | Marketing-KI Toggles ergänzt |
+| `app/dashboard/marketing/page.tsx` | KI-Button + Ergebnis-Panel in KI-Suite |

@@ -2410,7 +2410,7 @@ function InfoSection({ isDemo }: { isDemo: boolean }) {
             </div>
             <div>
               <h4 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: '#f8fbff' }}>§ 7 Datenschutz</h4>
-              <p style={{ margin: 0 }}>Die Verarbeitung personenbezogener Daten erfolgt gemäß unserer Datenschutzerklärung (siehe Tab „Datenschutz") und der DSGVO. Zahlungsdaten werden ausschließlich über Stripe verarbeitet und nicht auf unseren Servern gespeichert.</p>
+              <p style={{ margin: 0 }}>Die Verarbeitung personenbezogener Daten erfolgt gemäß unserer Datenschutzerklärung (siehe Tab &bdquo;Datenschutz&ldquo;) und der DSGVO. Zahlungsdaten werden ausschließlich über Stripe verarbeitet und nicht auf unseren Servern gespeichert.</p>
             </div>
             <div>
               <h4 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: '#f8fbff' }}>§ 8 Haftungsbeschränkung</h4>

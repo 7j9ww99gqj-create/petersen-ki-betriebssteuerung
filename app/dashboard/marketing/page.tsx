@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
+import { trackVisit } from '@/lib/recent'
 import EmptyState from '@/components/EmptyState'
 import {
   getMarketingAutomationRules,
@@ -2549,6 +2550,7 @@ export default function MarketingPilotPage() {
 
   const loadData = () => {
     if (isDemo) return
+    trackVisit({ href: '/dashboard/marketing', label: 'MarketingPilot', icon: '📣' })
     setLoading(true)
     setErrorMsg('')
     Promise.all([

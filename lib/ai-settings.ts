@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from './supabase-admin'
-import type { AiFeatureSettings } from './db'
+import type { AiFeatureSettings, MarketingKiSettings } from './db'
 
 const DEFAULT_AI_FEATURE_SETTINGS: AiFeatureSettings = {
   enabled: true,
@@ -36,4 +36,31 @@ export async function getServerAiFeatureSettings(
   }
 
   return DEFAULT_AI_FEATURE_SETTINGS
+}
+
+const DEFAULT_MARKETING_KI: MarketingKiSettings = {
+  contentDailyEnabled: false,
+  autopilotEnabled: false,
+  salesAssistantEnabled: false,
+}
+
+export async function getServerMarketingKiSettings(userId: string): Promise<MarketingKiSettings> {
+  try {
+    if (!isSupabaseAdminConfigured()) return DEFAULT_MARKETING_KI
+    const admin = createSupabaseAdminClient()
+    const { data } = await admin
+      .from('firma_einstellungen')
+      .select('marketing_content_daily_enabled, marketing_autopilot_enabled, marketing_sales_assistant_enabled')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (!data) return DEFAULT_MARKETING_KI
+    const row = data as Record<string, unknown>
+    return {
+      contentDailyEnabled: Boolean(row.marketing_content_daily_enabled),
+      autopilotEnabled: Boolean(row.marketing_autopilot_enabled),
+      salesAssistantEnabled: Boolean(row.marketing_sales_assistant_enabled),
+    }
+  } catch {
+    return DEFAULT_MARKETING_KI
+  }
 }

@@ -538,6 +538,9 @@ export type FirmaEinstellungen = {
   ai_enabled?: boolean
   ai_chat_enabled?: boolean
   ai_document_enabled?: boolean
+  marketing_content_daily_enabled?: boolean
+  marketing_autopilot_enabled?: boolean
+  marketing_sales_assistant_enabled?: boolean
   created_at?: string
   updated_at?: string
 }
@@ -620,6 +623,54 @@ export async function updateAiFeatureSettings(next: Partial<AiFeatureSettings>) 
     ai_enabled: merged.enabled,
     ai_chat_enabled: merged.chatEnabled,
     ai_document_enabled: merged.documentEnabled,
+  })
+
+  return merged
+}
+
+export type MarketingKiSettings = {
+  contentDailyEnabled: boolean
+  autopilotEnabled: boolean
+  salesAssistantEnabled: boolean
+}
+
+const DEFAULT_MARKETING_KI: MarketingKiSettings = {
+  contentDailyEnabled: false,
+  autopilotEnabled: false,
+  salesAssistantEnabled: false,
+}
+
+export async function getMarketingKiSettings(): Promise<MarketingKiSettings> {
+  try {
+    const firma = await getFirmaEinstellungen()
+    if (!firma) return DEFAULT_MARKETING_KI
+    const row = firma as Record<string, unknown>
+    return {
+      contentDailyEnabled: Boolean(row.marketing_content_daily_enabled),
+      autopilotEnabled: Boolean(row.marketing_autopilot_enabled),
+      salesAssistantEnabled: Boolean(row.marketing_sales_assistant_enabled),
+    }
+  } catch {
+    return DEFAULT_MARKETING_KI
+  }
+}
+
+export async function updateMarketingKiSettings(next: Partial<MarketingKiSettings>): Promise<MarketingKiSettings> {
+  const current = await getFirmaEinstellungen()
+  if (!current) throw new Error('Keine Firmeneinstellungen gefunden. Bitte zuerst die Firmendaten speichern.')
+
+  const row = current as Record<string, unknown>
+  const merged: MarketingKiSettings = {
+    contentDailyEnabled: next.contentDailyEnabled ?? Boolean(row.marketing_content_daily_enabled),
+    autopilotEnabled: next.autopilotEnabled ?? Boolean(row.marketing_autopilot_enabled),
+    salesAssistantEnabled: next.salesAssistantEnabled ?? Boolean(row.marketing_sales_assistant_enabled),
+  }
+
+  await upsertFirmaEinstellungen({
+    ...current,
+    marketing_content_daily_enabled: merged.contentDailyEnabled,
+    marketing_autopilot_enabled: merged.autopilotEnabled,
+    marketing_sales_assistant_enabled: merged.salesAssistantEnabled,
   })
 
   return merged
