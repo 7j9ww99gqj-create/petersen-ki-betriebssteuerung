@@ -64,8 +64,8 @@
   - **Datenbereinigungs-Migration vorbereitet**: `20260518170000_cleanup_all_demo_data.sql` löscht alle Demo-/Testdaten aus allen Tabellen + Test-User aus `auth.users` (Inhaber + Demo bleiben). Muss manuell im Supabase SQL Editor ausgeführt werden (CLI-Auth temporär nicht verfügbar).
   - Betroffene Dateien: `app/dashboard/einstellungen/page.tsx`, `app/dashboard/buero/page.tsx`, `lib/db.ts`, `supabase/migrations/20260518170000_cleanup_all_demo_data.sql`.
   - Offene Punkte:
-    - **Datenbereinigung manuell ausführen**: SQL-Inhalt von `supabase/migrations/20260518170000_cleanup_all_demo_data.sql` im Supabase SQL Editor (`https://supabase.com/dashboard/project/cchmjrnzaqvowqihcdte/sql`) ausführen.
-    - Mahnung-Zähler-Spalte `mahnung_count` in `buero_rechnungen` ist noch nicht via Migration angelegt (Spalte fehlt remote) — separate Migration nötig.
+    - ✅ Datenbereinigung erfolgreich ausgeführt: alle Büro-/Lager-/Werkstatt-/Marketing-/Planung-/Steuer-/Billing-Tabellen geleert; Test-User gelöscht; nur `info@petersen-ki-pilot.de` bleibt in `auth.users`.
+    - ✅ `mahnung_count`-Spalte in `buero_rechnungen` erfolgreich via Migration `20260518180000_add_buero_rechnung_mahnung_count.sql` angelegt.
   - Tests: `npm run build` grün.
   - Branch: `main` (Commits `435eaed`, `787ab12`, `0fe61f6`)
 - **Zuletzt erledigt (2026-05-18 – Inhaber-Dashboard Pilot-Zuteilung + Kunden eingerichtet + BüroPilot Mahnungen/AB-Nummern)**:
