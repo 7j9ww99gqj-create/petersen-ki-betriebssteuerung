@@ -212,6 +212,9 @@ export default function SteuerPilotPage() {
   const [stripeZahlungen, setStripeZahlungen] = useState<StripeZahlung[]>([])
   const [skrLoading, setSkrLoading] = useState(false)
   const [skrVorschlag, setSkrVorschlag] = useState<{ konto: string; bezeichnung: string; begruendung: string } | null>(null)
+  const [ocrLoading, setOcrLoading] = useState(false)
+  const [ocrText, setOcrText] = useState('')
+  const [showOcrInput, setShowOcrInput] = useState(false)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast(msg); setToastType(type)
@@ -332,6 +335,36 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
       }
     } catch { showToast('Fehler bei SKR-Anfrage', 'error') }
     finally { setSkrLoading(false) }
+  }
+
+  // ── OCR-Erkennung ─────────────────────────────────────────────────────────────
+
+  const handleOcrErkennung = async () => {
+    if (!ocrText.trim()) { showToast('Bitte Rechnungstext einfügen', 'error'); return }
+    setOcrLoading(true)
+    try {
+      const res = await fetch('/api/ocr-beleg', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: ocrText }),
+      })
+      const data = await res.json()
+      if (data.error) { showToast('OCR: ' + data.error, 'error'); return }
+      // Felder in editBeleg übernehmen
+      setEditBeleg(prev => ({
+        ...prev,
+        lieferant: data.lieferant ?? prev?.lieferant ?? '',
+        betrag: data.betrag_brutto ?? data.betrag_netto ?? prev?.betrag,
+        steuerbetrag: data.steuerbetrag ?? prev?.steuerbetrag,
+        steuersatz: data.steuersatz ?? prev?.steuersatz ?? 19,
+        datum: data.datum ?? prev?.datum,
+        notiz: data.notiz ?? prev?.notiz,
+      }))
+      setOcrText('')
+      setShowOcrInput(false)
+      showToast('✅ OCR-Felder übernommen', 'success')
+    } catch { showToast('Fehler bei OCR-Anfrage', 'error') }
+    finally { setOcrLoading(false) }
   }
 
   const handleSaveBeleg = async () => {
@@ -1364,6 +1397,41 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
       {editBeleg !== null && (
         <Modal title={editBeleg.id ? 'Beleg bearbeiten' : 'Neuer Beleg'} onClose={() => setEditBeleg(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* ── OCR-Erkennung ── */}
+            <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  onClick={() => setShowOcrInput(f => !f)}
+                  style={{ fontSize: 12, padding: '5px 12px', borderRadius: 999, border: '1px solid rgba(245,158,11,.4)', background: 'rgba(245,158,11,.1)', color: '#fbbf24', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  🔍 OCR – Felder auto-ausfüllen
+                </button>
+                <span style={{ fontSize: 11, color: '#aeb9c8' }}>Rechnungstext einfügen → KI erkennt Felder</span>
+              </div>
+              {showOcrInput && (
+                <div style={{ marginTop: 10 }}>
+                  <textarea
+                    className="pk-input"
+                    rows={4}
+                    placeholder="Rechnungstext hier einfügen (z.B. aus OCR-Scanner oder E-Mail)…"
+                    value={ocrText}
+                    onChange={e => setOcrText(e.target.value)}
+                    style={{ width: '100%', resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
+                  />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button
+                      className="pk-btn"
+                      onClick={handleOcrErkennung}
+                      disabled={ocrLoading || !ocrText.trim()}
+                      style={{ fontSize: 12, padding: '6px 14px', background: 'linear-gradient(135deg, #d97706, #b45309)' }}
+                    >
+                      {ocrLoading ? '⏳ Erkenne…' : '✓ Felder erkennen'}
+                    </button>
+                    <button onClick={() => { setShowOcrInput(false); setOcrText('') }} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Abbrechen</button>
+                  </div>
+                </div>
+              )}
+            </div>
             <div>
               <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Lieferant *</label>
               <input className="pk-input" placeholder="z.B. Büromaterial GmbH" value={editBeleg.lieferant ?? ''} onChange={e => setEditBeleg(p => ({ ...p, lieferant: e.target.value }))} />
