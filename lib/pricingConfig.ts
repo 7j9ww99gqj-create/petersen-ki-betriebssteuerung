@@ -133,6 +133,6 @@ export const STATUS_LABELS: Record<BookingStatus, string> = {
 }
 
 export function formatPrice(price: PriceValue) {
-  return price === 'request' ? 'auf Anfrage' : `${price.toLocaleString('de-DE')} € / Monat`
+  return price === 'request' ? 'auf Anfrage' : `${price.toLocaleString('de-DE')} € / Monat inkl. MwSt.`
 }
 

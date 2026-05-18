@@ -209,10 +209,11 @@ export async function buildSubscriptionInvoiceDraft(subscription: SubscriptionRe
   const issueDate = opts?.issueDate ?? new Date()
   const dueDate = new Date(issueDate)
   dueDate.setDate(dueDate.getDate() + (opts?.dueInDays ?? 14))
-  const netAmount = Number(subscription.monthlyPrice ?? 0)
+  // monthlyPrice ist Brutto (inkl. MwSt.) — Netto rückwärts berechnen
+  const grossAmount = Number(subscription.monthlyPrice ?? 0)
   const taxRate = Number(opts?.taxRate ?? 19)
-  const taxAmount = Number((netAmount * taxRate / 100).toFixed(2))
-  const grossAmount = Number((netAmount + taxAmount).toFixed(2))
+  const netAmount = Number((grossAmount / (1 + taxRate / 100)).toFixed(2))
+  const taxAmount = Number((grossAmount - netAmount).toFixed(2))
   return {
     id: genId('RE'),
     number: await getNextInvoiceNumber(),
