@@ -163,7 +163,7 @@ export default function EinstellungenPage() {
   const [ownerSentMessages, setOwnerSentMessages] = useState<{ id: string; owner_user_id: string; subject: string; body: string; recipient_type: string; recipient_user_id?: string; created_at: string }[]>([])
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [messageForm, setMessageForm] = useState({ subject: '', body: '' })
-  const [broadcastForm, setBroadcastForm] = useState({ subject: '', body: '', recipient_user_id: '' })
+  const [broadcastForm, setBroadcastForm] = useState({ subject: '', body: '', recipient_user_id: '', recipient_mode: 'all' as 'all' | 'single' })
   const [sendingMessage, setSendingMessage] = useState(false)
   const [postfachTab, setPostfachTab] = useState<'inbox' | 'sent'>('inbox')
 
@@ -248,7 +248,7 @@ export default function EinstellungenPage() {
   }, [canManageLiveUsers])
 
   useEffect(() => {
-    if ((section === 'rollen' || section === 'registrierungen' || section === 'kunden-eingerichtet') && canManageLiveUsers) {
+    if ((section === 'rollen' || section === 'registrierungen' || section === 'kunden-eingerichtet' || section === 'postfach') && canManageLiveUsers) {
       void loadManagedUsers()
     }
   }, [section, canManageLiveUsers, loadManagedUsers])
@@ -1141,7 +1141,69 @@ export default function EinstellungenPage() {
                   {postfachTab === 'sent' && (
                     <div>
                       <div className="pk-card" style={{ marginBottom: 24, padding: 16 }}>
-                        <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800 }}>An Nutzer senden</h3>
+                        <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>✉️ Neue Nachricht verfassen</h3>
+
+                        {/* Empfänger-Auswahl */}
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 8 }}>Empfänger</div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              onClick={() => setBroadcastForm(prev => ({ ...prev, recipient_mode: 'all', recipient_user_id: '' }))}
+                              style={{
+                                padding: '7px 14px', borderRadius: 8, cursor: 'pointer',
+                                fontSize: 13, fontWeight: 600,
+                                background: broadcastForm.recipient_mode === 'all' ? 'rgba(22,132,255,.2)' : 'rgba(255,255,255,.05)',
+                                color: broadcastForm.recipient_mode === 'all' ? '#6cb6ff' : '#aeb9c8',
+                                border: `1px solid ${broadcastForm.recipient_mode === 'all' ? 'rgba(22,132,255,.4)' : 'rgba(255,255,255,.1)'}`,
+                                transition: 'all .15s',
+                              }}
+                            >
+                              📢 Alle Nutzer
+                            </button>
+                            <button
+                              onClick={() => setBroadcastForm(prev => ({ ...prev, recipient_mode: 'single' }))}
+                              style={{
+                                padding: '7px 14px', borderRadius: 8, cursor: 'pointer',
+                                fontSize: 13, fontWeight: 600,
+                                background: broadcastForm.recipient_mode === 'single' ? 'rgba(22,132,255,.2)' : 'rgba(255,255,255,.05)',
+                                color: broadcastForm.recipient_mode === 'single' ? '#6cb6ff' : '#aeb9c8',
+                                border: `1px solid ${broadcastForm.recipient_mode === 'single' ? 'rgba(22,132,255,.4)' : 'rgba(255,255,255,.1)'}`,
+                                transition: 'all .15s',
+                              }}
+                            >
+                              👤 Einzelner Nutzer
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Nutzer-Dropdown wenn "Einzelner Nutzer" gewählt */}
+                        {broadcastForm.recipient_mode === 'single' && (
+                          <div style={{ marginBottom: 14 }}>
+                            <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 8 }}>Nutzer auswählen *</div>
+                            {managedUsers.filter(u => !u.isOwnerAccount).length === 0 ? (
+                              <div style={{ color: '#aeb9c8', fontSize: 13, padding: '8px 12px', background: 'rgba(255,255,255,.04)', borderRadius: 8 }}>
+                                Keine Nutzer gefunden. Zunächst Nutzer unter <strong>Kundensteuerung</strong> anlegen.
+                              </div>
+                            ) : (
+                              <select
+                                className="pk-input"
+                                value={broadcastForm.recipient_user_id}
+                                onChange={(e) => setBroadcastForm(prev => ({ ...prev, recipient_user_id: e.target.value }))}
+                              >
+                                <option value="">— Nutzer auswählen —</option>
+                                {managedUsers
+                                  .filter(u => !u.isOwnerAccount)
+                                  .map(u => (
+                                    <option key={u.id} value={u.id}>
+                                      {u.fullName || u.email} ({u.accessStatus === 'active' ? 'Aktiv' : u.accessStatus === 'pending' ? 'Ausstehend' : 'Gesperrt'})
+                                    </option>
+                                  ))}
+                              </select>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Betreff */}
                         <label style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
                           <span style={{ fontSize: 12, color: '#aeb9c8' }}>Betreff *</span>
                           <input
@@ -1151,7 +1213,9 @@ export default function EinstellungenPage() {
                             placeholder="z.B. Wichtige Benachrichtigung"
                           />
                         </label>
-                        <label style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+
+                        {/* Nachrichtentext */}
+                        <label style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
                           <span style={{ fontSize: 12, color: '#aeb9c8' }}>Nachrichtentext *</span>
                           <textarea
                             className="pk-input"
@@ -1161,11 +1225,17 @@ export default function EinstellungenPage() {
                             placeholder="Nachricht eingeben…"
                           />
                         </label>
+
                         <button
                           className="pk-btn"
                           onClick={async () => {
                             if (!broadcastForm.subject.trim() || !broadcastForm.body.trim()) {
                               setToast('Betreff und Text erforderlich')
+                              setToastType('error')
+                              return
+                            }
+                            if (broadcastForm.recipient_mode === 'single' && !broadcastForm.recipient_user_id) {
+                              setToast('Bitte einen Nutzer auswählen')
                               setToastType('error')
                               return
                             }
@@ -1178,13 +1248,16 @@ export default function EinstellungenPage() {
                                   action: 'broadcast',
                                   subject: broadcastForm.subject,
                                   body: broadcastForm.body,
+                                  recipient_user_id: broadcastForm.recipient_mode === 'single' ? broadcastForm.recipient_user_id : undefined,
                                 }),
                               })
                               if (!res.ok) throw new Error('Versand fehlgeschlagen')
-                              setToast('Nachricht an alle Nutzer versendete')
+                              const label = broadcastForm.recipient_mode === 'single'
+                                ? `Nachricht an ${managedUsers.find(u => u.id === broadcastForm.recipient_user_id)?.fullName || managedUsers.find(u => u.id === broadcastForm.recipient_user_id)?.email || 'Nutzer'} versendete`
+                                : 'Nachricht an alle Nutzer versendete'
+                              setToast(label)
                               setToastType('success')
-                              setBroadcastForm({ subject: '', body: '', recipient_user_id: '' })
-                              // Reload sent messages
+                              setBroadcastForm({ subject: '', body: '', recipient_user_id: '', recipient_mode: 'all' })
                               const sentRes = await fetch('/api/messages?action=sent')
                               if (sentRes.ok) {
                                 const sentData = await sentRes.json()
@@ -1199,7 +1272,11 @@ export default function EinstellungenPage() {
                           }}
                           disabled={sendingMessage}
                         >
-                          {sendingMessage ? '⏳ Wird versendete…' : '📤 Versenden an alle'}
+                          {sendingMessage
+                            ? '⏳ Wird gesendet…'
+                            : broadcastForm.recipient_mode === 'single'
+                              ? '📨 An Nutzer senden'
+                              : '📢 Rundmail an alle senden'}
                         </button>
                       </div>
 
@@ -1220,7 +1297,21 @@ export default function EinstellungenPage() {
                                   border: '1px solid rgba(255,255,255,.05)',
                                 }}
                               >
-                                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{msg.subject}</div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4, gap: 8 }}>
+                                  <div style={{ fontWeight: 600, fontSize: 13 }}>{msg.subject}</div>
+                                  <span style={{
+                                    fontSize: 11, padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0,
+                                    background: msg.recipient_type === 'all' ? 'rgba(22,132,255,.15)' : 'rgba(37,211,102,.12)',
+                                    color: msg.recipient_type === 'all' ? '#6cb6ff' : '#4ddb7e',
+                                  }}>
+                                    {msg.recipient_type === 'all' ? '📢 Alle' : '👤 Einzeln'}
+                                  </span>
+                                </div>
+                                {msg.recipient_type === 'single' && msg.recipient_user_id && (
+                                  <div style={{ fontSize: 11, color: '#20c8ff', marginBottom: 6 }}>
+                                    An: {managedUsers.find(u => u.id === msg.recipient_user_id)?.fullName || managedUsers.find(u => u.id === msg.recipient_user_id)?.email || msg.recipient_user_id}
+                                  </div>
+                                )}
                                 <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 8 }}>{msg.body}</div>
                                 <div style={{ fontSize: 11, color: '#6cb6ff' }}>
                                   {new Date(msg.created_at).toLocaleDateString('de-DE')} {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
