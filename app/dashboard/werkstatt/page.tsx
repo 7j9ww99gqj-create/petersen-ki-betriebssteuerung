@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
+import SkeletonCard from '@/components/SkeletonCard'
 import { hasDemoCookie } from '@/lib/auth'
 import { genId } from '@/lib/ids'
 import {
@@ -482,7 +483,8 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
 
       {/* KPI-Karten */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
-        {[
+        {loading && <SkeletonCard count={4} />}
+        {!loading && [
           { label: 'Offen', value: kpiOffen, icon: '📋', color: '#aeb9c8' },
           { label: 'In Arbeit', value: kpiInArbeit, icon: '⚙️', color: '#1684ff' },
           { label: 'Kritisch', value: kpiKritisch, icon: '🔴', color: '#f43f5e' },

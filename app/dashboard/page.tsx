@@ -7,6 +7,7 @@ import { createSupabaseClient } from '@/lib/supabase'
 import { getLagerArtikel, getBueroRechnungen, getBueroAuftraege, getFirmaEinstellungen, getOwnerDashboardSnapshot, type FirmaEinstellungen, type OwnerDashboardSnapshot } from '@/lib/db'
 import { loadRole, type AppRole } from '@/lib/roles'
 import { OwnerAiControlPanel } from '@/components/billing/OwnerAiControlPanel'
+import SkeletonCard from '@/components/SkeletonCard'
 import type { PilotId } from '@/lib/pricingConfig'
 
 const pilots = [
@@ -436,7 +437,8 @@ export default function DashboardPage() {
         {!kpiLoaded && <div style={{ width: 16, height: 16, border: '2px solid rgba(22,132,255,.3)', borderTopColor: '#1684ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />}
       </div>
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
-        {visibleKpiCards.map((s, i) => (
+        {!kpiLoaded && <SkeletonCard count={6} />}
+        {kpiLoaded && visibleKpiCards.map((s, i) => (
           <button
             key={s.label}
             onClick={() => router.push(s.href)}

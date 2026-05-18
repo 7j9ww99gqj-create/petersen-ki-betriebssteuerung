@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
+import SkeletonCard from '@/components/SkeletonCard'
 import { hasDemoCookie } from '@/lib/auth'
 import { genId } from '@/lib/ids'
 import {
@@ -1775,7 +1776,8 @@ export default function LagerPilotPage() {
 
       {/* Stats */}
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 22 }}>
-        {[
+        {loading && <SkeletonCard count={6} />}
+        {!loading && [
           { label: 'Artikel gesamt', value: String(artikel.length), icon: '📦', color: '#1684ff' },
           { label: 'Gesamtbestand', value: gesamtWert.toLocaleString('de-DE'), icon: '🔢', color: '#20c8ff' },
           { label: 'Niedrig Bestand', value: String(statsNiedrig), icon: '⚠️', color: '#f59e0b' },

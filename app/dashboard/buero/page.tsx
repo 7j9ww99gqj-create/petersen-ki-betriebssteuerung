@@ -15,6 +15,7 @@ import {
   getEinkaufWareneingaenge, insertEinkaufWareneingang,
 } from '@/lib/db'
 import { generateRechnungPDF, generateAngebotPDF, generateAuftragsbestaetigungPDF } from '@/lib/pdf'
+import SkeletonCard from '@/components/SkeletonCard'
 import { createSupabaseClient } from '@/lib/supabase'
 import { normalizeDocumentStoragePath, type StoredDocumentLink } from '@/lib/documents'
 import { genId } from '@/lib/ids'
@@ -519,11 +520,8 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
   }
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 28, height: 28, border: '3px solid rgba(32,200,255,.3)', borderTopColor: '#20c8ff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 10px' }} />
-        <div style={{ color: '#aeb9c8', fontSize: 13 }}>Lade Kunden…</div>
-      </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+      <SkeletonCard count={6} />
     </div>
   )
 

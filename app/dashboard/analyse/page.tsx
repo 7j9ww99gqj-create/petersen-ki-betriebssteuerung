@@ -8,6 +8,7 @@ import {
 import { hasDemoCookie } from '@/lib/auth'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import PilotDocumentArchive from '@/components/PilotDocumentArchive'
+import SkeletonCard from '@/components/SkeletonCard'
 
 // ── Typen ──────────────────────────────────────────────────────────────────────
 
@@ -522,20 +523,23 @@ export default function AnalysePilotPage() {
         <div>
           {/* KPI Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 24 }}>
-            <KPICard icon="💶" label="Umsatz (lfd. Monat)" value={fmtK(kpi.umsatzMonat)} color="#10b981" />
-            <KPICard icon="📈" label="Gewinn (lfd. Monat)" value={fmtK(kpi.gewinnMonat)} color="#1684ff" />
-            <KPICard icon="📦" label="Artikel im Lager" value={kpi.artikelGesamt.toLocaleString('de-DE')} color="#f59e0b"
-              sub={kpi.artikelNiedrig > 0 ? `Davon ${kpi.artikelNiedrig} niedrig` : 'Alle ausreichend'} />
-            <KPICard icon="✅" label="Ø Lagerauslastung" value={kpi.artikelLeer > 0 ? `${Math.round((1 - kpi.artikelLeer / Math.max(kpi.artikelGesamt, 1)) * 100)}%` : '100%'} color="#10b981" sub="Artikel mit Bestand > 0" />
-            <KPICard icon="👥" label="Aktive Kunden" value={String(kpi.aktivKunden)} color="#20c8ff" />
-            <KPICard icon="📋" label="Offene Angebote" value={String(kpi.offeneAngebote)} color="#f59e0b"
-              sub={kpi.offeneAngeboteSumme > 0 ? `Wert: ${fmtK(kpi.offeneAngeboteSumme)}` : undefined} />
-            <KPICard icon="💶" label="Offene Rechnungen" value={String(kpi.offeneRechnungen)} color="#f43f5e"
-              sub={kpi.offeneRechnungenSumme > 0 ? `Gesamt: ${fmtK(kpi.offeneRechnungenSumme)}` : undefined} />
-            <KPICard icon="⚠️" label="Kritische Artikel" value={String(kpi.artikelNiedrig + kpi.artikelLeer)} color="#f59e0b"
-              sub={`${kpi.artikelLeer} leer · ${kpi.artikelNiedrig} niedrig`} />
-            <KPICard icon="💰" label="Lagerwert" value={kpi.lagerwertHinweis ? `${kpi.lagerwert.toLocaleString('de-DE')} Stk` : `${kpi.lagerwert.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`} color="#f59e0b"
-              sub={kpi.lagerwertHinweis || 'Bestand × Einkaufspreis'} />
+            {loading && <SkeletonCard count={6} />}
+            {!loading && <>
+              <KPICard icon="💶" label="Umsatz (lfd. Monat)" value={fmtK(kpi.umsatzMonat)} color="#10b981" />
+              <KPICard icon="📈" label="Gewinn (lfd. Monat)" value={fmtK(kpi.gewinnMonat)} color="#1684ff" />
+              <KPICard icon="📦" label="Artikel im Lager" value={kpi.artikelGesamt.toLocaleString('de-DE')} color="#f59e0b"
+                sub={kpi.artikelNiedrig > 0 ? `Davon ${kpi.artikelNiedrig} niedrig` : 'Alle ausreichend'} />
+              <KPICard icon="✅" label="Ø Lagerauslastung" value={kpi.artikelLeer > 0 ? `${Math.round((1 - kpi.artikelLeer / Math.max(kpi.artikelGesamt, 1)) * 100)}%` : '100%'} color="#10b981" sub="Artikel mit Bestand > 0" />
+              <KPICard icon="👥" label="Aktive Kunden" value={String(kpi.aktivKunden)} color="#20c8ff" />
+              <KPICard icon="📋" label="Offene Angebote" value={String(kpi.offeneAngebote)} color="#f59e0b"
+                sub={kpi.offeneAngeboteSumme > 0 ? `Wert: ${fmtK(kpi.offeneAngeboteSumme)}` : undefined} />
+              <KPICard icon="💶" label="Offene Rechnungen" value={String(kpi.offeneRechnungen)} color="#f43f5e"
+                sub={kpi.offeneRechnungenSumme > 0 ? `Gesamt: ${fmtK(kpi.offeneRechnungenSumme)}` : undefined} />
+              <KPICard icon="⚠️" label="Kritische Artikel" value={String(kpi.artikelNiedrig + kpi.artikelLeer)} color="#f59e0b"
+                sub={`${kpi.artikelLeer} leer · ${kpi.artikelNiedrig} niedrig`} />
+              <KPICard icon="💰" label="Lagerwert" value={kpi.lagerwertHinweis ? `${kpi.lagerwert.toLocaleString('de-DE')} Stk` : `${kpi.lagerwert.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`} color="#f59e0b"
+                sub={kpi.lagerwertHinweis || 'Bestand × Einkaufspreis'} />
+            </>}
           </div>
 
           {/* Sparkline Umsatz */}
