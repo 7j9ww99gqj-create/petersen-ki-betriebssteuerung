@@ -175,11 +175,17 @@ export default function AnalysePilotPage() {
       else zeitraumStart.setMonth(now2.getMonth() - 6) // 6M default
       const chartMonate = zr === '7T' ? 1 : zr === '30T' ? 2 : zr === '3M' ? 3 : zr === '1J' ? 12 : 6
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      // Server-seitiger Datumsfilter: maximal 12 Monate zurück
+      const startOf12MonthsAgo = new Date()
+      startOf12MonthsAgo.setFullYear(startOf12MonthsAgo.getFullYear() - 1)
+      const start12Iso = startOf12MonthsAgo.toISOString()
+      const todayIso = new Date().toISOString()
+
       const [rechnungen, eingangsrechnungen, kunden, angebote, artikel, kiDocs] = await Promise.allSettled([
-        supabase.from('buero_rechnungen').select('betrag,summe,datum,status').order('created_at'),
-        supabase.from('buero_eingangsrechnungen').select('betrag_brutto,rechnungsdatum,status'),
+        supabase.from('buero_rechnungen').select('betrag,summe,datum,status').gte('datum', start12Iso.slice(0, 10)).lte('datum', todayIso.slice(0, 10)).order('datum'),
+        supabase.from('buero_eingangsrechnungen').select('betrag_brutto,rechnungsdatum,status').gte('rechnungsdatum', start12Iso.slice(0, 10)),
         supabase.from('buero_kunden').select('status'),
-        supabase.from('buero_angebote').select('betrag,datum,status'),
+        supabase.from('buero_angebote').select('betrag,datum,status').gte('datum', start12Iso.slice(0, 10)),
         supabase.from('lager_artikel').select('bestand,status,mindestbestand,created_at,einkaufspreis'),
         supabase.from('buero_dokumente').select('document_type,confidence,created_at').gte('created_at', sevenDaysAgo),
       ])
