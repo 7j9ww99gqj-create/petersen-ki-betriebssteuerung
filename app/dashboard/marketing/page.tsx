@@ -19,6 +19,9 @@ import {
   upsertMarketingNewsletter,
   upsertMarketingPostingPlan,
   upsertMarketingSeoKeyword,
+  deleteMarketingKampagne,
+  deleteMarketingLead,
+  deleteMarketingNewsletter,
 } from '@/lib/db'
 
 type KampagneStatus = 'Entwurf' | 'Aktiv' | 'Pausiert' | 'Abgeschlossen'
@@ -773,10 +776,13 @@ function KampagnenTab({
   onChange: (next: Kampagne[]) => void
 }) {
   const [showForm, setShowForm] = useState(false)
+  const [editItem, setEditItem] = useState<Kampagne | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState('Alle')
   const [toast, setToast] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [form, setForm] = useState({ name: '', typ: 'E-Mail', zielgruppe: '', start: '', ende: '', budget: '' })
+  const [editForm, setEditForm] = useState({ name: '', typ: 'E-Mail', zielgruppe: '', start: '', ende: '', budget: '' })
 
   const showToast = (msg: string, error = false) => {
     if (error) setErrorMsg(msg)
@@ -847,8 +853,94 @@ function KampagnenTab({
     showToast(`✅ Kampagne auf "${status}" gesetzt`)
   }
 
+  const handleDelete = async (id: string) => {
+    if (!isDemo) {
+      try {
+        await deleteMarketingKampagne(id)
+      } catch {
+        showToast('Fehler beim Löschen', true)
+        setDeleteConfirm(null)
+        return
+      }
+    }
+    onChange(kampagnen.filter(item => item.id !== id))
+    setDeleteConfirm(null)
+    showToast('✅ Kampagne gelöscht')
+  }
+
+  const openEdit = (item: Kampagne) => {
+    setEditItem(item)
+    setEditForm({
+      name: item.name,
+      typ: item.typ,
+      zielgruppe: item.zielgruppe,
+      start: item.start === '—' ? '' : item.start,
+      ende: item.ende === '—' ? '' : item.ende,
+      budget: item.budget.replace(' €', '').replace(/\./g, ''),
+    })
+  }
+
+  const handleEditSave = async () => {
+    if (!editItem || !editForm.name || !editForm.zielgruppe) return
+    const updated: Kampagne = {
+      ...editItem,
+      name: editForm.name,
+      typ: editForm.typ as Kampagne['typ'],
+      zielgruppe: editForm.zielgruppe,
+      start: editForm.start || '—',
+      ende: editForm.ende || '—',
+      budget: editForm.budget ? `${editForm.budget} €` : editItem.budget,
+    }
+    if (!isDemo) {
+      try {
+        await upsertMarketingKampagne(updated)
+      } catch {
+        showToast('Fehler beim Speichern', true)
+        return
+      }
+    }
+    onChange(kampagnen.map(item => item.id === updated.id ? updated : item))
+    setEditItem(null)
+    showToast(`✅ Kampagne "${updated.name}" gespeichert`)
+  }
+
   return (
     <div>
+      {editItem && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setEditItem(null)}>
+          <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Kampagne bearbeiten</h3>
+              <button onClick={() => setEditItem(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+              {([
+                { label: 'Kampagnenname *', key: 'name', placeholder: 'z.B. Sommer-Aktion' },
+                { label: 'Zielgruppe *', key: 'zielgruppe', placeholder: 'z.B. Bestandskunden' },
+                { label: 'Start', key: 'start', placeholder: 'TT.MM.JJJJ' },
+                { label: 'Ende', key: 'ende', placeholder: 'TT.MM.JJJJ' },
+                { label: 'Budget (€)', key: 'budget', placeholder: 'z.B. 1200' },
+              ] as const).map(field => (
+                <div key={field.key}>
+                  <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{field.label}</label>
+                  <input className="pk-input" placeholder={field.placeholder} value={(editForm as Record<string, string>)[field.key]} onChange={e => setEditForm(prev => ({ ...prev, [field.key]: e.target.value }))} />
+                </div>
+              ))}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
+                <select className="pk-input" value={editForm.typ} onChange={e => setEditForm(prev => ({ ...prev, typ: e.target.value }))}>
+                  {['E-Mail', 'Social Media', 'Newsletter', 'Anzeige'].map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
+              <button className="pk-btn" style={{ background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={handleEditSave}>Speichern</button>
+              <button className="pk-btn-ghost" onClick={() => setEditItem(null)}>Abbrechen</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
 
@@ -945,6 +1037,15 @@ function KampagnenTab({
                   {item.status === 'Aktiv' && <button onClick={() => handleStatus(item.id, 'Pausiert')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(245,158,11,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>⏸ Pausieren</button>}
                   {item.status === 'Aktiv' && <button onClick={() => handleStatus(item.id, 'Abgeschlossen')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(22,132,255,.3)', background: 'transparent', color: '#6cb6ff', cursor: 'pointer' }}>✅ Abschliessen</button>}
                   {item.status === 'Pausiert' && <button onClick={() => handleStatus(item.id, 'Aktiv')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>▶ Fortsetzen</button>}
+                  <button onClick={() => openEdit(item)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.18)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>✏️</button>
+                  {deleteConfirm === item.id ? (
+                    <>
+                      <button onClick={() => handleDelete(item.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.4)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>Löschen</button>
+                      <button onClick={() => setDeleteConfirm(null)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+                    </>
+                  ) : (
+                    <button onClick={() => setDeleteConfirm(item.id)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>🗑️</button>
+                  )}
                 </div>
               </div>
 
@@ -995,6 +1096,9 @@ function LeadsTab({
   onChange: (next: Lead[]) => void
 }) {
   const [showForm, setShowForm] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [editLead, setEditLead] = useState<Lead | null>(null)
+  const [editLeadForm, setEditLeadForm] = useState({ name: '', firma: '', email: '', telefon: '', quelle: 'Website', wert: '', betreuer: '' })
   const [filterStatus, setFilterStatus] = useState('Alle')
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState('')
@@ -1073,8 +1177,97 @@ function LeadsTab({
     showToast(`✅ Lead-Status auf "${status}" gesetzt`)
   }
 
+  const handleDeleteLead = async (id: string) => {
+    if (!isDemo) {
+      try {
+        await deleteMarketingLead(id)
+      } catch {
+        showToast('Fehler beim Löschen', true)
+        setDeleteConfirm(null)
+        return
+      }
+    }
+    onChange(leads.filter(lead => lead.id !== id))
+    setDeleteConfirm(null)
+    showToast('✅ Lead gelöscht')
+  }
+
+  const openEditLead = (lead: Lead) => {
+    setEditLead(lead)
+    setEditLeadForm({
+      name: lead.name,
+      firma: lead.firma,
+      email: lead.email,
+      telefon: lead.telefon,
+      quelle: lead.quelle,
+      wert: lead.wert === '—' ? '' : lead.wert.replace(' €', '').replace(/\./g, ''),
+      betreuer: lead.betreuer,
+    })
+  }
+
+  const handleEditLeadSave = async () => {
+    if (!editLead || !editLeadForm.name || !editLeadForm.email) return
+    const updated: Lead = {
+      ...editLead,
+      name: editLeadForm.name,
+      firma: editLeadForm.firma,
+      email: editLeadForm.email,
+      telefon: editLeadForm.telefon,
+      quelle: editLeadForm.quelle as LeadQuelle,
+      wert: editLeadForm.wert ? `${editLeadForm.wert} €` : editLead.wert,
+      betreuer: editLeadForm.betreuer,
+    }
+    if (!isDemo) {
+      try {
+        await upsertMarketingLead(updated)
+      } catch {
+        showToast('Fehler beim Speichern', true)
+        return
+      }
+    }
+    onChange(leads.map(lead => lead.id === updated.id ? updated : lead))
+    setEditLead(null)
+    showToast(`✅ Lead "${updated.name}" gespeichert`)
+  }
+
   return (
     <div>
+      {editLead && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setEditLead(null)}>
+          <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Lead bearbeiten</h3>
+              <button onClick={() => setEditLead(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>
+              {([
+                { label: 'Name *', key: 'name', placeholder: 'Vor- und Nachname' },
+                { label: 'Firma', key: 'firma', placeholder: 'Firmenname' },
+                { label: 'E-Mail *', key: 'email', placeholder: 'email@firma.de' },
+                { label: 'Telefon', key: 'telefon', placeholder: '040 12345' },
+                { label: 'Potenzieller Wert (€)', key: 'wert', placeholder: 'z.B. 5000' },
+                { label: 'Betreuer', key: 'betreuer', placeholder: 'Mitarbeitername' },
+              ] as const).map(field => (
+                <div key={field.key}>
+                  <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{field.label}</label>
+                  <input className="pk-input" placeholder={field.placeholder} value={(editLeadForm as Record<string, string>)[field.key]} onChange={e => setEditLeadForm(prev => ({ ...prev, [field.key]: e.target.value }))} />
+                </div>
+              ))}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Quelle</label>
+                <select className="pk-input" value={editLeadForm.quelle} onChange={e => setEditLeadForm(prev => ({ ...prev, quelle: e.target.value }))}>
+                  {['Website', 'Empfehlung', 'Messe', 'Social Media', 'Kaltakquise', 'Sonstiges'].map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
+              <button className="pk-btn" style={{ background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={handleEditLeadSave}>Speichern</button>
+              <button className="pk-btn-ghost" onClick={() => setEditLead(null)}>Abbrechen</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
 
@@ -1183,6 +1376,7 @@ function LeadsTab({
               <th>Betreuer</th>
               <th>Erstellt</th>
               <th>Aktion</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -1204,6 +1398,19 @@ function LeadsTab({
                       {leadPipeline.map(status => <option key={status}>{status}</option>)}
                     </select>
                   )}
+                </td>
+                <td>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <button onClick={() => openEditLead(lead)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,.18)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>✏️</button>
+                    {deleteConfirm === lead.id ? (
+                      <>
+                        <button onClick={() => handleDeleteLead(lead.id)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,80,80,.4)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>Löschen</button>
+                        <button onClick={() => setDeleteConfirm(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+                      </>
+                    ) : (
+                      <button onClick={() => setDeleteConfirm(lead.id)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>🗑️</button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -1227,6 +1434,9 @@ function NewsletterTab({
   onChange: (next: Newsletter[]) => void
 }) {
   const [showForm, setShowForm] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [editNewsletter, setEditNewsletter] = useState<Newsletter | null>(null)
+  const [editNlForm, setEditNlForm] = useState({ betreff: '', vorschau: '', datum: '', empfaenger: '' })
   const [toast, setToast] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [statusFilter, setStatusFilter] = useState<'Alle' | NewsletterStatus>('Alle')
@@ -1290,8 +1500,90 @@ function NewsletterTab({
     showToast(successMessage)
   }
 
+  const handleDeleteNewsletter = async (id: string) => {
+    if (!isDemo) {
+      try {
+        await deleteMarketingNewsletter(id)
+      } catch {
+        showToast('Fehler beim Löschen', true)
+        setDeleteConfirm(null)
+        return
+      }
+    }
+    onChange(newsletter.filter(item => item.id !== id))
+    setDeleteConfirm(null)
+    showToast('✅ Newsletter gelöscht')
+  }
+
+  const openEditNewsletter = (item: Newsletter) => {
+    setEditNewsletter(item)
+    setEditNlForm({
+      betreff: item.betreff,
+      vorschau: item.vorschau,
+      datum: item.datum,
+      empfaenger: String(item.empfaenger),
+    })
+  }
+
+  const handleEditNlSave = async () => {
+    if (!editNewsletter || !editNlForm.betreff) return
+    const updated: Newsletter = {
+      ...editNewsletter,
+      betreff: editNlForm.betreff,
+      vorschau: editNlForm.vorschau || editNewsletter.vorschau,
+      datum: editNlForm.datum || editNewsletter.datum,
+      empfaenger: Number(editNlForm.empfaenger) || editNewsletter.empfaenger,
+    }
+    if (!isDemo) {
+      try {
+        await upsertMarketingNewsletter(updated)
+      } catch {
+        showToast('Fehler beim Speichern', true)
+        return
+      }
+    }
+    onChange(newsletter.map(item => item.id === updated.id ? updated : item))
+    setEditNewsletter(null)
+    showToast(`✅ Newsletter "${updated.betreff.substring(0, 40)}" gespeichert`)
+  }
+
   return (
     <div>
+      {editNewsletter && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setEditNewsletter(null)}>
+          <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Newsletter bearbeiten</h3>
+              <button onClick={() => setEditNewsletter(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ display: 'grid', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Betreff *</label>
+                <input className="pk-input" value={editNlForm.betreff} onChange={e => setEditNlForm(prev => ({ ...prev, betreff: e.target.value }))} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Vorschautext</label>
+                <input className="pk-input" value={editNlForm.vorschau} onChange={e => setEditNlForm(prev => ({ ...prev, vorschau: e.target.value }))} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Versanddatum</label>
+                  <input className="pk-input" placeholder="TT.MM.JJJJ" value={editNlForm.datum} onChange={e => setEditNlForm(prev => ({ ...prev, datum: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Empfänger</label>
+                  <input className="pk-input" type="number" value={editNlForm.empfaenger} onChange={e => setEditNlForm(prev => ({ ...prev, empfaenger: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
+              <button className="pk-btn" style={{ background: 'linear-gradient(135deg, #d97706, #b45309)' }} onClick={handleEditNlSave}>Speichern</button>
+              <button className="pk-btn-ghost" onClick={() => setEditNewsletter(null)}>Abbrechen</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
       <Toast msg={toast} />
 
@@ -1404,6 +1696,15 @@ function NewsletterTab({
                   <button onClick={() => updateNewsletter(item.id, current => ({ ...current, status: 'Entwurf' }), '✅ Newsletter zurueck in Entwurf gesetzt')} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.18)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     ↺ Entwurf
                   </button>
+                )}
+                <button onClick={() => openEditNewsletter(item)} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.18)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer', whiteSpace: 'nowrap' }}>✏️ Bearbeiten</button>
+                {deleteConfirm === item.id ? (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => handleDeleteNewsletter(item.id)} style={{ fontSize: 11, padding: '5px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.4)', background: 'transparent', color: '#ff8080', cursor: 'pointer' }}>Löschen</button>
+                    <button onClick={() => setDeleteConfirm(null)} style={{ fontSize: 11, padding: '5px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setDeleteConfirm(item.id)} style={{ fontSize: 12, padding: '7px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer', whiteSpace: 'nowrap' }}>🗑️ Löschen</button>
                 )}
               </div>
             </div>
