@@ -17,6 +17,7 @@ const bottomNavItems = [
   { href: '/dashboard/lager',       icon: '📦', label: 'Lager' },
   { href: '/dashboard/buero',       icon: '🧾', label: 'Büro' },
   { href: '/dashboard/werkstatt',   icon: '🛠️', label: 'Werkstatt' },
+  { href: '/dashboard/steuer',      icon: '🧾', label: 'Steuer' },
   { href: '/dashboard/ki-erkennung',icon: '🧠', label: 'KI-Assist' },
   { href: '#menu',                  icon: '☰',  label: 'Menü' },
 ]
@@ -176,6 +177,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (item.href === '/dashboard/lager') return allowedPilotIds.includes('lager')
     if (item.href === '/dashboard/buero') return allowedPilotIds.includes('buero')
     if (item.href === '/dashboard/werkstatt') return allowedPilotIds.includes('werkstatt')
+    if (item.href === '/dashboard/steuer') return allowedPilotIds.includes('steuer')
     if (item.href === '/dashboard/ki-erkennung') return allowedPilotIds.length > 0
     return true
   })
