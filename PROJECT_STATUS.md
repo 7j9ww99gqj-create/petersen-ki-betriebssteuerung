@@ -26,9 +26,9 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `9180136`.
-- Jüngste Fortschritte: Tasks 2-8 parallel abgeschlossen — Multi-Positionen, ELSTER-Export, Marketing CRUD, AnalysePilot Live, Benutzerverwaltung, RLS-Policies, Pipeline-Widget.
-- Wichtigste externe Restpunkte: E-Mail-Versand bleibt bewusst manuell über das lokale Mailprogramm.
+- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Commit `9c24845`.
+- Jüngste Fortschritte: SteuerPilot Betrag-Bug fix + Beleg-Upload-System mit Kategorien/Filter/Inline-Delete; MarketingPilot Demo→Live-Calls, Edit+Delete vollständig verdrahtet.
+- Wichtigste externe Restpunkte: E-Mail-Versand bleibt bewusst manuell über das lokale Mailprogramm. Migration `20260518200000_steuer_belege_uploads.sql` im Supabase SQL-Editor ausführen.
 - Produktivlage: Kernsystem weitgehend vollständig; Hauptmodule produktionsreif.
 
 ### 0.2 Top-Offene Aufgaben (Priorisiert)
@@ -38,6 +38,14 @@
 - ✅ ~~**Task 3: SteuerPilot A13: ELSTER-XML-Export**~~ **Erledigt 2026-05-18** (Commit `043ff2e`).
 - ✅ ~~**Task 4: MarketingPilot Edit + Delete**~~ **Erledigt 2026-05-18** (Commit `3166286`).
 - ✅ ~~**Task 5: AnalysePilot Live-Daten**~~ **Erledigt 2026-05-18** (Commit `234fcc2`).
+- ✅ ~~**SteuerPilot: Betrag-Input Bug + Beleg-Upload mit Kategorie/Filter/Inline-Delete**~~ **Erledigt 2026-05-18** (Commit `ec0b705`).
+- ✅ ~~**MarketingPilot: Demo→Live-Calls + Edit/Delete verdrahtet**~~ **Erledigt 2026-05-18** (Commit `9c24845`).
+- 🔴 **Supabase-Migration ausführen**: `20260518200000_steuer_belege_uploads.sql` im SQL-Editor einspielen (neue Tabelle + Storage-Bucket).
+- 🟡 **EinkaufTab**: Demo-State auf echte Supabase-Calls umstellen.
+- 🟡 **KI-Aktion "Bestellung"** ausführbar machen (analog zu Umlagerung).
+- 🟡 **Stripe Analytics Integration** (4 h, einfach) — MRR-Verlauf im Marketing-Auswertungs-Tab.
+- 🟡 **Mailchimp API** (5 h, einfach) — Echtzeit-Öffnungsraten + Lead→Subscriber-Automatisierung.
+- 🟢 Analyse-Bestandstrend auf echte Wochensnapshots umstellen.
 - ✅ ~~**Task 6: Benutzerverwaltung Deaktivieren/Löschen/Suche**~~ **Erledigt 2026-05-18** (Commit `80e0f8c`).
 - ✅ ~~**Task 7: RLS-Policies vollständig**~~ **Erledigt 2026-05-18** (Commit `7aee934`).
 - ✅ ~~**Task 8: Pipeline-Widget 3 KPIs**~~ **Erledigt 2026-05-18** (Commit `dadb045`).
@@ -50,10 +58,10 @@
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-18, Commit `9180136`  
-**Letzte Session:** Tasks 2-8 parallel — Multi-Positionen, ELSTER-Export, Marketing CRUD, AnalysePilot Live, Benutzerverwaltung, RLS-Policies, Pipeline-Widget  
-**Nächster Focus:** EinkaufTab Live-Daten → KI-Bestellaktion ausführbar  
-**Blocker:** Keine  
+**Letzter Stand:** 2026-05-18, Commit `9c24845`  
+**Letzte Session:** SteuerPilot Betrag-Bug fix + Beleg-Upload-System (Kategorie/Filter/Inline-Delete); MarketingPilot Demo→Live + Edit/Delete komplett verdrahtet  
+**Nächster Focus:** Supabase-Migration `steuer_belege_uploads` einspielen → Stripe Analytics Integration → Mailchimp API  
+**Blocker:** Migration `20260518200000_steuer_belege_uploads.sql` muss manuell im SQL-Editor ausgeführt werden  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
 ## 1. Kurzüberblick
@@ -69,6 +77,16 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – SteuerPilot + MarketingPilot parallel, Commits `ec0b705` + `9c24845`)**:
+  - **SteuerPilot — Betrag-Bug fix**: Input von `type="number"` auf `type="text" inputMode="decimal"` umgestellt; onChange normalisiert Komma→Punkt, kein `|| 0`-Override mehr. Datei: `steuer/page.tsx`.
+  - **SteuerPilot — Beleg-Upload-System**: Neues Formular (Kategorie-Select: Fixkosten/Betriebsausgaben/Anschaffung/Sonstiges, Betrag, Datum, Notiz, Datei-Upload) → Upload in Bucket `steuer-belege`. Dateien: `steuer/page.tsx`, `lib/db.ts`.
+  - **SteuerPilot — Kategorie-Filter-Tabs**: Alle / Fixkosten / Betriebsausgaben / Anschaffung / Sonstiges mit Zähler. Datei: `steuer/page.tsx`.
+  - **SteuerPilot — Inline-Delete**: Ja/Nein-Buttons (kein `confirm()`), löscht Datei aus Storage + DB. Datei: `steuer/page.tsx`.
+  - **lib/db.ts**: Neue Funktionen `getSteuerBelegUploads`, `upsertSteuerBelegUpload`, `deleteSteuerBelegUpload`, `uploadSteuerBelegFile`.
+  - **Migration**: `supabase/migrations/20260518200000_steuer_belege_uploads.sql` — Tabelle `steuer_belege_uploads` + Bucket-Policies. ⚠️ Muss manuell im Supabase SQL-Editor ausgeführt werden.
+  - **MarketingPilot — Demo→Live**: Live-Calls für Kampagnen/Leads/Newsletter waren bereits korrekt; Demo-Guards bestätigt. Datei: `marketing/page.tsx`.
+  - **MarketingPilot — Edit + Delete vollständig**: 8 neue Delete-Funktionen in `lib/db.ts`; Edit-Modal + Inline-Confirm-Delete für Kampagnen, Leads, Newsletter in `marketing/page.tsx`.
+  - Tests: lint + build grün.
 - **Zuletzt erledigt (2026-05-18 – Tasks 2-8 parallel, Commits `043ff2e`–`9180136`)**:
   - **Task 2 (Multi-Positionen)**: `PositionenEditor`-Komponente in Angebote/Aufträge/Rechnungen. Positionen als JSON-Array, Betrag dynamisch berechnet, rückwärtskompatibel. Dateien: `buero/page.tsx`, `lib/db.ts`.
   - **Task 3 (ELSTER-Export)**: Neues `lib/steuer-export.ts` mit `generateElsterXml()`. Button „📥 ELSTER-XML exportieren" im UStVA-Tab + Export-Karte. Kennzahlen 81 (USt) + 83 (VSt). Datei: `steuer/page.tsx`.
