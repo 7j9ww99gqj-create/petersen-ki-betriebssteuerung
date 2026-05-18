@@ -5,6 +5,8 @@ import { getBueroRechnungen, getSteuerBelege, upsertSteuerBeleg, deleteSteuerBel
 import { genId } from '@/lib/ids'
 import { createSupabaseClient } from '@/lib/supabase'
 import { getSteuerWarnings, type Warning } from '@/lib/warnings'
+import { useRole } from '@/lib/roles'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import dynamic from 'next/dynamic'
 
 // Lazy-load schwere Tabs
@@ -172,6 +174,7 @@ function WarnBadge({ type }: { type: Warning['type'] }) {
 
 export default function SteuerPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
+  const { role, permissions } = useRole()
   const [tab, setTab] = useState<SteuerTab>('dashboard')
   const [belege, setBelege] = useState<Beleg[]>([])
   const [ustva, setUstva] = useState<Ustva[]>([])
@@ -354,6 +357,18 @@ export default function SteuerPilotPage() {
     )
   }
 
+  if (!isDemo && !permissions.canViewSteuer) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: '#aeb9c8' }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
+        <div style={{ fontWeight: 700 }}>Kein Zugriff</div>
+        <div style={{ fontSize: 13, marginTop: 6 }}>
+          Der SteuerPilot ist nur für Admin, Büro und Inhaber zugänglich.
+        </div>
+      </div>
+    )
+  }
+
   const calc = calcUStVA()
   const filteredBelege = belege.filter(b => {
     const ms = !search || b.lieferant.toLowerCase().includes(search.toLowerCase()) || (b.notiz ?? '').toLowerCase().includes(search.toLowerCase())
@@ -503,6 +518,38 @@ export default function SteuerPilotPage() {
               ))}
             </div>
           </div>
+
+          {/* Ausgaben-Übersicht */}
+          {(() => {
+            const gesamtFixkostenBrutto = fixkosten.filter(f => f.aktiv).reduce((s, f) =>
+              s + f.betrag_brutto * faktorForIntervall(f.zahlungsintervall), 0)
+            const gesamtBetriebsausgaben = betriebsausgabenMonat.reduce((s, b) => s + b.betrag_brutto, 0)
+            const gesamtBelege = belegeMonat.reduce((s, b) => s + b.betrag, 0)
+            const gesamtAnschaffungen = anschaffungenMonat.reduce((s, a) => s + a.betrag_brutto, 0)
+            const gesamtAusgaben = gesamtFixkostenBrutto + gesamtBetriebsausgaben + gesamtBelege + gesamtAnschaffungen
+            return (
+              <div className="pk-card" style={{ padding: 20, marginTop: 16 }}>
+                <div style={{ fontWeight: 700, marginBottom: 14 }}>📊 Ausgaben-Übersicht ({monthLabel(selectedMonat)})</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                  {[
+                    { l: 'Fixkosten (monatl.)', v: fmt(gesamtFixkostenBrutto) },
+                    { l: 'Betriebsausgaben', v: fmt(gesamtBetriebsausgaben) },
+                    { l: 'Belege (Eingang)', v: fmt(gesamtBelege) },
+                    { l: 'Anschaffungen', v: fmt(gesamtAnschaffungen) },
+                  ].map(row => (
+                    <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+                      <span style={{ color: '#aeb9c8' }}>{row.l}</span>
+                      <strong style={{ color: '#f8fbff', fontFamily: 'monospace' }}>{row.v}</strong>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '10px 0 0', fontWeight: 700 }}>
+                    <span style={{ color: '#f8fbff' }}>Gesamt Ausgaben</span>
+                    <strong style={{ color: '#ff8080', fontFamily: 'monospace' }}>{fmt(gesamtAusgaben)}</strong>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Letzte Belege */}
           <div className="pk-card" style={{ padding: 20, marginTop: 16 }}>
@@ -662,10 +709,13 @@ export default function SteuerPilotPage() {
                         <div style={{ display: 'flex', gap: 4 }}>
                           <button onClick={() => setEditBeleg(b)} className="pk-btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }}>✏️</button>
                           {deleteConfirm === b.id ? (
-                            <>
-                              <button onClick={() => handleDeleteBeleg(b.id)} style={{ fontSize: 11, padding: '3px 8px', background: 'rgba(255,80,80,.15)', border: '1px solid rgba(255,80,80,.35)', color: '#ff8080', borderRadius: 6, cursor: 'pointer' }}>Ja</button>
-                              <button onClick={() => setDeleteConfirm(null)} className="pk-btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }}>Nein</button>
-                            </>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                              <span style={{ fontSize: 10, color: '#f59e0b' }}>§ 147 AO: 10 Jahre Aufbewahrungspflicht</span>
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button onClick={() => handleDeleteBeleg(b.id)} style={{ fontSize: 11, padding: '3px 8px', background: 'rgba(255,80,80,.15)', border: '1px solid rgba(255,80,80,.35)', color: '#ff8080', borderRadius: 6, cursor: 'pointer' }}>Ja</button>
+                                <button onClick={() => setDeleteConfirm(null)} className="pk-btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }}>Nein</button>
+                              </div>
+                            </div>
                           ) : (
                             <button onClick={() => setDeleteConfirm(b.id)} className="pk-btn-ghost" style={{ fontSize: 11, padding: '3px 8px' }}>🗑️</button>
                           )}
@@ -831,26 +881,20 @@ export default function SteuerPilotPage() {
           {ustva.length > 0 && (
             <div className="pk-card" style={{ padding: 20, marginBottom: 16 }}>
               <div style={{ fontWeight: 700, marginBottom: 16 }}>UStVA Verlauf (Balkendiagramm)</div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', overflowX: 'auto', paddingBottom: 8 }}>
-                {[...ustva].reverse().map(u => {
-                  const maxVal = Math.max(...ustva.map(x => x.umsatzsteuer + x.vorsteuer))
-                  const ustPct = maxVal > 0 ? (u.umsatzsteuer / maxVal) * 160 : 0
-                  const vstPct = maxVal > 0 ? (u.vorsteuer / maxVal) * 160 : 0
-                  return (
-                    <div key={u.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 60 }}>
-                      <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end' }}>
-                        <div style={{ width: 18, height: ustPct, background: '#ff8080', borderRadius: '3px 3px 0 0', transition: 'height .3s' }} title={`USt: ${fmt(u.umsatzsteuer)}`} />
-                        <div style={{ width: 18, height: vstPct, background: '#4ddb7e', borderRadius: '3px 3px 0 0', transition: 'height .3s' }} title={`VSt: ${fmt(u.vorsteuer)}`} />
-                      </div>
-                      <div style={{ fontSize: 10, color: '#aeb9c8', textAlign: 'center' }}>{u.monat.slice(5)}</div>
-                    </div>
-                  )
-                })}
-              </div>
-              <div style={{ display: 'flex', gap: 16, marginTop: 10, fontSize: 11, color: '#aeb9c8' }}>
-                <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#ff8080', borderRadius: 2, marginRight: 4 }} />Umsatzsteuer</span>
-                <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#4ddb7e', borderRadius: 2, marginRight: 4 }} />Vorsteuer</span>
-              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={[...ustva].reverse().map(u => ({ monat: monthLabel(u.monat), USt: u.umsatzsteuer, VSt: u.vorsteuer }))}>
+                  <XAxis dataKey="monat" tick={{ fontSize: 11, fill: '#aeb9c8' }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#aeb9c8' }} />
+                  <Tooltip
+                    formatter={(value) => [typeof value === 'number' ? fmt(value) : value]}
+                    contentStyle={{ background: '#101a28', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, fontSize: 12 }}
+                    labelStyle={{ color: '#f8fbff', fontWeight: 700 }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, color: '#aeb9c8' }} />
+                  <Bar dataKey="USt" fill="#ff8080" radius={[3, 3, 0, 0]} name="Umsatzsteuer" />
+                  <Bar dataKey="VSt" fill="#4ddb7e" radius={[3, 3, 0, 0]} name="Vorsteuer" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           )}
 
@@ -999,6 +1043,8 @@ export default function SteuerPilotPage() {
               { label: 'UStVA berechnet', done: !!aktuellUstva },
               { label: 'UStVA als geprüft markiert', done: aktuellUstva?.status === 'geprüft' },
               { label: 'DATEV-Export erstellt', done: belegeMonat.some(b => b.status === 'exportiert') },
+              { label: 'Fixkosten für diesen Monat geprüft', done: fixkosten.filter(f => f.aktiv).length > 0 },
+              { label: 'Betriebsausgaben für diesen Monat erfasst', done: betriebsausgabenMonat.length > 0 },
             ].map((item, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                 <span style={{ fontSize: 15 }}>{item.done ? '✅' : '⬜'}</span>

@@ -33,6 +33,7 @@ export const PERMISSIONS = {
   canManageRoles: (role: AppRole) => role === 'Inhaber' || role === 'Admin',
   canExport: (role: AppRole) => role === 'Inhaber' || role === 'Admin' || role === 'Büro',
   canManageUsers: (role: AppRole) => role === 'Inhaber' || role === 'Admin',
+  canViewSteuer: (role: AppRole) => ['Inhaber', 'Admin', 'Büro'].includes(role),
 }
 
 export function normalizeRole(value: unknown): AppRole {
@@ -102,6 +103,7 @@ export function useRole(): {
     canManageRoles: boolean
     canExport: boolean
     canManageUsers: boolean
+    canViewSteuer: boolean
   }
 } {
   const [role, setRoleState] = useState<AppRole>('Admin')
@@ -126,6 +128,7 @@ export function useRole(): {
       canManageRoles: PERMISSIONS.canManageRoles(role),
       canExport: PERMISSIONS.canExport(role),
       canManageUsers: PERMISSIONS.canManageUsers(role),
+      canViewSteuer: PERMISSIONS.canViewSteuer(role),
     },
   }
 }
