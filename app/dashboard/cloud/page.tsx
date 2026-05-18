@@ -467,14 +467,14 @@ export default function CloudPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0,
         }}>☁️</div>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>Cloud & Sync</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>Cloud/Sync & Backup</h1>
           <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>
             {isDemo ? 'Demo-Ansicht ohne Live-Cloud' : 'Live-Status · Backup-System · Modulübersicht'}
           </p>
         </div>
         <span
           className={snapshot.cloudStatus === 'Live verbunden' ? 'badge badge-green' : 'badge badge-gray'}
-          style={{ marginLeft: 'auto' }}
+          style={{ marginLeft: 'auto', flexShrink: 0 }}
         >
           {snapshot.cloudStatus === 'Live verbunden' ? '● LIVE' : '● DEMO'}
         </span>
@@ -500,7 +500,7 @@ export default function CloudPage() {
       )}
 
       {/* Hauptbereich: Backup + Datenstatus */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+      <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20, marginBottom: 20 }}>
 
         {/* Backup-System */}
         <div className="pk-card">
@@ -687,7 +687,7 @@ export default function CloudPage() {
       </div>
 
       {/* Aktivitätsprotokoll + Geräte */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
         <div className="pk-card">
           <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800 }}>📋 Aktivitätsprotokoll</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
