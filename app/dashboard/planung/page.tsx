@@ -979,6 +979,25 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
     setEditAufgabe(a)
   }
 
+  // Prüft ob alle Aufgaben eines Projekts erledigt sind und setzt Fortschritt auf 100%
+  const checkAndAutoUpdateProjekt = async (projektName: string, currentAufgaben: Aufgabe[]) => {
+    if (!projektName || projektName === '—') return
+    const projektAufgaben = currentAufgaben.filter(a => a.projekt === projektName)
+    if (projektAufgaben.length === 0) return
+    const alleErledigt = projektAufgaben.every(a => a.status === 'Erledigt')
+    if (!alleErledigt) return
+    if (!isDemo) {
+      try {
+        const projekte = await getPlanungProjekte()
+        const proj = (projekte as Projekt[]).find(p => p.name === projektName || p.id === projektName)
+        if (proj) {
+          await upsertPlanungProjekt({ ...proj, fortschritt: 100 })
+        }
+      } catch { /* ignorieren – kein kritischer Fehler */ }
+    }
+    showToast('✅ Alle Aufgaben erledigt — Fortschritt auf 100% gesetzt')
+  }
+
   const handleUpdate = async () => {
     if (!editAufgabe || !editForm.titel) return
     const updated: Aufgabe = {
@@ -990,9 +1009,11 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
     if (!isDemo) {
       try { await upsertPlanungAufgabe(updated) } catch { showToast('Fehler beim Speichern', true); return }
     }
-    setAufgaben(prev => prev.map(a => a.id === updated.id ? updated : a))
+    const newAufgaben = aufgaben.map(a => a.id === updated.id ? updated : a)
+    setAufgaben(newAufgaben)
     setEditAufgabe(null)
     showToast(`✅ Aufgabe aktualisiert`)
+    if (updated.status === 'Erledigt') await checkAndAutoUpdateProjekt(updated.projekt, newAufgaben)
   }
 
   const handleStatus = async (id: string, status: AufgabeStatus) => {
@@ -1000,8 +1021,10 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
     if (!isDemo && aufgabe) {
       try { await upsertPlanungAufgabe({ ...aufgabe, status }) } catch { showToast('Fehler', true); return }
     }
-    setAufgaben(prev => prev.map(a => a.id === id ? { ...a, status } : a))
+    const newAufgaben = aufgaben.map(a => a.id === id ? { ...a, status } : a)
+    setAufgaben(newAufgaben)
     showToast(`✅ Status auf "${status}" gesetzt`)
+    if (status === 'Erledigt' && aufgabe) await checkAndAutoUpdateProjekt(aufgabe.projekt, newAufgaben)
   }
 
   const handleDelete = async (id: string) => {
