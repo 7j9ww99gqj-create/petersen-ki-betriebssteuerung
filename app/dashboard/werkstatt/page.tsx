@@ -14,6 +14,7 @@ import {
   getWerkstattStoerungen, upsertWerkstattStoerung, deleteWerkstattStoerung,
   getLagerArtikel, syncWerkstattMaterialToLager,
 } from '@/lib/db'
+import PilotDocumentArchive from '@/components/PilotDocumentArchive'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
 
@@ -2104,7 +2105,7 @@ function FertigungsleitstandTab({ isDemo, karten, setKarten, mitarbeiterNamen }:
   )
 }
 
-type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet' | 'wartung' | 'stoerungen' | 'maschinenakte' | 'mitarbeiter' | 'bereiche' | 'leitstand'
+type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet' | 'wartung' | 'stoerungen' | 'maschinenakte' | 'mitarbeiter' | 'bereiche' | 'leitstand' | 'archiv'
 
 export default function WerkstattPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
@@ -2213,6 +2214,7 @@ export default function WerkstattPilotPage() {
           { id: 'maschinenakte', label: '📘 Maschinenakte' },
           { id: 'mitarbeiter', label: '👷 Mitarbeiter' },
           { id: 'bereiche', label: '🏭 Maschinen/Bereiche' },
+          { id: 'archiv', label: '🗂️ Archiv' },
         ] as const).map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding: '10px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
@@ -2232,6 +2234,17 @@ export default function WerkstattPilotPage() {
       {tab === 'maschinenakte' && <MaschinenakteTab bereiche={bereiche} karten={karten} wartungen={wartungen} stoerungen={stoerungen} />}
       {tab === 'mitarbeiter' && <MitarbeiterTab isDemo={isDemo} mitarbeiter={mitarbeiter} setMitarbeiter={setMitarbeiter} />}
       {tab === 'bereiche' && <BereicheTab isDemo={isDemo} bereiche={bereiche} setBereiche={setBereiche} />}
+
+      {/* ── ARCHIV ── */}
+      {tab === 'archiv' && (
+        <div>
+          <div style={{ marginBottom: 18 }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 800 }}>🗂️ Dokument-Archiv – WerkstattPilot</h3>
+            <p style={{ margin: 0, fontSize: 13, color: '#aeb9c8' }}>Wartungsprotokolle, Prüfberichte und Werkstatt-Dokumente verwalten.</p>
+          </div>
+          <PilotDocumentArchive pilotType="werkstatt" />
+        </div>
+      )}
     </div>
   )
 }

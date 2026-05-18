@@ -1491,3 +1491,68 @@ create policy "broadcast_messages_insert" on broadcast_messages
 
 create index if not exists idx_broadcast_messages_created on broadcast_messages(created_at desc);
 create index if not exists idx_broadcast_messages_recipient on broadcast_messages(recipient_user_id, created_at desc);
+
+-- =====================================================
+-- Dokumenten-Archiv für alle Piloten (2026-05-18)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS pilot_documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pilot_type VARCHAR NOT NULL CHECK (pilot_type IN ('lager', 'werkstatt', 'analyse', 'planung')),
+  document_name VARCHAR NOT NULL,
+  document_type VARCHAR NOT NULL,
+  file_path VARCHAR,
+  file_url VARCHAR,
+  file_size BIGINT,
+  mime_type VARCHAR,
+  uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id),
+  tags TEXT[],
+  description TEXT,
+  category VARCHAR
+);
+
+CREATE INDEX IF NOT EXISTS idx_pilot_documents_pilot_type ON pilot_documents(pilot_type);
+CREATE INDEX IF NOT EXISTS idx_pilot_documents_created_by ON pilot_documents(created_by);
+CREATE INDEX IF NOT EXISTS idx_pilot_documents_search ON pilot_documents USING GIN(to_tsvector('german', COALESCE(document_name, '') || ' ' || COALESCE(description, '')));
+
+ALTER TABLE pilot_documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their pilot documents" ON pilot_documents
+  FOR ALL USING (auth.uid() = created_by);
+
+-- =====================================================
+-- Steuer-Belege Tabelle (2026-05-18)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS tax_receipts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  receipt_type VARCHAR NOT NULL CHECK (receipt_type IN ('Fixkosten', 'Betriebsausgaben', 'Anschaffungen')),
+  category VARCHAR NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  receipt_date DATE NOT NULL,
+  description TEXT,
+  file_url VARCHAR,
+  file_path VARCHAR,
+  uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id),
+  tax_year INTEGER DEFAULT EXTRACT(YEAR FROM NOW())
+);
+
+ALTER TABLE tax_receipts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their tax receipts" ON tax_receipts
+  FOR ALL USING (auth.uid() = created_by);
+
+-- =====================================================
+-- Push-Subscriptions für PWA (2026-05-18)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) NOT NULL,
+  endpoint TEXT NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth_key TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, endpoint)
+);
+
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage their push subscriptions" ON push_subscriptions
+  FOR ALL USING (auth.uid() = user_id);

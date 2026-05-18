@@ -9,6 +9,7 @@ import {
   getPlanungRessourcen, upsertPlanungRessource, deletePlanungRessource,
   getBueroAuftraege,
 } from '@/lib/db'
+import PilotDocumentArchive from '@/components/PilotDocumentArchive'
 
 // ── Typen ─────────────────────────────────────────────────────────────────────
 
@@ -1333,7 +1334,7 @@ function LoadingSpinner({ label }: { label: string }) {
 
 // ── Haupt-Seite ───────────────────────────────────────────────────────────────
 
-type Tab = 'projekte' | 'kalender' | 'ressourcen' | 'aufgaben'
+type Tab = 'projekte' | 'kalender' | 'ressourcen' | 'aufgaben' | 'archiv'
 
 export default function PlanungPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
@@ -1414,6 +1415,7 @@ export default function PlanungPilotPage() {
           { id: 'kalender', label: '📅 Kalender', count: termine.length },
           { id: 'ressourcen', label: '⚙️ Ressourcen', count: ressourcen.length },
           { id: 'aufgaben', label: '✏️ Aufgaben', count: aufgaben.filter(a => a.status !== 'Erledigt').length },
+          { id: 'archiv', label: '🗂️ Archiv', count: 0 },
         ] as const).map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding: '10px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
@@ -1429,6 +1431,17 @@ export default function PlanungPilotPage() {
       {tab === 'kalender' && <KalenderTab isDemo={isDemo} />}
       {tab === 'ressourcen' && <RessourcenTab isDemo={isDemo} />}
       {tab === 'aufgaben' && <AufgabenTab isDemo={isDemo} />}
+
+      {/* ── ARCHIV ── */}
+      {tab === 'archiv' && (
+        <div>
+          <div style={{ marginBottom: 18 }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 800 }}>🗂️ Dokument-Archiv – PlanungPilot</h3>
+            <p style={{ margin: 0, fontSize: 13, color: '#aeb9c8' }}>Projektpläne, Terminprotokolle und Planungs-Dokumente verwalten.</p>
+          </div>
+          <PilotDocumentArchive pilotType="planung" />
+        </div>
+      )}
     </div>
   )
 }

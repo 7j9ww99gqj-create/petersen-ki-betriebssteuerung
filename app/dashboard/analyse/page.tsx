@@ -7,6 +7,7 @@ import {
 } from 'recharts'
 import { hasDemoCookie } from '@/lib/auth'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
+import PilotDocumentArchive from '@/components/PilotDocumentArchive'
 
 // ── Typen ──────────────────────────────────────────────────────────────────────
 
@@ -139,7 +140,7 @@ function KPICard({ icon, label, value, delta, color, sub }: {
 
 // ── Tabs ───────────────────────────────────────────────────────────────────────
 
-type Tab = 'uebersicht' | 'umsatz' | 'bestand' | 'ki'
+type Tab = 'uebersicht' | 'umsatz' | 'bestand' | 'ki' | 'archiv'
 
 export default function AnalysePilotPage() {
   const [tab, setTab] = useState<Tab>('uebersicht')
@@ -462,6 +463,7 @@ export default function AnalysePilotPage() {
           { id: 'umsatz', label: '💶 Umsatz & Gewinn' },
           { id: 'bestand', label: '📦 Bestandsentwicklung' },
           { id: 'ki', label: '🧠 KI-Nutzung' },
+          { id: 'archiv', label: '🗂️ Archiv' },
         ] as const).map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding: '10px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
@@ -756,6 +758,17 @@ export default function AnalysePilotPage() {
           </div>
         )
       })()}
+
+      {/* ── ARCHIV ── */}
+      {tab === 'archiv' && (
+        <div>
+          <div style={{ marginBottom: 18 }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 800 }}>🗂️ Dokument-Archiv – AnalysePilot</h3>
+            <p style={{ margin: 0, fontSize: 13, color: '#aeb9c8' }}>Berichte, Auswertungen und Analyse-Dokumente verwalten.</p>
+          </div>
+          <PilotDocumentArchive pilotType="analyse" />
+        </div>
+      )}
     </div>
   )
 }

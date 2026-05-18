@@ -13,6 +13,7 @@ import {
   upsertEinkaufBestellung, getEinkaufLieferanten,
   insertLagerBestandSnapshot,
 } from '@/lib/db'
+import PilotDocumentArchive from '@/components/PilotDocumentArchive'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ const SP_TYPEN = ['Standard', 'Kühl', 'Tiefkühl', 'Eingang', 'Ausgang', 'Sperr
 
 type SortKey = 'id' | 'name' | 'bestand' | 'status'
 type SortDir = 'asc' | 'desc'
-type LagerTab = 'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur' | 'bestellung' | 'historie' | 'stellplaetze' | 'lagerbelegung' | 'umlagerung' | 'kommissionierung' | 'tagesbericht'
+type LagerTab = 'bestand' | 'bewegungen' | 'eingang' | 'ausgang' | 'inventur' | 'bestellung' | 'historie' | 'stellplaetze' | 'lagerbelegung' | 'umlagerung' | 'kommissionierung' | 'tagesbericht' | 'archiv'
 type PickStatus = 'offen' | 'gepickt' | 'abgeschlossen'
 type Pickliste = {
   id: string
@@ -883,7 +884,7 @@ export default function LagerPilotPage() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab')
-    if (requestedTab && ['bestand', 'bewegungen', 'eingang', 'ausgang', 'inventur', 'bestellung', 'historie', 'stellplaetze', 'lagerbelegung', 'umlagerung', 'kommissionierung', 'tagesbericht'].includes(requestedTab)) {
+    if (requestedTab && ['bestand', 'bewegungen', 'eingang', 'ausgang', 'inventur', 'bestellung', 'historie', 'stellplaetze', 'lagerbelegung', 'umlagerung', 'kommissionierung', 'tagesbericht', 'archiv'].includes(requestedTab)) {
       setTab(requestedTab as LagerTab)
     }
     const requestedStatus = searchParams.get('status')
@@ -1879,6 +1880,8 @@ export default function LagerPilotPage() {
             { id: 'lagerbelegung', label: '📊 Lagerbelegung' },
             { id: 'umlagerung', label: '↔️ Umlagerung' },
             { id: 'kommissionierung', label: '🧺 Kommissionierung' },
+            null,
+            { id: 'archiv', label: '🗂️ Archiv' },
           ],
         ] as ({ id: string; label: string; ki?: boolean } | null)[][]).map((row, ri) => (
           <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', rowGap: 4, paddingBottom: ri === 0 ? 2 : 0 }}>
@@ -3619,6 +3622,17 @@ export default function LagerPilotPage() {
           </div>
         )
       })()}
+
+      {/* ── ARCHIV ── */}
+      {tab === 'archiv' && (
+        <div>
+          <div style={{ marginBottom: 18 }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 800 }}>🗂️ Dokumen-Archiv – LagerPilot</h3>
+            <p style={{ margin: 0, fontSize: 13, color: '#aeb9c8' }}>Lieferscheine, Inventurprotokolle und andere Lager-Dokumente verwalten.</p>
+          </div>
+          <PilotDocumentArchive pilotType="lager" />
+        </div>
+      )}
     </div>
   )
 }
