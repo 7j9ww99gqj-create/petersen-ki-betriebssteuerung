@@ -402,28 +402,29 @@ export default function CloudPage() {
     },
   ]), [snapshot, lastBackup, isDemo])
 
-  useEffect(() => {
+  const loadData = async () => {
     if (isDemo) {
       setSnapshot(demoSnapshot)
       setLoading(false)
       setBackupsLoading(false)
       return
     }
-
-    const run = async () => {
-      setError('')
-      try {
-        const [snap, bups] = await Promise.all([loadCloudSnapshot(), getCloudBackups()])
-        setSnapshot(snap)
-        setBackups(bups)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Cloud-Daten konnten nicht geladen werden.')
-      } finally {
-        setLoading(false)
-        setBackupsLoading(false)
-      }
+    setError('')
+    try {
+      const [snap, bups] = await Promise.all([loadCloudSnapshot(), getCloudBackups()])
+      setSnapshot(snap)
+      setBackups(bups)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Cloud-Daten konnten nicht geladen werden.')
+    } finally {
+      setLoading(false)
+      setBackupsLoading(false)
     }
-    void run()
+  }
+
+  useEffect(() => {
+    void loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDemo])
 
   const triggerRefresh = async () => {
@@ -494,8 +495,17 @@ export default function CloudPage() {
       </div>
 
       {error && (
-        <div className="pk-card" style={{ marginBottom: 16, color: '#ff8080', border: '1px solid rgba(255,80,80,.25)' }}>
-          {error}
+        <div style={{
+          marginBottom: 16, padding: '12px 16px', borderRadius: 12,
+          background: 'rgba(255,80,80,.1)', border: '1px solid rgba(255,80,80,.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          flexWrap: 'wrap'
+        }}>
+          <span style={{ fontSize: 13, color: '#ff8080' }}>⚠️ {error}</span>
+          <button className="pk-btn-ghost" onClick={() => { setError(''); void loadData() }}
+            style={{ fontSize: 12, padding: '5px 12px', flexShrink: 0 }}>
+            ↻ Erneut versuchen
+          </button>
         </div>
       )}
 

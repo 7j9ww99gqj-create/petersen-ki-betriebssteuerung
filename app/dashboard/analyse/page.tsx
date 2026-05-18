@@ -162,7 +162,7 @@ export default function AnalysePilotPage() {
   const [kiData, setKiData] = useState<KiDayPoint[]>([])
   const [kiDocTypes, setKiDocTypes] = useState<{ type: string; count: number }[]>([])
   const [isDemo, setIsDemo] = useState(false)
-  const [loadError, setLoadError] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [zahlungsmoralData, setZahlungsmoralData] = useState<ZahlungsmoralKunde[]>([])
 
   useEffect(() => {
@@ -460,8 +460,8 @@ export default function AnalysePilotPage() {
         }))
         .sort((a, b) => b.avgVerzoegerungTage - a.avgVerzoegerungTage)
       setZahlungsmoralData(zmData)
-    } catch {
-      setLoadError(true)
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Daten konnten nicht geladen werden.')
       setKpi(ZERO_KPI)
       setUmsatzData([])
       setBestandData([])
@@ -490,13 +490,23 @@ export default function AnalysePilotPage() {
           {loading && <span className="badge badge-blue">⏳ Lädt…</span>}
           {!loading && !isDemo && !loadError && <span className="badge badge-green">● Live</span>}
           {loadError && <span className="badge badge-red">⚠️ Ladefehler</span>}
+
         </div>
       </div>
 
       {/* Fehler-Banner */}
       {loadError && (
-        <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(244,63,94,.08)', border: '1px solid rgba(244,63,94,.25)', fontSize: 13, color: '#fb7185' }}>
-          ⚠️ Daten konnten nicht geladen werden. Bitte Seite neu laden oder Verbindung prüfen.
+        <div style={{
+          marginBottom: 16, padding: '12px 16px', borderRadius: 12,
+          background: 'rgba(255,80,80,.1)', border: '1px solid rgba(255,80,80,.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          flexWrap: 'wrap'
+        }}>
+          <span style={{ fontSize: 13, color: '#ff8080' }}>⚠️ {loadError}</span>
+          <button className="pk-btn-ghost" onClick={() => { setLoadError(''); void loadLiveData(zeitraum) }}
+            style={{ fontSize: 12, padding: '5px 12px', flexShrink: 0 }}>
+            ↻ Erneut versuchen
+          </button>
         </div>
       )}
 

@@ -34,9 +34,10 @@ export default function BueroPilotPage() {
   const [loading, setLoading] = useState(!isDemo)
   const [errorMsg, setErrorMsg] = useState('')
 
-  // Shared data laden (Kunden + Angebote + Aufträge + Rechnungen für Cross-Tab-Referenzen)
-  useEffect(() => {
+  const loadData = () => {
     if (isDemo) return
+    setLoading(true)
+    setErrorMsg('')
     Promise.all([getBueroKunden(), getBueroAngebote(), getBueroAuftraege(), getBueroRechnungen()])
       .then(([k, a, au, r]) => {
         setKunden(k as Kunde[])
@@ -44,8 +45,14 @@ export default function BueroPilotPage() {
         setAuftraege(au as Auftrag[])
         setSharedRechnungen(r as Rechnung[])
       })
-      .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
+      .catch((err) => setErrorMsg(err instanceof Error ? err.message : 'Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
+  }
+
+  // Shared data laden (Kunden + Angebote + Aufträge + Rechnungen für Cross-Tab-Referenzen)
+  useEffect(() => {
+    loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDemo])
 
   useEffect(() => {
@@ -109,7 +116,20 @@ export default function BueroPilotPage() {
         <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>
       </div>
 
-      {errorMsg && <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>{errorMsg}</div>}
+      {errorMsg && (
+        <div style={{
+          marginBottom: 16, padding: '12px 16px', borderRadius: 12,
+          background: 'rgba(255,80,80,.1)', border: '1px solid rgba(255,80,80,.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          flexWrap: 'wrap'
+        }}>
+          <span style={{ fontSize: 13, color: '#ff8080' }}>⚠️ {errorMsg}</span>
+          <button className="pk-btn-ghost" onClick={() => { setErrorMsg(''); void loadData() }}
+            style={{ fontSize: 12, padding: '5px 12px', flexShrink: 0 }}>
+            ↻ Erneut versuchen
+          </button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 22 }}>

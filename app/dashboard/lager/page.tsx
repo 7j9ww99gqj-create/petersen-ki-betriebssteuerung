@@ -1684,16 +1684,6 @@ export default function LagerPilotPage() {
     </div>
   )
 
-  if (loadError) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-      <div className="pk-card" style={{ textAlign: 'center', padding: 40, maxWidth: 440 }}>
-        <div style={{ fontSize: 36, marginBottom: 12 }}>📦</div>
-        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8, color: '#f8fbff' }}>Laden fehlgeschlagen</div>
-        <div style={{ color: '#aeb9c8', fontSize: 13, marginBottom: 20 }}>{loadError}</div>
-        <button onClick={() => setRetryKey(k => k + 1)} className="pk-btn" style={{ fontSize: 13 }}>↺ Erneut laden</button>
-      </div>
-    </div>
-  )
 
   return (
     <div className="fade-in">
@@ -1782,6 +1772,21 @@ export default function LagerPilotPage() {
           <span className="badge badge-green">● AKTIV</span>
         </div>
       </div>
+
+      {loadError && (
+        <div style={{
+          marginBottom: 16, padding: '12px 16px', borderRadius: 12,
+          background: 'rgba(255,80,80,.1)', border: '1px solid rgba(255,80,80,.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          flexWrap: 'wrap'
+        }}>
+          <span style={{ fontSize: 13, color: '#ff8080' }}>⚠️ {loadError}</span>
+          <button className="pk-btn-ghost" onClick={() => { setLoadError(''); setRetryKey(k => k + 1) }}
+            style={{ fontSize: 12, padding: '5px 12px', flexShrink: 0 }}>
+            ↻ Erneut versuchen
+          </button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 22 }}>

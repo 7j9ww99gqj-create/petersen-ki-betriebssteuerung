@@ -194,6 +194,7 @@ export default function SteuerPilotPage() {
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([])
   const [warnings, setWarnings] = useState<Warning[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [toast, setToast] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [selectedMonat, setSelectedMonat] = useState(currentMonthStr())
@@ -237,38 +238,45 @@ export default function SteuerPilotPage() {
     setTimeout(() => setToast(''), 3500)
   }
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true)
-      if (isDemo) {
-        setBelege(demoBelege); setUstva(demoUstva); setRechnungen(demoRechnungen)
-        setFixkosten(demoFixkosten); setBetriebsausgaben(demoBetriebsausgaben); setAnschaffungen(demoAnschaffungen)
-        setStripeZahlungen(demoStripeZahlungen)
-        setWarnings(await getSteuerWarnings(true))
-        setLoading(false); return
-      }
-      try {
-        const supabase = createSupabaseClient()
-        const start12 = new Date(); start12.setFullYear(start12.getFullYear() - 1)
-        const [b, u, w, r, fk, ba, ans, bu, stripeResult] = await Promise.all([
-          getSteuerBelege(), getSteuerUstva(), getSteuerWarnings(false), getBueroRechnungen(),
-          getSteuerFixkosten(), getSteuerBetriebsausgaben(), getSteuerAnschaffungen(),
-          getSteuerBelegUploads(),
-          supabase.from('billing_payments').select('id,amount,booked_at,provider_ref').eq('status', 'paid').gte('booked_at', start12.toISOString()),
-        ])
-        setBelege(b as Beleg[])
-        setUstva(u as Ustva[])
-        setWarnings(w)
-        setRechnungen((r as Rechnung[]) ?? [])
-        setFixkosten((fk ?? []) as FixkostenMin[])
-        setBetriebsausgaben((ba ?? []) as BetriebsausgabeMin[])
-        setAnschaffungen((ans ?? []) as AnschaffungMin[])
-        setBelegUploads(bu)
-        if (!stripeResult.error) setStripeZahlungen((stripeResult.data ?? []) as StripeZahlung[])
-      } catch { showToast('Daten konnten nicht geladen werden', 'error') }
-      finally { setLoading(false) }
+  const loadData = async () => {
+    setLoading(true)
+    setLoadError('')
+    if (isDemo) {
+      setBelege(demoBelege); setUstva(demoUstva); setRechnungen(demoRechnungen)
+      setFixkosten(demoFixkosten); setBetriebsausgaben(demoBetriebsausgaben); setAnschaffungen(demoAnschaffungen)
+      setStripeZahlungen(demoStripeZahlungen)
+      setWarnings(await getSteuerWarnings(true))
+      setLoading(false); return
     }
-    load()
+    try {
+      const supabase = createSupabaseClient()
+      const start12 = new Date(); start12.setFullYear(start12.getFullYear() - 1)
+      const [b, u, w, r, fk, ba, ans, bu, stripeResult] = await Promise.all([
+        getSteuerBelege(), getSteuerUstva(), getSteuerWarnings(false), getBueroRechnungen(),
+        getSteuerFixkosten(), getSteuerBetriebsausgaben(), getSteuerAnschaffungen(),
+        getSteuerBelegUploads(),
+        supabase.from('billing_payments').select('id,amount,booked_at,provider_ref').eq('status', 'paid').gte('booked_at', start12.toISOString()),
+      ])
+      setBelege(b as Beleg[])
+      setUstva(u as Ustva[])
+      setWarnings(w)
+      setRechnungen((r as Rechnung[]) ?? [])
+      setFixkosten((fk ?? []) as FixkostenMin[])
+      setBetriebsausgaben((ba ?? []) as BetriebsausgabeMin[])
+      setAnschaffungen((ans ?? []) as AnschaffungMin[])
+      setBelegUploads(bu)
+      if (!stripeResult.error) setStripeZahlungen((stripeResult.data ?? []) as StripeZahlung[])
+      setLoadError('')
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Daten konnten nicht geladen werden')
+      showToast('Daten konnten nicht geladen werden', 'error')
+    }
+    finally { setLoading(false) }
+  }
+
+  useEffect(() => {
+    void loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDemo])
 
   // ── Berechnungen ──────────────────────────────────────────────────────────────
@@ -584,6 +592,21 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
           </div>
         </div>
       </div>
+
+      {loadError && (
+        <div style={{
+          marginBottom: 16, padding: '12px 16px', borderRadius: 12,
+          background: 'rgba(255,80,80,.1)', border: '1px solid rgba(255,80,80,.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          flexWrap: 'wrap'
+        }}>
+          <span style={{ fontSize: 13, color: '#ff8080' }}>⚠️ {loadError}</span>
+          <button className="pk-btn-ghost" onClick={() => { setLoadError(''); void loadData() }}
+            style={{ fontSize: 12, padding: '5px 12px', flexShrink: 0 }}>
+            ↻ Erneut versuchen
+          </button>
+        </div>
+      )}
 
       {/* Navigation – horizontale Tab-Bar (alle Screens) */}
       <div className="pk-tab-bar" style={{ marginBottom: 24 }}>
