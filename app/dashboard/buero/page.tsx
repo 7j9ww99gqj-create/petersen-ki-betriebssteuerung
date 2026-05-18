@@ -14,7 +14,7 @@ import {
   getEinkaufBestellungen, upsertEinkaufBestellung,
   getEinkaufWareneingaenge, insertEinkaufWareneingang,
 } from '@/lib/db'
-import { generateRechnungPDF, generateAngebotPDF } from '@/lib/pdf'
+import { generateRechnungPDF, generateAngebotPDF, generateAuftragsbestaetigungPDF } from '@/lib/pdf'
 import { createSupabaseClient } from '@/lib/supabase'
 import { normalizeDocumentStoragePath, type StoredDocumentLink } from '@/lib/documents'
 import { genId } from '@/lib/ids'
@@ -1252,6 +1252,13 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                 placeholder="kunde@beispiel.de"
                 style={{ width: '100%', marginBottom: 16 }}
               />
+              <button
+                className="pk-btn-ghost"
+                style={{ fontWeight: 700, marginBottom: 10, width: '100%' }}
+                onClick={() => generateAngebotPDF(angebot, angebot.kunde)}
+              >
+                📄 PDF erstellen & herunterladen
+              </button>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                 <button className="pk-btn-ghost" onClick={() => setAngebotMailTarget(null)} disabled={angebotMailSending}>Abbrechen</button>
                 <button
@@ -1665,6 +1672,11 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
                   ▶ Auftrag starten
                 </button>
               )}
+              {a.ab_nummer && (
+                <button onClick={e => { e.stopPropagation(); generateAuftragsbestaetigungPDF(a, a.kunde) }} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(32,200,255,.25)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
+                  📄 AB-PDF
+                </button>
+              )}
               {(a.status === 'In Bearbeitung' || a.status === 'Abgeschlossen') && (
                 <button onClick={e => { e.stopPropagation(); handleAuftragZuRechnung(a) }} style={{ fontSize: 12, padding: '6px 16px', borderRadius: 999, border: '1px solid rgba(245,158,11,.3)', background: 'rgba(245,158,11,.08)', color: '#f59e0b', cursor: 'pointer', fontWeight: 700 }}>
                   → Rechnung erstellen
@@ -1694,6 +1706,50 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
           })()
         ))}
       </div>
+
+      {auftragMailTarget && (() => {
+        const auftrag = auftraege.find(a => a.id === auftragMailTarget.id)
+        if (!auftrag) return null
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setAuftragMailTarget(null)}>
+            <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>✉️ Auftragsbestätigung senden</h3>
+                <button onClick={() => setAuftragMailTarget(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
+              </div>
+              <div style={{ fontSize: 13, color: '#aeb9c8', marginBottom: 14 }}>
+                <strong style={{ color: '#f8fbff' }}>{auftrag.ab_nummer || auftrag.id}</strong> — {auftrag.kunde} — {auftrag.wert}
+              </div>
+              <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>E-Mail-Adresse des Empfängers</label>
+              <input
+                className="pk-input"
+                type="email"
+                value={auftragMailTarget.email}
+                onChange={e => setAuftragMailTarget({ ...auftragMailTarget, email: e.target.value })}
+                placeholder="kunde@beispiel.de"
+                style={{ width: '100%', marginBottom: 16 }}
+              />
+              <button
+                className="pk-btn-ghost"
+                style={{ fontWeight: 700, marginBottom: 10, width: '100%' }}
+                onClick={() => generateAuftragsbestaetigungPDF(auftrag, auftrag.kunde)}
+              >
+                📄 PDF erstellen & herunterladen
+              </button>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button className="pk-btn-ghost" onClick={() => setAuftragMailTarget(null)} disabled={auftragMailSending}>Abbrechen</button>
+                <button
+                  className="pk-btn"
+                  disabled={auftragMailSending || !auftragMailTarget.email.includes('@')}
+                  onClick={() => handleABMailSend(auftragMailTarget.email, auftrag)}
+                >
+                  {auftragMailSending ? '⏳ Sende…' : '✉️ Jetzt senden'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

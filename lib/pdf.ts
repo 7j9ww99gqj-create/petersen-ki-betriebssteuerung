@@ -27,6 +27,18 @@ export type PDFAngebot = {
   status: string
 }
 
+export type PDFAuftragsbestaetigung = {
+  id: string
+  kunde: string
+  beschreibung: string
+  wert: string
+  start: string
+  ende: string
+  status: string
+  ab_nummer?: string
+  ab_verschickt_am?: string
+}
+
 export type PDFTemplate = 'modern-dark' | 'classic-light' | 'elegant-minimal' | 'petersen-brand'
 
 export type PDFCompanySettings = {
@@ -41,6 +53,9 @@ export type PDFCompanySettings = {
   website?: string
   ust_id?: string
   steuernummer?: string
+  geschaeftsfuehrer?: string
+  handelsregister?: string
+  slogan?: string
   bankname?: string
   iban?: string
   bic?: string
@@ -54,6 +69,10 @@ export type PDFCompanySettings = {
     showSteuernummer?: boolean
     showUstId?: boolean
     showWebsite?: boolean
+    showGeschaeftsfuehrer?: boolean
+    useForAngebote?: boolean
+    useForAuftragsbestaetigungen?: boolean
+    useForRechnungen?: boolean
   }
 }
 
@@ -69,6 +88,10 @@ const FALLBACK_COMPANY: PDFCompanySettings = {
     showSteuernummer: true,
     showUstId: true,
     showWebsite: true,
+    showGeschaeftsfuehrer: true,
+    useForAngebote: true,
+    useForAuftragsbestaetigungen: true,
+    useForRechnungen: true,
   },
 }
 
@@ -120,6 +143,14 @@ function fmtEuro(n: number): string {
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
 
+function parseEuroValue(value: string): number {
+  const normalized = value
+    .replace(/[^\d,.-]/g, '')
+    .replace(/\./g, '')
+    .replace(',', '.')
+  return parseFloat(normalized) || 0
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DocType = any
 
@@ -153,12 +184,12 @@ function getHintStyle(template: PDFTemplate, accent: [number, number, number]): 
       subtextColor: [95, 115, 140],
     }
     case 'petersen-brand': return {
-      bg: [5, 14, 30],
+      bg: [242, 248, 255],
       borderMode: 'none',
-      accentBar: [21, 96, 232] as [number, number, number],
-      titleColor: [100, 168, 255] as [number, number, number],
-      textColor: [150, 198, 248],
-      subtextColor: [95, 152, 210],
+      accentBar: [0, 102, 255] as [number, number, number],
+      titleColor: [6, 42, 105] as [number, number, number],
+      textColor: [24, 44, 72],
+      subtextColor: [78, 112, 150],
     }
     default: return {
       bg: [12, 22, 36],
@@ -233,6 +264,8 @@ function drawFooterModernDark(doc: DocType, company: PDFCompanySettings, accent:
   const parts: string[] = []
   if (company.dokument_footer) parts.push(company.dokument_footer)
   if (company.briefpapier_layout?.showWebsite !== false && company.website) parts.push(company.website)
+  if (company.briefpapier_layout?.showGeschaeftsfuehrer !== false && company.geschaeftsfuehrer) parts.push(`GF ${company.geschaeftsfuehrer}`)
+  if (company.handelsregister) parts.push(company.handelsregister)
   if (company.briefpapier_layout?.showBankdaten !== false && company.bankname) parts.push(company.bankname)
   if (company.briefpapier_layout?.showBankdaten !== false && company.iban) parts.push(`IBAN ${company.iban}`)
   if (company.briefpapier_layout?.showBankdaten !== false && company.bic) parts.push(`BIC ${company.bic}`)
@@ -314,6 +347,8 @@ function drawFooterClassicLight(doc: DocType, company: PDFCompanySettings, accen
   const parts: string[] = []
   if (company.dokument_footer) parts.push(company.dokument_footer)
   if (company.briefpapier_layout?.showWebsite !== false && company.website) parts.push(company.website)
+  if (company.briefpapier_layout?.showGeschaeftsfuehrer !== false && company.geschaeftsfuehrer) parts.push(`GF ${company.geschaeftsfuehrer}`)
+  if (company.handelsregister) parts.push(company.handelsregister)
   if (company.briefpapier_layout?.showBankdaten !== false && company.bankname) parts.push(company.bankname)
   if (company.briefpapier_layout?.showBankdaten !== false && company.iban) parts.push(`IBAN ${company.iban}`)
   if (company.briefpapier_layout?.showBankdaten !== false && company.bic) parts.push(`BIC ${company.bic}`)
@@ -393,6 +428,8 @@ function drawFooterElegantMinimal(doc: DocType, company: PDFCompanySettings, acc
   const parts: string[] = []
   if (company.dokument_footer) parts.push(company.dokument_footer)
   if (company.briefpapier_layout?.showWebsite !== false && company.website) parts.push(company.website)
+  if (company.briefpapier_layout?.showGeschaeftsfuehrer !== false && company.geschaeftsfuehrer) parts.push(`GF ${company.geschaeftsfuehrer}`)
+  if (company.handelsregister) parts.push(company.handelsregister)
   if (company.briefpapier_layout?.showBankdaten !== false && company.bankname) parts.push(company.bankname)
   if (company.briefpapier_layout?.showBankdaten !== false && company.iban) parts.push(`IBAN ${company.iban}`)
   if (company.briefpapier_layout?.showBankdaten !== false && company.bic) parts.push(`BIC ${company.bic}`)
@@ -439,149 +476,169 @@ function drawClouds(doc: DocType, side: 'left' | 'right', baseY: number, pageW: 
   doc.ellipse(bx + cx * 24, baseY - 7, 8, 3.5, 'F')
 }
 
+function drawPetersenWatermark(doc: DocType): void {
+  const ox = 112
+  const oy = 92
+
+  doc.setFillColor(246, 251, 255)
+  doc.triangle(ox + 48, oy, ox + 96, oy + 28, ox + 48, oy + 55, 'F')
+  doc.setFillColor(240, 247, 255)
+  doc.triangle(ox, oy + 28, ox + 48, oy, ox + 48, oy + 55, 'F')
+  doc.setFillColor(233, 242, 254)
+  doc.triangle(ox + 48, oy + 55, ox + 96, oy + 28, ox + 96, oy + 83, 'F')
+  doc.setFillColor(238, 246, 255)
+  doc.triangle(ox, oy + 28, ox + 48, oy + 55, ox, oy + 83, 'F')
+
+  doc.setFillColor(255, 255, 255)
+  doc.triangle(ox + 25, oy + 38, ox + 48, oy + 25, ox + 71, oy + 38, 'F')
+  doc.triangle(ox + 25, oy + 38, ox + 48, oy + 51, ox + 25, oy + 66, 'F')
+  doc.triangle(ox + 71, oy + 38, ox + 71, oy + 66, ox + 48, oy + 51, 'F')
+
+  doc.setFillColor(232, 241, 253)
+  doc.triangle(ox + 48, oy + 78, ox + 96, oy + 51, ox + 96, oy + 106, 'F')
+  doc.setFillColor(238, 246, 255)
+  doc.triangle(ox + 48, oy + 78, ox + 96, oy + 106, ox + 48, oy + 133, 'F')
+}
+
 function drawHeaderPetersenBrand(doc: DocType, company: PDFCompanySettings, logoData: string | null, accent: [number, number, number]): void {
   const pageW = 210
   const margin = 20
-  const hH = 30
 
-  // Base dark background
-  doc.setFillColor(4, 12, 26)
-  doc.rect(0, 0, pageW, hH, 'F')
+  drawPetersenWatermark(doc)
 
-  // Cloud clusters at bottom of header
-  drawClouds(doc, 'left', hH - 2, pageW)
-  drawClouds(doc, 'right', hH - 2, pageW)
-
-  // Center atmospheric glow
-  doc.setFillColor(8, 30, 100)
-  doc.ellipse(pageW / 2, hH + 2, 55, 12, 'F')
-  doc.setFillColor(5, 18, 65)
-  doc.ellipse(pageW / 2, hH, 38, 8, 'F')
-
-  // Top accent line (gradient simulation)
-  doc.setFillColor(18, 65, 195)
-  doc.rect(0, 0, pageW * 0.3, 0.6, 'F')
-  doc.setFillColor(...accent)
-  doc.rect(pageW * 0.3, 0, pageW * 0.4, 0.7, 'F')
-  doc.setFillColor(18, 65, 195)
-  doc.rect(pageW * 0.7, 0, pageW * 0.3, 0.6, 'F')
-
-  // Bottom accent line
-  doc.setFillColor(18, 65, 195)
-  doc.rect(0, hH - 0.8, pageW * 0.3, 0.8, 'F')
-  doc.setFillColor(...accent)
-  doc.rect(pageW * 0.3, hH - 1, pageW * 0.4, 1, 'F')
-  doc.setFillColor(18, 65, 195)
-  doc.rect(pageW * 0.7, hH - 0.8, pageW * 0.3, 0.8, 'F')
-
-  // Logo image (user-uploaded)
   if (logoData) {
-    try { doc.addImage(logoData, imageFormat(logoData), margin, 4.5, 20, 20) } catch {}
+    try { doc.addImage(logoData, imageFormat(logoData), margin, 10, 24, 24) } catch {}
   }
-  const nameX = logoData ? margin + 24 : margin
+  const nameX = logoData ? margin + 30 : margin
+  const brandName = company.firmenname || FALLBACK_COMPANY.firmenname!
+  const kiMatch = brandName.match(/^(.*?)(KI)(.*)$/i)
 
-  // Company name — white, bold
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(12)
-  doc.setTextColor(255, 255, 255)
-  doc.text((company.firmenname || FALLBACK_COMPANY.firmenname!).toUpperCase(), nameX, 13.5)
-
-  // Tagline
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(6.5)
-  doc.setTextColor(85, 150, 220)
-  doc.text('DIGITALE BETRIEBSSTEUERUNG  ·  KI-GESTÜTZT', nameX, 20)
-
-  // Contact right column
-  const contactParts: string[] = []
-  if (company.website) contactParts.push(company.website)
-  if (company.email) contactParts.push(company.email)
-  if (company.telefon) contactParts.push(company.telefon)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
-  doc.setTextColor(130, 182, 235)
-  if (contactParts.length) doc.text(contactParts.join('  ·  '), pageW - margin, 12, { align: 'right' })
-
-  const adressParts: string[] = []
-  if (company.adresse) adressParts.push(company.adresse)
-  if (company.plz || company.ort) adressParts.push([company.plz, company.ort].filter(Boolean).join(' '))
-  if (adressParts.length) {
-    doc.setFontSize(7.5)
-    doc.setTextColor(100, 150, 210)
-    doc.text(adressParts.join(', '), pageW - margin, 18, { align: 'right' })
+  doc.setFontSize(18)
+  doc.setTextColor(3, 18, 55)
+  if (kiMatch) {
+    const beforeKi = kiMatch[1]
+    const afterKi = kiMatch[3]
+    doc.text(beforeKi, nameX, 22)
+    const kiX = nameX + doc.getTextWidth(beforeKi)
+    doc.setTextColor(...accent)
+    doc.text(kiMatch[2], kiX, 22)
+    doc.setTextColor(3, 18, 55)
+    if (afterKi) doc.text(afterKi, kiX + doc.getTextWidth(kiMatch[2]), 22)
+  } else {
+    doc.text(brandName, nameX, 22)
   }
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.5)
+  doc.setTextColor(8, 28, 75)
+  doc.text((company.slogan || 'BETRIEBSSTEUERUNG').toUpperCase(), nameX, 30)
+
+  const contactLines = [
+    company.firmenname,
+    company.adresse,
+    [company.plz, company.ort].filter(Boolean).join(' '),
+    company.telefon,
+    company.email,
+    company.briefpapier_layout?.showWebsite !== false ? company.website : '',
+  ].filter(Boolean).slice(0, 6) as string[]
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.4)
+  doc.setTextColor(6, 24, 68)
+  contactLines.forEach((line, i) => {
+    const y = 10.8 + i * 5.1
+    doc.setFillColor(...accent)
+    if (i === 0) doc.circle(159, y - 1.6, 1.1, 'F')
+    else if (i === 3) doc.circle(159, y - 1.6, 1, 'F')
+    else if (i === 4) doc.rect(158, y - 2.5, 2.1, 1.6, 'F')
+    else if (i === 5) doc.circle(159, y - 1.6, 1, 'S')
+    doc.setTextColor(6, 24, 68)
+    doc.text(line, 165, y)
+  })
 
   const taxParts: string[] = []
   if (company.briefpapier_layout?.showUstId !== false && company.ust_id) taxParts.push(`USt-ID: ${company.ust_id}`)
   if (company.briefpapier_layout?.showSteuernummer !== false && company.steuernummer) taxParts.push(`St.-Nr.: ${company.steuernummer}`)
   if (taxParts.length) {
-    doc.setFontSize(7)
-    doc.setTextColor(80, 125, 190)
-    doc.text(taxParts.join('  ·  '), pageW - margin, 24, { align: 'right' })
+    doc.setFontSize(6.7)
+    doc.setTextColor(80, 105, 140)
+    doc.text(taxParts.join('  ·  '), margin, 39.5)
   }
+
+  doc.setDrawColor(15, 70, 180)
+  doc.setLineWidth(0.3)
+  doc.line(margin, 44, 155, 44)
+  doc.setDrawColor(...accent)
+  doc.setLineWidth(0.6)
+  doc.line(155, 44, pageW - margin, 44)
 }
 
-function drawFooterPetersenBrand(doc: DocType, company: PDFCompanySettings, accent: [number, number, number]): void {
+function drawFooterPetersenBrand(doc: DocType, company: PDFCompanySettings, accent: [number, number, number], logoData: string | null): void {
   const pageW = 210
   const margin = 20
-  const footerY = 265
   const pageH = 297
+  const footerTop = 244
+  const footerBody = 260
 
-  // Full footer background
   doc.setFillColor(4, 12, 26)
-  doc.rect(0, footerY, pageW, pageH - footerY, 'F')
+  doc.rect(0, footerBody, pageW, pageH - footerBody, 'F')
+  doc.triangle(0, footerTop, 18, footerTop, 0, footerBody, 'F')
+  doc.triangle(18, footerTop, 64, footerBody, 0, footerBody, 'F')
 
-  // Diagonal cut: white triangle masks top-left corner
-  // Line goes from (0, footerY+11) to (pageW, footerY)
-  doc.setFillColor(255, 255, 255)
-  doc.triangle(0, footerY, pageW, footerY, 0, footerY + 11, 'F')
-
-  // Cloud clusters at bottom
   drawClouds(doc, 'left', pageH - 5, pageW)
-  drawClouds(doc, 'right', pageH - 5, pageW)
 
-  // Center glow
   doc.setFillColor(5, 18, 65)
-  doc.ellipse(pageW / 2, pageH, 45, 10, 'F')
+  doc.ellipse(pageW / 2, pageH + 1, 55, 9, 'F')
 
-  // Content starts at footerY + 16 (below diagonal cut zone)
-  const contentY = footerY + 17
+  const contentY = 271
+
+  doc.setDrawColor(150, 186, 230)
+  doc.setLineWidth(0.25)
+  doc.line(82, 268, 82, 286)
+  doc.line(142, 268, 142, 286)
+
+  if (logoData) {
+    try { doc.addImage(logoData, imageFormat(logoData), 11, 267, 17, 17) } catch {}
+  }
 
   // Col 1: Company
+  const companyX = logoData ? 34 : margin
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8.5)
   doc.setTextColor(215, 232, 255)
-  doc.text(company.firmenname || FALLBACK_COMPANY.firmenname!, margin, contentY)
+  doc.text(company.firmenname || FALLBACK_COMPANY.firmenname!, companyX, contentY)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
-  doc.setTextColor(110, 162, 218)
+  doc.setFontSize(7)
+  doc.setTextColor(190, 214, 240)
   const addrParts: string[] = []
   if (company.adresse) addrParts.push(company.adresse)
   if (company.plz || company.ort) addrParts.push([company.plz, company.ort].filter(Boolean).join(' '))
-  addrParts.forEach((line, i) => doc.text(line, margin, contentY + 5 + i * 4.5))
+  if (company.briefpapier_layout?.showGeschaeftsfuehrer !== false && company.geschaeftsfuehrer) addrParts.push(`GF ${company.geschaeftsfuehrer}`)
+  if (company.handelsregister) addrParts.push(company.handelsregister)
+  addrParts.slice(0, 4).forEach((line, i) => doc.text(line, companyX, contentY + 5 + i * 4.1))
 
   // Col 2: Contact
-  const col2X = pageW / 2 - 22
+  const col2X = 94
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
-  doc.setTextColor(110, 162, 218)
+  doc.setFontSize(7)
+  doc.setTextColor(215, 232, 255)
   const contactLines: string[] = []
-  if (company.website) contactLines.push(company.website)
-  if (company.email) contactLines.push(company.email)
   if (company.telefon) contactLines.push(company.telefon)
+  if (company.email) contactLines.push(company.email)
+  if (company.briefpapier_layout?.showWebsite !== false && company.website) contactLines.push(company.website)
   contactLines.forEach((line, i) => doc.text(line, col2X, contentY + i * 4.8))
 
   // Col 3: Bank
   if (company.briefpapier_layout?.showBankdaten !== false) {
-    const col3X = pageW - margin - 52
+    const col3X = 154
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(7.5)
     doc.setTextColor(185, 215, 248)
     doc.text('Bankverbindung', col3X, contentY)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7)
-    doc.setTextColor(100, 150, 208)
+    doc.setTextColor(215, 232, 255)
     const bankLines: string[] = []
     if (company.bankname) bankLines.push(company.bankname)
     if (company.iban) bankLines.push(`IBAN ${company.iban}`)
@@ -614,11 +671,11 @@ function drawHeader(doc: DocType, company: PDFCompanySettings, logoData: string 
   return drawHeaderModernDark(doc, company, logoData, accent)
 }
 
-function drawFooter(doc: DocType, company: PDFCompanySettings, accent: [number, number, number]): void {
+function drawFooter(doc: DocType, company: PDFCompanySettings, accent: [number, number, number], logoData: string | null = null): void {
   const t = company.briefpapier_layout?.template ?? 'modern-dark'
   if (t === 'classic-light') return drawFooterClassicLight(doc, company, accent)
   if (t === 'elegant-minimal') return drawFooterElegantMinimal(doc, company, accent)
-  if (t === 'petersen-brand') return drawFooterPetersenBrand(doc, company, accent)
+  if (t === 'petersen-brand') return drawFooterPetersenBrand(doc, company, accent, logoData)
   return drawFooterModernDark(doc, company, accent)
 }
 
@@ -628,13 +685,13 @@ export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: str
   const company = getCompanySettings()
   const accent = hexToRgb(company.briefpapier_layout?.akzentfarbe || '#20c8ff')
   const template: PDFTemplate = company.briefpapier_layout?.template ?? 'modern-dark'
-  const logoData = await loadImageDataUrl(company.logo_url)
+  const logoData = await loadImageDataUrl(company.logo_url || (template === 'petersen-brand' ? '/logo.jpg' : undefined))
   const hint = getHintStyle(template, accent)
   const pageW = 210
   const margin = 20
 
   drawHeader(doc, company, logoData, accent)
-  drawFooter(doc, company, accent)
+  drawFooter(doc, company, accent, logoData)
 
   // Absenderzeile (DIN-5008)
   const senderLine = [
@@ -714,7 +771,7 @@ export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: str
   doc.text('Einzelpreis', pageW - margin - 40, tableY + 5.8)
   doc.text('Betrag (netto)', pageW - margin - 3, tableY + 5.8, { align: 'right' })
 
-  const betragRaw = parseFloat(rechnung.betrag.replace(/[^\d,\.]/g, '').replace(',', '.')) || 0
+  const betragRaw = parseEuroValue(rechnung.betrag)
   const mwstSatz = rechnung.steuer_satz ?? Number(company.standard_mwst ?? 19)
   const nettoVal = rechnung.netto ?? (rechnung.summe ? rechnung.summe / (1 + mwstSatz / 100) : betragRaw)
   const steuerVal = rechnung.steuerbetrag ?? (nettoVal * mwstSatz / 100)
@@ -830,19 +887,192 @@ export async function generateRechnungPDF(rechnung: PDFRechnung, kundenName: str
   doc.save(`Rechnung_${rechnung.nummer || rechnung.id}.pdf`)
 }
 
+export async function generateAuftragsbestaetigungPDF(auftrag: PDFAuftragsbestaetigung, kundenName: string, returnBase64?: boolean): Promise<string | void> {
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const company = getCompanySettings()
+  const accent = hexToRgb(company.briefpapier_layout?.akzentfarbe || '#20c8ff')
+  const template: PDFTemplate = company.briefpapier_layout?.template ?? 'modern-dark'
+  const logoData = await loadImageDataUrl(company.logo_url || (template === 'petersen-brand' ? '/logo.jpg' : undefined))
+  const hint = getHintStyle(template, accent)
+  const pageW = 210
+  const margin = 20
+
+  drawHeader(doc, company, logoData, accent)
+  drawFooter(doc, company, accent, logoData)
+
+  const senderLine = [
+    company.firmenname || FALLBACK_COMPANY.firmenname,
+    company.adresse,
+    [company.plz, company.ort].filter(Boolean).join(' '),
+  ].filter(Boolean).join(', ')
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(6.5)
+  doc.setTextColor(140, 155, 170)
+  doc.text(senderLine, margin, 38)
+  doc.setDrawColor(180, 195, 210)
+  doc.setLineWidth(0.2)
+  doc.line(margin, 39.5, margin + 80, 39.5)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(20, 25, 35)
+  doc.text(kundenName, margin, 47)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(90, 105, 120)
+  doc.text('Sehr geehrte Damen und Herren,', margin, 53)
+
+  const metaX = 128
+  const metaLabelW = 32
+  const metaRows: [string, string][] = [
+    ['Datum:', heuteFormatiert()],
+    ['AB-Nr.:', auftrag.ab_nummer || auftrag.id],
+    ['Auftrag:', auftrag.id],
+    ['Leistungszeit:', [auftrag.start, auftrag.ende].filter(Boolean).join(' bis ')],
+    ['Status:', auftrag.status],
+  ]
+  metaRows.forEach(([label, value], i) => {
+    const y = 38 + i * 6.2
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(100, 115, 130)
+    doc.text(label, metaX, y)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(20, 25, 35)
+    doc.text(value || '-', metaX + metaLabelW, y)
+  })
+
+  const titleY = 68
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(17)
+  doc.setTextColor(10, 16, 26)
+  doc.text('AUFTRAGSBESTÄTIGUNG', margin, titleY)
+  doc.setFillColor(...accent)
+  doc.rect(margin, titleY + 2, 62, 0.8, 'F')
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5)
+  doc.setTextColor(40, 48, 60)
+  doc.text('vielen Dank für Ihren Auftrag. Hiermit bestätigen wir die Ausführung der folgenden Leistung:', margin, 80, { maxWidth: 170 })
+
+  const tableY = 92
+  doc.setFillColor(10, 18, 30)
+  doc.rect(margin, tableY, pageW - 2 * margin, 8.5, 'F')
+  doc.setFillColor(...accent)
+  doc.rect(margin, tableY, 2, 8.5, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8.5)
+  doc.setTextColor(200, 215, 230)
+  doc.text('Pos.', margin + 4, tableY + 5.8)
+  doc.text('Leistung / Bezeichnung', margin + 16, tableY + 5.8)
+  doc.text('Zeitraum', pageW - margin - 64, tableY + 5.8)
+  doc.text('Betrag (netto)', pageW - margin - 3, tableY + 5.8, { align: 'right' })
+
+  const rowY = tableY + 8.5
+  const beschreibung = doc.splitTextToSize(auftrag.beschreibung || 'Auftrag', 85)
+  const rowH = Math.max(15, 7 + beschreibung.length * 4.2)
+  doc.setFillColor(248, 251, 254)
+  doc.rect(margin, rowY, pageW - 2 * margin, rowH, 'F')
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(30, 38, 50)
+  doc.text('1', margin + 4, rowY + 7)
+  doc.text(beschreibung, margin + 16, rowY + 7)
+  doc.text([auftrag.start, auftrag.ende].filter(Boolean).join(' – ') || '-', pageW - margin - 64, rowY + 7)
+  const nettoVal = parseEuroValue(auftrag.wert)
+  doc.text(fmtEuro(nettoVal), pageW - margin - 3, rowY + 7, { align: 'right' })
+
+  const mwstSatz = Number(company.standard_mwst ?? 19)
+  const mwst = nettoVal * (mwstSatz / 100)
+  const brutto = nettoVal + mwst
+  const sumY = rowY + rowH + 3
+  const sumX = pageW - margin - 70
+  const sumW = 70
+  const sumRowsData: [string, string][] = [
+    ['Nettobetrag', fmtEuro(nettoVal)],
+    [`zzgl. ${mwstSatz}% MwSt.`, fmtEuro(mwst)],
+  ]
+  sumRowsData.forEach(([label, value], i) => {
+    const y = sumY + 6 + i * 6.5
+    doc.setFillColor(i % 2 === 0 ? 245 : 250, i % 2 === 0 ? 248 : 252, 255)
+    doc.rect(sumX, y - 4.5, sumW, 6.5, 'F')
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(90, 105, 120)
+    doc.text(label, sumX + 3, y)
+    doc.setTextColor(20, 28, 40)
+    doc.text(value, sumX + sumW - 3, y, { align: 'right' })
+  })
+
+  const totalY = sumY + 6 + sumRowsData.length * 6.5 + 1
+  doc.setFillColor(10, 18, 30)
+  doc.rect(sumX, totalY - 4.5, sumW, 9, 'F')
+  doc.setFillColor(...accent)
+  doc.rect(sumX, totalY - 4.5, 2, 9, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.setTextColor(200, 215, 230)
+  doc.text('Auftragswert', sumX + 4, totalY + 1)
+  doc.setTextColor(...accent)
+  doc.text(fmtEuro(brutto), sumX + sumW - 3, totalY + 1, { align: 'right' })
+
+  const hinweisY = totalY + 14
+  const hinweisH = 18
+  doc.setFillColor(...hint.bg)
+  doc.roundedRect(margin, hinweisY, pageW - 2 * margin, hinweisH, 3, 3, 'F')
+  if (hint.borderMode === 'stroke') {
+    doc.setDrawColor(...accent)
+    doc.setLineWidth(0.5)
+    doc.roundedRect(margin, hinweisY, pageW - 2 * margin, hinweisH, 3, 3, 'S')
+  }
+  if (hint.accentBar) {
+    doc.setFillColor(...hint.accentBar)
+    doc.roundedRect(margin, hinweisY, 3, hinweisH, 1.5, 1.5, 'F')
+  }
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8.8)
+  if (hint.titleColor) doc.setTextColor(...hint.titleColor)
+  else doc.setTextColor(...accent)
+  doc.text('Auftragsbestätigung', margin + 6, hinweisY + 6.5)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.2)
+  doc.setTextColor(...hint.textColor)
+  doc.text(`Bitte verwenden Sie bei Rückfragen die AB-Nr. ${auftrag.ab_nummer || auftrag.id}.`, margin + 6, hinweisY + 12.5)
+
+  const signY = hinweisY + hinweisH + 10
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(60, 75, 90)
+  doc.text('Mit freundlichen Grüßen', margin, signY)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  doc.setTextColor(...accent)
+  doc.text(company.firmenname || FALLBACK_COMPANY.firmenname!, margin, signY + 7)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  doc.setTextColor(100, 115, 130)
+  doc.text(company.slogan || 'Digitale Betriebssteuerung für moderne Unternehmen', margin, signY + 13)
+
+  if (returnBase64) return doc.output('datauristring').split(',')[1]
+  doc.save(`Auftragsbestaetigung_${auftrag.ab_nummer || auftrag.id}.pdf`)
+}
+
 export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string, returnBase64?: boolean): Promise<string | void> {
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const company = getCompanySettings()
   const accent = hexToRgb(company.briefpapier_layout?.akzentfarbe || '#20c8ff')
   const template: PDFTemplate = company.briefpapier_layout?.template ?? 'modern-dark'
-  const logoData = await loadImageDataUrl(company.logo_url)
+  const logoData = await loadImageDataUrl(company.logo_url || (template === 'petersen-brand' ? '/logo.jpg' : undefined))
   const hint = getHintStyle(template, accent)
   const pageW = 210
   const margin = 20
 
   drawHeader(doc, company, logoData, accent)
-  drawFooter(doc, company, accent)
+  drawFooter(doc, company, accent, logoData)
 
   // Absenderzeile
   const senderLine = [
@@ -929,7 +1159,7 @@ export async function generateAngebotPDF(angebot: PDFAngebot, kundenName: string
   doc.text(angebot.betrag, pageW - margin - 3, row1Y + 7, { align: 'right' })
 
   // Summen-Block
-  const betragNetto = parseFloat(angebot.betrag.replace(/[^\d,\.]/g, '').replace(',', '.')) || 0
+  const betragNetto = parseEuroValue(angebot.betrag)
   const mwstSatz = Number(company.standard_mwst ?? 19)
   const mwst = betragNetto * (mwstSatz / 100)
   const brutto = betragNetto + mwst

@@ -64,6 +64,10 @@ type ManagedUsersEntitlement = {
   reason: string
 }
 
+type SettingsSection = 'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'registrierungen' | 'kunden-eingerichtet' | 'aktivitaetslog' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'
+
+const SETTINGS_SECTIONS: SettingsSection[] = ['profil', 'firma', 'billing', 'kundensteuerung', 'registrierungen', 'kunden-eingerichtet', 'aktivitaetslog', 'benachrichtigungen', 'rollen', 'info', 'import']
+
 const ACCESS_STATUS_OPTIONS: AccessStatus[] = ['pending', 'active', 'suspended']
 const ACCESS_MODE_OPTIONS: AccessMode[] = ['standard', 'demo']
 const MANAGED_PILOT_OPTIONS: PilotId[] = ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer']
@@ -89,7 +93,7 @@ const PILOT_LABELS: Record<PilotId, string> = {
 
 export default function EinstellungenPage() {
   const router = useRouter()
-  const [section, setSection] = useState<'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'registrierungen' | 'kunden-eingerichtet' | 'aktivitaetslog' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'>('profil')
+  const [section, setSection] = useState<SettingsSection>('profil')
   const [toast, setToast] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [isDemo, setIsDemo] = useState(false)
@@ -126,11 +130,9 @@ export default function EinstellungenPage() {
     const payment = params.get('payment')
     const invoice = params.get('invoice')
 
-    if (sectionParam === 'registrierungen') {
-      setSection('registrierungen')
-    } else if (sectionParam === 'kundensteuerung') {
-      setSection('kundensteuerung')
-    } else if (sectionParam === 'billing' || payment === 'success' || payment === 'cancelled') {
+    if (sectionParam && SETTINGS_SECTIONS.includes(sectionParam as SettingsSection)) {
+      setSection(sectionParam as SettingsSection)
+    } else if (payment === 'success' || payment === 'cancelled') {
       setSection('billing')
     }
 
@@ -461,7 +463,7 @@ export default function EinstellungenPage() {
     return `mailto:${encodeURIComponent(user.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
   }
 
-  const NavItem = ({ id, icon, label }: { id: typeof section; icon: string; label: string }) => (
+  const NavItem = ({ id, icon, label }: { id: SettingsSection; icon: string; label: string }) => (
     <button onClick={() => setSection(id)} data-active={section === id} style={{
       width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
       borderRadius: 10, border: 'none', cursor: 'pointer', textAlign: 'left',
@@ -1714,6 +1716,9 @@ const emptyFirma: FirmaEinstellungen = {
     showUstId: true,
     showGeschaeftsfuehrer: true,
     showWebsite: true,
+    useForAngebote: true,
+    useForAuftragsbestaetigungen: true,
+    useForRechnungen: true,
   },
   onboarding_completed: false,
 }
@@ -1766,13 +1771,25 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
   const setLayout = (key: string, value: unknown) =>
     setFirma(prev => ({ ...prev, briefpapier_layout: { ...(prev.briefpapier_layout ?? {}), [key]: value } }))
   const layout = (firma.briefpapier_layout ?? {}) as Record<string, unknown>
+  const selectedTemplate = String(layout.template ?? 'modern-dark')
+  const petersenBrandLocked = selectedTemplate === 'petersen-brand' && currentRole !== 'Inhaber'
 
   const save = async (complete = true) => {
-    if (!canEdit) { showToast('Nur Admins dürfen Firmendaten bearbeiten', 'error'); return }
+    if (!canEdit) { showToast('Nur Admins und Inhaber dürfen Firmendaten bearbeiten', 'error'); return }
     if (!firma.firmenname.trim()) { showToast('Firmenname ist Pflicht', 'error'); return }
+    if (petersenBrandLocked) { showToast('Petersen Brand ist nur für den Inhaber-Account freigegeben', 'error'); return }
     setSaving(true)
     try {
-      const payload = { ...firma, onboarding_completed: complete ? true : firma.onboarding_completed }
+      const payload = {
+        ...firma,
+        briefpapier_layout: {
+          ...(firma.briefpapier_layout ?? {}),
+          useForAngebote: layout.useForAngebote !== false,
+          useForAuftragsbestaetigungen: layout.useForAuftragsbestaetigungen !== false,
+          useForRechnungen: layout.useForRechnungen !== false,
+        },
+        onboarding_completed: complete ? true : firma.onboarding_completed,
+      }
       if (isDemo) {
         setFirma(payload)
         localStorage.setItem('pk_firma_einstellungen', JSON.stringify(payload))
@@ -1817,6 +1834,19 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
       <input className="pk-input" type={type} disabled={inputDisabled} value={String(firma[key] ?? '')} onChange={e => setField(key, e.target.value as never)} placeholder={placeholder} />
     </div>
   )
+  const requiredDocumentFields: Array<[keyof FirmaEinstellungen, string]> = [
+    ['firmenname', 'Firmenname'],
+    ['adresse', 'Adresse'],
+    ['plz', 'PLZ'],
+    ['ort', 'Ort'],
+    ['email', 'E-Mail'],
+    ['telefon', 'Telefon'],
+    ['iban', 'IBAN'],
+  ]
+  const missingDocumentFields = requiredDocumentFields
+    .filter(([key]) => !String(firma[key] ?? '').trim())
+    .map(([, label]) => label)
+  const completedDocumentFields = requiredDocumentFields.length - missingDocumentFields.length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1827,9 +1857,37 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
       )}
       {!canEdit && (
         <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', color: '#aeb9c8', fontSize: 13 }}>
-          Nur Admins dürfen Firmendaten und Briefpapier bearbeiten. Sie können die Daten hier ansehen.
+          Nur Admins und Inhaber dürfen Firmendaten und Briefpapier bearbeiten. Sie können die Daten hier ansehen.
         </div>
       )}
+      {petersenBrandLocked && (
+        <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.24)', color: '#fbbf24', fontSize: 13, fontWeight: 700 }}>
+          Petersen Brand ist in diesem Account gesperrt. Bitte als Inhaber anmelden oder eine andere Vorlage wählen.
+        </div>
+      )}
+
+      <div className="pk-card" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(220px, .8fr)', gap: 16, alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: 12, color: '#6cb6ff', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Dokumentdaten</div>
+          <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 900 }}>Firmendaten für Angebote, Auftragsbestätigungen und Rechnungen</h3>
+          <div style={{ color: '#aeb9c8', fontSize: 13, lineHeight: 1.6 }}>
+            {missingDocumentFields.length === 0
+              ? 'Alle Pflichtdaten für saubere Geschäftsdokumente sind hinterlegt.'
+              : `Es fehlen noch: ${missingDocumentFields.join(', ')}.`}
+          </div>
+        </div>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
+            <div style={{ width: `${Math.round((completedDocumentFields / requiredDocumentFields.length) * 100)}%`, height: '100%', background: missingDocumentFields.length === 0 ? '#4ddb7e' : '#20c8ff' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {['Angebote', 'Auftragsbestätigungen', 'Rechnungen'].map(label => (
+              <span key={label} className="badge badge-blue">{label}</span>
+            ))}
+            {currentRole === 'Inhaber' && <span className="badge badge-green">Inhaber-Briefpapier</span>}
+          </div>
+        </div>
+      </div>
 
       <div className="pk-card">
         <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800 }}>🏢 Firmendaten & Logo</h3>

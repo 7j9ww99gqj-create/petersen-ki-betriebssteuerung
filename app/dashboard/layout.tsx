@@ -58,6 +58,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     standard_waehrung: 'EUR',
     dokument_footer: '',
     briefpapier_layout: {
+      template: 'modern-dark',
       logoPosition: 'links',
       akzentfarbe: '#20c8ff',
       showBankdaten: true,
@@ -65,6 +66,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       showUstId: true,
       showGeschaeftsfuehrer: true,
       showWebsite: true,
+      useForAngebote: true,
+      useForAuftragsbestaetigungen: true,
+      useForRechnungen: true,
     },
     onboarding_completed: false,
   })
@@ -290,7 +294,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
                 <h2 style={{ margin: '4px 0 4px', fontSize: 22, fontWeight: 900 }}>Briefpapier einmal einrichten</h2>
                 <p style={{ margin: 0, color: '#aeb9c8', fontSize: 13 }}>
-                  Diese Daten erscheinen später im Dashboard, in Angeboten, Rechnungen und Exporten.
+                  Diese Daten erscheinen später im Dashboard, in Angeboten, Auftragsbestätigungen, Rechnungen und Exporten.
                 </p>
               </div>
               <button className="pk-btn-ghost" onClick={() => setShowCompanyOnboarding(false)} disabled={companySaving}>

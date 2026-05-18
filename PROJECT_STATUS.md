@@ -28,6 +28,7 @@
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
 - Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Quick-Win-Sprint.
 - Jüngste Fortschritte (2026-05-18 Quick-Win-Sprint): 7 schnelle Fixes deployed — deletePlanungRessource, AnalysePilot-Status-Filter, PieChart-Bereinigung, LagerPilot Bestellung→DB, Wareneingänge im KI-Kontext.
+- Aktueller lokaler Stand (Branch `feature/briefpapier-firmendaten`): Inhaber-Briefpapier/Firmendaten erweitert; Petersen Brand für Angebote, Auftragsbestätigungen und Rechnungen integriert.
 - Wichtigste externe Restpunkte: Alle Migrations sind eingespielt (`Remote database is up to date`). Keine ausstehenden SQL-Migrationen mehr.
 - Produktivlage: Kernsystem weitgehend vollständig; Hauptmodule produktionsreif.
 
@@ -77,7 +78,7 @@
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
 **Letzter Stand:** 2026-05-18, Commit `9a9b0ad`  
-**Letzte Session:** Owner-Dashboard-Sprint — 5 Tasks deployed: MTD/YTD-KPIs, Kunden-Cockpit, Alerts-Tab, AnalysePilot Zeitraum-Filter  
+**Letzte Session:** Owner-Dashboard-Sprint + lokales Inhaber-Briefpapier-Update — Petersen Brand, Firmendaten-Struktur, AB-PDF
 **Nächster Focus:** Pipeline-Kanban (5h, Opus) → Positions-Übernahme Angebot→Rechnung (1h) → BüroPilot↔PlanungPilot FK (4h)  
 **Blocker:** Keine — alle Migrations eingespielt (`db push` sauber)  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
@@ -95,6 +96,12 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – Inhaber-Briefpapier & Firmendaten, Branch `feature/briefpapier-firmendaten`)**:
+  - **Briefpapier/PDF** (`lib/pdf.ts`): Template `petersen-brand` optisch näher am neuen Briefpapier ausgerichtet (heller Header, Kontaktblock, dezentes Wasserzeichen, dunkler Footer mit Diagonalfläche/Logo), Firmen-/Steuer-/Bankdaten werden sauberer genutzt.
+  - **Auftragsbestätigung-PDF**: Neue Funktion `generateAuftragsbestaetigungPDF()` ergänzt; BüroPilot-Aufträge zeigen jetzt `AB-PDF` und das AB-Mail-Modal bietet PDF-Erstellung wie Angebote/Rechnungen.
+  - **Firmendaten** (`einstellungen/page.tsx`, `layout.tsx`): Strukturkarte für Dokumentdaten ergänzt; Pflichtdaten-Check für Angebote/Auftragsbestätigungen/Rechnungen; Inhaber-Template wird gegen Nicht-Inhaber gesperrt.
+  - **Inhaber-Dashboard** (`dashboard/page.tsx`): Owner-only Einstieg „Inhaber-Briefpapier“ mit Direktlink zu `Einstellungen → Firmendaten`.
+  - Tests: `npx tsc --noEmit`, `npm run lint`, `npm run build` grün (nur bekannte Warnungen).
 - **Zuletzt erledigt (2026-05-18 – Quick-Win-Sprint, 7 Fixes)**:
   - **PlanungPilot: `deletePlanungRessource`** — Funktion in `lib/db.ts` ergänzt (analog `deletePlanungTermin`); Import + `handleDelete`-Verdrahtung in `planung/page.tsx`. UI-Delete-Button läuft jetzt echte DB-Löschung.
   - **AnalysePilot: Status-Filter** — `analyse/page.tsx:236` von `'Entwurf'/'Gesendet'` auf `'Erstellt'/'Versendet'/'Akzeptiert'` korrigiert (BüroPilot-Workflow-Abgleich).

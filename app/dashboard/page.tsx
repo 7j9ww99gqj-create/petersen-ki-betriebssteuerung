@@ -475,6 +475,34 @@ export default function DashboardPage() {
           <div style={{ marginBottom: 14 }}>
             <OwnerAiControlPanel enabled compact />
           </div>
+          <div style={{
+            marginBottom: 14,
+            border: '1px solid rgba(32,200,255,.22)',
+            borderRadius: 18,
+            background: 'linear-gradient(180deg, rgba(8,18,34,.96), rgba(5,10,20,.98))',
+            padding: 16,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 14,
+            flexWrap: 'wrap',
+          }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', minWidth: 240 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(32,200,255,.12)', border: '1px solid rgba(32,200,255,.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                📄
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 900, color: '#f8fbff' }}>Inhaber-Briefpapier</div>
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>Petersen Brand für Angebote, Auftragsbestätigungen und Rechnungen.</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span className="badge badge-green">Nur Inhaber</span>
+              <button className="pk-btn-ghost" onClick={() => router.push('/dashboard/einstellungen?section=firma')} style={{ fontSize: 12, fontWeight: 800 }}>
+                Firmendaten öffnen →
+              </button>
+            </div>
+          </div>
           <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
             {[
               { label: 'Aktive Kunden', value: ownerSnapshot.activeCustomers.toLocaleString('de-DE'), icon: '👥', color: '#20c8ff', href: '/dashboard/einstellungen', delta: 'Live aus Billing' },
