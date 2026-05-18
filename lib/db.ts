@@ -2431,6 +2431,84 @@ export async function bulkImportSteuerKonten(rows: Array<{
   return data
 }
 
+// ── Steuer Fixkosten ───────────────────────────────────────────────────────────
+
+export async function getSteuerFixkosten() {
+  const { data, error } = await db().from('steuer_fixkosten').select('*').order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertSteuerFixkosten(f: {
+  id: string; titel: string; kategorie: string; betrag_netto: number; steuersatz: number
+  betrag_brutto: number; zahlungsintervall: string; naechste_zahlung?: string
+  anbieter?: string; notiz?: string; datei_url?: string; aktiv: boolean
+}) {
+  const { data, error } = await db().from('steuer_fixkosten').upsert({ ...f, updated_at: new Date().toISOString() }).select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteSteuerFixkosten(id: string) {
+  const { error } = await db().from('steuer_fixkosten').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function uploadSteuerDokument(file: File, userId: string, prefix = 'steuer'): Promise<string> {
+  const supabase = createSupabaseClient()
+  const ext = file.name.split('.').pop() ?? 'pdf'
+  const path = `${prefix}/${userId}/${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('dokumente').upload(path, file, { upsert: true })
+  if (error) throw error
+  const { data: { publicUrl } } = supabase.storage.from('dokumente').getPublicUrl(path)
+  return publicUrl
+}
+
+// ── Steuer Betriebsausgaben ────────────────────────────────────────────────────
+
+export async function getSteuerBetriebsausgaben() {
+  const { data, error } = await db().from('steuer_betriebsausgaben').select('*').order('datum', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertSteuerBetriebsausgabe(b: {
+  id: string; titel: string; kategorie: string; betrag_netto: number; steuersatz: number
+  betrag_brutto: number; datum: string; anbieter?: string; notiz?: string; datei_url?: string
+}) {
+  const { data, error } = await db().from('steuer_betriebsausgaben').upsert({ ...b, updated_at: new Date().toISOString() }).select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteSteuerBetriebsausgabe(id: string) {
+  const { error } = await db().from('steuer_betriebsausgaben').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ── Steuer Anschaffungen ───────────────────────────────────────────────────────
+
+export async function getSteuerAnschaffungen() {
+  const { data, error } = await db().from('steuer_anschaffungen').select('*').order('kaufdatum', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function upsertSteuerAnschaffung(a: {
+  id: string; titel: string; kategorie: string; betrag_netto: number; steuersatz: number
+  betrag_brutto: number; kaufdatum: string; lieferant?: string; seriennummer?: string
+  garantie_bis?: string; notiz?: string; datei_url?: string; gwg: boolean
+}) {
+  const { data, error } = await db().from('steuer_anschaffungen').upsert({ ...a, updated_at: new Date().toISOString() }).select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteSteuerAnschaffung(id: string) {
+  const { error } = await db().from('steuer_anschaffungen').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function bulkImportWerkstattZeitbuchungen(rows: Array<{
   mitarbeiter: string; auftragsnr: string; stunden: number
   datum?: string; taetigkeit?: string

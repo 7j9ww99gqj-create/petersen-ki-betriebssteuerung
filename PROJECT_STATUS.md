@@ -55,6 +55,26 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – SteuerPilot Massiverweiterung)**:
+  - **Neue Navigation**: 9 Tabs (Dashboard, Einnahmen, Belege, Fixkosten, Betriebsausgaben, Anschaffungen, UStVA, Auswertungen, Export) mit Icon + Label.
+  - **Fixkosten-Modul**: Vollständiges CRUD mit 16 Kategorien, Zahlungsintervallen (monatlich/quartalsweise/halbjährlich/jährlich), automatischem monatlichem Anteil, Vorsteuerberechnung, Datei-Upload, Kategorie-Balkendiagramm, Aktiv/Inaktiv-Toggle, Suche & Filter.
+  - **Betriebsausgaben-Modul**: Variable Einzelausgaben mit 15 Kategorien, Monatsfilter, Tabellen- & Kartenansicht, Summenspalte, Vorsteuer-Ausweis, Upload.
+  - **Anschaffungen-Modul**: Wirtschaftsgüter-Verwaltung mit GWG-Erkennung (≤ 800 € netto), AfA-Berechnung nach amtlicher Nutzungsdauer, Restbuchwert, Seriennummer, Garantiedatum, Upload.
+  - **Einnahmen-Tab**: Liest echte `buero_rechnungen` je Monat, zeigt USt aus Rechnungen, Status-Übersicht; verbindet BüroPilot mit SteuerPilot.
+  - **Dashboard**: Zentrale KPI-Übersicht mit USt/VSt/Zahllast, Warnungs-Panel, klickbare Schnellzugriffe, Letzte Belege.
+  - **Belege verbessert**: Inline-Status-Dropdown (ohne Modal), Duplikat-Erkennung (gleicher Lieferant + Betrag ±7 Tage), Datei-Vorschau-Link, Suche/Filter, Prüfungs-Checkliste.
+  - **UStVA verbessert**: Auto-Aggregat aus `buero_rechnungen` (USt) + Belegen (VSt), Ampel-Badge, Einnahmen-Zeile, klickbarer Verlauf.
+  - **Auswertungen**: CSS-Balkendiagramm USt/VSt, Jahrestabelle mit Summen, Vorsteuer nach Steuersatz.
+  - **Shared-Komponenten**: `components/steuer/shared.tsx` mit wiederverwendbaren Typen, Helpers und UI-Atomen.
+  - **DB-Migration**: `20260518150000_add_steuer_erweiterung.sql` — Tabellen `steuer_fixkosten`, `steuer_betriebsausgaben`, `steuer_anschaffungen` mit RLS.
+  - **lib/db.ts**: Neue Funktionen `getSteuerFixkosten/upsertSteuerFixkosten/deleteSteuerFixkosten`, `getSteuerBetriebsausgaben/upsertSteuerBetriebsausgabe/deleteSteuerBetriebsausgabe`, `getSteuerAnschaffungen/upsertSteuerAnschaffung/deleteSteuerAnschaffung`, `uploadSteuerDokument`.
+  - Betroffene Dateien: `app/dashboard/steuer/page.tsx`, `components/steuer/shared.tsx`, `components/steuer/SteuerFixkosten.tsx`, `components/steuer/SteuerBetriebsausgaben.tsx`, `components/steuer/SteuerAnschaffungen.tsx`, `lib/db.ts`, `supabase/migrations/20260518150000_add_steuer_erweiterung.sql`.
+  - Offene Punkte:
+    - Migration `20260518150000_add_steuer_erweiterung.sql` per `npx supabase db push` auf Remote anwenden.
+    - Fixkosten/Betriebsausgaben/Anschaffungen in UStVA-VSt-Berechnung einbeziehen (aktuell nur Belege).
+    - Auswertungs-Charts: echte `recharts`- oder `chart.js`-Bibliothek für interaktive Grafiken (aktuell CSS-Balken).
+  - Tests: `npm run lint` grün (nur bestehende Warnungen); `npm run build` grün.
+  - Branch: `main`
 - **Zuletzt erledigt (2026-05-18 – BüroPilot Angebot→Auftrag→Rechnung Vollprozess)**:
   - **Angebote**: Status `Entwurf` → `Erstellt` (Freigabe) → `Versendet` (nach mailto); fortlaufende Nummern via `pk_next_angebot_number()`; ⏰-Reminder-Badge nach 10 Tagen ohne Auftragskonvertierung; Mail öffnet lokales Mailprogramm mit vorausgefülltem Empfänger/Betreff.
   - **Aufträge**: neue Stati `AB erforderlich` → `AB erstellt` → `AB versendet` → `In Bearbeitung`; AB per mailto verschicken; Workflow-Buttons pro Status; „→ Rechnung erstellen" wechselt direkt in Rechnungen-Tab.
