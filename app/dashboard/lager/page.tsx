@@ -22,7 +22,7 @@ import PilotDocumentArchive from '@/components/PilotDocumentArchive'
 type Artikel = {
   id: string; name: string; kategorie: string; bestand: number
   einheit: string; lagerplatz: string; status: string; mindestbestand?: number
-  lieferant_id?: string | null
+  lieferant_id?: string | null; einkaufspreis?: number
 }
 type Bewegung = {
   id: number | string; typ: string; artikel: string; menge: number
@@ -206,8 +206,8 @@ function pickStatusLabel(status: PickStatus) {
 
 // ── Modal-Komponente ─────────────────────────────────────────────────────────
 
-type ArtikelForm = { id: string; name: string; kategorie: string; einheit: string; mindestbestand: string; lieferant_id: string }
-const emptyForm: ArtikelForm = { id: '', name: '', kategorie: 'Rohstoffe', einheit: 'Stk', mindestbestand: '0', lieferant_id: '' }
+type ArtikelForm = { id: string; name: string; kategorie: string; einheit: string; mindestbestand: string; lieferant_id: string; einkaufspreis: string }
+const emptyForm: ArtikelForm = { id: '', name: '', kategorie: 'Rohstoffe', einheit: 'Stk', mindestbestand: '0', lieferant_id: '', einkaufspreis: '0' }
 
 function ArtikelModal({ artikel, onSave, onClose, lieferanten }: {
   artikel?: Artikel | null
@@ -222,6 +222,7 @@ function ArtikelModal({ artikel, onSave, onClose, lieferanten }: {
     einheit: artikel.einheit,
     mindestbestand: String(artikel.mindestbestand ?? 0),
     lieferant_id: artikel.lieferant_id ?? '',
+    einkaufspreis: String(artikel.einkaufspreis ?? 0),
   } : emptyForm)
 
   const set = (k: keyof ArtikelForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -258,11 +259,17 @@ function ArtikelModal({ artikel, onSave, onClose, lieferanten }: {
               </select>
             </div>
           </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Mindestbestand ⚠️</label>
-            <input className="pk-input" type="number" min="0" value={form.mindestbestand} onChange={set('mindestbestand')} />
-            <div style={{ marginTop: 5, fontSize: 11, color: '#7f8ea3' }}>Menge und Stellplatz werden erst bei der Einlagerung gebucht.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Mindestbestand ⚠️</label>
+              <input className="pk-input" type="number" min="0" value={form.mindestbestand} onChange={set('mindestbestand')} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Einkaufspreis (€)</label>
+              <input className="pk-input" type="number" min="0" step="0.01" placeholder="0.00" value={form.einkaufspreis} onChange={set('einkaufspreis')} />
+            </div>
           </div>
+          <div style={{ marginTop: -8, fontSize: 11, color: '#7f8ea3' }}>Menge und Stellplatz werden erst bei der Einlagerung gebucht.</div>
           {lieferanten && lieferanten.length > 0 && (
             <div>
               <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Stammlieferant</label>
@@ -1068,7 +1075,8 @@ export default function LagerPilotPage() {
     const bestand = existing?.bestand ?? 0
     const lagerplatz = existing?.lagerplatz ?? ''
     const status = calcStatus(bestand, mindestbestand)
-    const a: Artikel = { id, name: form.name.trim(), kategorie: form.kategorie, bestand, einheit: form.einheit, lagerplatz, status, mindestbestand, lieferant_id: form.lieferant_id || null }
+    const einkaufspreis = parseFloat(form.einkaufspreis.replace(',', '.')) || 0
+    const a: Artikel = { id, name: form.name.trim(), kategorie: form.kategorie, bestand, einheit: form.einheit, lagerplatz, status, mindestbestand, lieferant_id: form.lieferant_id || null, einkaufspreis }
 
     setSaving(true)
     if (!isDemo) {
