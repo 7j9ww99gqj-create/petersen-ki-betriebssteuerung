@@ -26,11 +26,11 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, 30-Aufgaben-Sprint vollständig deployed.
-- Letzter Commit: `2b068fc` — Sprint-Migration 18/22/25/26/30 eingespielt.
-- Jüngste Fortschritte (2026-05-18 – 30-Aufgaben-Sprint): Alle 30 Aufgaben implementiert, committed, gepusht und live auf Vercel. Migrations `20260518210000` für Aufgaben 18/22/25/26/30 nachträglich eingespielt.
-- Infrastruktur: PreToolUse-Hook konfiguriert — `npx tsc --noEmit` blockiert ab sofort jeden Push bei TypeScript-Fehlern (`.claude/settings.json`).
-- Alle Migrations eingespielt: Remote-DB ist up to date (`20260518210000` ist neueste Migration).
+- Letzter dokumentierter Live-Stand: `2026-05-18`, `main`, Messaging & Postfach-System live.
+- Letzter Commit: `f35f444` — Empfänger-Auswahl (Alle/Einzeln) im Owner-Postfach.
+- Jüngste Fortschritte (2026-05-18 – Messaging-System): Postfach-Feature vollständig implementiert — Zahnrad-Icon, Postfach-Menüpunkt, User→Owner Support, Owner→User Broadcast/Einzelnachricht.
+- Infrastruktur: PreToolUse-Hook konfiguriert — `npx tsc --noEmit` blockiert Push bei TypeScript-Fehlern.
+- ⚠️ Ausstehend: Messaging SQL-Schema manuell im Supabase SQL-Editor ausführen (Tabellen `user_messages`, `broadcast_messages`).
 - Produktivlage: Kernsystem vollständig; alle Hauptmodule produktionsreif und erweitert.
 
 ### 0.2 Top-Offene Aufgaben (Priorisiert)
@@ -94,6 +94,7 @@
 - ✅ ~~**Sprint-Aufgabe 28: WerkstattPilot Fertigungsleitstand**~~ **Erledigt 2026-05-18** (Commit `e7e76d4`) — neuer Tab, 3-Spalten-Kanban, SLA-Ampel, Batch-Aktionen.
 - ✅ ~~**Sprint-Aufgabe 29: SteuerPilot OCR-Erkennung**~~ **Erledigt 2026-05-18** (Commit `a5d595c`) — API-Route `ocr-beleg`, KI füllt Felder automatisch.
 - ✅ ~~**Sprint-Aufgabe 30: PlanungPilot auftrag_id FK + Meilensteine**~~ **Erledigt 2026-05-18** (Commit `60be09b`) — FK, Button in BüroPilot, Meilenstein-CRUD.
+- 🔴 **Messaging SQL-Schema ausführen** — Tabellen `user_messages` + `broadcast_messages` müssen einmalig manuell im Supabase SQL-Editor eingespielt werden. Bis dahin ist das Postfach nicht funktionsfähig.
 - 🔴 **LagerPilot: Umlagerung atomarisieren** — Datenverlust-Risiko bei Teil-Fehlern (4 Awaits ohne Rollback). Supabase-RPC nötig.
 - 🔴 **LagerPilot: Dual-Layer-Bestandssync** — `lager_artikel.bestand` und `lager_stellplatz_bestand` laufen auseinander; KI-Kontext inkonsistent.
 - 🔴 **WerkstattPilot: FK `buero_auftrag_id`** — `auftragsnr` ist freier Text ohne Referenzintegrität; echte Karte↔Auftrag-FK fehlt noch.
@@ -107,10 +108,10 @@
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-18, Commit `2b068fc`  
-**Letzte Session:** 30-Aufgaben-Sprint vollständig deployed + Sprint-Migration nachgezogen + PreToolUse-Hook für TypeScript-Check vor Push eingerichtet  
-**Nächster Focus:** Pipeline-Kanban (5h, Opus) → Zahlungsmoral-Report (2h) → LagerPilot Umlagerung atomarisieren (Supabase-RPC)  
-**Blocker:** Keine — alle Migrations eingespielt (`20260518210000` ist neueste), Build + TSC grün, Vercel Ready  
+**Letzter Stand:** 2026-05-18, Commit `f35f444`  
+**Letzte Session:** Messaging & Postfach-System implementiert — Zahnrad-Icon, Postfach-Menüpunkt, User-Support, Owner-Broadcast/Einzelnachricht mit Empfänger-Dropdown  
+**Nächster Focus:** Messaging SQL-Schema in Supabase ausführen → Pipeline-Kanban (5h, Opus) → Zahlungsmoral-Report (2h)  
+**Blocker:** Messaging SQL-Schema noch nicht in Supabase eingespielt (Tabellen `user_messages`, `broadcast_messages` fehlen in DB)  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
 ## 1. Kurzüberblick
@@ -126,6 +127,18 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – Messaging & Postfach-System, Commits `9ae15d1`–`f35f444`):**
+  - **Settings-Icon** (`layout.tsx`): Zahnrad-Icon ⚙️ oben rechts neben Glocke ersetzt alten Buchstaben-Button. Hover-Effekt blau.
+  - **Postfach-Menüpunkt** (`einstellungen/page.tsx`): Neuer NavItem 📬 zwischen Billing & Benachrichtigungen. Für alle User sichtbar.
+  - **User-View**: Support-Anfragen schreiben (Betreff + Text), versendete Nachrichten mit Lesestatus (gelesen ✓ / ungelesen ⏱️).
+  - **Owner-View** (nur `info@petersen-ki-pilot.de`):
+    - Inbox-Tab: Alle Support-Anfragen von Nutzern, Ungelesen-Badge.
+    - Versendete-Tab: Nachricht verfassen mit Empfänger-Toggle (📢 Alle / 👤 Einzelner Nutzer), Dropdown aus `managedUsers`.
+    - History: Badge zeigt Empfänger-Typ + Empfängername bei Einzelversand.
+  - **API**: `app/api/messages/route.ts` — GET (`?action=inbox`, `?action=sent`, standard) + POST (`send`, `broadcast`, `mark_read`).
+  - **DB-Funktionen** (`lib/db.ts`): `getUserMessages`, `insertUserMessage`, `markUserMessageAsRead`, `getOwnerInbox`, `insertBroadcastMessage`, `getOwnerSentMessages`.
+  - **Schema** (`supabase/schema.sql`): Tabellen `user_messages` + `broadcast_messages` + RLS-Policies + Indexes hinzugefügt. ⚠️ Manuell im SQL-Editor ausführen!
+  - Build + TSC ✅ grün.
 - **Zuletzt erledigt (2026-05-18 – 30-Aufgaben-Sprint, Commits `5de7454`–`2b068fc`):**
   - **Aufgabe 1** (`5de7454`): AnalysePilot Lagerwert-KPI (💰 Bestand × Einkaufspreis, Demo-Fallback). `analyse/page.tsx`
   - **Aufgabe 2** (`828bb19`): SteuerPilot VSt Fixkosten als separate UStVA-Zeile. `steuer/page.tsx`
