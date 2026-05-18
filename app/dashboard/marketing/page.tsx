@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
 import EmptyState from '@/components/EmptyState'
 import {
@@ -527,6 +528,53 @@ function DemoLabTab({
   onJump: (tab: Tab) => void
 }) {
   const [selected, setSelected] = useState<DemoMarketingFeature>(demoMarketingFeatures[0])
+  const [kiResult, setKiResult] = useState<Record<string, unknown> | null>(null)
+  const [kiLoading, setKiLoading] = useState(false)
+  const [kiError, setKiError] = useState('')
+  const [kiDisabled, setKiDisabled] = useState(false)
+
+  useEffect(() => {
+    setKiResult(null)
+    setKiError('')
+    setKiDisabled(false)
+  }, [selected.id])
+
+  const KI_ROUTES: Partial<Record<string, string>> = {
+    'content-daily': '/api/marketing/content-daily',
+    autopilot: '/api/marketing/autopilot',
+    'sales-assistant': '/api/marketing/sales-assistant',
+  }
+
+  const KI_LABELS: Partial<Record<string, Record<string, string>>> = {
+    'content-daily': { titel: 'Titel', kanal: 'Kanal', hook: 'Hook', inhalt: 'Inhalt', cta: 'Call to Action', begruendung: 'Begründung' },
+    autopilot: { zielgruppe: 'Zielgruppe', kanal_empfehlung: 'Kanal-Empfehlung', kampagnen_idee: 'Kampagnen-Idee', funnel_luecke: 'Funnel-Lücke', naechster_schritt: 'Nächster Schritt', prioritaet: 'Priorität' },
+    'sales-assistant': { top_lead: 'Top-Lead', sofort_aktion: 'Sofort-Aktion', followup_text: 'Follow-up Text', kanal: 'Kanal', einwand_vorbereitung: 'Einwand-Vorbereitung', naechste_3_schritte: 'Nächste 3 Schritte' },
+  }
+
+  async function runKi() {
+    const route = KI_ROUTES[selected.id]
+    if (!route) return
+    setKiLoading(true)
+    setKiError('')
+    setKiResult(null)
+    setKiDisabled(false)
+    try {
+      const res = await fetch(route, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kampagnen, leads, seoKeywords, newsletter }),
+      })
+      const data = await res.json() as Record<string, unknown>
+      if (res.status === 403 && data.disabled) { setKiDisabled(true); return }
+      if (!res.ok) { setKiError(String(data.error || 'Fehler bei der KI-Anfrage.')); return }
+      setKiResult(data)
+    } catch {
+      setKiError('Netzwerkfehler. Bitte erneut versuchen.')
+    } finally {
+      setKiLoading(false)
+    }
+  }
+
   const hotLead = [...leads]
     .filter(lead => !['Gewonnen', 'Verloren'].includes(lead.status))
     .sort((a, b) => getLeadScore(b) - getLeadScore(a))[0]
@@ -598,6 +646,53 @@ function DemoLabTab({
               <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '.06em', marginBottom: 5 }}>Sofort sinnvoll</div>
               <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>{hotLead.name} · Score {getLeadScore(hotLead)}</div>
               <div style={{ fontSize: 12, color: '#d0d9e8' }}>{getLeadAction(hotLead)}</div>
+            </div>
+          )}
+
+          {/* KI-Button für die 3 aktiven Module */}
+          {KI_ROUTES[selected.id] && (
+            <div style={{ marginTop: 14 }}>
+              {!kiResult && !kiDisabled && (
+                <button
+                  onClick={runKi}
+                  disabled={kiLoading}
+                  className="pk-btn"
+                  style={{ width: '100%', opacity: kiLoading ? 0.7 : 1, fontSize: 14 }}
+                >
+                  {kiLoading ? '⏳ KI analysiert…' : '✨ KI jetzt ausführen'}
+                </button>
+              )}
+
+              {kiDisabled && (
+                <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(245,158,11,.07)', border: '1px solid rgba(245,158,11,.18)', fontSize: 13, color: '#aeb9c8', lineHeight: 1.5 }}>
+                  🔒 Noch nicht aktiviert — Im Inhaber-Dashboard unter <strong style={{ color: '#fbbf24' }}>Einstellungen → KI-Funktionen → Marketing-KI</strong> einschalten.
+                </div>
+              )}
+
+              {kiError && (
+                <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(255,80,80,.1)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13 }}>
+                  {kiError}
+                  <button onClick={runKi} style={{ marginLeft: 12, fontSize: 12, color: '#ff8080', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Erneut versuchen</button>
+                </div>
+              )}
+
+              {kiResult && (() => {
+                const labels = KI_LABELS[selected.id] ?? {}
+                return (
+                  <div style={{ marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase' as const, fontWeight: 800, letterSpacing: '.06em', marginBottom: 10 }}>✨ KI-Ergebnis</div>
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {Object.entries(kiResult).map(([key, value]) => (
+                        <div key={key} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(22,132,255,.07)', border: '1px solid rgba(22,132,255,.15)' }}>
+                          <div style={{ fontSize: 10, color: '#aeb9c8', textTransform: 'uppercase' as const, fontWeight: 800, letterSpacing: '.06em', marginBottom: 4 }}>{labels[key] ?? key}</div>
+                          <div style={{ fontSize: 13, color: '#f8fbff', lineHeight: 1.5 }}>{String(value)}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={() => { setKiResult(null) }} style={{ marginTop: 10, fontSize: 12, color: '#aeb9c8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>↺ Neu generieren</button>
+                  </div>
+                )
+              })()}
             </div>
           )}
         </div>
@@ -2429,8 +2524,18 @@ function AuswertungenTab({
 }
 
 export default function MarketingPilotPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [isDemo] = useState(() => hasDemoCookie())
-  const [tab, setTab] = useState<Tab>('demo-lab')
+  const [tab, setTabState] = useState<Tab>(
+    (searchParams.get('tab') as Tab) || 'demo-lab'
+  )
+  const setTab = (newTab: Tab) => {
+    setTabState(newTab)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', newTab)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
   const [kampagnen, setKampagnen] = useState<Kampagne[]>(isDemo ? demoKampagnen : [])
   const [leads, setLeads] = useState<Lead[]>(isDemo ? demoLeads : [])
   const [newsletter, setNewsletter] = useState<Newsletter[]>(isDemo ? demoNewsletter : [])

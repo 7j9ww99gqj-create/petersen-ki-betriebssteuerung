@@ -8,7 +8,7 @@ void parseBetrag
 
 function PipelineKanbanTab({ angebote, auftraege, rechnungen, setTab }: {
   angebote: Angebot[]; auftraege: Auftrag[]; rechnungen: Rechnung[]
-  setTab: React.Dispatch<React.SetStateAction<Tab>>
+  setTab: (t: Tab) => void
 }) {
   const cols: { id: string; label: string; color: string; accent: string }[] = [
     { id: 'angebot', label: 'Angebot', color: 'rgba(99,102,241,.15)', accent: '#818cf8' },

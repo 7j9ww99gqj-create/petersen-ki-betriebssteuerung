@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
 import SkeletonCard from '@/components/SkeletonCard'
 import EmptyState from '@/components/EmptyState'
@@ -2142,8 +2143,18 @@ function FertigungsleitstandTab({ isDemo, karten, setKarten, mitarbeiterNamen }:
 type Tab = 'karten' | 'zeit' | 'material' | 'qualitaet' | 'wartung' | 'stoerungen' | 'maschinenakte' | 'mitarbeiter' | 'bereiche' | 'leitstand' | 'archiv'
 
 export default function WerkstattPilotPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [isDemo] = useState(() => hasDemoCookie())
-  const [tab, setTab] = useState<Tab>('karten')
+  const [tab, setTabState] = useState<Tab>(
+    (searchParams.get('tab') as Tab) || 'karten'
+  )
+  const setTab = (newTab: Tab) => {
+    setTabState(newTab)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', newTab)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
   const [newKarteParams, setNewKarteParams] = useState<NewKarteParams | undefined>(undefined)
   const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
   const [zeitbuchungen, setZeitbuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])

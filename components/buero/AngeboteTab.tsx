@@ -8,7 +8,7 @@ import { Toast, Modal, DeleteConfirm, StatusBadgeAngebot, labelStyle } from './s
 import type { Kunde, Angebot, Auftrag, Rechnung, Dokument, Position, Tab } from '@/types/buero'
 import { demoAngebote, demoDokumente, isDokumentAvailableForRelation, applyDokumentRelationToState, getLinkedDokument, getLocalFirmaDefaults } from '@/types/buero'
 
-function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterStatus, isOwner, setTab: setParentTab, setRechnungen }: { isDemo: boolean; kunden: Kunde[]; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; initialFilterStatus?: string; isOwner?: boolean; setTab?: React.Dispatch<React.SetStateAction<Tab>>; setRechnungen?: React.Dispatch<React.SetStateAction<Rechnung[]>> }) {
+function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterStatus, isOwner, setTab: setParentTab, setRechnungen }: { isDemo: boolean; kunden: Kunde[]; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; initialFilterStatus?: string; isOwner?: boolean; setTab?: (t: Tab) => void; setRechnungen?: React.Dispatch<React.SetStateAction<Rechnung[]>> }) {
   const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
   const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [showForm, setShowForm] = useState(false)

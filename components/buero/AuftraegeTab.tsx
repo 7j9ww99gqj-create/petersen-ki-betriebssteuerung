@@ -8,7 +8,7 @@ import { Toast, Modal, DeleteConfirm, StatusBadgeAuftrag, ProgressBar, labelStyl
 import type { Auftrag, Kunde, Rechnung, Dokument, Tab } from '@/types/buero'
 import { demoDokumente, getLinkedDokument, isDokumentAvailableForRelation, applyDokumentRelationToState, getLocalFirmaDefaults } from '@/types/buero'
 
-function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRechnungen: setSharedRechnungen, setMailTarget: setSharedMailTarget }: { isDemo: boolean; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; kunden: Kunde[]; setTab: React.Dispatch<React.SetStateAction<Tab>>; setRechnungen?: React.Dispatch<React.SetStateAction<Rechnung[]>>; setMailTarget?: React.Dispatch<React.SetStateAction<{ id: string; email: string; typ: 'rechnung' } | null>> }) {
+function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRechnungen: setSharedRechnungen, setMailTarget: setSharedMailTarget }: { isDemo: boolean; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; kunden: Kunde[]; setTab: (t: Tab) => void; setRechnungen?: React.Dispatch<React.SetStateAction<Rechnung[]>>; setMailTarget?: React.Dispatch<React.SetStateAction<{ id: string; email: string; typ: 'rechnung' } | null>> }) {
   const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [toast, setToast] = useState('')

@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
 import { getBueroRechnungen, getSteuerBelege, upsertSteuerBeleg, deleteSteuerBeleg, getSteuerUstva, upsertSteuerUstva, uploadSteuerBeleg, getSteuerFixkosten, getSteuerBetriebsausgaben, getSteuerAnschaffungen, getSteuerBelegUploads, upsertSteuerBelegUpload, deleteSteuerBelegUpload, uploadSteuerBelegFile, type SteuerBelegUpload } from '@/lib/db'
 import { genId } from '@/lib/ids'
@@ -186,9 +187,19 @@ function WarnBadge({ type }: { type: Warning['type'] }) {
 // ── Haupt-Komponente ───────────────────────────────────────────────────────────
 
 export default function SteuerPilotPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [isDemo] = useState(() => hasDemoCookie())
   const { role, permissions } = useRole()
-  const [tab, setTab] = useState<SteuerTab>('dashboard')
+  const [tab, setTabState] = useState<SteuerTab>(
+    (searchParams.get('tab') as SteuerTab) || 'dashboard'
+  )
+  const setTab = (newTab: SteuerTab) => {
+    setTabState(newTab)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', newTab)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
   const [belege, setBelege] = useState<Beleg[]>([])
   const [ustva, setUstva] = useState<Ustva[]>([])
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([])

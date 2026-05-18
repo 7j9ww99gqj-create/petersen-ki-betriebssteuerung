@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import SkeletonCard from '@/components/SkeletonCard'
 import EmptyState from '@/components/EmptyState'
 import { hasDemoCookie } from '@/lib/auth'
@@ -809,9 +809,18 @@ function ScannerModal({ onClose, onScan }: {
 
 export default function LagerPilotPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [isDemo] = useState(() => hasDemoCookie())
   const [aiSettings, setAiSettings] = useState<AiFeatureSettings>({ enabled: true, chatEnabled: true, documentEnabled: true })
-  const [tab, setTab] = useState<LagerTab>('bestand')
+  const [tab, setTabState] = useState<LagerTab>(
+    (searchParams.get('tab') as LagerTab) || 'bestand'
+  )
+  const setTab = (newTab: LagerTab) => {
+    setTabState(newTab)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', newTab)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
   const [search, setSearch] = useState('')
   const [filterKat, setFilterKat] = useState('Alle')
   const [bestandStatusFilter, setBestandStatusFilter] = useState<'Alle' | 'ok' | 'niedrig' | 'leer'>('Alle')
@@ -892,11 +901,8 @@ export default function LagerPilotPage() {
     getEinkaufLieferanten().then(l => setLieferantenListe((l as { id: string; name: string }[]) ?? [])).catch(() => {})
   }, [isDemo, retryKey])
 
+  // Sync status filter from URL params
   useEffect(() => {
-    const requestedTab = searchParams.get('tab')
-    if (requestedTab && ['bestand', 'bewegungen', 'eingang', 'ausgang', 'inventur', 'bestellung', 'historie', 'stellplaetze', 'lagerbelegung', 'umlagerung', 'kommissionierung', 'tagesbericht', 'archiv'].includes(requestedTab)) {
-      setTab(requestedTab as LagerTab)
-    }
     const requestedStatus = searchParams.get('status')
     if (requestedStatus && ['Alle', 'ok', 'niedrig', 'leer'].includes(requestedStatus)) {
       setBestandStatusFilter(requestedStatus as 'Alle' | 'ok' | 'niedrig' | 'leer')

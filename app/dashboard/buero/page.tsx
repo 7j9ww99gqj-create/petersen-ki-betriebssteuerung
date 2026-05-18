@@ -25,7 +25,15 @@ export default function BueroPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
   const { role } = useRole()
   const isOwner = isDemo ? true : role === 'Admin'
-  const [tab, setTab] = useState<Tab>('kunden')
+  const [tab, setTabState] = useState<Tab>(
+    (searchParams.get('tab') as Tab) || 'kunden'
+  )
+  const setTab = (newTab: Tab) => {
+    setTabState(newTab)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', newTab)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
   const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
   const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
   const [auftraege, setAuftraege] = useState<Auftrag[]>(isDemo ? demoAuftraege : [])
@@ -70,12 +78,6 @@ export default function BueroPilotPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, isDemo])
 
-  useEffect(() => {
-    const requestedTab = searchParams.get('tab')
-    if (requestedTab && ['kunden', 'angebote', 'auftraege', 'rechnungen', 'eingangsrechnungen', 'dokumente', 'einkauf'].includes(requestedTab)) {
-      setTab(requestedTab as Tab)
-    }
-  }, [searchParams])
 
   // KPI-Berechnungen für Pipeline-Widget
   const offeneAngebote = angebote.filter(a => a.status === 'Versendet' || a.status === 'Entwurf').length
