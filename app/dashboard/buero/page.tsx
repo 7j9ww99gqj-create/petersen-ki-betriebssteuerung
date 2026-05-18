@@ -36,7 +36,7 @@ type Angebot = {
 type Auftrag = {
   id: string; kunde_id?: string; kunde: string; beschreibung: string; wert: string
   start: string; ende: string; status: 'AB erforderlich' | 'AB erstellt' | 'AB versendet' | 'In Bearbeitung' | 'Abgeschlossen' | 'Geplant' | 'Pausiert'
-  fortschritt: number; angebot_id?: string; ab_verschickt_am?: string
+  fortschritt: number; angebot_id?: string; ab_verschickt_am?: string; ab_nummer?: string
 }
 
 type Rechnung = {
@@ -1113,7 +1113,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
 
 // ── Aufträge-Tab ────────────────────────────────────────────────────────────
 
-function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isDemo: boolean; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; kunden: Kunde[]; setTab: React.Dispatch<React.SetStateAction<Tab>> }) {
+function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRechnungen: setSharedRechnungen, setMailTarget: setSharedMailTarget }: { isDemo: boolean; auftraege: Auftrag[]; setAuftraege: React.Dispatch<React.SetStateAction<Auftrag[]>>; kunden: Kunde[]; setTab: React.Dispatch<React.SetStateAction<Tab>>; setRechnungen?: React.Dispatch<React.SetStateAction<Rechnung[]>>; setMailTarget?: React.Dispatch<React.SetStateAction<{ id: string; email: string; typ: 'rechnung' } | null>> }) {
   const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [toast, setToast] = useState('')
@@ -1181,6 +1181,18 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isD
     )))
   }
 
+  const getNextABNumber = (): string => {
+    const year = new Date().getFullYear()
+    const existing = auftraege
+      .map(a => a.ab_nummer)
+      .filter(Boolean)
+      .filter(n => n?.startsWith(`AB-${year}-`))
+      .map(n => parseInt(n!.replace(`AB-${year}-`, ''), 10))
+      .filter(n => !isNaN(n))
+    const next = existing.length > 0 ? Math.max(...existing) + 1 : 1
+    return `AB-${year}-${String(next).padStart(3, '0')}`
+  }
+
   const handleAbschliessen = async (id: string) => {
     const auftrag = auftraege.find(a => a.id === id)
     if (!isDemo && auftrag) {
@@ -1192,11 +1204,13 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isD
 
   const handleABErstellen = async (id: string) => {
     const auftrag = auftraege.find(a => a.id === id)
-    if (!isDemo && auftrag) {
-      try { await upsertBueroAuftrag({ ...auftrag, status: 'AB erstellt' }) } catch { showToast('Fehler beim Speichern', true); return }
+    if (!auftrag) return
+    const abNummer = isDemo ? `AB-${new Date().getFullYear()}-DEMO` : getNextABNumber()
+    if (!isDemo) {
+      try { await upsertBueroAuftrag({ ...auftrag, status: 'AB erstellt', ab_nummer: abNummer }) } catch { showToast('Fehler beim Speichern', true); return }
     }
-    setAuftraege(prev => prev.map(a => a.id === id ? { ...a, status: 'AB erstellt' } : a))
-    showToast(`📋 Auftragsbestätigung für ${id} erstellt – bitte verschicken`)
+    setAuftraege(prev => prev.map(a => a.id === id ? { ...a, status: 'AB erstellt', ab_nummer: abNummer } : a))
+    showToast(`📋 Auftragsbestätigung ${abNummer} erstellt – bitte verschicken`)
   }
 
   const handleABStarten = async (id: string) => {
@@ -1211,7 +1225,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isD
   const handleABMailSend = async (email: string, auftrag: Auftrag) => {
     setAuftragMailSending(true)
     try {
-      const subject = `Auftragsbestätigung ${auftrag.id}`
+      const subject = `Auftragsbestätigung ${auftrag.ab_nummer || auftrag.id}`
       const body = ['Guten Tag,', '', `anbei erhalten Sie die Auftragsbestätigung für Auftrag ${auftrag.id}.`, `Beschreibung: ${auftrag.beschreibung}`, `Wert: ${auftrag.wert}`, '', 'Viele Grüße'].join('\n')
       window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
       const today = new Date().toISOString().split('T')[0]
@@ -1248,6 +1262,13 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isD
     }
     if (!isDemo) {
       try { await upsertBueroRechnung(newRe) } catch { showToast('Fehler beim Erstellen der Rechnung', true); return }
+    }
+    if (setSharedRechnungen) {
+      setSharedRechnungen(prev => [{ ...newRe, kunde_id: newRe.kunde_id ?? undefined }, ...prev])
+    }
+    if (setSharedMailTarget) {
+      const k = kunden.find(k => k.id === auftrag.kunde_id || k.name === auftrag.kunde)
+      setSharedMailTarget({ id: newRe.id, email: k?.email || '', typ: 'rechnung' })
     }
     showToast(`✅ Rechnung ${newRe.nummer || newRe.id} erstellt`)
     setTab('rechnungen' as Tab)
@@ -1461,6 +1482,13 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isD
                 </div>
                 <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 2 }}>{a.beschreibung}</div>
                 <div style={{ color: '#aeb9c8', fontSize: 13 }}>🏢 {a.kunde}</div>
+                {a.ab_nummer && (
+                  <div style={{ marginTop: 4 }}>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.3)', color: '#1684ff', fontFamily: 'monospace' }}>
+                      AB: {a.ab_nummer}
+                    </span>
+                  </div>
+                )}
                 <div style={{ color: '#aeb9c8', fontSize: 12, marginTop: 4 }}>Dokument: {linkedDokument?.name ?? '—'}</div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -1520,8 +1548,10 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab }: { isD
 
 // ── Rechnungen-Tab ──────────────────────────────────────────────────────────
 
-function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolean; kunden: Kunde[]; initialFilterStatus?: string }) {
-  const [rechnungen, setRechnungen] = useState<Rechnung[]>(isDemo ? demoRechnungen : [])
+function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, setSharedRechnungen, sharedMailTarget, setSharedMailTarget }: { isDemo: boolean; kunden: Kunde[]; initialFilterStatus?: string; sharedRechnungen?: Rechnung[]; setSharedRechnungen?: React.Dispatch<React.SetStateAction<Rechnung[]>>; sharedMailTarget?: { id: string; email: string; typ: 'rechnung' } | null; setSharedMailTarget?: React.Dispatch<React.SetStateAction<{ id: string; email: string; typ: 'rechnung' } | null>> }) {
+  const [rechnungenLocal, setRechnungenLocal] = useState<Rechnung[]>(isDemo ? demoRechnungen : [])
+  const rechnungen = sharedRechnungen ?? rechnungenLocal
+  const setRechnungen: React.Dispatch<React.SetStateAction<Rechnung[]>> = setSharedRechnungen ?? setRechnungenLocal
   const [dokumente, setDokumente] = useState<Dokument[]>(isDemo ? demoDokumente : [])
   const [toast, setToast] = useState('')
   const [toastError, setToastError] = useState(false)
@@ -1538,7 +1568,9 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   // Mail-Versand
-  const [mailTarget, setMailTarget] = useState<{ id: string; email: string; typ: 'rechnung' } | null>(null)
+  const [mailTargetLocal, setMailTargetLocal] = useState<{ id: string; email: string; typ: 'rechnung' } | null>(null)
+  const mailTarget = sharedMailTarget !== undefined ? sharedMailTarget : mailTargetLocal
+  const setMailTarget = (setSharedMailTarget ?? setMailTargetLocal) as React.Dispatch<React.SetStateAction<{ id: string; email: string; typ: 'rechnung' } | null>>
   const [mailSending, setMailSending] = useState(false)
 
   useEffect(() => {
@@ -1634,11 +1666,32 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
 
   const handleMahnung = async (id: string) => {
     const rechnung = rechnungen.find(r => r.id === id)
-    if (!isDemo && rechnung) {
+    if (!rechnung) return
+    if (!isDemo) {
       try { await upsertBueroRechnung({ ...rechnung, status: 'Mahnung' }) } catch { showToast('Fehler beim Speichern', true); return }
     }
     setRechnungen(prev => prev.map(r => r.id === id ? { ...r, status: 'Mahnung' } : r))
-    showToast(`📮 Mahnung für Rechnung ${id} wurde versendet`)
+    const subject = `Zahlungserinnerung: Rechnung ${rechnung.nummer || rechnung.id}`
+    const body = [
+      `Guten Tag ${rechnung.kunde},`,
+      '',
+      `hiermit möchten wir Sie freundlich an die offene Zahlung folgender Rechnung erinnern:`,
+      '',
+      `Rechnungsnummer: ${rechnung.nummer || rechnung.id}`,
+      `Betrag: ${rechnung.betrag}`,
+      `Fälligkeitsdatum: ${rechnung.faellig}`,
+      '',
+      `Bitte überweisen Sie den ausstehenden Betrag innerhalb von 7 Werktagen auf unser Konto.`,
+      '',
+      `Bei Rückfragen stehen wir Ihnen gerne zur Verfügung.`,
+      '',
+      `Mit freundlichen Grüßen`,
+    ].join('\n')
+    const k = kunden.find(k => k.id === rechnung.kunde_id || k.name === rechnung.kunde)
+    if (k?.email) {
+      window.location.href = `mailto:${encodeURIComponent(k.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    }
+    showToast(`📮 Mahnung für ${rechnung.nummer || id} erstellt – Mail-Entwurf vorbereitet`)
   }
 
   const handleNeu = async () => {
@@ -1892,9 +1945,14 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus }: { isDemo: boolea
                         </>
                       )}
                       {r.status === 'Mahnung' && (
-                        <button onClick={e => { e.stopPropagation(); handleBezahlt(r.id) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
-                          ✅ Bezahlt
-                        </button>
+                        <>
+                          <button onClick={e => { e.stopPropagation(); handleBezahlt(r.id) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(37,211,102,.3)', background: 'transparent', color: '#4ddb7e', cursor: 'pointer' }}>
+                            ✅ Bezahlt
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); handleMahnung(r.id) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,165,0,.3)', background: 'transparent', color: '#ffb347', cursor: 'pointer' }}>
+                            📮 2. Mahnung
+                          </button>
+                        </>
                       )}
                       <button onClick={e => { e.stopPropagation(); generateRechnungPDF(r, r.kunde) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
                         📄 PDF
@@ -3090,6 +3148,8 @@ export default function BueroPilotPage() {
   const [tab, setTab] = useState<Tab>('kunden')
   const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
   const [auftraege, setAuftraege] = useState<Auftrag[]>(isDemo ? demoAuftraege : [])
+  const [sharedRechnungen, setSharedRechnungen] = useState<Rechnung[]>(isDemo ? demoRechnungen : [])
+  const [sharedMailTarget, setSharedMailTarget] = useState<{ id: string; email: string; typ: 'rechnung' } | null>(null)
   const [loading, setLoading] = useState(!isDemo)
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -3168,10 +3228,10 @@ export default function BueroPilotPage() {
 
       <TabBar tab={tab} setTab={setTab} />
 
-      {tab === 'kunden' && <KundenTab isDemo={isDemo} auftraege={auftraege} rechnungen={isDemo ? demoRechnungen : []} />}
+      {tab === 'kunden' && <KundenTab isDemo={isDemo} auftraege={auftraege} rechnungen={sharedRechnungen} />}
       {tab === 'angebote' && <AngeboteTab isDemo={isDemo} kunden={kunden} auftraege={auftraege} setAuftraege={setAuftraege} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
-      {tab === 'auftraege' && <AuftraegeTab isDemo={isDemo} auftraege={auftraege} setAuftraege={setAuftraege} kunden={kunden} setTab={setTab} />}
-      {tab === 'rechnungen' && <RechnungenTab isDemo={isDemo} kunden={kunden} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
+      {tab === 'auftraege' && <AuftraegeTab isDemo={isDemo} auftraege={auftraege} setAuftraege={setAuftraege} kunden={kunden} setTab={setTab} setRechnungen={setSharedRechnungen} setMailTarget={setSharedMailTarget} />}
+      {tab === 'rechnungen' && <RechnungenTab isDemo={isDemo} kunden={kunden} initialFilterStatus={searchParams.get('filter') ?? undefined} sharedRechnungen={sharedRechnungen} setSharedRechnungen={setSharedRechnungen} sharedMailTarget={sharedMailTarget} setSharedMailTarget={setSharedMailTarget} />}
       {tab === 'eingangsrechnungen' && <EingangRechnungenTab isDemo={isDemo} initialFilterStatus={searchParams.get('filter') ?? undefined} />}
       {tab === 'dokumente' && <DokumenteTab isDemo={isDemo} />}
       {tab === 'einkauf' && <EinkaufTab isDemo={isDemo} />}
