@@ -163,12 +163,23 @@ export default function AnalysePilotPage() {
       setLoading(false)
       return
     }
-    loadLiveData()
-  }, [])
+    setLoading(true)
+    loadLiveData(zeitraum)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zeitraum])
 
-  async function loadLiveData() {
+  async function loadLiveData(zr: string = '6M') {
     try {
       const supabase = createSupabaseClient()
+      // Zeitraum → Startdatum
+      const now2 = new Date()
+      const zeitraumStart = new Date(now2)
+      if (zr === '7T') zeitraumStart.setDate(now2.getDate() - 7)
+      else if (zr === '30T') zeitraumStart.setDate(now2.getDate() - 30)
+      else if (zr === '3M') zeitraumStart.setMonth(now2.getMonth() - 3)
+      else if (zr === '1J') zeitraumStart.setFullYear(now2.getFullYear() - 1)
+      else zeitraumStart.setMonth(now2.getMonth() - 6) // 6M default
+      const chartMonate = zr === '7T' ? 1 : zr === '30T' ? 2 : zr === '3M' ? 3 : zr === '1J' ? 12 : 6
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
       const [rechnungen, eingangsrechnungen, kunden, angebote, artikel, kiDocs] = await Promise.allSettled([
         supabase.from('buero_rechnungen').select('betrag,summe,datum,status').order('created_at'),
@@ -210,14 +221,13 @@ export default function AnalysePilotPage() {
 
       // ── KPI berechnen ──
       const now = new Date()
-      const monatStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
       const umsatzDiesen = rechnungenRows
-        .filter(r => r.datum && new Date(r.datum) >= monatStart)
+        .filter(r => r.datum && new Date(r.datum) >= zeitraumStart)
         .reduce((s, r) => s + (r.summe ?? parseEuro(r.betrag)), 0)
 
       const kostenDiesen = kosten
-        .filter(k => k.rechnungsdatum && new Date(k.rechnungsdatum) >= monatStart)
+        .filter(k => k.rechnungsdatum && new Date(k.rechnungsdatum) >= zeitraumStart)
         .reduce((s, k) => s + (k.betrag_brutto ?? 0), 0)
 
       const offeneRechnungenList = rechnungenRows.filter(r => r.status === 'Offen' || r.status === 'Fällig')
@@ -239,9 +249,9 @@ export default function AnalysePilotPage() {
         offeneAngeboteSumme: Math.round(offeneAngeboteSumme),
       })
 
-      // ── Umsatz-Chart: letzte 8 Monate ──
+      // ── Umsatz-Chart: Fenster nach Zeitraum ──
       const umsatzByMonth = new Map<string, { umsatz: number; kosten: number }>()
-      for (let i = 7; i >= 0; i--) {
+      for (let i = chartMonate - 1; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
         umsatzByMonth.set(key, { umsatz: 0, kosten: 0 })
