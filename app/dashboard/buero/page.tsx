@@ -40,6 +40,7 @@ type Auftrag = {
   id: string; kunde_id?: string; kunde: string; beschreibung: string; wert: string
   start: string; ende: string; status: 'AB erforderlich' | 'AB erstellt' | 'AB versendet' | 'In Bearbeitung' | 'Abgeschlossen' | 'Geplant' | 'Pausiert'
   fortschritt: number; angebot_id?: string; ab_verschickt_am?: string; ab_nummer?: string
+  positionen?: Position[]
 }
 
 type Position = { id: string; beschreibung: string; menge: number; einheit: string; einzelpreis: number }
@@ -963,6 +964,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
       status: 'AB erforderlich',
       fortschritt: 0,
       angebot_id: a.id,
+      positionen: a.positionen,
     }
     if (!isDemo) {
       try { await upsertBueroAuftrag(newAuftrag) } catch { showToast('Fehler beim Erstellen des Auftrags', true); return }
@@ -987,6 +989,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
       faellig: fmt(new Date(today.getTime() + firmaDefaults.zahlungsziel_tage * 86400000)),
       erstellt: fmt(today),
       status: 'Erstellt' as const,
+      positionen: a.positionen,
     }
     if (!isDemo) {
       try { await upsertBueroRechnung(newRe) } catch { showToast('Fehler beim Erstellen der Rechnung', true); return }
@@ -1220,58 +1223,63 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                 {kunden.map(k => <option key={k.id}>{k.name}</option>)}
               </select>
             </div>
-            {isOwner && form.kunde && (
-              <div style={{ gridColumn: '1 / -1', padding: '12px 14px', borderRadius: 10, background: 'rgba(32,200,255,.06)', border: '1px solid rgba(32,200,255,.18)' }}>
-                <div style={{ fontSize: 12, color: '#20c8ff', fontWeight: 700, marginBottom: 10 }}>📦 Paket / Piloten auto-befüllen</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label style={labelStyle}>Paket</label>
-                    <select className="pk-input" value={form.paketId} style={{ cursor: 'pointer' }} onChange={e => {
-                      const newPaketId = e.target.value as PackageId | ''
-                      const pkg = newPaketId ? PACKAGE_PRICING[newPaketId] : null
-                      const price = pkg && form.tier ? pkg.prices[form.tier as EmployeeTierId] : null
-                      const tierLabel = EMPLOYEE_TIERS.find(t => t.id === form.tier)?.label ?? form.tier
-                      setForm(p => ({
-                        ...p,
-                        paketId: newPaketId,
-                        titel: pkg && price && price !== 'request' ? `${pkg.name} Paket (${tierLabel})` : p.titel,
-                        betrag: pkg && price && typeof price === 'number' ? `${price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : p.betrag,
-                      }))
-                    }}>
-                      <option value="">— Manuell eingeben —</option>
-                      {Object.values(PACKAGE_PRICING).map(pkg => (
-                        <option key={pkg.id} value={pkg.id}>{pkg.icon} {pkg.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Mitarbeiterstaffel</label>
-                    <select className="pk-input" value={form.tier} style={{ cursor: 'pointer' }} onChange={e => {
-                      const newTier = e.target.value as EmployeeTierId | ''
+            <div style={{ gridColumn: '1 / -1', padding: '14px 16px', borderRadius: 12, background: 'rgba(32,200,255,.05)', border: '1px solid rgba(32,200,255,.18)' }}>
+              <div style={{ fontSize: 12, color: '#20c8ff', fontWeight: 700, marginBottom: 12 }}>📦 Paket auswählen (optional)</div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 7, fontWeight: 600 }}>1. Mitarbeiterstaffel wählen</div>
+                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                  {EMPLOYEE_TIERS.map(t => (
+                    <button type="button" key={t.id} onClick={() => {
                       const pkg = form.paketId ? PACKAGE_PRICING[form.paketId as PackageId] : null
-                      const price = pkg && newTier ? pkg.prices[newTier] : null
-                      const tierLabel = EMPLOYEE_TIERS.find(t => t.id === newTier)?.label ?? newTier
+                      const price = pkg ? pkg.prices[t.id] : null
                       setForm(p => ({
                         ...p,
-                        tier: newTier,
-                        titel: pkg && price && price !== 'request' ? `${pkg.name} Paket (${tierLabel})` : p.titel,
+                        tier: t.id,
                         betrag: pkg && price && typeof price === 'number' ? `${price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : p.betrag,
+                        titel: pkg && price && price !== 'request' ? `${pkg.name} Paket (${t.label})` : p.titel,
                       }))
-                    }}>
-                      <option value="">— wählen —</option>
-                      {EMPLOYEE_TIERS.map(t => (
-                        <option key={t.id} value={t.id}>{t.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                    }} style={{
+                      padding: '6px 14px', borderRadius: 999,
+                      border: `1px solid ${form.tier === t.id ? '#20c8ff' : 'rgba(255,255,255,.12)'}`,
+                      background: form.tier === t.id ? 'rgba(32,200,255,.18)' : 'transparent',
+                      color: form.tier === t.id ? '#20c8ff' : '#aeb9c8',
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    }}>{t.label}</button>
+                  ))}
                 </div>
-                {form.paketId && (
-                  <div style={{ marginTop: 8, fontSize: 12, color: '#aeb9c8' }}>
-                    Enthält: {PACKAGE_PRICING[form.paketId as PackageId]?.included.join(', ')}
-                  </div>
-                )}
               </div>
-            )}
+              <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 7, fontWeight: 600 }}>2. Paket anklicken</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+                {Object.values(PACKAGE_PRICING).map(pkg => {
+                  const price = form.tier ? pkg.prices[form.tier as EmployeeTierId] : null
+                  const isSelected = form.paketId === pkg.id
+                  return (
+                    <div key={pkg.id} onClick={() => {
+                      const tierLabel = EMPLOYEE_TIERS.find(t => t.id === form.tier)?.label ?? ''
+                      const newSelected = !isSelected
+                      setForm(p => ({
+                        ...p,
+                        paketId: newSelected ? pkg.id : '',
+                        titel: newSelected && price && price !== 'request' ? `${pkg.name} Paket${tierLabel ? ` (${tierLabel})` : ''}` : p.titel,
+                        betrag: newSelected && price && typeof price === 'number' ? `${price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : p.betrag,
+                      }))
+                    }} style={{
+                      padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                      border: `2px solid ${isSelected ? '#20c8ff' : 'rgba(255,255,255,.08)'}`,
+                      background: isSelected ? 'rgba(32,200,255,.12)' : 'rgba(255,255,255,.02)',
+                    }}>
+                      <div style={{ fontWeight: 800, fontSize: 13, color: isSelected ? '#20c8ff' : '#f8fbff', marginBottom: 3 }}>{pkg.icon} {pkg.name}</div>
+                      <div style={{ fontSize: 12, color: isSelected ? '#7ee8ff' : '#aeb9c8', fontWeight: 700 }}>
+                        {price !== null ? (typeof price === 'number' ? `${price} €/Monat` : 'Auf Anfrage') : '— Staffel wählen'}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#6b7a8d', marginTop: 5, lineHeight: 1.4 }}>
+                        {pkg.included.slice(0, 3).join(' · ')}{pkg.included.length > 3 ? ' …' : ''}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
             <div>
               <label style={labelStyle}>Titel / Leistung *</label>
               <input className="pk-input" placeholder="z.B. Wartungsvertrag 2025" value={form.titel} onChange={e => setForm(p => ({ ...p, titel: e.target.value }))} />
@@ -1488,7 +1496,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
   const [toast, setToast] = useState('')
   const [toastError, setToastError] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ kunde: '', beschreibung: '', wert: '', start: '', ende: '', dokumentId: '' })
+  const [form, setForm] = useState({ kunde: '', beschreibung: '', wert: '', start: '', ende: '', dokumentId: '', paketId: '' as PackageId | '', tier: '' as EmployeeTierId | '' })
 
   // Edit-Modal
   const [editAuftrag, setEditAuftrag] = useState<Auftrag | null>(null)
@@ -1628,6 +1636,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
       faellig: fmt(new Date(today.getTime() + firmaDefaults.zahlungsziel_tage * 86400000)),
       erstellt: fmt(today),
       status: 'Erstellt' as const,
+      positionen: auftrag.positionen,
     }
     if (!isDemo) {
       try { await upsertBueroRechnung(newRe) } catch { showToast('Fehler beim Erstellen der Rechnung', true); return }
@@ -1660,7 +1669,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
       } catch { showToast('Fehler beim Speichern', true); return }
     }
     setAuftraege(prev => [newA, ...prev])
-    setForm({ kunde: '', beschreibung: '', wert: '', start: '', ende: '', dokumentId: '' })
+    setForm({ kunde: '', beschreibung: '', wert: '', start: '', ende: '', dokumentId: '', paketId: '', tier: '' })
     setShowForm(false)
     showToast(`✅ Auftrag ${newA.id} wurde angelegt`)
   }
@@ -1799,6 +1808,63 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
                 <option value="">Kunde wählen…</option>
                 {kunden.map(k => <option key={k.id}>{k.name}</option>)}
               </select>
+            </div>
+            <div style={{ gridColumn: '1 / -1', padding: '14px 16px', borderRadius: 12, background: 'rgba(32,200,255,.05)', border: '1px solid rgba(32,200,255,.18)' }}>
+              <div style={{ fontSize: 12, color: '#20c8ff', fontWeight: 700, marginBottom: 12 }}>📦 Paket auswählen (optional)</div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 7, fontWeight: 600 }}>1. Mitarbeiterstaffel wählen</div>
+                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                  {EMPLOYEE_TIERS.map(t => (
+                    <button type="button" key={t.id} onClick={() => {
+                      const pkg = form.paketId ? PACKAGE_PRICING[form.paketId as PackageId] : null
+                      const price = pkg ? pkg.prices[t.id] : null
+                      setForm(p => ({
+                        ...p,
+                        tier: t.id,
+                        wert: pkg && price && typeof price === 'number' ? `${price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : p.wert,
+                        beschreibung: pkg && price && price !== 'request' ? `${pkg.name} Paket (${t.label})` : p.beschreibung,
+                      }))
+                    }} style={{
+                      padding: '6px 14px', borderRadius: 999,
+                      border: `1px solid ${form.tier === t.id ? '#20c8ff' : 'rgba(255,255,255,.12)'}`,
+                      background: form.tier === t.id ? 'rgba(32,200,255,.18)' : 'transparent',
+                      color: form.tier === t.id ? '#20c8ff' : '#aeb9c8',
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    }}>{t.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 7, fontWeight: 600 }}>2. Paket anklicken</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+                {Object.values(PACKAGE_PRICING).map(pkg => {
+                  const price = form.tier ? pkg.prices[form.tier as EmployeeTierId] : null
+                  const isSelected = form.paketId === pkg.id
+                  return (
+                    <div key={pkg.id} onClick={() => {
+                      const tierLabel = EMPLOYEE_TIERS.find(t => t.id === form.tier)?.label ?? ''
+                      const newSelected = !isSelected
+                      setForm(p => ({
+                        ...p,
+                        paketId: newSelected ? pkg.id : '',
+                        beschreibung: newSelected && price && price !== 'request' ? `${pkg.name} Paket${tierLabel ? ` (${tierLabel})` : ''}` : p.beschreibung,
+                        wert: newSelected && price && typeof price === 'number' ? `${price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : p.wert,
+                      }))
+                    }} style={{
+                      padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                      border: `2px solid ${isSelected ? '#20c8ff' : 'rgba(255,255,255,.08)'}`,
+                      background: isSelected ? 'rgba(32,200,255,.12)' : 'rgba(255,255,255,.02)',
+                    }}>
+                      <div style={{ fontWeight: 800, fontSize: 13, color: isSelected ? '#20c8ff' : '#f8fbff', marginBottom: 3 }}>{pkg.icon} {pkg.name}</div>
+                      <div style={{ fontSize: 12, color: isSelected ? '#7ee8ff' : '#aeb9c8', fontWeight: 700 }}>
+                        {price !== null ? (typeof price === 'number' ? `${price} €/Monat` : 'Auf Anfrage') : '— Staffel wählen'}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#6b7a8d', marginTop: 5, lineHeight: 1.4 }}>
+                        {pkg.included.slice(0, 3).join(' · ')}{pkg.included.length > 3 ? ' …' : ''}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
             <div>
               <label style={labelStyle}>Beschreibung *</label>
