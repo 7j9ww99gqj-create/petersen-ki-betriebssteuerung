@@ -329,16 +329,31 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
   const [editKarte, setEditKarte] = useState<Arbeitskarte | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [sliderValues, setSliderValues] = useState<Record<string, number>>({})
+  const [zeitIstMap, setZeitIstMap] = useState<Record<string, number>>({})
   const [form, setForm] = useState({
     auftragsnr: '', beschreibung: '', mitarbeiter: '', prioritaet: 'Mittel' as Prioritaet,
     status: 'Offen' as AKStatus, geplant: '', stunden: '', maschine: '',
   })
 
   useEffect(() => {
-    if (isDemo) return
+    if (isDemo) {
+      // Demo: berechne Ist-Stunden aus demoZeit
+      const map: Record<string, number> = {}
+      demoZeit.forEach(b => { map[b.auftragsnr] = (map[b.auftragsnr] ?? 0) + b.stunden })
+      setZeitIstMap(map)
+      return
+    }
     setLoading(true); setErrorMsg('')
-    getWerkstattKarten()
-      .then(data => setKarten(data as Arbeitskarte[]))
+    Promise.all([
+      getWerkstattKarten(),
+      getWerkstattZeitbuchungen(),
+    ])
+      .then(([kartenData, zeitData]) => {
+        setKarten(kartenData as Arbeitskarte[])
+        const map: Record<string, number> = {}
+        ;(zeitData as Zeitbuchung[]).forEach(b => { map[b.auftragsnr] = (map[b.auftragsnr] ?? 0) + b.stunden })
+        setZeitIstMap(map)
+      })
       .catch(() => setErrorMsg('Arbeitskarten konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
   }, [isDemo, retryKey])
@@ -585,7 +600,19 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
                   <span>👷 {k.mitarbeiter}</span>
                   {k.maschine !== '—' && <span>⚙️ {k.maschine}</span>}
                   <span>📅 bis {k.geplant}</span>
-                  <span>⏱️ {k.stunden}h geplant</span>
+                  {(() => {
+                    const soll = k.stunden
+                    const ist = zeitIstMap[k.auftragsnr] ?? 0
+                    if (soll === 0 && ist === 0) return <span>⏱️ Keine Zeiterfassung</span>
+                    const pct = soll > 0 ? Math.min(150, Math.round(ist / soll * 100)) : 0
+                    const color = pct > 100 ? '#fb7185' : pct >= 80 ? '#f59e0b' : '#4ddb7e'
+                    return (
+                      <span style={{ color, fontWeight: 600 }}>
+                        ⏱️ {ist}h Ist / {soll}h Soll{pct > 0 ? ` (${pct}%)` : ''}
+                        {pct > 100 && ' ⚠️'}
+                      </span>
+                    )
+                  })()}
                   <span>📋 Erstellt: {k.erstellt}</span>
                 </div>
               </div>
