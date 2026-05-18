@@ -1419,3 +1419,8 @@ alter table planung_aufgaben add column if not exists stunden_ist  numeric defau
 
 -- Aufgabe 25: lager_artikel lieferant_id (falls Aufgabe 22 noch nicht gelaufen)
 alter table lager_artikel add column if not exists lieferant_id text references einkauf_lieferanten(id) on delete set null;
+
+-- ── Aufgabe 26: BüroPilot Angebote Positionen ─────────────────────────────────
+-- Positionen als JSONB-Array in buero_angebote speichern
+alter table buero_angebote add column if not exists positionen jsonb default '[]'::jsonb;
+alter table buero_rechnungen add column if not exists positionen jsonb default '[]'::jsonb;

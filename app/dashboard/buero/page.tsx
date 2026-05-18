@@ -33,6 +33,7 @@ type Angebot = {
   id: string; kunde_id?: string; kunde: string; titel: string; betrag: string; datum: string
   gueltig: string; status: 'Entwurf' | 'Erstellt' | 'Versendet' | 'Akzeptiert' | 'Abgelehnt'
   nummer?: string; verschickt_am?: string
+  positionen?: Position[]
 }
 
 type Auftrag = {
@@ -748,6 +749,9 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
   const [kiTextLoading, setKiTextLoading] = useState(false)
   const [kiText, setKiText] = useState('')
 
+  // Positionen-Editor (Angebot Edit-Modal)
+  const [editPositionen, setEditPositionen] = useState<Position[]>([])
+
   const handleGenerateKiText = async () => {
     if (!form.kunde && !form.titel) { showToast('Bitte zuerst Kunde und Titel ausfüllen', true); return }
     setKiTextLoading(true)
@@ -905,15 +909,23 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
       status: a.status,
       dokumentId: getLinkedDokument(dokumente, 'angebot_id', a.id)?.id ?? '',
     })
+    setEditPositionen(Array.isArray(a.positionen) ? a.positionen : [])
   }
 
   const handleEditSave = async () => {
     if (!editAngebot) return
     const previousDokumentId = getLinkedDokument(dokumente, 'angebot_id', editAngebot.id)?.id
-    const updated: Angebot = { ...editAngebot, ...editForm, betrag: editForm.betrag.includes('€') ? editForm.betrag : `${editForm.betrag} €` }
+    // Betrag aus Positionen berechnen, wenn vorhanden
+    const positionenSumme = editPositionen.length > 0
+      ? editPositionen.reduce((s, p) => s + p.menge * p.einzelpreis, 0)
+      : null
+    const betragStr = positionenSumme !== null
+      ? `${positionenSumme.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+      : (editForm.betrag.includes('€') ? editForm.betrag : `${editForm.betrag} €`)
+    const updated: Angebot = { ...editAngebot, ...editForm, betrag: betragStr, positionen: editPositionen }
     if (!isDemo) {
       try {
-        await upsertBueroAngebot(updated)
+        await upsertBueroAngebot({ ...updated, positionen: editPositionen })
         await syncDokumentVerknuepfung(updated, editForm.dokumentId, previousDokumentId)
       } catch { showToast('Fehler beim Speichern', true); return }
     }
@@ -1066,6 +1078,70 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                 {dokumentOptionen.map(doc => <option key={doc.id} value={doc.id}>{doc.name} ({doc.datum})</option>)}
               </select>
             </div>
+          </div>
+          {/* ── Positionen-Editor ── */}
+          <div style={{ marginTop: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <label style={{ fontSize: 13, fontWeight: 700, color: '#aeb9c8' }}>Positionen</label>
+              <button
+                onClick={() => setEditPositionen(prev => [...prev, { id: `POS-${Date.now()}`, beschreibung: '', menge: 1, einheit: 'Stk', einzelpreis: 0 }])}
+                style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.4)', background: 'rgba(32,200,255,.08)', color: '#20c8ff', cursor: 'pointer', fontWeight: 700 }}
+              >
+                + Position hinzufügen
+              </button>
+            </div>
+            {editPositionen.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#aeb9c8', padding: '10px 0' }}>Keine Positionen – Betrag wird manuell eingegeben.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {editPositionen.map((pos, idx) => (
+                  <div key={pos.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 100px 36px', gap: 6, alignItems: 'center' }}>
+                    <input
+                      className="pk-input"
+                      placeholder="Beschreibung"
+                      value={pos.beschreibung}
+                      style={{ fontSize: 12 }}
+                      onChange={e => setEditPositionen(prev => prev.map((p, i) => i === idx ? { ...p, beschreibung: e.target.value } : p))}
+                    />
+                    <input
+                      className="pk-input"
+                      placeholder="Menge"
+                      type="number"
+                      min={0}
+                      value={pos.menge}
+                      style={{ fontSize: 12 }}
+                      onChange={e => setEditPositionen(prev => prev.map((p, i) => i === idx ? { ...p, menge: parseFloat(e.target.value) || 0 } : p))}
+                    />
+                    <select
+                      className="pk-input"
+                      value={pos.einheit}
+                      style={{ fontSize: 12, cursor: 'pointer' }}
+                      onChange={e => setEditPositionen(prev => prev.map((p, i) => i === idx ? { ...p, einheit: e.target.value } : p))}
+                    >
+                      {['Stk', 'h', 'm', 'm²', 'm³', 'kg', 'l', 'Psch', 'Set'].map(u => <option key={u}>{u}</option>)}
+                    </select>
+                    <input
+                      className="pk-input"
+                      placeholder="Einzelpreis €"
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={pos.einzelpreis}
+                      style={{ fontSize: 12 }}
+                      onChange={e => setEditPositionen(prev => prev.map((p, i) => i === idx ? { ...p, einzelpreis: parseFloat(e.target.value) || 0 } : p))}
+                    />
+                    <button
+                      onClick={() => setEditPositionen(prev => prev.filter((_, i) => i !== idx))}
+                      style={{ background: 'none', border: 'none', color: '#ff8080', cursor: 'pointer', fontSize: 14, padding: '4px' }}
+                    >🗑️</button>
+                  </div>
+                ))}
+                <div style={{ textAlign: 'right', fontSize: 13, fontWeight: 800, color: '#20c8ff', marginTop: 4 }}>
+                  Gesamt: {editPositionen.reduce((s, p) => s + p.menge * p.einzelpreis, 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                  <span style={{ color: '#aeb9c8', fontWeight: 400, fontSize: 11, marginLeft: 8 }}>(überschreibt Betrag-Feld)</span>
+                </div>
+              </div>
+            )}
           </div>
           <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
             <button className="pk-btn" onClick={handleEditSave}>Speichern</button>
