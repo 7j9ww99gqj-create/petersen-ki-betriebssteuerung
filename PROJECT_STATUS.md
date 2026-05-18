@@ -55,6 +55,17 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+- **Zuletzt erledigt (2026-05-18 – BüroPilot Angebot→Auftrag→Rechnung Vollprozess)**:
+  - **Angebote**: Status `Entwurf` → `Erstellt` (Freigabe) → `Versendet` (nach mailto); fortlaufende Nummern via `pk_next_angebot_number()`; ⏰-Reminder-Badge nach 10 Tagen ohne Auftragskonvertierung; Mail öffnet lokales Mailprogramm mit vorausgefülltem Empfänger/Betreff.
+  - **Aufträge**: neue Stati `AB erforderlich` → `AB erstellt` → `AB versendet` → `In Bearbeitung`; AB per mailto verschicken; Workflow-Buttons pro Status; „→ Rechnung erstellen" wechselt direkt in Rechnungen-Tab.
+  - **Rechnungen**: neue Rechnungen starten als `Erstellt` (muss verschickt werden); „✉️ Verschicken"-Button setzt Status auf `Offen`.
+  - **DB-Migration**: `20260518120000_add_buero_workflow_columns.sql` – Spalten `buero_angebote.nummer`, `buero_angebote.verschickt_am`, `buero_auftraege.angebot_id`, `buero_auftraege.ab_verschickt_am`, Funktion `pk_next_angebot_number()`.
+  - Betroffene Dateien: `supabase/migrations/20260518120000_add_buero_workflow_columns.sql`, `lib/db.ts`, `app/dashboard/buero/page.tsx`.
+  - Offene Punkte:
+    - Migration `20260518120000_add_buero_workflow_columns.sql` muss per `npx supabase db push` auf Remote-Supabase angewendet werden (falls noch nicht geschehen).
+    - Branch `feature/buero-workflow` noch nicht in `main` gemergt – kein Auto-Deploy bisher.
+  - Tests: `npm run lint` grün (bekannte Warnungen); `npm run build` grün.
+  - Branch: `feature/buero-workflow` (Commit `905f2e5`)
 - **Zuletzt erledigt (2026-05-18 – Manueller Registrierungs-/Billing-Prozess ohne automatischen Mailversand)**:
   - **Automatischen Mailversand aus dem Zielprozess entfernt**: keine automatische Rechnungs-/Angebotsmail mehr; vorhandene Mail-Aktionen öffnen nur noch einen lokalen `mailto:`-Entwurf.
   - **Registrierung läuft serverseitig ohne Bestätigungsmail**: neue Route `app/api/auth/register/route.ts` erstellt Supabase-Auth-User per Admin API, setzt `access_status = pending` und legt im Inhaber-BüroPilot automatisch einen Kunden aus den Registrierungsdaten an.
