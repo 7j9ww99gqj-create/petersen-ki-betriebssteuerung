@@ -32,7 +32,7 @@ export const PERMISSIONS = {
   canEdit: (role: AppRole) => role !== 'Lager',
   canManageRoles: (role: AppRole) => role === 'Inhaber' || role === 'Admin',
   canExport: (role: AppRole) => role === 'Inhaber' || role === 'Admin' || role === 'Büro',
-  canManageUsers: (role: AppRole) => role === 'Inhaber',
+  canManageUsers: (role: AppRole) => role === 'Inhaber' || role === 'Admin',
 }
 
 export function normalizeRole(value: unknown): AppRole {
@@ -85,21 +85,11 @@ export async function setRole(role: AppRole): Promise<AppRole> {
     return normalized
   }
 
-  try {
-    const supabase = createSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const email = user?.email?.toLowerCase() ?? ''
-    const currentRole = normalizeRole(user?.app_metadata?.role ?? user?.user_metadata?.role)
-    const mayUseInhaber = email === INHABER_EMAIL || currentRole === 'Inhaber'
-    const safeRole = normalized === 'Inhaber' && !mayUseInhaber ? 'Admin' : normalized
-    localStorage.setItem('pk_role', safeRole)
-    const { error } = await supabase.auth.updateUser({ data: { role: safeRole } })
-    if (error) throw error
-  } catch {
-    // lokale Rolle als Fallback beibehalten
+  const currentRole = await readAuthRole()
+  if (currentRole) {
+    localStorage.setItem('pk_role', currentRole)
   }
-
-  return localStorage.getItem('pk_role') as AppRole ?? normalized
+  throw new Error('Rollen koennen im Produktivbetrieb nicht selbst geaendert werden. Bitte Freigabe ueber Inhaber/Admin vornehmen.')
 }
 
 export function useRole(): {

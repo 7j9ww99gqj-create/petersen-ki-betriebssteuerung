@@ -5,13 +5,16 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useParams } from 'next/navigation'
 import {
   getBueroAngebotById,
+  getBueroAngebotDetailContext,
   getBueroAuftragById,
+  getBueroAuftragDetailContext,
   getBueroDokumentById,
   getBueroEingangsrechnungById,
   getBueroEingangsrechnungDetailContext,
   getBueroKundeById,
   getBueroKundeDetailContext,
   getBueroRechnungById,
+  getBueroRechnungDetailContext,
   getDokumentUrl,
   getEinkaufBestellungById,
   getEinkaufLieferantById,
@@ -56,7 +59,10 @@ const LOADERS: Record<string, (id: string) => Promise<DetailData | null>> = {
 }
 
 const CONTEXT_LOADERS: Record<string, (id: string) => Promise<DetailContext>> = {
+  angebote: async id => await getBueroAngebotDetailContext(id),
+  auftraege: async id => await getBueroAuftragDetailContext(id),
   kunden: async id => await getBueroKundeDetailContext(id),
+  rechnungen: async id => await getBueroRechnungDetailContext(id),
   eingangsrechnungen: async id => await getBueroEingangsrechnungDetailContext(id),
   lieferanten: async id => await getEinkaufLieferantDetailContext(id),
 }
@@ -219,6 +225,268 @@ function KundenDetailView({ context }: { context: Record<string, unknown> }) {
               </div>
             )
           }}
+        />
+      </SectionCard>
+
+      <SectionCard title="Dokumente">
+        <CompactList
+          empty="Keine Dokumente verknüpft."
+          items={dokumente}
+          renderItem={item => (
+            <div key={String(item.id)} style={{ padding: 12, borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <EntityLink href={`/dashboard/buero/dokumente/${encodeURIComponent(String(item.id))}`} label={String(item.name || item.id)} />
+                <div style={{ color: '#aeb9c8', fontSize: 13, marginTop: 4 }}>{formatValue(item.typ || item.kategorie || item.status)}</div>
+              </div>
+              <div style={{ color: '#aeb9c8', fontSize: 13 }}>{formatValue(item.datum)}</div>
+            </div>
+          )}
+        />
+      </SectionCard>
+    </div>
+  )
+}
+
+function AngebotDetailView({ context }: { context: Record<string, unknown> }) {
+  const angebot = (context.angebot ?? {}) as Record<string, unknown>
+  const kunde = (context.kunde ?? {}) as Record<string, unknown>
+  const auftraege = ((context.auftraege ?? []) as Array<Record<string, unknown>>)
+  const rechnungen = ((context.rechnungen ?? []) as Array<Record<string, unknown>>)
+  const dokumente = ((context.dokumente ?? []) as Array<Record<string, unknown>>)
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+        <MetricCard label="Status" value={angebot.status ?? '—'} />
+        <MetricCard label="Betrag" value={angebot.betrag ?? '—'} tone="#ffb347" />
+        <MetricCard label="Aufträge" value={auftraege.length} tone="#4ddb7e" />
+        <MetricCard label="Dokumente" value={dokumente.length} tone="#f59e0b" />
+      </div>
+
+      <SectionCard title="Angebotsdaten">
+        <PropertyGrid
+          data={angebot}
+          fields={[
+            { key: 'titel', label: 'Titel' },
+            { key: 'datum', label: 'Datum' },
+            { key: 'gueltig', label: 'Gueltig bis' },
+            { key: 'status', label: 'Status' },
+            { key: 'betrag', label: 'Betrag' },
+          ]}
+        />
+      </SectionCard>
+
+      <SectionCard
+        title="Kundenbezug"
+        action={kunde.id ? <EntityLink href={`/dashboard/buero/kunden/${encodeURIComponent(String(kunde.id))}`} label="Zum Kunden" /> : null}
+      >
+        <PropertyGrid
+          data={{ ...kunde, name: kunde.name || angebot.kunde }}
+          fields={[
+            { key: 'name', label: 'Kunde' },
+            { key: 'ansprechpartner', label: 'Ansprechpartner' },
+            { key: 'email', label: 'E-Mail' },
+            { key: 'telefon', label: 'Telefon' },
+            { key: 'status', label: 'Status' },
+          ]}
+        />
+      </SectionCard>
+
+      <SectionCard title="Folgevorgaenge">
+        <CompactList
+          empty="Noch keine Folgeobjekte vorhanden."
+          items={[
+            ...auftraege.map(item => ({ ...item, _kind: 'auftrag' })),
+            ...rechnungen.map(item => ({ ...item, _kind: 'rechnung' })),
+          ]}
+          renderItem={item => {
+            const kind = String(item._kind)
+            const href = kind === 'auftrag'
+              ? `/dashboard/buero/auftraege/${encodeURIComponent(String(item.id))}`
+              : `/dashboard/buero/rechnungen/${encodeURIComponent(String(item.id))}`
+            const title = kind === 'auftrag' ? String(item.beschreibung || item.id) : String(item.nummer || item.id)
+            const side = kind === 'auftrag' ? item.wert : item.betrag
+            const meta = kind === 'auftrag'
+              ? `${formatValue(item.status)} · ${formatValue(item.start || item.ende)}`
+              : `${formatValue(item.status)} · fällig ${formatValue(item.faellig || item.erstellt)}`
+            return (
+              <div key={`${kind}-${String(item.id)}`} style={{ padding: 12, borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <EntityLink href={href} label={title} />
+                  <div style={{ color: '#aeb9c8', fontSize: 13, marginTop: 4 }}>{meta}</div>
+                </div>
+                <div style={{ fontWeight: 700 }}>{formatValue(side)}</div>
+              </div>
+            )
+          }}
+        />
+      </SectionCard>
+
+      <SectionCard title="Dokumente">
+        <CompactList
+          empty="Keine Dokumente verknüpft."
+          items={dokumente}
+          renderItem={item => (
+            <div key={String(item.id)} style={{ padding: 12, borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <EntityLink href={`/dashboard/buero/dokumente/${encodeURIComponent(String(item.id))}`} label={String(item.name || item.id)} />
+                <div style={{ color: '#aeb9c8', fontSize: 13, marginTop: 4 }}>{formatValue(item.typ || item.kategorie || item.status)}</div>
+              </div>
+              <div style={{ color: '#aeb9c8', fontSize: 13 }}>{formatValue(item.datum)}</div>
+            </div>
+          )}
+        />
+      </SectionCard>
+    </div>
+  )
+}
+
+function AuftragDetailView({ context }: { context: Record<string, unknown> }) {
+  const auftrag = (context.auftrag ?? {}) as Record<string, unknown>
+  const kunde = (context.kunde ?? {}) as Record<string, unknown>
+  const rechnungen = ((context.rechnungen ?? []) as Array<Record<string, unknown>>)
+  const dokumente = ((context.dokumente ?? []) as Array<Record<string, unknown>>)
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+        <MetricCard label="Status" value={auftrag.status ?? '—'} />
+        <MetricCard label="Wert" value={auftrag.wert ?? '—'} tone="#ffb347" />
+        <MetricCard label="Fortschritt" value={`${formatValue(auftrag.fortschritt ?? 0)} %`} tone="#4ddb7e" />
+        <MetricCard label="Rechnungen" value={rechnungen.length} tone="#f59e0b" />
+      </div>
+
+      <SectionCard title="Auftragsdaten">
+        <PropertyGrid
+          data={auftrag}
+          fields={[
+            { key: 'beschreibung', label: 'Beschreibung' },
+            { key: 'start', label: 'Start' },
+            { key: 'ende', label: 'Ende' },
+            { key: 'status', label: 'Status' },
+            { key: 'wert', label: 'Wert' },
+            { key: 'fortschritt', label: 'Fortschritt %' },
+          ]}
+        />
+      </SectionCard>
+
+      <SectionCard
+        title="Kundenbezug"
+        action={kunde.id ? <EntityLink href={`/dashboard/buero/kunden/${encodeURIComponent(String(kunde.id))}`} label="Zum Kunden" /> : null}
+      >
+        <PropertyGrid
+          data={{ ...kunde, name: kunde.name || auftrag.kunde }}
+          fields={[
+            { key: 'name', label: 'Kunde' },
+            { key: 'ansprechpartner', label: 'Ansprechpartner' },
+            { key: 'email', label: 'E-Mail' },
+            { key: 'telefon', label: 'Telefon' },
+            { key: 'status', label: 'Status' },
+          ]}
+        />
+      </SectionCard>
+
+      <SectionCard title="Rechnungen">
+        <CompactList
+          empty="Keine Rechnungen zum Kundenkontext gefunden."
+          items={rechnungen}
+          renderItem={item => (
+            <div key={String(item.id)} style={{ padding: 12, borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <EntityLink href={`/dashboard/buero/rechnungen/${encodeURIComponent(String(item.id))}`} label={String(item.nummer || item.id)} />
+                <div style={{ color: '#aeb9c8', fontSize: 13, marginTop: 4 }}>{formatValue(item.status)} · fällig {formatValue(item.faellig || item.erstellt)}</div>
+              </div>
+              <div style={{ fontWeight: 700 }}>{formatValue(item.betrag || item.summe)}</div>
+            </div>
+          )}
+        />
+      </SectionCard>
+
+      <SectionCard title="Dokumente">
+        <CompactList
+          empty="Keine Dokumente verknüpft."
+          items={dokumente}
+          renderItem={item => (
+            <div key={String(item.id)} style={{ padding: 12, borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <EntityLink href={`/dashboard/buero/dokumente/${encodeURIComponent(String(item.id))}`} label={String(item.name || item.id)} />
+                <div style={{ color: '#aeb9c8', fontSize: 13, marginTop: 4 }}>{formatValue(item.typ || item.kategorie || item.status)}</div>
+              </div>
+              <div style={{ color: '#aeb9c8', fontSize: 13 }}>{formatValue(item.datum)}</div>
+            </div>
+          )}
+        />
+      </SectionCard>
+    </div>
+  )
+}
+
+function RechnungDetailView({ context }: { context: Record<string, unknown> }) {
+  const rechnung = (context.rechnung ?? {}) as Record<string, unknown>
+  const kunde = (context.kunde ?? {}) as Record<string, unknown>
+  const dokumente = ((context.dokumente ?? []) as Array<Record<string, unknown>>)
+  const payments = ((context.payments ?? []) as Array<Record<string, unknown>>)
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+        <MetricCard label="Status" value={rechnung.status ?? '—'} />
+        <MetricCard label="Summe" value={rechnung.betrag ?? rechnung.summe ?? '—'} tone="#ffb347" />
+        <MetricCard label="Zahlungen" value={payments.length} tone="#4ddb7e" />
+        <MetricCard label="Dokumente" value={dokumente.length} tone="#f59e0b" />
+      </div>
+
+      <SectionCard title="Rechnungsdaten" action={rechnung.payment_link_url ? <a href={String(rechnung.payment_link_url)} target="_blank" rel="noreferrer" style={{ color: '#6cb6ff', fontWeight: 700, textDecoration: 'none' }}>Stripe-Zahlseite</a> : null}>
+        <PropertyGrid
+          data={rechnung}
+          fields={[
+            { key: 'nummer', label: 'Rechnungsnummer' },
+            { key: 'rechnungstyp', label: 'Typ' },
+            { key: 'erstellt', label: 'Erstellt' },
+            { key: 'faellig', label: 'Faellig' },
+            { key: 'status', label: 'Status' },
+            { key: 'betrag', label: 'Betrag' },
+            { key: 'netto', label: 'Netto' },
+            { key: 'steuerbetrag', label: 'Steuer' },
+            { key: 'bezahlt_am', label: 'Bezahlt am' },
+          ]}
+        />
+      </SectionCard>
+
+      <SectionCard
+        title="Kundenbezug"
+        action={kunde.id ? <EntityLink href={`/dashboard/buero/kunden/${encodeURIComponent(String(kunde.id))}`} label="Zum Kunden" /> : null}
+      >
+        <PropertyGrid
+          data={{ ...kunde, name: kunde.name || rechnung.kunde }}
+          fields={[
+            { key: 'name', label: 'Kunde' },
+            { key: 'ansprechpartner', label: 'Ansprechpartner' },
+            { key: 'email', label: 'E-Mail' },
+            { key: 'telefon', label: 'Telefon' },
+            { key: 'status', label: 'Status' },
+          ]}
+        />
+      </SectionCard>
+
+      <SectionCard title="Zahlungsverlauf">
+        <CompactList
+          empty="Noch keine Payment-Einträge vorhanden."
+          items={payments}
+          renderItem={item => (
+            <div key={String(item.id)} style={{ padding: 12, borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontWeight: 700 }}>{formatValue(item.provider)} · {formatValue(item.status)}</div>
+                <div style={{ color: '#aeb9c8', fontSize: 13, marginTop: 4 }}>
+                  Ref {formatValue(item.providerRef || item.externalReference)} · Quelle {formatValue(item.statusSource)}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 700 }}>{formatValue(item.amount)} {formatValue(item.currency)}</div>
+                <div style={{ color: '#aeb9c8', fontSize: 13, marginTop: 4 }}>{formatValue(item.bookedAt || item.createdAt)}</div>
+              </div>
+            </div>
+          )}
         />
       </SectionCard>
 
@@ -475,7 +743,10 @@ export default function BueroDetailPage() {
 
   const specializedView = useMemo(() => {
     if (!context) return null
+    if (entity === 'angebote') return <AngebotDetailView context={context} />
+    if (entity === 'auftraege') return <AuftragDetailView context={context} />
     if (entity === 'kunden') return <KundenDetailView context={context} />
+    if (entity === 'rechnungen') return <RechnungDetailView context={context} />
     if (entity === 'lieferanten') return <LieferantenDetailView context={context} />
     if (entity === 'eingangsrechnungen') return <EingangsrechnungDetailView context={context} documentUrl={documentUrl} />
     return null

@@ -2,13 +2,15 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
+import { isSupabaseConfigured } from '@/lib/supabase'
 
 export default function RegisterPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [company, setCompany] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -28,30 +30,23 @@ export default function RegisterPage() {
 
     setLoading(true)
     try {
-      const supabase = createSupabaseClient()
-      const { data, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            role: 'Mitarbeiter',
-          },
-        },
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName,
+          company,
+        }),
       })
+      const data = await res.json().catch(() => null) as { error?: string } | null
 
-      if (authError) {
-        setError(authError.message)
+      if (!res.ok) {
+        setError(data?.error ?? 'Registrierung konnte nicht angelegt werden.')
         return
       }
 
-      // Session directly available → email confirmation disabled → go to dashboard
-      if (data.session) {
-        router.push('/dashboard')
-        router.refresh()
-        return
-      }
-
-      // No session → email confirmation required
       setSuccess(true)
     } catch (e) {
       setError('Verbindungsfehler. Bitte Internetverbindung prüfen.')
@@ -93,26 +88,20 @@ export default function RegisterPage() {
           {success ? (
             /* ── E-Mail-Bestätigung ausstehend ── */
             <div style={{ textAlign: 'center', padding: '8px 0' }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>📧</div>
-              <h2 style={{ margin: '0 0 12px', fontSize: 20, fontWeight: 800 }}>E-Mail bestätigen</h2>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+              <h2 style={{ margin: '0 0 12px', fontSize: 20, fontWeight: 800 }}>Registrierung eingegangen</h2>
               <p style={{ margin: '0 0 20px', color: '#aeb9c8', fontSize: 14, lineHeight: 1.6 }}>
-                Wir haben einen Bestätigungslink an <strong style={{ color: '#f8fbff' }}>{email}</strong> gesendet.
-                Bitte öffnen Sie die E-Mail und klicken Sie auf den Link.
+                Ihr Konto für <strong style={{ color: '#f8fbff' }}>{email}</strong> wurde angelegt.
               </p>
               <p style={{ margin: '0 0 24px', fontSize: 13, color: '#4a5568', lineHeight: 1.5 }}>
-                Kein E-Mail erhalten? Prüfen Sie den Spam-Ordner oder{' '}
-                <button onClick={() => setSuccess(false)} style={{
-                  background: 'none', border: 'none', cursor: 'pointer', color: '#6cb6ff',
-                  fontSize: 13, textDecoration: 'underline', padding: 0,
-                }}>versuchen Sie es erneut</button>.
+                Der Zugang bleibt gesperrt, bis ein Inhaber Ihren Account freischaltet und Piloten zuteilt.
               </p>
               <div style={{
                 padding: '12px 16px', borderRadius: 10,
                 background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.2)',
                 fontSize: 12, color: '#93b8ff', textAlign: 'left', lineHeight: 1.5,
               }}>
-                💡 <strong>Tipp für Entwickler:</strong> E-Mail-Bestätigung in Supabase unter
-                Authentication → Settings → „Confirm email&quot; deaktivieren, dann ist der Login sofort möglich.
+                Sie sehen nach dem Login einen Hinweis auf den Freigabestatus, bis Ihr Zugang aktiv gesetzt wurde.
               </div>
               <button onClick={() => router.push('/login')} className="pk-btn"
                 style={{ width: '100%', marginTop: 20, fontWeight: 700 }}>
@@ -134,6 +123,16 @@ export default function RegisterPage() {
                   <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>E-Mail Adresse</label>
                   <input className="pk-input" type="email" placeholder="name@betrieb.de" value={email}
                     onChange={e => setEmail(e.target.value)} autoComplete="email" disabled={loading} />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Name</label>
+                  <input className="pk-input" placeholder="Max Mustermann" value={fullName}
+                    onChange={e => setFullName(e.target.value)} autoComplete="name" disabled={loading} />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Firma</label>
+                  <input className="pk-input" placeholder="Musterbetrieb GmbH" value={company}
+                    onChange={e => setCompany(e.target.value)} autoComplete="organization" disabled={loading} />
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Passwort</label>

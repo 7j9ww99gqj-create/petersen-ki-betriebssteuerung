@@ -3,6 +3,13 @@
 ## Start
 - Lies immer zuerst `PROJECT_STATUS.md`.
 - Nutze `PROJECT_STATUS.md` als aktuelle Projektübersicht.
+- Lies standardmäßig zuerst nur die kompakten Abschnitte:
+  - `0. Schnellzugriff`
+  - `2. Aktueller Arbeitsstand`
+  - `5. Bekannte Probleme`
+  - `6. Offene Aufgaben`
+  - `15. Nächste Empfehlung`
+- Lies die langen Verlaufs-/Analyseabschnitte (`8` bis `14`) nur bei echtem Bedarf.
 - Arbeite kompakt und token-sparend.
 - Keine unnötigen Komplettanalysen.
 - Nur relevante Dateien prüfen.
@@ -15,6 +22,8 @@
 - Bestehende Funktionen nicht entfernen.
 - Änderungen klein und nachvollziehbar halten.
 - `PROJECT_STATUS.md` bleibt die aktuelle Projektübersicht.
+- Historische Inhalte in `PROJECT_STATUS.md` nicht löschen, sondern bei Bedarf nach unten in Verlauf/Detail einordnen.
+- Bei Widersprüchen gilt immer der neueste Eintrag im Abschnitt `Aktueller Arbeitsstand`.
 - Owner-/Billing-Änderungen immer auch dort knapp dokumentieren:
   - Änderungen
   - betroffene Dateien

@@ -7,6 +7,7 @@ import {
   upsertBillingSubscription,
   updateBillingSubscriptionStatus,
   upsertBueroKunde,
+  upsertBueroAuftrag,
   upsertBueroRechnung,
 } from './db'
 import { genId } from './ids'
@@ -129,7 +130,6 @@ export async function createBookingRequest(input: BookingRequestInput): Promise<
     status: 'pending_payment',
     softwareEnabled: false,
   })
-  await ensureBookingAutomation(subscription)
   return subscription
 }
 
@@ -173,6 +173,30 @@ export async function ensureOwnerCustomerForSubscription(subscription: Subscript
     payload: { subscriptionId: subscription.id },
   })
   return customerId
+}
+
+export async function ensureOwnerOrderForSubscription(subscription: SubscriptionRecord, customerId?: string) {
+  const finalCustomerId = customerId ?? `BILL-${subscription.id}`
+  const pilotSummary = subscription.pilotIds.length ? subscription.pilotIds.join(', ') : 'Einzelbuchung'
+  const orderId = `AUF-${subscription.id}`
+  await upsertBueroAuftrag({
+    id: orderId,
+    kunde_id: finalCustomerId,
+    kunde: subscription.userEmail || subscription.userKey,
+    billing_subscription_id: subscription.id,
+    beschreibung: `Abo-Buchung ${subscription.packageId ?? pilotSummary}`,
+    wert: subscription.monthlyPrice != null ? `${subscription.monthlyPrice.toFixed(2)} € / Monat` : 'auf Anfrage',
+    start: formatDateForUi(new Date()),
+    status: subscription.softwareEnabled ? 'In Bearbeitung' : 'Geplant',
+    fortschritt: subscription.softwareEnabled ? 25 : 0,
+  })
+  await appendAuditLog({
+    action: 'billing.order.synced_from_subscription',
+    targetType: 'buero_auftrag',
+    targetId: orderId,
+    payload: { subscriptionId: subscription.id, customerId: finalCustomerId },
+  })
+  return orderId
 }
 
 export async function buildSubscriptionInvoiceDraft(subscription: SubscriptionRecord, customerId: string, opts?: {
@@ -245,18 +269,9 @@ export async function createBillingInvoiceForSubscription(subscription: Subscrip
 
 export async function ensureBookingAutomation(subscription: SubscriptionRecord) {
   const customerId = await ensureOwnerCustomerForSubscription(subscription)
+  const orderId = await ensureOwnerOrderForSubscription(subscription, customerId)
   const existingInvoice = await getLatestBueroRechnungBySubscriptionId(subscription.id)
-  if (!existingInvoice) {
-    await createBillingInvoiceForSubscription(subscription)
-  } else {
-    await appendAuditLog({
-      action: 'billing.invoice.reused_for_subscription',
-      targetType: 'buero_rechnung',
-      targetId: existingInvoice.id,
-      payload: { subscriptionId: subscription.id, customerId },
-    })
-  }
-  return { customerId, hasExistingInvoice: Boolean(existingInvoice) }
+  return { customerId, orderId, hasExistingInvoice: Boolean(existingInvoice) }
 }
 
 export async function recordSubscriptionPayment(subscription: SubscriptionRecord, input: {

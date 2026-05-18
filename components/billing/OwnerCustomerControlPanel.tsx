@@ -1,11 +1,19 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { listBillingSubscriptionsForOwner, updateBillingSubscriptionControls } from '@/lib/db'
+import { getLatestBueroRechnungBySubscriptionId, listBillingSubscriptionsForOwner, updateBillingSubscriptionControls } from '@/lib/db'
+import { createBillingInvoiceForSubscription } from '@/lib/billing'
 import { PACKAGE_PRICING, PILOT_PRICING, STATUS_LABELS, type BookingStatus } from '@/lib/pricingConfig'
 import type { SubscriptionRecord } from '@/lib/billing'
 
 const STATUS_OPTIONS: BookingStatus[] = ['pending_payment', 'proof_sent', 'active', 'cancelled', 'rejected']
+
+type BillingInvoiceMini = {
+  id: string
+  nummer?: string
+  status?: string
+  betrag?: string
+}
 
 export function OwnerCustomerControlPanel({
   enabled,
@@ -15,6 +23,7 @@ export function OwnerCustomerControlPanel({
   showToast: (msg: string, type?: 'success' | 'error') => void
 }) {
   const [rows, setRows] = useState<SubscriptionRecord[]>([])
+  const [invoiceBySubscription, setInvoiceBySubscription] = useState<Record<string, BillingInvoiceMini | null>>({})
   const [loading, setLoading] = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
 
@@ -22,7 +31,19 @@ export function OwnerCustomerControlPanel({
     if (!enabled) return
     setLoading(true)
     listBillingSubscriptionsForOwner()
-      .then(setRows)
+      .then(async data => {
+        setRows(data)
+        const invoicePairs = await Promise.all(data.map(async row => {
+          const invoice = await getLatestBueroRechnungBySubscriptionId(row.id).catch(() => null)
+          return [row.id, invoice ? {
+            id: String(invoice.id),
+            nummer: String(invoice.nummer ?? ''),
+            status: String(invoice.status ?? ''),
+            betrag: String(invoice.betrag ?? ''),
+          } : null] as const
+        }))
+        setInvoiceBySubscription(Object.fromEntries(invoicePairs))
+      })
       .catch(err => showToast(err instanceof Error ? err.message : 'Kundensteuerung konnte nicht geladen werden', 'error'))
       .finally(() => setLoading(false))
   }, [enabled, showToast])
@@ -38,6 +59,55 @@ export function OwnerCustomerControlPanel({
     } finally {
       setSavingId(null)
     }
+  }
+
+  const createInvoice = async (row: SubscriptionRecord) => {
+    setSavingId(row.id)
+    try {
+      const existing = await getLatestBueroRechnungBySubscriptionId(row.id).catch(() => null)
+      if (existing) {
+        setInvoiceBySubscription(current => ({
+          ...current,
+          [row.id]: {
+            id: String(existing.id),
+            nummer: String(existing.nummer ?? ''),
+            status: String(existing.status ?? ''),
+            betrag: String(existing.betrag ?? ''),
+          },
+        }))
+        showToast('Rechnung existiert bereits.')
+        return
+      }
+      const draft = await createBillingInvoiceForSubscription(row)
+      setInvoiceBySubscription(current => ({
+        ...current,
+        [row.id]: {
+          id: draft.id,
+          nummer: draft.number,
+          status: draft.status,
+          betrag: `${draft.grossAmount.toFixed(2)} €`,
+        },
+      }))
+      showToast(`✅ Rechnung ${draft.number} erstellt`)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Rechnung konnte nicht erstellt werden', 'error')
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  const buildInvoiceMailHref = (row: SubscriptionRecord, invoice: BillingInvoiceMini) => {
+    const subject = `Rechnung ${invoice.nummer || invoice.id} von Petersen KI`
+    const body = [
+      'Guten Tag,',
+      '',
+      `anbei erhalten Sie die Rechnung ${invoice.nummer || invoice.id} zu Ihrer Buchung bei Petersen KI.`,
+      `Buchung: ${row.packageId ? PACKAGE_PRICING[row.packageId]?.name ?? row.packageId : row.pilotIds.map(id => PILOT_PRICING[id]?.name).filter(Boolean).join(', ') || 'Einzelbuchung'}`,
+      invoice.betrag ? `Betrag: ${invoice.betrag}` : '',
+      '',
+      'Viele Gruesse',
+    ].filter(Boolean).join('\n')
+    return `mailto:${encodeURIComponent(row.userEmail || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
   }
 
   if (!enabled) return null
@@ -138,6 +208,7 @@ export function OwnerCustomerControlPanel({
               : row.pilotIds.map(id => PILOT_PRICING[id]?.name).filter(Boolean).join(', ') || 'Einzelbuchung'
             const isProofSent = row.status === 'proof_sent'
             const isPendingPayment = row.status === 'pending_payment'
+            const invoice = invoiceBySubscription[row.id]
             return (
               <div
                 key={row.id}
@@ -157,10 +228,13 @@ export function OwnerCustomerControlPanel({
                       {row.softwareEnabled ? 'Software aktiv' : 'Software aus'}
                     </span>
                     <span className="badge badge-blue">{STATUS_LABELS[row.status]}</span>
+                    <span className={invoice ? 'badge badge-green' : 'badge badge-gray'}>
+                      {invoice ? `Rechnung ${invoice.nummer || invoice.id}` : 'Keine Rechnung'}
+                    </span>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 10, marginTop: 12, alignItems: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto auto', gap: 10, marginTop: 12, alignItems: 'center' }}>
                   <select
                     className="pk-input"
                     value={row.status}
@@ -179,6 +253,23 @@ export function OwnerCustomerControlPanel({
                   >
                     {row.softwareEnabled ? 'Software sperren' : 'Software freischalten'}
                   </button>
+                  <button
+                    className={invoice ? 'pk-btn-ghost' : 'pk-btn'}
+                    disabled={savingId === row.id || Boolean(invoice)}
+                    onClick={() => createInvoice(row)}
+                    style={{ fontWeight: 800, minWidth: 150, opacity: invoice ? .6 : 1 }}
+                  >
+                    {invoice ? 'Rechnung erstellt' : 'Rechnung erstellen'}
+                  </button>
+                  {invoice && row.userEmail ? (
+                    <a
+                      href={buildInvoiceMailHref(row, invoice)}
+                      className="pk-btn-ghost"
+                      style={{ fontWeight: 800, minWidth: 130, textDecoration: 'none', textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      Mail öffnen
+                    </a>
+                  ) : null}
                 </div>
               </div>
             )

@@ -147,6 +147,9 @@ declare
   owner_user_id uuid;
   customer_name text;
   customer_status text;
+  customer_id text;
+  order_id text;
+  order_label text;
 begin
   select id into owner_user_id
   from auth.users
@@ -156,6 +159,10 @@ begin
   if owner_user_id is null then
     return new;
   end if;
+
+  customer_id := 'BILL-' || new.id;
+  order_id := 'AUF-' || new.id;
+  order_label := coalesce(nullif(new.package_id, ''), array_to_string(new.pilot_ids, ', '), 'Abo-Buchung');
 
   customer_name := coalesce(
     nullif(split_part(coalesce(new.user_email, ''), '@', 1), ''),
@@ -172,7 +179,7 @@ begin
   insert into public.buero_kunden (
     id, user_id, auth_user_id, source, billing_subscription_id, name, typ, ansprechpartner, email, umsatz, status, software_enabled, updated_at
   ) values (
-    'BILL-' || new.id,
+    customer_id,
     owner_user_id,
     new.user_id,
     'billing',
@@ -196,6 +203,31 @@ begin
     umsatz = excluded.umsatz,
     status = excluded.status,
     software_enabled = excluded.software_enabled,
+    updated_at = now();
+
+  insert into public.buero_auftraege (
+    id, user_id, kunde_id, billing_subscription_id, kunde, beschreibung, wert, start, status, fortschritt, updated_at
+  ) values (
+    order_id,
+    owner_user_id,
+    customer_id,
+    new.id,
+    customer_name,
+    'Abo-Buchung ' || order_label,
+    coalesce(new.monthly_price::text || ' € / Monat', 'auf Anfrage'),
+    to_char(coalesce(new.created_at, now()), 'DD.MM.YYYY'),
+    case when coalesce(new.software_enabled, false) then 'In Bearbeitung' else 'Geplant' end,
+    case when coalesce(new.software_enabled, false) then 25 else 0 end,
+    now()
+  )
+  on conflict (id) do update set
+    kunde_id = excluded.kunde_id,
+    billing_subscription_id = excluded.billing_subscription_id,
+    kunde = excluded.kunde,
+    beschreibung = excluded.beschreibung,
+    wert = excluded.wert,
+    status = excluded.status,
+    fortschritt = excluded.fortschritt,
     updated_at = now();
 
   return new;
@@ -492,10 +524,12 @@ create table if not exists buero_angebote (
   user_id    uuid references auth.users not null default auth.uid(),
   kunde_id   text references buero_kunden(id),
   kunde      text,
+  nummer     text,
   titel      text,
   betrag     text,
   datum      text,
   gueltig    text,
+  verschickt_am date,
   status     text default 'Entwurf',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
@@ -505,11 +539,14 @@ create table if not exists buero_auftraege (
   id          text primary key,
   user_id     uuid references auth.users not null default auth.uid(),
   kunde_id    text references buero_kunden(id),
+  billing_subscription_id text references billing_subscriptions(id),
+  angebot_id text references buero_angebote(id),
   kunde       text,
   beschreibung text,
   wert        text,
   start       text,
   ende        text,
+  ab_verschickt_am date,
   status      text default 'Geplant',
   fortschritt integer default 0,
   created_at  timestamptz default now(),
@@ -621,6 +658,29 @@ begin
 end;
 $$;
 
+create or replace function pk_next_angebot_number()
+returns text
+language plpgsql
+security definer
+as $$
+declare
+  yr text := to_char(CURRENT_DATE, 'YYYY');
+  prefix text;
+  max_nr int := 0;
+begin
+  prefix := 'ANG-' || yr || '-';
+  select coalesce(max(cast(substring(nummer from length(prefix) + 1) as integer)), 0)
+  into max_nr
+  from buero_angebote
+  where nummer like prefix || '%'
+    and length(nummer) = length(prefix) + 5;
+
+  return prefix || lpad((max_nr + 1)::text, 5, '0');
+end;
+$$;
+
+grant execute on function pk_next_angebot_number() to authenticated;
+
 -- Eingangsrechnungen / Lieferantenrechnungen
 -- WICHTIG: Nach Deployment im Supabase SQL-Editor ausführen, falls die Tabelle noch fehlt.
 create table if not exists buero_eingangsrechnungen (
@@ -717,6 +777,7 @@ create index if not exists idx_buero_dokumente_angebot_id on buero_dokumente(ang
 create index if not exists idx_buero_dokumente_auftrag_id on buero_dokumente(auftrag_id);
 create index if not exists idx_buero_angebote_kunde_id on buero_angebote(kunde_id);
 create index if not exists idx_buero_auftraege_kunde_id on buero_auftraege(kunde_id);
+create index if not exists idx_buero_auftraege_billing_subscription_id on buero_auftraege(billing_subscription_id);
 create index if not exists idx_buero_rechnungen_kunde_id on buero_rechnungen(kunde_id);
 create index if not exists idx_buero_rechnungen_payment_link_id on buero_rechnungen(payment_link_id);
 create index if not exists idx_buero_rechnungen_payment_link_reference on buero_rechnungen(payment_link_reference);

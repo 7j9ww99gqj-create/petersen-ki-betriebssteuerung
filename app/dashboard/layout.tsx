@@ -7,6 +7,7 @@ import GlobalSearch from '@/components/GlobalSearch'
 import SupportButton from '@/components/SupportButton'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { hasDemoCookie } from '@/lib/auth'
+import { getAccessProfile } from '@/lib/access'
 import { ROLE_LABELS, loadRole, type AppRole } from '@/lib/roles'
 import { getFirmaEinstellungen, upsertFirmaEinstellungen, uploadFirmenLogo, type FirmaEinstellungen } from '@/lib/db'
 
@@ -27,6 +28,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [userName, setUserName] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [role, setRoleState] = useState<AppRole>('Admin')
+  const [allowedPilotIds, setAllowedPilotIds] = useState<string[]>(['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer'])
   const [companyChecked, setCompanyChecked] = useState(false)
   const [showCompanyOnboarding, setShowCompanyOnboarding] = useState(false)
   const [companySaving, setCompanySaving] = useState(false)
@@ -76,7 +78,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Auth check
   useEffect(() => {
-    if (hasDemoCookie()) { setUserName('Demo'); setChecked(true); return }
+    if (hasDemoCookie()) { setUserName('Demo'); setAllowedPilotIds(['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer']); setChecked(true); return }
     if (!isSupabaseConfigured()) { router.push('/login'); return }
 
     let subscription: { unsubscribe: () => void } | null = null
@@ -85,6 +87,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (!session) { router.push('/login'); return }
         setUserName((session.user.email ?? '').split('@')[0])
+        setAllowedPilotIds(getAccessProfile(session.user).allowedPilotIds)
         setChecked(true)
       }).catch(() => router.push('/login'))
 
@@ -163,6 +166,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
+
+  const filteredBottomNavItems = bottomNavItems.filter(item => {
+    if (item.href === '#menu' || item.href === '/dashboard') return true
+    if (item.href === '/dashboard/lager') return allowedPilotIds.includes('lager')
+    if (item.href === '/dashboard/buero') return allowedPilotIds.includes('buero')
+    if (item.href === '/dashboard/werkstatt') return allowedPilotIds.includes('werkstatt')
+    if (item.href === '/dashboard/ki-erkennung') return allowedPilotIds.length > 0
+    return true
+  })
 
   return (
     <div style={{ display: 'flex' }}>
@@ -355,7 +367,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* ── Bottom Navigation (Mobile) ── */}
       <nav className="bottom-nav" role="navigation" aria-label="Hauptnavigation">
-        {bottomNavItems.map(item => {
+        {filteredBottomNavItems.map(item => {
           const active = item.href !== '#menu' && isActive(item.href)
           return (
             <button
