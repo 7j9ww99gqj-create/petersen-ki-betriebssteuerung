@@ -1779,7 +1779,7 @@ export async function getWerkstattKarten() {
 export async function upsertWerkstattKarte(k: {
   id: string; auftragsnr?: string; beschreibung?: string; mitarbeiter?: string
   prioritaet?: string; status?: string; erstellt?: string; geplant?: string
-  stunden?: number; fortschritt?: number; maschine?: string
+  stunden?: number; fortschritt?: number; maschine?: string; buero_auftrag_id?: string | null
 }) {
   const { data, error } = await db()
     .from('werkstatt_karten')

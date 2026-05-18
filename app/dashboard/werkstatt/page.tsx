@@ -13,6 +13,7 @@ import {
   getWerkstattWartungen, upsertWerkstattWartung, deleteWerkstattWartung,
   getWerkstattStoerungen, upsertWerkstattStoerung, deleteWerkstattStoerung,
   getLagerArtikel, syncWerkstattMaterialToLager,
+  getBueroAuftraege,
 } from '@/lib/db'
 import PilotDocumentArchive from '@/components/PilotDocumentArchive'
 
@@ -317,8 +318,9 @@ function EditKarteModal({ karte, onClose, onSave, mitarbeiterNamen, bereichNamen
 // ── Arbeitskarten-Tab ─────────────────────────────────────────────────────────
 
 type NewKarteParams = { auftragsnr?: string; beschreibung?: string }
+type BueroAuftragRef = { id: string; titel?: string; beschreibung?: string; ab_nummer?: string }
 
-function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKarteParams }: { isDemo: boolean; mitarbeiterNamen: string[]; bereichNamen: string[]; newKarteParams?: NewKarteParams }) {
+function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKarteParams, bueroAuftraege }: { isDemo: boolean; mitarbeiterNamen: string[]; bereichNamen: string[]; newKarteParams?: NewKarteParams; bueroAuftraege: BueroAuftragRef[] }) {
   const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
@@ -334,7 +336,7 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
   const [zeitIstMap, setZeitIstMap] = useState<Record<string, number>>({})
   const [form, setForm] = useState({
     auftragsnr: '', beschreibung: '', mitarbeiter: '', prioritaet: 'Mittel' as Prioritaet,
-    status: 'Offen' as AKStatus, geplant: '', stunden: '', maschine: '',
+    status: 'Offen' as AKStatus, geplant: '', stunden: '', maschine: '', buero_auftrag_id: '',
   })
 
   useEffect(() => {
@@ -400,10 +402,12 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
       fortschritt: 0, maschine: form.maschine || '—',
     }
     if (!isDemo) {
-      try { await upsertWerkstattKarte(newKarte) } catch { showToast('Fehler beim Speichern', true); return }
+      try {
+        await upsertWerkstattKarte({ ...newKarte, buero_auftrag_id: form.buero_auftrag_id || null })
+      } catch { showToast('Fehler beim Speichern', true); return }
     }
     setKarten(prev => [newKarte, ...prev])
-    setForm({ auftragsnr: '', beschreibung: '', mitarbeiter: '', prioritaet: 'Mittel', status: 'Offen', geplant: '', stunden: '', maschine: '' })
+    setForm({ auftragsnr: '', beschreibung: '', mitarbeiter: '', prioritaet: 'Mittel', status: 'Offen', geplant: '', stunden: '', maschine: '', buero_auftrag_id: '' })
     setShowForm(false)
     showToast(`✅ Arbeitskarte ${newKarte.id} wurde erfolgreich erstellt`)
   }
@@ -522,6 +526,28 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
         <div className="pk-card fade-in" style={{ marginBottom: 20, border: '1px solid rgba(167,139,250,.25)' }}>
           <h3 style={{ margin: '0 0 18px', fontSize: 15, fontWeight: 800 }}>🛠️ Neue Arbeitskarte erstellen</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+            {bueroAuftraege.length > 0 && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>BüroPilot Auftrag verknüpfen (optional)</label>
+                <select className="pk-input" value={form.buero_auftrag_id} onChange={e => {
+                  const id = e.target.value
+                  const auftrag = bueroAuftraege.find(a => a.id === id)
+                  setForm(p => ({
+                    ...p,
+                    buero_auftrag_id: id,
+                    auftragsnr: id ? (auftrag?.ab_nummer || auftrag?.id?.slice(-8) || p.auftragsnr) : p.auftragsnr,
+                    beschreibung: id && !p.beschreibung ? (auftrag?.titel || auftrag?.beschreibung || '') : p.beschreibung,
+                  }))
+                }} style={{ cursor: 'pointer' }}>
+                  <option value="">— Kein Auftrag verknüpft —</option>
+                  {bueroAuftraege.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.ab_nummer ? `${a.ab_nummer} – ` : ''}{a.titel || a.beschreibung || a.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Auftragsnummer *</label>
               <input className="pk-input" placeholder="z.B. A-2025-035" value={form.auftragsnr} onChange={e => setForm(p => ({ ...p, auftragsnr: e.target.value }))} />
@@ -2117,6 +2143,7 @@ export default function WerkstattPilotPage() {
   const [bereiche, setBereiche] = useState<WerkstattBereich[]>(isDemo ? demoBereiche : [])
   const [wartungen, setWartungen] = useState<WerkstattWartung[]>(isDemo ? demoWartungen : [])
   const [stoerungen, setStoerungen] = useState<WerkstattStoerung[]>(isDemo ? demoStoerungen : [])
+  const [bueroAuftraege, setBueroAuftraege] = useState<BueroAuftragRef[]>([])
   const [loading, setLoading] = useState(!isDemo)
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -2132,14 +2159,15 @@ export default function WerkstattPilotPage() {
 
   useEffect(() => {
     if (isDemo) return
-    Promise.all([getWerkstattKarten(), getWerkstattZeitbuchungen(), getWerkstattMitarbeiter(), getWerkstattBereiche(), getWerkstattWartungen(), getWerkstattStoerungen()])
-      .then(([k, z, m, b, w, s]) => {
+    Promise.all([getWerkstattKarten(), getWerkstattZeitbuchungen(), getWerkstattMitarbeiter(), getWerkstattBereiche(), getWerkstattWartungen(), getWerkstattStoerungen(), getBueroAuftraege()])
+      .then(([k, z, m, b, w, s, auftraege]) => {
         setKarten(k as Arbeitskarte[])
         setZeitbuchungen(z as Zeitbuchung[])
         setMitarbeiter(m as Mitarbeiter[])
         setBereiche(b as WerkstattBereich[])
         setWartungen(w as WerkstattWartung[])
         setStoerungen(s as WerkstattStoerung[])
+        setBueroAuftraege((auftraege as BueroAuftragRef[]).filter(a => a.id))
       })
       .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
@@ -2225,7 +2253,7 @@ export default function WerkstattPilotPage() {
       </div>
 
       {tab === 'leitstand' && <FertigungsleitstandTab isDemo={isDemo} karten={karten} setKarten={setKarten} mitarbeiterNamen={mitarbeiterNamen} />}
-      {tab === 'karten' && <ArbeitskartentTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} bereichNamen={bereichNamen} newKarteParams={newKarteParams} />}
+      {tab === 'karten' && <ArbeitskartentTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} bereichNamen={bereichNamen} newKarteParams={newKarteParams} bueroAuftraege={bueroAuftraege} />}
       {tab === 'zeit' && <ZeiterfassungTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
       {tab === 'material' && <MaterialverbrauchTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
       {tab === 'qualitaet' && <QualitaetTab isDemo={isDemo} mitarbeiterNamen={mitarbeiterNamen} />}
