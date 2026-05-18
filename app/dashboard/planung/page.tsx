@@ -10,6 +10,7 @@ import {
   getBueroAuftraege,
 } from '@/lib/db'
 import PilotDocumentArchive from '@/components/PilotDocumentArchive'
+import EmptyState from '@/components/EmptyState'
 
 // ── Typen ─────────────────────────────────────────────────────────────────────
 
@@ -517,14 +518,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
           </div>
         ))}
         {filtered.length === 0 && (
-          <div className="pk-card fade-in" style={{ textAlign: 'center', padding: '40px 20px' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🗂️</div>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>Noch keine Projekte vorhanden</div>
-            <div style={{ color: '#aeb9c8', fontSize: 13, marginBottom: 18 }}>Erstelle dein erstes Projekt, um Aufgaben, Termine und Ressourcen zu verwalten.</div>
-            <button className="pk-btn" style={{ background: 'linear-gradient(135deg, #e11d48, #9f1239)', fontSize: 13 }} onClick={() => setShowCreateForm(true)}>
-              🗂️ Erstes Projekt anlegen
-            </button>
-          </div>
+          <EmptyState icon="🗂️" title="Noch keine Projekte vorhanden" description="Erstelle dein erstes Projekt, um Aufgaben, Termine und Ressourcen zu verwalten." actionLabel="🗂️ Erstes Projekt anlegen" onAction={() => setShowCreateForm(true)} />
         )}
       </div>
 

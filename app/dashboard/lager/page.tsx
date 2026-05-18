@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import SkeletonCard from '@/components/SkeletonCard'
+import EmptyState from '@/components/EmptyState'
 import { hasDemoCookie } from '@/lib/auth'
 import { genId } from '@/lib/ids'
 import {
@@ -1966,7 +1967,10 @@ export default function LagerPilotPage() {
               {snapshotLoading ? '⏳ Speichere…' : '📸 Bestand-Snapshot'}
             </button>
           </div>
-          <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+          {artikel.length === 0 && (
+            <EmptyState icon="📦" title="Noch keine Artikel vorhanden" description="Lege deinen ersten Artikel an, um Bestände, Bewegungen und Lagerplätze zu verwalten." actionLabel="+ Artikel anlegen" onAction={() => setModal('new')} />
+          )}
+          <div className="pk-card" style={{ padding: 0, overflowX: 'auto', display: artikel.length === 0 ? 'none' : undefined }}>
             <div className="pk-table-wrap">
               <table className="pk-table">
                 <thead>

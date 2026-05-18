@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
+import EmptyState from '@/components/EmptyState'
 import {
   getMarketingAutomationRules,
   getMarketingKampagnen,
@@ -1012,6 +1013,9 @@ function KampagnenTab({
         </div>
       )}
 
+      {filtered.length === 0 && (
+        <EmptyState icon="📣" title="Keine Kampagnen vorhanden" description="Lege deine erste Kampagne an, um den Überblick über E-Mail, Social Media und Newsletter zu behalten." actionLabel="+ Kampagne anlegen" onAction={() => setShowForm(true)} />
+      )}
       <div style={{ display: 'grid', gap: 12 }}>
         {filtered.map(item => {
           const openRate = item.empfaenger > 0 ? (item.geoeffnet / item.empfaenger) * 100 : 0

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
 import SkeletonCard from '@/components/SkeletonCard'
+import EmptyState from '@/components/EmptyState'
 import { hasDemoCookie } from '@/lib/auth'
 import { genId } from '@/lib/ids'
 import {
@@ -708,10 +709,7 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
           </div>
         ))}
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#aeb9c8' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-            Keine Arbeitskarten für diesen Filter
-          </div>
+          <EmptyState icon="📋" title="Keine Arbeitskarten" description="Keine Arbeitskarten für diesen Filter oder noch keine vorhanden." actionLabel="+ Karte anlegen" onAction={() => setShowForm(true)} />
         )}
       </div>
 

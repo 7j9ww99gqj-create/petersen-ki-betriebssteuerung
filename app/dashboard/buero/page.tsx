@@ -16,6 +16,7 @@ import {
 } from '@/lib/db'
 import { generateRechnungPDF, generateAngebotPDF, generateAuftragsbestaetigungPDF } from '@/lib/pdf'
 import SkeletonCard from '@/components/SkeletonCard'
+import EmptyState from '@/components/EmptyState'
 import { createSupabaseClient } from '@/lib/supabase'
 import { normalizeDocumentStoragePath, type StoredDocumentLink } from '@/lib/documents'
 import { genId } from '@/lib/ids'
@@ -780,7 +781,10 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
         </div>
       )}
 
-      <div className="pk-card" style={{ padding: 0, overflowX: 'auto' }}>
+      {filtered.length === 0 && kunden.length === 0 && (
+        <EmptyState icon="👥" title="Noch keine Kunden vorhanden" description="Lege deinen ersten Kunden an, um Aufträge, Angebote und Rechnungen zu verwalten." actionLabel="+ Kunden anlegen" onAction={() => setShowForm(true)} />
+      )}
+      <div className="pk-card" style={{ padding: 0, overflowX: 'auto', display: filtered.length === 0 && kunden.length === 0 ? 'none' : undefined }}>
         <table className="pk-table">
           <thead>
             <tr>
