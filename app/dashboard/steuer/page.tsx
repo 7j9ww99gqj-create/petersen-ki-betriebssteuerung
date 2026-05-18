@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
-import { getBueroRechnungen, getSteuerBelege, upsertSteuerBeleg, deleteSteuerBeleg, getSteuerUstva, upsertSteuerUstva, uploadSteuerBeleg } from '@/lib/db'
+import { getBueroRechnungen, getSteuerBelege, upsertSteuerBeleg, deleteSteuerBeleg, getSteuerUstva, upsertSteuerUstva, uploadSteuerBeleg, getSteuerFixkosten, getSteuerBetriebsausgaben, getSteuerAnschaffungen } from '@/lib/db'
 import { genId } from '@/lib/ids'
 import { createSupabaseClient } from '@/lib/supabase'
 import { getSteuerWarnings, type Warning } from '@/lib/warnings'
@@ -27,6 +27,15 @@ type Rechnung = {
   id: string; kunde?: string; nummer?: string; summe?: number; netto?: number
   steuer_satz?: number; steuerbetrag?: number; status?: string
   erstellt?: string; bezahlt_am?: string; faellig?: string
+}
+
+type FixkostenMin = { id: string; betrag_brutto: number; steuersatz: number; zahlungsintervall: string; aktiv: boolean }
+type BetriebsausgabeMin = { id: string; betrag_brutto: number; steuersatz: number; datum: string }
+type AnschaffungMin = { id: string; betrag_brutto: number; steuersatz: number; kaufdatum: string }
+
+function faktorForIntervall(intervall: string): number {
+  const m: Record<string, number> = { monatlich: 1, quartalsweise: 1 / 3, halbjährlich: 1 / 6, jährlich: 1 / 12 }
+  return m[intervall] ?? 1
 }
 
 type SteuerTab =
@@ -70,6 +79,23 @@ const demoRechnungen: Rechnung[] = [
   { id: 'R-001', kunde: 'Mustermann GmbH', nummer: 'RE-2025-042', summe: 2380, netto: 2000, steuer_satz: 19, steuerbetrag: 380, status: 'bezahlt', erstellt: '2025-04-03', bezahlt_am: '2025-04-10' },
   { id: 'R-002', kunde: 'Tech Startup AG', nummer: 'RE-2025-043', summe: 5950, netto: 5000, steuer_satz: 19, steuerbetrag: 950, status: 'offen', erstellt: '2025-04-15', faellig: '2025-05-05' },
   { id: 'R-003', kunde: 'Design Studio', nummer: 'RE-2025-044', summe: 1190, netto: 1000, steuer_satz: 19, steuerbetrag: 190, status: 'bezahlt', erstellt: '2025-03-20', bezahlt_am: '2025-04-01' },
+]
+const demoFixkosten: FixkostenMin[] = [
+  { id: 'FK-001', betrag_brutto: 39.99, steuersatz: 19, zahlungsintervall: 'monatlich', aktiv: true },
+  { id: 'FK-002', betrag_brutto: 499.99, steuersatz: 19, zahlungsintervall: 'monatlich', aktiv: true },
+  { id: 'FK-003', betrag_brutto: 11.99, steuersatz: 19, zahlungsintervall: 'monatlich', aktiv: true },
+  { id: 'FK-004', betrag_brutto: 24.99, steuersatz: 19, zahlungsintervall: 'monatlich', aktiv: true },
+  { id: 'FK-005', betrag_brutto: 850.00, steuersatz: 0, zahlungsintervall: 'jährlich', aktiv: true },
+]
+const demoBetriebsausgaben: BetriebsausgabeMin[] = [
+  { id: 'BA-001', betrag_brutto: 29.99, steuersatz: 19, datum: '2025-04-05' },
+  { id: 'BA-002', betrag_brutto: 59.00, steuersatz: 19, datum: '2025-04-08' },
+  { id: 'BA-003', betrag_brutto: 30.39, steuersatz: 7, datum: '2025-03-12' },
+  { id: 'BA-004', betrag_brutto: 100.00, steuersatz: 19, datum: '2025-04-15' },
+]
+const demoAnschaffungen: AnschaffungMin[] = [
+  { id: 'ANS-001', betrag_brutto: 2499.00, steuersatz: 19, kaufdatum: '2025-04-10' },
+  { id: 'ANS-002', betrag_brutto: 249.99, steuersatz: 19, kaufdatum: '2025-03-15' },
 ]
 
 // ── Hilfsfunktionen ────────────────────────────────────────────────────────────
@@ -162,6 +188,9 @@ export default function SteuerPilotPage() {
   const [filterStatus, setFilterStatus] = useState('Alle')
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [fixkosten, setFixkosten] = useState<FixkostenMin[]>([])
+  const [betriebsausgaben, setBetriebsausgaben] = useState<BetriebsausgabeMin[]>([])
+  const [anschaffungen, setAnschaffungen] = useState<AnschaffungMin[]>([])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast(msg); setToastType(type)
@@ -173,17 +202,22 @@ export default function SteuerPilotPage() {
       setLoading(true)
       if (isDemo) {
         setBelege(demoBelege); setUstva(demoUstva); setRechnungen(demoRechnungen)
+        setFixkosten(demoFixkosten); setBetriebsausgaben(demoBetriebsausgaben); setAnschaffungen(demoAnschaffungen)
         setWarnings(await getSteuerWarnings(true))
         setLoading(false); return
       }
       try {
-        const [b, u, w, r] = await Promise.all([
+        const [b, u, w, r, fk, ba, ans] = await Promise.all([
           getSteuerBelege(), getSteuerUstva(), getSteuerWarnings(false), getBueroRechnungen(),
+          getSteuerFixkosten(), getSteuerBetriebsausgaben(), getSteuerAnschaffungen(),
         ])
         setBelege(b as Beleg[])
         setUstva(u as Ustva[])
         setWarnings(w)
         setRechnungen((r as Rechnung[]) ?? [])
+        setFixkosten((fk ?? []) as FixkostenMin[])
+        setBetriebsausgaben((ba ?? []) as BetriebsausgabeMin[])
+        setAnschaffungen((ans ?? []) as AnschaffungMin[])
       } catch { showToast('Daten konnten nicht geladen werden', 'error') }
       finally { setLoading(false) }
     }
@@ -201,9 +235,15 @@ export default function SteuerPilotPage() {
   const aktuellUstva = ustva.find(u => u.monat === selectedMonat)
 
   const vorsteuerBelege = belegeMonat.reduce((s, b) => s + (b.steuerbetrag ?? 0), 0)
+  const betriebsausgabenMonat = betriebsausgaben.filter(b => b.datum.startsWith(selectedMonat))
+  const anschaffungenMonat = anschaffungen.filter(a => a.kaufdatum.startsWith(selectedMonat))
+  const vorsteuerFixkosten = fixkosten.filter(f => f.aktiv).reduce((s, f) => s + calcVst(f.betrag_brutto * faktorForIntervall(f.zahlungsintervall), f.steuersatz), 0)
+  const vorsteuerBetriebsAusg = betriebsausgabenMonat.reduce((s, b) => s + calcVst(b.betrag_brutto, b.steuersatz), 0)
+  const vorsteuerAnschaffungen = anschaffungenMonat.reduce((s, a) => s + calcVst(a.betrag_brutto, a.steuersatz), 0)
+  const vorsteuerGesamt = vorsteuerBelege + vorsteuerFixkosten + vorsteuerBetriebsAusg + vorsteuerAnschaffungen
   const umsatzsteuerRechnungen = rechnungenMonat.reduce((s, r) => s + (r.steuerbetrag ?? 0), 0)
   const umsatzsteuerGes = aktuellUstva?.umsatzsteuer ?? umsatzsteuerRechnungen
-  const zahllast = umsatzsteuerGes - vorsteuerBelege
+  const zahllast = umsatzsteuerGes - vorsteuerGesamt
   const einnahmenMonat = rechnungenMonat.reduce((s, r) => s + (r.summe ?? 0), 0)
 
   const calcUStVA = () => {
@@ -261,12 +301,12 @@ export default function SteuerPilotPage() {
   }
 
   const handleMarkiereGeprueft = async () => {
-    const c = calcUStVA()
+    const ust = aktuellUstva?.umsatzsteuer ?? umsatzsteuerRechnungen
     const entry: Ustva = {
       id: `USTVA-${selectedMonat}`, monat: selectedMonat,
-      umsatzsteuer: aktuellUstva?.umsatzsteuer ?? umsatzsteuerRechnungen,
-      vorsteuer: c.steuer19 + c.steuer7,
-      zahllast: (aktuellUstva?.umsatzsteuer ?? umsatzsteuerRechnungen) - (c.steuer19 + c.steuer7),
+      umsatzsteuer: ust,
+      vorsteuer: vorsteuerGesamt,
+      zahllast: ust - vorsteuerGesamt,
       status: 'geprüft',
     }
     if (isDemo) { setUstva(prev => prev.map(u => u.monat === selectedMonat ? entry : u)); showToast('UStVA als geprüft markiert'); return }
@@ -393,7 +433,7 @@ export default function SteuerPilotPage() {
           {/* KPI-Grid */}
           <div className="stats-grid" style={{ marginBottom: 24 }}>
             <KpiCard label="Einnahmen (brutto)" value={fmt(einnahmenMonat)} sub={`${rechnungenMonat.length} Rechnungen`} color="#4ddb7e" onClick={() => setTab('einnahmen')} />
-            <KpiCard label="Vorsteuer (VSt)" value={fmt(vorsteuerBelege)} sub={`${belegeMonat.length} Belege`} color="#4ddb7e" onClick={() => setTab('belege')} />
+            <KpiCard label="Vorsteuer (VSt)" value={fmt(vorsteuerGesamt)} sub="Belege + Fixkosten + Ausgaben" color="#4ddb7e" onClick={() => setTab('ustva')} />
             <KpiCard label="Umsatzsteuer (USt)" value={fmt(umsatzsteuerGes)} sub="aus Rechnungen" color="#ff8080" onClick={() => setTab('einnahmen')} />
             <KpiCard label="UStVA Zahllast" value={fmt(Math.max(0, zahllast))} sub={zahllast < 0 ? `Erstattung: ${fmt(Math.abs(zahllast))}` : 'ans Finanzamt'} color={STEUER_COLOR} onClick={() => setTab('ustva')} />
           </div>
@@ -406,7 +446,7 @@ export default function SteuerPilotPage() {
                 {[
                   { l: 'Einnahmen netto', v: fmt(rechnungenMonat.reduce((s, r) => s + (r.netto ?? 0), 0)), c: '#f8fbff' },
                   { l: 'Umsatzsteuer (§ 18 UStG)', v: fmt(umsatzsteuerGes), c: '#ff8080' },
-                  { l: 'Vorsteuer (§ 15 UStG)', v: fmt(vorsteuerBelege), c: '#4ddb7e' },
+                  { l: 'Vorsteuer (§ 15 UStG)', v: fmt(vorsteuerGesamt), c: '#4ddb7e' },
                   { l: zahllast >= 0 ? '→ Zahllast' : '→ Erstattung', v: fmt(Math.abs(zahllast)), c: STEUER_COLOR },
                 ].map(row => (
                   <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
@@ -684,13 +724,15 @@ export default function SteuerPilotPage() {
             {/* Vorsteuer */}
             <div className="pk-card" style={{ padding: 20 }}>
               <div style={{ fontWeight: 700, marginBottom: 14, color: '#4ddb7e' }}>🧾 Vorsteuer (Eingang)</div>
+              {/* Belege nach Steuersatz */}
               {[7, 19].map(satz => {
                 const b = belegeMonat.filter(b => b.steuersatz === satz)
                 const nettoSum = b.reduce((s, x) => s + (x.betrag - x.steuerbetrag), 0)
                 const steuSum = b.reduce((s, x) => s + x.steuerbetrag, 0)
+                if (b.length === 0) return null
                 return (
                   <div key={satz} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,.03)', marginBottom: 8 }}>
-                    <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>{satz}% USt-Satz ({b.length} Belege)</div>
+                    <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>{satz}% – Belege ({b.length})</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: 13 }}>Netto: <strong>{fmt(nettoSum)}</strong></span>
                       <span style={{ fontSize: 13, color: '#4ddb7e' }}>VSt: <strong>{fmt(steuSum)}</strong></span>
@@ -698,9 +740,39 @@ export default function SteuerPilotPage() {
                   </div>
                 )
               })}
+              {/* Fixkosten */}
+              {vorsteuerFixkosten > 0 && (
+                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,.03)', marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Fixkosten (mtl. Anteil)</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 13 }}>{fixkosten.filter(f => f.aktiv).length} aktive Positionen</span>
+                    <span style={{ fontSize: 13, color: '#4ddb7e' }}>VSt: <strong>{fmt(vorsteuerFixkosten)}</strong></span>
+                  </div>
+                </div>
+              )}
+              {/* Betriebsausgaben */}
+              {vorsteuerBetriebsAusg > 0 && (
+                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,.03)', marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Betriebsausgaben ({betriebsausgabenMonat.length})</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 13 }}>Brutto: <strong>{fmt(betriebsausgabenMonat.reduce((s, b) => s + b.betrag_brutto, 0))}</strong></span>
+                    <span style={{ fontSize: 13, color: '#4ddb7e' }}>VSt: <strong>{fmt(vorsteuerBetriebsAusg)}</strong></span>
+                  </div>
+                </div>
+              )}
+              {/* Anschaffungen */}
+              {vorsteuerAnschaffungen > 0 && (
+                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,.03)', marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Anschaffungen ({anschaffungenMonat.length})</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 13 }}>Brutto: <strong>{fmt(anschaffungenMonat.reduce((s, a) => s + a.betrag_brutto, 0))}</strong></span>
+                    <span style={{ fontSize: 13, color: '#4ddb7e' }}>VSt: <strong>{fmt(vorsteuerAnschaffungen)}</strong></span>
+                  </div>
+                </div>
+              )}
               <div style={{ borderTop: '1px solid rgba(255,255,255,.1)', paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
                 <span>Vorsteuer gesamt (§ 15)</span>
-                <span style={{ color: '#4ddb7e', fontFamily: 'monospace' }}>{fmt(calc.steuer19 + calc.steuer7)}</span>
+                <span style={{ color: '#4ddb7e', fontFamily: 'monospace' }}>{fmt(vorsteuerGesamt)}</span>
               </div>
             </div>
 
@@ -714,7 +786,7 @@ export default function SteuerPilotPage() {
                 {zahllast >= 0 ? '→ Zahlung ans Finanzamt' : '→ Erstattung vom Finanzamt'}
               </div>
               <div style={{ fontSize: 12, color: '#4a5568', marginTop: 8 }}>
-                {fmt(umsatzsteuerGes)} USt − {fmt(calc.steuer19 + calc.steuer7)} VSt
+                {fmt(umsatzsteuerGes)} USt − {fmt(vorsteuerGesamt)} VSt
               </div>
               <div style={{ marginTop: 12 }}>
                 {zahllast < 0 && <span className="badge badge-green">Erstattung</span>}
