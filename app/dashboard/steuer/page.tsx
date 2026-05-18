@@ -945,16 +945,14 @@ export default function SteuerPilotPage() {
                   </div>
                 )
               })}
-              {/* Fixkosten */}
-              {vorsteuerFixkosten > 0 && (
-                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,.03)', marginBottom: 8 }}>
-                  <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Fixkosten (mtl. Anteil)</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 13 }}>{fixkosten.filter(f => f.aktiv).length} aktive Positionen</span>
-                    <span style={{ fontSize: 13, color: '#4ddb7e' }}>VSt: <strong>{fmt(vorsteuerFixkosten)}</strong></span>
-                  </div>
+              {/* Fixkosten — VSt Fixkosten */}
+              <div style={{ padding: '8px 12px', borderRadius: 8, background: vorsteuerFixkosten > 0 ? 'rgba(255,255,255,.03)' : 'rgba(255,255,255,.01)', marginBottom: 8, border: vorsteuerFixkosten > 0 ? '1px solid rgba(77,219,126,.15)' : '1px solid rgba(255,255,255,.05)' }}>
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>VSt Fixkosten (mtl. Anteil, aktiv)</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13 }}>{fixkosten.filter(f => f.aktiv).length} Positionen aktiv</span>
+                  <span style={{ fontSize: 13, color: '#4ddb7e' }}>VSt: <strong>{fmt(vorsteuerFixkosten)}</strong></span>
                 </div>
-              )}
+              </div>
               {/* Betriebsausgaben */}
               {vorsteuerBetriebsAusg > 0 && (
                 <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,.03)', marginBottom: 8 }}>
