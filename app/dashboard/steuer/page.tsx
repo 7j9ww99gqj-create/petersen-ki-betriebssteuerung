@@ -8,6 +8,7 @@ import { getSteuerWarnings, type Warning } from '@/lib/warnings'
 import { useRole } from '@/lib/roles'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import dynamic from 'next/dynamic'
+import { downloadElsterXml } from '@/lib/steuer-export'
 
 // Lazy-load schwere Tabs
 const SteuerFixkostenTab      = dynamic(() => import('@/components/steuer/SteuerFixkosten'), { ssr: false })
@@ -340,6 +341,11 @@ export default function SteuerPilotPage() {
     ]
     downloadCsv(rows, `UStVA_${selectedMonat}.csv`)
     showToast('Monatsexport heruntergeladen')
+  }
+
+  const handleElsterExport = () => {
+    downloadElsterXml(selectedMonat, umsatzsteuerGes, vorsteuerGesamt)
+    showToast('ELSTER-XML exportiert')
   }
 
   function downloadCsv(rows: string[][], filename: string) {
@@ -754,6 +760,7 @@ export default function SteuerPilotPage() {
             </div>
             <button className="pk-btn" onClick={handleMarkiereGeprueft} style={{ fontSize: 13 }}>✓ Als geprüft markieren</button>
             <button className="pk-btn-ghost" onClick={handleMonatExport} style={{ fontSize: 13 }}>📥 CSV-Export</button>
+            <button className="pk-btn-ghost" onClick={handleElsterExport} style={{ fontSize: 13 }}>📥 ELSTER-XML exportieren</button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 20 }}>
@@ -999,10 +1006,27 @@ export default function SteuerPilotPage() {
           </div>
 
           <div className="pk-card" style={{ padding: 24 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>📥 ELSTER-XML Export (UStVA)</div>
+            <div style={{ fontSize: 13, color: '#aeb9c8', marginBottom: 16 }}>
+              Exportiert die UStVA-Voranmeldung als ELSTER-XML mit Kennzahlen 81 (USt) und 83 (VSt) für den gewählten Monat.
+            </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+              <select className="pk-input" value={selectedMonat} onChange={e => setSelectedMonat(e.target.value)} style={{ maxWidth: 220 }}>
+                {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+              </select>
+              <button className="pk-btn" onClick={handleElsterExport} style={{ fontSize: 14 }}>
+                📥 ELSTER-XML exportieren
+              </button>
+            </div>
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', fontSize: 12, color: '#ffb347' }}>
+              ⚠️ Dies ist ein Vorbereitungsdokument (§§ 81/83 UStG). Bitte mit Ihrem Steuerberater abstimmen. Keine direkte ELSTER-Übertragung.
+            </div>
+          </div>
+
+          <div className="pk-card" style={{ padding: 24 }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>🔮 Geplante Exporte</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[
-                { label: 'ELSTER XML Export', desc: 'Direktübertragung ans Finanzamt (in Vorbereitung)', soon: true },
                 { label: 'Steuerberater-Export', desc: 'Vollständiges Belegpaket als ZIP (in Vorbereitung)', soon: true },
                 { label: 'SKR 03 / SKR 04 Export', desc: 'Buchungsexport für Kanzleisoftware (geplant)', soon: true },
               ].map(item => (

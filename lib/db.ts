@@ -1215,6 +1215,7 @@ export async function upsertBueroRechnung(r: {
   auto_generated?: boolean
   leistungszeitraum_von?: string; leistungszeitraum_bis?: string; faellig?: string
   erstellt?: string; status?: string; bezahlt_am?: string; mahnung_count?: number
+  positionen?: unknown
 }) {
   const kundenIndex = await listBueroKundenIndex()
   const kundeRecord = r.kunde_id

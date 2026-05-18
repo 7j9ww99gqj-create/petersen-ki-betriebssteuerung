@@ -41,10 +41,12 @@ type Auftrag = {
   fortschritt: number; angebot_id?: string; ab_verschickt_am?: string; ab_nummer?: string
 }
 
+type Position = { id: string; beschreibung: string; menge: number; einheit: string; einzelpreis: number }
+
 type Rechnung = {
   id: string; nummer?: string; kunde_id?: string; kunde: string; betrag: string; faellig: string
   erstellt: string; status: 'Erstellt' | 'Offen' | 'Bezahlt' | 'Überfällig' | 'Mahnung'
-  bezahltAm?: string; mahnung_count?: number
+  bezahltAm?: string; mahnung_count?: number; positionen?: Position[]
 }
 
 type Dokument = {
@@ -1659,6 +1661,37 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
   )
 }
 
+// ── Rechnungen-Hilfsfunktionen ──────────────────────────────────────────────
+
+function berechneBetragAusPositionen(pos: Position[]): string {
+  const sum = pos.reduce((s, p) => s + p.menge * p.einzelpreis, 0)
+  return sum.toFixed(2).replace('.', ',') + ' €'
+}
+
+function PositionenEditor({ positionen, onChange }: { positionen: Position[]; onChange: (p: Position[]) => void }) {
+  const addPos = () => onChange([...positionen, { id: `POS-${Date.now()}`, beschreibung: '', menge: 1, einheit: 'Stk', einzelpreis: 0 }])
+  const updPos = (idx: number, field: keyof Position, value: string | number) => onChange(positionen.map((p, i) => i === idx ? { ...p, [field]: value } : p))
+  const remPos = (idx: number) => onChange(positionen.filter((_, i) => i !== idx))
+  if (positionen.length === 0) {
+    return <button type="button" className="pk-btn-ghost" onClick={addPos} style={{ fontSize: 12, marginTop: 4 }}>+ Positionen hinzufügen</button>
+  }
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, marginBottom: 6 }}>Positionen</div>
+      {positionen.map((pos, idx) => (
+        <div key={pos.id} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 70px 90px 32px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+          <input className="pk-input" placeholder="Beschreibung" value={pos.beschreibung} onChange={e => updPos(idx, 'beschreibung', e.target.value)} style={{ fontSize: 12 }} />
+          <input className="pk-input" type="number" placeholder="Menge" value={pos.menge} min={0} onChange={e => updPos(idx, 'menge', parseFloat(e.target.value) || 0)} style={{ fontSize: 12 }} />
+          <input className="pk-input" placeholder="Einheit" value={pos.einheit} onChange={e => updPos(idx, 'einheit', e.target.value)} style={{ fontSize: 12 }} />
+          <input className="pk-input" type="number" placeholder="Preis €" value={pos.einzelpreis} min={0} step={0.01} onChange={e => updPos(idx, 'einzelpreis', parseFloat(e.target.value) || 0)} style={{ fontSize: 12 }} />
+          <button type="button" onClick={() => remPos(idx)} style={{ background: 'none', border: 'none', color: '#ff8080', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        </div>
+      ))}
+      <button type="button" className="pk-btn-ghost" onClick={addPos} style={{ fontSize: 11, marginTop: 2 }}>+ Position</button>
+    </div>
+  )
+}
+
 // ── Rechnungen-Tab ──────────────────────────────────────────────────────────
 
 function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, setSharedRechnungen, sharedMailTarget, setSharedMailTarget }: { isDemo: boolean; kunden: Kunde[]; initialFilterStatus?: string; sharedRechnungen?: Rechnung[]; setSharedRechnungen?: React.Dispatch<React.SetStateAction<Rechnung[]>>; sharedMailTarget?: { id: string; email: string; typ: 'rechnung' } | null; setSharedMailTarget?: React.Dispatch<React.SetStateAction<{ id: string; email: string; typ: 'rechnung' } | null>> }) {
@@ -1676,6 +1709,10 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
   // Edit-Modal
   const [editRechnung, setEditRechnung] = useState<Rechnung | null>(null)
   const [editForm, setEditForm] = useState({ kunde: '', betrag: '', faellig: '', status: 'Offen' as Rechnung['status'], dokumentId: '' })
+  const [editPositionen, setEditPositionen] = useState<Position[]>([])
+
+  // Positionen (Neu-Formular)
+  const [formPositionen, setFormPositionen] = useState<Position[]>([])
 
   // Delete-Bestätigung
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -1839,7 +1876,9 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
     }
     if (!isDemo) {
       try {
-        await upsertBueroRechnung({ ...newRe, positionen: newRe.positionen })
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { positionen: _pos1, ...newReDb } = newRe
+        await upsertBueroRechnung(newReDb)
         await syncDokumentVerknuepfung(newRe, form.dokumentId)
       } catch { showToast('Fehler beim Speichern', true); return }
     }
@@ -1869,7 +1908,9 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
     const updated: Rechnung = { ...editRechnung, ...editForm, betrag: berechneterBetrag, positionen: editPositionen.length > 0 ? editPositionen : undefined }
     if (!isDemo) {
       try {
-        await upsertBueroRechnung({ ...updated, positionen: updated.positionen })
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { positionen: _pos2, ...updatedDb } = updated
+        await upsertBueroRechnung(updatedDb)
         await syncDokumentVerknuepfung(updated, editForm.dokumentId, previousDokumentId)
       } catch { showToast('Fehler beim Speichern', true); return }
     }
