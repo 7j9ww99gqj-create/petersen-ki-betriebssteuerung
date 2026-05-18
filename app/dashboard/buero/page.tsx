@@ -744,6 +744,26 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
   const [angebotMailTarget, setAngebotMailTarget] = useState<{ id: string; email: string } | null>(null)
   const [angebotMailSending, setAngebotMailSending] = useState(false)
 
+  // KI-Angebotstext
+  const [kiTextLoading, setKiTextLoading] = useState(false)
+  const [kiText, setKiText] = useState('')
+
+  const handleGenerateKiText = async () => {
+    if (!form.kunde && !form.titel) { showToast('Bitte zuerst Kunde und Titel ausfüllen', true); return }
+    setKiTextLoading(true)
+    try {
+      const res = await fetch('/api/generate-angebot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kunde: form.kunde, titel: form.titel, betrag: form.betrag }),
+      })
+      const data = await res.json()
+      if (data.text) setKiText(data.text)
+      else showToast('KI-Text konnte nicht generiert werden', true)
+    } catch { showToast('Fehler bei KI-Anfrage', true) }
+    finally { setKiTextLoading(false) }
+  }
+
   useEffect(() => {
     if (isDemo) return
     Promise.all([getBueroAngebote(), getBueroDokumente()])
@@ -1195,6 +1215,29 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                 {dokumentOptionen.map(doc => <option key={doc.id} value={doc.id}>{doc.name} ({doc.datum})</option>)}
               </select>
             </div>
+          </div>
+          {/* KI-Angebotstext */}
+          <div style={{ marginTop: 14, padding: '12px 14px', borderRadius: 10, background: 'rgba(167,139,250,.06)', border: '1px solid rgba(167,139,250,.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: kiText ? 10 : 0 }}>
+              <button
+                onClick={handleGenerateKiText}
+                disabled={kiTextLoading}
+                style={{ padding: '7px 16px', borderRadius: 999, border: '1px solid rgba(167,139,250,.4)', background: 'rgba(167,139,250,.12)', color: '#c4b5fd', fontSize: 12, fontWeight: 700, cursor: kiTextLoading ? 'wait' : 'pointer' }}
+              >
+                {kiTextLoading ? '⏳ Generiere…' : '✨ KI-Angebotstext generieren'}
+              </button>
+              <span style={{ fontSize: 11, color: '#aeb9c8' }}>Basierend auf Kunde + Titel</span>
+            </div>
+            {kiText && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4, fontWeight: 700 }}>Generierter Text:</div>
+                <div style={{ fontSize: 13, color: '#f8fbff', lineHeight: 1.6, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,.04)', whiteSpace: 'pre-wrap' }}>{kiText}</div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button onClick={() => { navigator.clipboard.writeText(kiText); showToast('Text kopiert') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(167,139,250,.3)', background: 'transparent', color: '#c4b5fd', cursor: 'pointer' }}>📋 Kopieren</button>
+                  <button onClick={() => setKiText('')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>✕ Verwerfen</button>
+                </div>
+              </div>
+            )}
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
             <button className="pk-btn" onClick={handleSave}>Als Entwurf speichern</button>
