@@ -12,6 +12,7 @@ import {
   getWerkstattPruefprotokolle, insertWerkstattPruefprotokoll,
   getWerkstattWartungen, upsertWerkstattWartung, deleteWerkstattWartung,
   getWerkstattStoerungen, upsertWerkstattStoerung, deleteWerkstattStoerung,
+  getLagerArtikel, syncWerkstattMaterialToLager,
 } from '@/lib/db'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
@@ -865,12 +866,20 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
   const [loading, setLoading] = useState(!isDemo)
   const [retryKey, setRetryKey] = useState(0)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
+  const [lagerArtikel, setLagerArtikel] = useState<{ id: string; name: string; bestand: number; einheit: string }[]>([])
+  const [lagerSyncMsg, setLagerSyncMsg] = useState<string | null>(null)
 
   useEffect(() => {
     if (isDemo) return
     setLoading(true); setErrorMsg('')
-    getWerkstattMaterial()
-      .then(data => setMaterial(data as Materialverbrauch[]))
+    Promise.all([
+      getWerkstattMaterial(),
+      getLagerArtikel(),
+    ])
+      .then(([matData, artData]) => {
+        setMaterial(matData as Materialverbrauch[])
+        setLagerArtikel((artData as { id: string; name: string; bestand: number; einheit: string }[]) ?? [])
+      })
       .catch(() => setErrorMsg('Materialverbrauch konnte nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
   }, [isDemo, retryKey])
@@ -886,6 +895,26 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
     const newEntry: Materialverbrauch = { id: Date.now(), ...form, menge: Number(form.menge), datum: today }
     if (!isDemo) {
       try { await insertWerkstattMaterial(newEntry) } catch { showToast('Fehler beim Speichern', true); return }
+      // Lager-Sync: Bestand reduzieren
+      try {
+        await syncWerkstattMaterialToLager({
+          artikelName: form.artikel,
+          menge: Number(form.menge),
+          einheit: form.einheit,
+          auftragsnr: form.auftragsnr,
+          mitarbeiter: form.mitarbeiter,
+        })
+        // Lager-Artikel-Bestand lokal aktualisieren
+        setLagerArtikel(prev => prev.map(a => {
+          if (a.name.toLowerCase() === form.artikel.toLowerCase()) {
+            const newBestand = Math.max(0, a.bestand - Number(form.menge))
+            return { ...a, bestand: newBestand }
+          }
+          return a
+        }))
+        setLagerSyncMsg(`📦 Lager: ${form.artikel} um ${form.menge} ${form.einheit} reduziert`)
+        setTimeout(() => setLagerSyncMsg(null), 5000)
+      } catch { /* Lager-Sync ist best-effort */ }
     }
     setMaterial(prev => [newEntry, ...prev])
     setForm({ artikel: '', menge: '', einheit: 'Stk', auftragsnr: '', mitarbeiter: '' })
@@ -916,12 +945,49 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
           <button onClick={() => setRetryKey(k => k + 1)} style={{ padding: '4px 12px', borderRadius: 8, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.1)', color: '#ff8080', cursor: 'pointer', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>↺ Erneut laden</button>
         </div>
       )}
+      {lagerSyncMsg && (
+        <div style={{ marginBottom: 12, padding: '10px 16px', borderRadius: 10, background: 'rgba(22,132,255,.1)', border: '1px solid rgba(22,132,255,.3)', color: '#6cb6ff', fontSize: 13, fontWeight: 600 }}>
+          {lagerSyncMsg}
+        </div>
+      )}
       <div className="pk-card fade-in" style={{ marginBottom: 16, border: '1px solid rgba(167,139,250,.2)' }}>
         <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 800 }}>🔩 Materialverbrauch buchen</h3>
+        {lagerArtikel.length > 0 && (
+          <div style={{ marginBottom: 10, fontSize: 12, color: '#4ddb7e', padding: '6px 10px', borderRadius: 8, background: 'rgba(77,219,126,.08)', border: '1px solid rgba(77,219,126,.2)' }}>
+            📦 {lagerArtikel.length} Lager-Artikel verfügbar – Bestand wird bei Buchung automatisch reduziert.
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           <div>
             <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Artikel</label>
-            <input className="pk-input" placeholder="Artikelname" value={form.artikel} onChange={e => setForm(p => ({ ...p, artikel: e.target.value }))} />
+            <input
+              className="pk-input"
+              placeholder="Artikelname"
+              list="lager-artikel-list"
+              value={form.artikel}
+              onChange={e => {
+                const val = e.target.value
+                setForm(p => ({ ...p, artikel: val }))
+                // Einheit aus Lager-Artikel auto-befüllen
+                const found = lagerArtikel.find(a => a.name.toLowerCase() === val.toLowerCase())
+                if (found?.einheit) setForm(p => ({ ...p, artikel: val, einheit: found.einheit }))
+              }}
+            />
+            <datalist id="lager-artikel-list">
+              {lagerArtikel.map(a => (
+                <option key={a.id} value={a.name}>{a.name} (Bestand: {a.bestand} {a.einheit})</option>
+              ))}
+            </datalist>
+            {(() => {
+              const found = lagerArtikel.find(a => a.name.toLowerCase() === form.artikel.toLowerCase())
+              if (!found) return null
+              return (
+                <div style={{ fontSize: 11, color: found.bestand <= (Number(form.menge) || 0) ? '#fb7185' : '#4ddb7e', marginTop: 4 }}>
+                  Lagerbestand: {found.bestand} {found.einheit}
+                  {found.bestand <= (Number(form.menge) || 0) && ' ⚠️ Bestand wird 0'}
+                </div>
+              )
+            })()}
           </div>
           <div>
             <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Menge</label>

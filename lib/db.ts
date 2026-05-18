@@ -1156,6 +1156,50 @@ export async function insertLagerBewegung(b: {
   return data
 }
 
+// ── WERKSTATT → LAGER SYNC (Aufgabe 27) ──────────────────────────────────────
+
+/**
+ * Nach einer Material-Entnahme in der Werkstatt:
+ * 1. Lager-Artikel-Bestand um `menge` reduzieren
+ * 2. Lager-Bewegung "Ausgang" erzeugen
+ * Falls der Artikel nicht gefunden wird, wird nur die Bewegung geloggt.
+ */
+export async function syncWerkstattMaterialToLager(input: {
+  artikelName: string
+  menge: number
+  einheit: string
+  auftragsnr: string
+  mitarbeiter?: string
+}) {
+  const client = db()
+  // Artikel suchen (case-insensitive über ilike)
+  const { data: artikelRows } = await client
+    .from('lager_artikel')
+    .select('id,name,bestand')
+    .ilike('name', input.artikelName.trim())
+    .limit(1)
+
+  if (artikelRows && artikelRows.length > 0) {
+    const art = artikelRows[0] as { id: string; name: string; bestand: number }
+    const neuerBestand = Math.max(0, (art.bestand ?? 0) - input.menge)
+    const newStatus = neuerBestand === 0 ? 'leer' : neuerBestand <= 5 ? 'niedrig' : 'ok'
+    await client
+      .from('lager_artikel')
+      .update({ bestand: neuerBestand, status: newStatus, updated_at: new Date().toISOString() })
+      .eq('id', art.id)
+  }
+
+  // Lager-Bewegung "Ausgang" loggen
+  await client.from('lager_bewegungen').insert({
+    typ: 'Ausgang',
+    artikel: input.artikelName,
+    menge: input.menge,
+    mitarbeiter: input.mitarbeiter ?? '',
+    status: `Werkstatt-Entnahme: ${input.auftragsnr}`,
+    datum: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+  })
+}
+
 // ── BÜRO ─────────────────────────────────────────────────────────────────────
 
 export async function getBueroKunden() {
