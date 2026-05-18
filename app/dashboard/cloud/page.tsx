@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
+import { trackVisit } from '@/lib/recent'
 import {
   getBueroAngebote,
   getBueroAuftraege,
@@ -409,6 +410,7 @@ export default function CloudPage() {
       setBackupsLoading(false)
       return
     }
+    trackVisit({ href: '/dashboard/cloud', label: 'CloudPilot', icon: '☁️' })
     setError('')
     try {
       const [snap, bups] = await Promise.all([loadCloudSnapshot(), getCloudBackups()])

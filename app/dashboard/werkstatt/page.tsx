@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { trackVisit } from '@/lib/recent'
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
 import SkeletonCard from '@/components/SkeletonCard'
 import EmptyState from '@/components/EmptyState'
@@ -2178,6 +2179,7 @@ export default function WerkstattPilotPage() {
 
   useEffect(() => {
     if (isDemo) return
+    trackVisit({ href: '/dashboard/werkstatt', label: 'WerkstattPilot', icon: '🔧' })
     Promise.all([getWerkstattKarten(), getWerkstattZeitbuchungen(), getWerkstattMitarbeiter(), getWerkstattBereiche(), getWerkstattWartungen(), getWerkstattStoerungen(), getBueroAuftraege()])
       .then(([k, z, m, b, w, s, auftraege]) => {
         setKarten(k as Arbeitskarte[])

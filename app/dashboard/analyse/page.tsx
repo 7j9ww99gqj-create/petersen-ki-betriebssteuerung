@@ -7,6 +7,7 @@ import {
 } from 'recharts'
 import { hasDemoCookie } from '@/lib/auth'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
+import { trackVisit } from '@/lib/recent'
 import PilotDocumentArchive from '@/components/PilotDocumentArchive'
 import SkeletonCard from '@/components/SkeletonCard'
 
@@ -184,6 +185,7 @@ export default function AnalysePilotPage() {
       setLoading(false)
       return
     }
+    trackVisit({ href: '/dashboard/analyse', label: 'AnalysePilot', icon: '📊' })
     setLoading(true)
     loadLiveData(zeitraum)
   // eslint-disable-next-line react-hooks/exhaustive-deps

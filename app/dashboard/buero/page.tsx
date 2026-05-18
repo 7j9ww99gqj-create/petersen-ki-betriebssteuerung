@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
+import { trackVisit } from '@/lib/recent'
 import { getBueroKunden, getBueroAngebote, getBueroAuftraege, getBueroRechnungen } from '@/lib/db'
 import { useRole } from '@/lib/roles'
 import { TabBar } from '@/components/buero/shared'
@@ -45,6 +46,7 @@ export default function BueroPilotPage() {
 
   const loadData = () => {
     if (isDemo) return
+    trackVisit({ href: '/dashboard/buero', label: 'BüroPilot', icon: '🧾' })
     setLoading(true)
     setErrorMsg('')
     // Beim Start nur Kunden + Rechnungen laden (Basis-Daten)

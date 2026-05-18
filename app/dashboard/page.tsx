@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
+import { getRecentVisits, type RecentItem } from '@/lib/recent'
 import { getAccessProfile } from '@/lib/access'
 import { createSupabaseClient } from '@/lib/supabase'
 import { getLagerArtikel, getBueroRechnungen, getBueroAuftraege, getFirmaEinstellungen, getOwnerDashboardSnapshot, type FirmaEinstellungen, type OwnerDashboardSnapshot } from '@/lib/db'
@@ -202,6 +203,7 @@ export default function DashboardPage() {
   const [ownerPendingRegistrations, setOwnerPendingRegistrations] = useState(0)
   const [pendingRegistrations, setPendingRegistrations] = useState<PendingRegistration[]>([])
   const [savingRegistrationId, setSavingRegistrationId] = useState('')
+  const [recentVisits, setRecentVisits] = useState<RecentItem[]>([])
 
   const loadOwnerSnapshot = () => {
     getOwnerDashboardSnapshot()
@@ -210,6 +212,7 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
+    setRecentVisits(getRecentVisits())
     const u = localStorage.getItem('pk_user')
     if (u) setUser(JSON.parse(u))
     setTimeout(() => setHeaderVisible(true), 80)
@@ -718,6 +721,24 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Zuletzt besucht */}
+      {recentVisits.length > 0 && (
+        <div className="pk-card" style={{ marginBottom: 24 }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 800 }}>🕐 Zuletzt besucht</h3>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {recentVisits.map(item => (
+              <button key={item.href} onClick={() => router.push(item.href)}
+                style={{ all: 'unset', cursor: 'pointer', padding: '8px 14px', borderRadius: 10,
+                  background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)',
+                  display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>{item.icon}</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quick actions */}
       <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>

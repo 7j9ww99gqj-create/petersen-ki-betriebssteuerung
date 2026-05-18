@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { trackVisit } from '@/lib/recent'
 import SkeletonCard from '@/components/SkeletonCard'
 import EmptyState from '@/components/EmptyState'
 import { hasDemoCookie } from '@/lib/auth'
@@ -892,6 +893,7 @@ export default function LagerPilotPage() {
   // Daten laden (Basis: Artikel + Bewegungen)
   useEffect(() => {
     if (isDemo) return
+    trackVisit({ href: '/dashboard/lager', label: 'LagerPilot', icon: '📦' })
     getAiFeatureSettings().then(setAiSettings).catch(() => {})
     setLoading(true); setLoadError('')
     Promise.all([getLagerArtikel(), getLagerBewegungen()])

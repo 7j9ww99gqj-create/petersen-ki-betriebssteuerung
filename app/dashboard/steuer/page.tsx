@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { trackVisit } from '@/lib/recent'
 import { hasDemoCookie } from '@/lib/auth'
 import { getBueroRechnungen, getSteuerBelege, upsertSteuerBeleg, deleteSteuerBeleg, getSteuerUstva, upsertSteuerUstva, uploadSteuerBeleg, getSteuerFixkosten, getSteuerBetriebsausgaben, getSteuerAnschaffungen, getSteuerBelegUploads, upsertSteuerBelegUpload, deleteSteuerBelegUpload, uploadSteuerBelegFile, type SteuerBelegUpload } from '@/lib/db'
 import { genId } from '@/lib/ids'
@@ -252,6 +253,7 @@ export default function SteuerPilotPage() {
   const loadData = async () => {
     setLoading(true)
     setLoadError('')
+    if (!isDemo) trackVisit({ href: '/dashboard/steuer', label: 'SteuerPilot', icon: '🧮' })
     if (isDemo) {
       setBelege(demoBelege); setUstva(demoUstva); setRechnungen(demoRechnungen)
       setFixkosten(demoFixkosten); setBetriebsausgaben(demoBetriebsausgaben); setAnschaffungen(demoAnschaffungen)

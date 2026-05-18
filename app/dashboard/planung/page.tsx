@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { trackVisit } from '@/lib/recent'
 import { hasDemoCookie } from '@/lib/auth'
 import { genId } from '@/lib/ids'
 import {
@@ -1342,6 +1343,7 @@ export default function PlanungPilotPage() {
 
   const loadData = () => {
     if (isDemo) return
+    trackVisit({ href: '/dashboard/planung', label: 'PlanungPilot', icon: '📅' })
     setLoading(true)
     setErrorMsg('')
     Promise.all([getPlanungProjekte(), getPlanungTermine(), getPlanungAufgaben(), getPlanungRessourcen()])
