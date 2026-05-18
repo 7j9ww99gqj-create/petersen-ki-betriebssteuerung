@@ -862,6 +862,7 @@ alter table lager_artikel add column if not exists beschreibung text;
 alter table lager_artikel add column if not exists einkaufspreis numeric default 0;
 alter table lager_artikel add column if not exists verkaufspreis numeric default 0;
 alter table lager_artikel add column if not exists lagerort text;
+alter table lager_artikel add column if not exists lieferant_id text references einkauf_lieferanten(id) on delete set null;
 
 -- ── WerkstattPilot ──────────────────────────────────────────
 

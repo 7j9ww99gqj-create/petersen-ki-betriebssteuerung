@@ -10,7 +10,7 @@ import {
   upsertLagerStellplatz, deleteLagerStellplatz,
   upsertLagerStellplatzBestand, deleteLagerStellplatzBestand, umlagerArtikel,
   getAiFeatureSettings, type AiFeatureSettings,
-  upsertEinkaufBestellung,
+  upsertEinkaufBestellung, getEinkaufLieferanten,
 } from '@/lib/db'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
@@ -18,6 +18,7 @@ import {
 type Artikel = {
   id: string; name: string; kategorie: string; bestand: number
   einheit: string; lagerplatz: string; status: string; mindestbestand?: number
+  lieferant_id?: string | null
 }
 type Bewegung = {
   id: number | string; typ: string; artikel: string; menge: number
@@ -201,13 +202,14 @@ function pickStatusLabel(status: PickStatus) {
 
 // ── Modal-Komponente ─────────────────────────────────────────────────────────
 
-type ArtikelForm = { id: string; name: string; kategorie: string; einheit: string; mindestbestand: string }
-const emptyForm: ArtikelForm = { id: '', name: '', kategorie: 'Rohstoffe', einheit: 'Stk', mindestbestand: '0' }
+type ArtikelForm = { id: string; name: string; kategorie: string; einheit: string; mindestbestand: string; lieferant_id: string }
+const emptyForm: ArtikelForm = { id: '', name: '', kategorie: 'Rohstoffe', einheit: 'Stk', mindestbestand: '0', lieferant_id: '' }
 
-function ArtikelModal({ artikel, onSave, onClose }: {
+function ArtikelModal({ artikel, onSave, onClose, lieferanten }: {
   artikel?: Artikel | null
   onSave: (form: ArtikelForm) => void
   onClose: () => void
+  lieferanten?: { id: string; name: string }[]
 }) {
   const [form, setForm] = useState<ArtikelForm>(artikel ? {
     id: artikel.id,
@@ -215,6 +217,7 @@ function ArtikelModal({ artikel, onSave, onClose }: {
     kategorie: artikel.kategorie,
     einheit: artikel.einheit,
     mindestbestand: String(artikel.mindestbestand ?? 0),
+    lieferant_id: artikel.lieferant_id ?? '',
   } : emptyForm)
 
   const set = (k: keyof ArtikelForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -256,6 +259,15 @@ function ArtikelModal({ artikel, onSave, onClose }: {
             <input className="pk-input" type="number" min="0" value={form.mindestbestand} onChange={set('mindestbestand')} />
             <div style={{ marginTop: 5, fontSize: 11, color: '#7f8ea3' }}>Menge und Stellplatz werden erst bei der Einlagerung gebucht.</div>
           </div>
+          {lieferanten && lieferanten.length > 0 && (
+            <div>
+              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Stammlieferant</label>
+              <select className="pk-input" value={form.lieferant_id} onChange={set('lieferant_id')}>
+                <option value="">— kein Stammlieferant —</option>
+                {lieferanten.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
           <button className="pk-btn" onClick={() => { if (form.id.trim() && form.name.trim()) onSave(form) }} style={{ flex: 1, fontWeight: 700 }}>
@@ -850,6 +862,9 @@ export default function LagerPilotPage() {
   const [picklisten, setPicklisten] = useState<Pickliste[]>([])
   const [activePickId, setActivePickId] = useState<string | null>(null)
 
+  // Lieferanten-State (für Artikel-Stammlieferant)
+  const [lieferantenListe, setLieferantenListe] = useState<{ id: string; name: string }[]>([])
+
   // Daten laden
   useEffect(() => {
     if (isDemo) return
@@ -859,6 +874,7 @@ export default function LagerPilotPage() {
       .then(([a, b]) => { setArtikel(a as Artikel[]); setBewegungen(b as Bewegung[]) })
       .catch(() => setLoadError('Lagerdaten konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
+    getEinkaufLieferanten().then(l => setLieferantenListe((l as { id: string; name: string }[]) ?? [])).catch(() => {})
   }, [isDemo, retryKey])
 
   useEffect(() => {
@@ -1045,7 +1061,7 @@ export default function LagerPilotPage() {
     const bestand = existing?.bestand ?? 0
     const lagerplatz = existing?.lagerplatz ?? ''
     const status = calcStatus(bestand, mindestbestand)
-    const a: Artikel = { id, name: form.name.trim(), kategorie: form.kategorie, bestand, einheit: form.einheit, lagerplatz, status, mindestbestand }
+    const a: Artikel = { id, name: form.name.trim(), kategorie: form.kategorie, bestand, einheit: form.einheit, lagerplatz, status, mindestbestand, lieferant_id: form.lieferant_id || null }
 
     setSaving(true)
     if (!isDemo) {
@@ -1672,6 +1688,7 @@ export default function LagerPilotPage() {
           artikel={modal === 'new' ? null : modal}
           onSave={handleSaveArtikel}
           onClose={() => setModal(null)}
+          lieferanten={lieferantenListe}
         />
       )}
 

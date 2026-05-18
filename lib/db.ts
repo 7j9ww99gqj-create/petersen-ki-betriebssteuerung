@@ -1070,6 +1070,7 @@ export async function getLagerArtikel() {
 export async function upsertLagerArtikel(artikel: {
   id: string; name: string; kategorie?: string; bestand?: number
   einheit?: string; lagerplatz?: string; status?: string; mindestbestand?: number
+  lieferant_id?: string | null
 }) {
   const { data, error } = await db()
     .from('lager_artikel')
