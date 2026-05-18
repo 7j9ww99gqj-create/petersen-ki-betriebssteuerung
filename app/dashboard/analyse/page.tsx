@@ -140,7 +140,16 @@ function KPICard({ icon, label, value, delta, color, sub }: {
 
 // ── Tabs ───────────────────────────────────────────────────────────────────────
 
-type Tab = 'uebersicht' | 'umsatz' | 'bestand' | 'ki' | 'archiv'
+type Tab = 'uebersicht' | 'umsatz' | 'bestand' | 'ki' | 'archiv' | 'zahlungsmoral'
+
+type ZahlungsmoralKunde = {
+  name: string
+  anzahl: number
+  bezahlt: number
+  mahnung: number
+  avgVerzoegerungTage: number
+  mahnquote: number
+}
 
 export default function AnalysePilotPage() {
   const [tab, setTab] = useState<Tab>('uebersicht')
@@ -153,6 +162,7 @@ export default function AnalysePilotPage() {
   const [kiDocTypes, setKiDocTypes] = useState<{ type: string; count: number }[]>([])
   const [isDemo, setIsDemo] = useState(false)
   const [loadError, setLoadError] = useState(false)
+  const [zahlungsmoralData, setZahlungsmoralData] = useState<ZahlungsmoralKunde[]>([])
 
   useEffect(() => {
     const demo = hasDemoCookie()
@@ -197,7 +207,7 @@ export default function AnalysePilotPage() {
       const start12Iso = startOf12MonthsAgo.toISOString()
       const todayIso = new Date().toISOString()
 
-      const [rechnungen, eingangsrechnungen, kunden, angebote, artikel, kiDocs, fixkosten, betriebsausgaben, snapshots] = await Promise.allSettled([
+      const [rechnungen, eingangsrechnungen, kunden, angebote, artikel, kiDocs, fixkosten, betriebsausgaben, snapshots, rechnungenDetail] = await Promise.allSettled([
         supabase.from('buero_rechnungen').select('betrag,summe,datum,status').gte('datum', start12Iso.slice(0, 10)).lte('datum', todayIso.slice(0, 10)).order('datum'),
         supabase.from('buero_eingangsrechnungen').select('betrag_brutto,rechnungsdatum,status').gte('rechnungsdatum', start12Iso.slice(0, 10)),
         supabase.from('buero_kunden').select('status'),
@@ -207,6 +217,7 @@ export default function AnalysePilotPage() {
         supabase.from('steuer_fixkosten').select('betrag_brutto,steuersatz,zahlungsintervall,aktiv'),
         supabase.from('steuer_betriebsausgaben').select('betrag_brutto,datum').gte('datum', start12Iso.slice(0, 10)),
         supabase.from('lager_bestand_snapshots').select('datum,artikel_ges,niedrig,leer').gte('datum', start12Iso.slice(0, 10)).order('datum', { ascending: true }).limit(30),
+        supabase.from('buero_rechnungen').select('kunde,faellig,bezahlt_am,status,mahnung_count').gte('datum', start12Iso.slice(0, 10)),
       ])
 
       // ── Rechnungen ──
@@ -416,6 +427,38 @@ export default function AnalysePilotPage() {
         typeMap.set(doc.document_type, (typeMap.get(doc.document_type) ?? 0) + 1)
       }
       setKiDocTypes(Array.from(typeMap.entries()).map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count))
+
+      // ── Zahlungsmoral-Auswertung ──
+      type RechDetailRow = { kunde?: string | null; faellig?: string | null; bezahlt_am?: string | null; status?: string | null; mahnung_count?: number | null }
+      const rechnungenDetailRows = rechnungenDetail.status === 'fulfilled' && !rechnungenDetail.value.error
+        ? (rechnungenDetail.value.data ?? []) as RechDetailRow[]
+        : []
+      const kundeMap = new Map<string, { anzahl: number; bezahlt: number; mahnung: number; totalVerzug: number; verzugCount: number }>()
+      for (const r of rechnungenDetailRows) {
+        const k = r.kunde || 'Unbekannt'
+        if (!kundeMap.has(k)) kundeMap.set(k, { anzahl: 0, bezahlt: 0, mahnung: 0, totalVerzug: 0, verzugCount: 0 })
+        const entry = kundeMap.get(k)!
+        entry.anzahl++
+        if (r.status === 'Bezahlt' && r.bezahlt_am && r.faellig) {
+          entry.bezahlt++
+          const faelligDate = new Date(r.faellig)
+          const bezahltDate = new Date(r.bezahlt_am)
+          const verzugTage = Math.round((bezahltDate.getTime() - faelligDate.getTime()) / 86400000)
+          if (verzugTage > 0) { entry.totalVerzug += verzugTage; entry.verzugCount++ }
+        }
+        if ((r.mahnung_count ?? 0) > 0 || r.status === 'Mahnung') entry.mahnung++
+      }
+      const zmData: ZahlungsmoralKunde[] = Array.from(kundeMap.entries())
+        .map(([name, v]) => ({
+          name,
+          anzahl: v.anzahl,
+          bezahlt: v.bezahlt,
+          mahnung: v.mahnung,
+          avgVerzoegerungTage: v.verzugCount > 0 ? Math.round(v.totalVerzug / v.verzugCount) : 0,
+          mahnquote: v.anzahl > 0 ? Math.round((v.mahnung / v.anzahl) * 100) : 0,
+        }))
+        .sort((a, b) => b.avgVerzoegerungTage - a.avgVerzoegerungTage)
+      setZahlungsmoralData(zmData)
     } catch {
       setLoadError(true)
       setKpi(ZERO_KPI)
@@ -464,6 +507,7 @@ export default function AnalysePilotPage() {
           { id: 'bestand', label: '📦 Bestandsentwicklung' },
           { id: 'ki', label: '🧠 KI-Nutzung' },
           { id: 'archiv', label: '🗂️ Archiv' },
+          { id: 'zahlungsmoral', label: '💳 Zahlungsmoral' },
         ] as const).map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding: '10px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
@@ -767,6 +811,70 @@ export default function AnalysePilotPage() {
             <p style={{ margin: 0, fontSize: 13, color: '#aeb9c8' }}>Berichte, Auswertungen und Analyse-Dokumente verwalten.</p>
           </div>
           <PilotDocumentArchive pilotType="analyse" />
+        </div>
+      )}
+
+      {/* ── ZAHLUNGSMORAL ── */}
+      {tab === 'zahlungsmoral' && (
+        <div>
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 800 }}>💳 Zahlungsmoral-Report</h3>
+            <p style={{ margin: 0, fontSize: 13, color: '#aeb9c8' }}>Ø Zahlungsverzug und Mahnquote je Kunde (letzte 12 Monate)</p>
+          </div>
+          {isDemo && (
+            <div className="pk-card" style={{ marginBottom: 16, padding: '14px 18px', border: '1px solid rgba(32,200,255,.2)', color: '#20c8ff', fontSize: 13 }}>
+              Demo-Modus: Zeige Beispieldaten. Im Live-Betrieb werden echte Rechnungsdaten ausgewertet.
+            </div>
+          )}
+          {!isDemo && zahlungsmoralData.length === 0 && (
+            <div className="pk-card" style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>💳</div>
+              Noch keine bezahlten Rechnungen mit Fälligkeitsdatum vorhanden.
+            </div>
+          )}
+          {(isDemo ? [
+            { name: 'Müller GmbH', anzahl: 8, bezahlt: 7, mahnung: 1, avgVerzoegerungTage: 12, mahnquote: 13 },
+            { name: 'Schmidt AG', anzahl: 5, bezahlt: 4, mahnung: 2, avgVerzoegerungTage: 8, mahnquote: 40 },
+            { name: 'Weber & Co', anzahl: 3, bezahlt: 3, mahnung: 0, avgVerzoegerungTage: 0, mahnquote: 0 },
+            { name: 'Bauer KG', anzahl: 6, bezahlt: 5, mahnung: 1, avgVerzoegerungTage: 24, mahnquote: 17 },
+          ] : zahlungsmoralData).map((k, i) => (
+            <div key={k.name} className="pk-card" style={{ marginBottom: 10, padding: '14px 18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <span style={{ fontWeight: 800, fontSize: 14 }}>#{i + 1} {k.name}</span>
+                  <span style={{ color: '#aeb9c8', fontSize: 12, marginLeft: 10 }}>{k.anzahl} Rechnungen · {k.bezahlt} bezahlt</span>
+                </div>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: k.avgVerzoegerungTage > 14 ? '#f43f5e' : k.avgVerzoegerungTage > 7 ? '#f59e0b' : '#10b981' }}>
+                      {k.avgVerzoegerungTage === 0 ? '—' : `+${k.avgVerzoegerungTage}d`}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>Ø Verzug</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: k.mahnquote > 30 ? '#f43f5e' : k.mahnquote > 10 ? '#f59e0b' : '#10b981' }}>
+                      {k.mahnquote}%
+                    </div>
+                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>Mahnquote</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: k.mahnung > 0 ? '#f59e0b' : '#10b981' }}>
+                      {k.mahnung}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>Mahnungen</div>
+                  </div>
+                </div>
+              </div>
+              {/* Balken Verzug */}
+              {k.avgVerzoegerungTage > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,.06)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.min(100, k.avgVerzoegerungTage * 2)}%`, borderRadius: 2, background: k.avgVerzoegerungTage > 14 ? '#f43f5e' : k.avgVerzoegerungTage > 7 ? '#f59e0b' : '#10b981', transition: 'width .5s' }} />
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
