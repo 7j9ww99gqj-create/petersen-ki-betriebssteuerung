@@ -9,6 +9,7 @@
 import { createSupabaseClient } from './supabase'
 import { normalizeDocumentStoragePath } from './documents'
 import { genId } from './ids'
+import { logAuditAction } from './user-audit'
 import type { BookingStatus, EmployeeTierId, PackageId, PilotId } from './pricingConfig'
 import {
   db,
@@ -879,6 +880,7 @@ export async function deleteLagerArtikel(id: string) {
   }
   const { error } = await db().from('lager_artikel').delete().eq('id', id)
   if (error) throw error
+  logAuditAction({ action: 'delete', entityType: 'artikel', entityId: id })
 }
 
 // Lädt eine signed URL für ein Artikelbild (1h Gültigkeit, CDN-cached)
@@ -1057,6 +1059,7 @@ export async function upsertBueroKunde(k: {
 export async function deleteBueroKunde(id: string) {
   const { error } = await db().from('buero_kunden').delete().eq('id', id)
   if (error) throw error
+  logAuditAction({ action: 'delete', entityType: 'kunde', entityId: id })
 }
 
 export async function checkBueroKundeDuplicate(email: string, excludeId?: string) {
@@ -1081,6 +1084,7 @@ export async function anonymisiereBueroKunde(id: string) {
     })
     .eq('id', id)
   if (error) throw error
+  logAuditAction({ action: 'anonymize', entityType: 'kunde', entityId: id })
 }
 
 export async function getBueroAngebote() {
@@ -1317,16 +1321,19 @@ export async function getLatestBueroRechnungBySubscriptionId(subscriptionId: str
 export async function deleteBueroAngebot(id: string) {
   const { error } = await db().from('buero_angebote').delete().eq('id', id)
   if (error) throw error
+  logAuditAction({ action: 'delete', entityType: 'angebot', entityId: id })
 }
 
 export async function deleteBueroAuftrag(id: string) {
   const { error } = await db().from('buero_auftraege').delete().eq('id', id)
   if (error) throw error
+  logAuditAction({ action: 'delete', entityType: 'auftrag', entityId: id })
 }
 
 export async function deleteBueroRechnung(id: string) {
   const { error } = await db().from('buero_rechnungen').delete().eq('id', id)
   if (error) throw error
+  logAuditAction({ action: 'delete', entityType: 'rechnung', entityId: id })
 }
 
 export async function getBueroEingangsrechnungen() {
@@ -1393,6 +1400,7 @@ export async function getBueroEingangsrechnungById(id: string) {
 export async function deleteBueroEingangsrechnung(id: string) {
   const { error } = await db().from('buero_eingangsrechnungen').delete().eq('id', id)
   if (error) throw error
+  logAuditAction({ action: 'delete', entityType: 'eingangsrechnung', entityId: id })
 }
 
 export async function markEingangsrechnungBezahlt(id: string, bezahlt_am?: string) {
@@ -1701,6 +1709,7 @@ export async function upsertWerkstattKarte(k: {
 export async function deleteWerkstattKarte(id: string) {
   const { error } = await db().from('werkstatt_karten').delete().eq('id', id)
   if (error) throw error
+  logAuditAction({ action: 'delete', entityType: 'werkstatt_karte', entityId: id })
 }
 
 export async function getWerkstattMitarbeiter() {
@@ -2389,6 +2398,7 @@ export async function deleteSteuerBeleg(id: string) {
   }
   const { error } = await supabase.from('steuer_belege').delete().eq('id', id)
   if (error) throw error
+  logAuditAction({ action: 'delete', entityType: 'beleg', entityId: id })
 }
 
 export async function getSteuerUstva() {
