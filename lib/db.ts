@@ -2678,8 +2678,30 @@ export async function bulkImportLagerArtikel(rows: Array<{
 export async function bulkImportBueroKunden(rows: Array<{
   id: string; name: string; email?: string; telefon?: string
   adresse?: string; kundennummer?: string; notizen?: string
+  ansprechpartner?: string; mobil?: string
+  strasse?: string; plz?: string; ort?: string; land?: string
+  website?: string; ust_id?: string
 }>) {
-  const { data, error } = await db().from('buero_kunden').insert(rows).select()
+  // Schutz: leere oder doppelte Einträge filtern
+  const seen = new Set<string>()
+  const cleaned = rows
+    .map(r => {
+      const out = { ...r }
+      // Adresse aus Einzelfeldern zusammensetzen, falls leer
+      if (!out.adresse && (out.strasse || out.plz || out.ort)) {
+        out.adresse = [out.strasse, [out.plz, out.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+      }
+      return out
+    })
+    .filter(r => {
+      const key = (r.name || '').trim().toLowerCase()
+      if (!key) return false // ohne Name keinen Import
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  if (!cleaned.length) return []
+  const { data, error } = await db().from('buero_kunden').insert(cleaned).select()
   if (error) throw error
   return data
 }

@@ -3585,8 +3585,30 @@ async function runBulkImport(dataType: ImportDataType, rows: Record<string, stri
     return prepared.length
   }
   if (dataType === 'kunden') {
-    const prepared = rows.map(r => ({ id: genId('KD'), name: r.name ?? '', email: r.email, telefon: r.telefon, adresse: r.adresse, kundennummer: r.kundennummer, notizen: r.notizen }))
-    await bulkImportBueroKunden(prepared); return prepared.length
+    const prepared = rows.map(r => {
+      // Name kann aus mehreren Spalten kommen — Firma > Kundenname > Vorname+Nachname > Ansprechpartner
+      const name = (r.name && r.name.trim()) || (r.ansprechpartner && r.ansprechpartner.trim()) || ''
+      return {
+        id: genId('KD'),
+        name,
+        kundennummer: r.kundennummer,
+        ansprechpartner: r.ansprechpartner,
+        email: r.email,
+        telefon: r.telefon,
+        mobil: r.mobil,
+        strasse: r.strasse,
+        plz: r.plz,
+        ort: r.ort,
+        land: r.land,
+        website: r.website,
+        ust_id: r.ust_id,
+        adresse: r.adresse,
+        notizen: r.notizen,
+      }
+    }).filter(r => r.name.trim().length > 0)
+    if (!prepared.length) return 0
+    const result = await bulkImportBueroKunden(prepared)
+    return result.length
   }
   if (dataType === 'lieferanten') {
     const prepared = rows.map(r => ({ id: genId('LFR'), name: r.name ?? '', email: r.email, telefon: r.telefon, ort: r.ort, kategorie: r.kategorie, zahlungsziel: r.zahlungsziel, notiz: r.notiz }))
