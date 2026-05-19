@@ -122,6 +122,7 @@ export default function OnboardingWizard({ form, onFieldChange, onLogoChange, on
             </div>
             <label style={inputStyle}>
               <span style={labelStyle}>Firmenname *</span>
+              {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
               <input className="pk-input" value={form.firmenname} onChange={e => onFieldChange('firmenname', e.target.value)} placeholder="z.B. Muster GmbH" autoFocus />
             </label>
             <label style={inputStyle}>

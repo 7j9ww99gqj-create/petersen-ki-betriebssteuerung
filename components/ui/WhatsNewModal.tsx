@@ -48,17 +48,23 @@ export default function WhatsNewModal() {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Was ist neu in Petersen KI"
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
       }}
       onClick={close}
+      onKeyDown={e => { if (e.key === 'Escape') close() }}
     >
       <div
         className="pk-card fade-in"
         style={{ width: '100%', maxWidth: 520, maxHeight: '85vh', overflowY: 'auto' }}
         onClick={e => e.stopPropagation()}
+        onKeyDown={e => e.stopPropagation()}
+        role="document"
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
           <div>
