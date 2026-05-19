@@ -13,6 +13,7 @@ import { createSupabaseClient } from '@/lib/supabase'
 import { normalizeDocumentStoragePath, type StoredDocumentLink } from '@/lib/documents'
 import { genId } from '@/lib/ids'
 import DocumentPreviewModal from '@/components/DocumentPreviewModal'
+import { useGlobalToast } from '@/components/ui/ToastProvider'
 
 // ─── Demo-Daten ───────────────────────────────────────────────────────────────
 
@@ -248,7 +249,7 @@ export default function KiErkennungPage() {
   const [chatLoading, setChatLoading] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ msgIdx: number; actionIdx: number } | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [actionToast, setActionToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+  const toast = useGlobalToast()
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   // Tagesbrief beim ersten Laden generieren
@@ -461,8 +462,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     }
 
     const showToast = (msg: string, type: 'success' | 'error') => {
-      setActionToast({ msg, type })
-      setTimeout(() => setActionToast(null), 4500)
+      if (type === 'error') toast.error(msg); else toast.success(msg)
     }
 
     const updated: DocumentAiResult = {
@@ -516,8 +516,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
   async function handoverDocument(target: HandoverTarget) {
     if (!docResult) return
     const showToast = (msg: string, type: 'success' | 'error') => {
-      setActionToast({ msg, type })
-      setTimeout(() => setActionToast(null), 4500)
+      if (type === 'error') toast.error(msg); else toast.success(msg)
     }
     if (handoverConfirm !== target) {
       setHandoverConfirm(target)
@@ -609,8 +608,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     const key = `${msgIdx}-${actionIdx}`
     setActionLoading(key)
     const showToast = (msg: string, type: 'success' | 'error') => {
-      setActionToast({ msg, type })
-      setTimeout(() => setActionToast(null), 4500)
+      if (type === 'error') toast.error(msg); else toast.success(msg)
     }
 
     try {
@@ -653,8 +651,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     const key = `${msgIdx}-${actionIdx}`
     setActionLoading(key)
     const showToast = (msg: string, type: 'success' | 'error') => {
-      setActionToast({ msg, type })
-      setTimeout(() => setActionToast(null), 4500)
+      if (type === 'error') toast.error(msg); else toast.success(msg)
     }
     try {
       if (hasDemoCookie()) {
@@ -1412,19 +1409,6 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
         </div>
       )}
 
-      {/* Aktions-Toast */}
-      {actionToast && (
-        <div style={{
-          position: 'fixed', bottom: 90, right: 24, zIndex: 9999,
-          padding: '14px 20px', borderRadius: 12, maxWidth: 380,
-          background: actionToast.type === 'error' ? 'rgba(255,80,80,.15)' : 'rgba(37,211,102,.12)',
-          border: `1px solid ${actionToast.type === 'error' ? 'rgba(255,80,80,.4)' : 'rgba(37,211,102,.35)'}`,
-          color: actionToast.type === 'error' ? '#ff8080' : '#4ddb7e',
-          fontSize: 14, fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,.4)',
-        }}>
-          {actionToast.msg}
-        </div>
-      )}
     </div>
   )
 }
