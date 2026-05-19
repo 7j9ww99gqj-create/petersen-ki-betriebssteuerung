@@ -8,7 +8,7 @@ import { getBueroKunden, getBueroAngebote, getBueroAuftraege, getBueroRechnungen
 import { useRole } from '@/lib/roles'
 import { TabBar } from '@/components/buero/shared'
 import type { Kunde, Angebot, Auftrag, Rechnung, Tab } from '@/types/buero'
-import { demoKunden, demoAngebote, demoAuftraege, demoRechnungen, parseBetrag } from '@/types/buero'
+import { demoKunden, demoAngebote, demoAuftraege, demoRechnungen, parseBetrag, demoBueroZeiterfassung, demoBueroArtikel, demoAnsprechpartner, demoLieferanten } from '@/types/buero'
 import KundenTab from '@/components/buero/KundenTab'
 import AngeboteTab from '@/components/buero/AngeboteTab'
 import AuftraegeTab from '@/components/buero/AuftraegeTab'
@@ -19,6 +19,9 @@ import EinkaufTab from '@/components/buero/EinkaufTab'
 import AlertsTab from '@/components/buero/AlertsTab'
 import PipelineKanbanTab from '@/components/buero/PipelineKanbanTab'
 import KiToolsTab from '@/components/buero/KiToolsTab'
+import ZeiterfassungTab from '@/components/buero/ZeiterfassungTab'
+import LieferantenTab from '@/components/buero/LieferantenTab'
+import ArtikelTab from '@/components/buero/ArtikelTab'
 
 // ── Haupt-Seite ─────────────────────────────────────────────────────────────
 
@@ -37,7 +40,7 @@ export default function BueroPilotPage() {
     params.set('tab', newTab)
     router.replace(`?${params.toString()}`, { scroll: false })
   }
-  const BUERO_TABS: Tab[] = ['kunden', 'angebote', 'auftraege', 'rechnungen', 'eingangsrechnungen', 'dokumente', 'einkauf', 'ki-tools']
+  const BUERO_TABS: Tab[] = ['kunden', 'angebote', 'auftraege', 'rechnungen', 'eingangsrechnungen', 'dokumente', 'einkauf', 'ki-tools', 'zeiterfassung', 'lieferanten', 'artikel']
   useSwipeTabs(BUERO_TABS, tab, (t) => setTab(t as Tab))
   const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
   const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
@@ -157,20 +160,15 @@ export default function BueroPilotPage() {
       {/* Stats */}
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 22 }}>
         {[
-          { label: 'Kunden gesamt', value: String(kunden.filter(k => k.status === 'Aktiv').length), icon: '👥', color: '#20c8ff' },
-          { label: 'Offene Angebote', value: String(offeneAngebote), icon: '📋', color: '#1684ff' },
-          { label: 'Laufende Aufträge', value: String(laufendeAuftraege), icon: '✅', color: '#25d366' },
-          { label: 'Offene Rechnungen', value: String(offeneRechnungen), icon: '💶', color: '#f59e0b' },
+          { label: 'Kunden', value: String(kunden.length), icon: '👥', color: '#20c8ff', targetTab: 'kunden' as Tab },
+          { label: 'Angebote', value: String(angebote.length || offeneAngebote), icon: '📋', color: '#1684ff', targetTab: 'angebote' as Tab },
+          { label: 'Aufträge', value: String(auftraege.length || laufendeAuftraege), icon: '✅', color: '#25d366', targetTab: 'auftraege' as Tab },
+          { label: 'Rechnungen', value: String(sharedRechnungen.length || offeneRechnungen), icon: '💶', color: '#f59e0b', targetTab: 'rechnungen' as Tab },
         ].map(s => (
           <button
             key={s.label}
             className="pk-card"
-            onClick={() => {
-              if (s.label === 'Kunden gesamt') router.push('/dashboard/buero?tab=kunden')
-              if (s.label === 'Offene Angebote') router.push('/dashboard/buero?tab=angebote&filter=Versendet')
-              if (s.label === 'Laufende Aufträge') router.push('/dashboard/buero?tab=auftraege')
-              if (s.label === 'Offene Rechnungen') router.push('/dashboard/buero?tab=rechnungen&filter=Offen')
-            }}
+            onClick={() => setTab(s.targetTab)}
             style={{ textAlign: 'center', padding: '16px 12px', cursor: 'pointer', color: 'inherit' }}
           >
             <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
@@ -181,11 +179,13 @@ export default function BueroPilotPage() {
       </div>
 
       {/* Finanzkennzahlen */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 18 }}>
         {[
           { label: 'Umsatz MTD', value: fmtEuro(umsatzMTD), icon: '📅', color: '#20c8ff', tab: 'rechnungen' as Tab },
           { label: 'Umsatz YTD', value: fmtEuro(umsatzYTD), icon: '📆', color: '#25d366', tab: 'rechnungen' as Tab },
-          { label: 'Überfällig / Mahnung', value: String(ueberfaelligCount), icon: '⚠️', color: ueberfaelligCount > 0 ? '#f59e0b' : '#aeb9c8', tab: 'alerts' as Tab },
+          { label: 'Zeiterfassung', value: '⏱', icon: '🕐', color: '#a78bfa', tab: 'zeiterfassung' as Tab },
+          { label: 'Lieferanten', value: '🏭', icon: '🏭', color: '#20c8ff', tab: 'lieferanten' as Tab },
+          { label: 'Artikel', value: '📦', icon: '📦', color: '#f59e0b', tab: 'artikel' as Tab },
         ].map(s => (
           <button key={s.label} className="pk-card" onClick={() => setTab(s.tab)}
             style={{ textAlign: 'center', padding: '12px 10px', cursor: 'pointer', color: 'inherit' }}>
@@ -208,6 +208,9 @@ export default function BueroPilotPage() {
       {tab === 'alerts' && <AlertsTab kunden={kunden} rechnungen={sharedRechnungen} auftraege={auftraege} />}
       {tab === 'pipeline' && <PipelineKanbanTab angebote={angebote} auftraege={auftraege} rechnungen={sharedRechnungen} setTab={setTab} />}
       {tab === 'ki-tools' && <KiToolsTab isDemo={isDemo} rechnungen={sharedRechnungen} />}
+      {tab === 'zeiterfassung' && <ZeiterfassungTab isDemo={isDemo} kunden={kunden} />}
+      {tab === 'lieferanten' && <LieferantenTab isDemo={isDemo} />}
+      {tab === 'artikel' && <ArtikelTab isDemo={isDemo} />}
     </div>
   )
 }

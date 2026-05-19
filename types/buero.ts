@@ -6,6 +6,45 @@ import { normalizeDocumentStoragePath, type StoredDocumentLink } from '@/lib/doc
 export type Kunde = {
   id: string; name: string; typ: 'Firma' | 'Privat'; ansprechpartner: string
   email: string; telefon: string; ort: string; umsatz: string; status: 'Aktiv' | 'Inaktiv'
+  website?: string
+  strasse?: string
+  plz?: string
+  lieferadresse?: string
+  rechnungsadresse?: string
+}
+
+export type KundeAnsprechpartner = {
+  id: string
+  kunde_id: string
+  name: string
+  email: string
+  telefon: string
+  position?: string
+}
+
+export type BueroZeiterfassung = {
+  id: string
+  kunde_id?: string
+  kunde?: string
+  datum: string
+  von: string
+  bis: string
+  stundensatz: number
+  beschreibung?: string
+  erstellt_am?: string
+}
+
+export type BueroArtikel = {
+  id: string
+  artikelnummer?: string
+  name: string
+  kategorie?: string
+  einheit: string
+  einkaufspreis?: number
+  verkaufspreis?: number
+  mwst?: number
+  beschreibung?: string
+  aktiv: boolean
 }
 
 export type Angebot = {
@@ -67,7 +106,7 @@ export type Eingangsrechnung = {
 export type DocumentRelationField = 'eingangsrechnung_id' | 'rechnung_id' | 'angebot_id' | 'auftrag_id'
 export const documentRelationFields: DocumentRelationField[] = ['eingangsrechnung_id', 'rechnung_id', 'angebot_id', 'auftrag_id']
 
-export type Tab = 'kunden' | 'angebote' | 'auftraege' | 'rechnungen' | 'eingangsrechnungen' | 'dokumente' | 'einkauf' | 'alerts' | 'pipeline' | 'ki-tools'
+export type Tab = 'kunden' | 'angebote' | 'auftraege' | 'rechnungen' | 'eingangsrechnungen' | 'dokumente' | 'einkauf' | 'alerts' | 'pipeline' | 'ki-tools' | 'zeiterfassung' | 'lieferanten' | 'artikel'
 
 // Einkauf/Lieferanten-Typen
 export type Lieferant = {
@@ -89,12 +128,32 @@ export type EinkaufSubTab = 'lieferanten' | 'bestellungen' | 'wareneingaenge'
 // ── Demo-Daten ──────────────────────────────────────────────────────────────
 
 export const demoKunden: Kunde[] = [
-  { id: 'K-001', name: 'Müller Bau GmbH', typ: 'Firma', ansprechpartner: 'Thomas Müller', email: 't.mueller@muellerbu.de', telefon: '040 12345-0', ort: 'Hamburg', umsatz: '84.200 €', status: 'Aktiv' },
-  { id: 'K-002', name: 'Schmidt & Partner', typ: 'Firma', ansprechpartner: 'Anna Schmidt', email: 'a.schmidt@sp-kg.de', telefon: '030 98765-10', ort: 'Berlin', umsatz: '31.500 €', status: 'Aktiv' },
-  { id: 'K-003', name: 'Technik Nord AG', typ: 'Firma', ansprechpartner: 'Lars Brandt', email: 'l.brandt@techniknord.de', telefon: '0511 44400', ort: 'Hannover', umsatz: '127.800 €', status: 'Aktiv' },
+  { id: 'K-001', name: 'Müller Bau GmbH', typ: 'Firma', ansprechpartner: 'Thomas Müller', email: 't.mueller@muellerbu.de', telefon: '040 12345-0', ort: 'Hamburg', umsatz: '84.200 €', status: 'Aktiv', website: 'https://www.muellerbu.de', strasse: 'Hafenstr. 12', plz: '20459', lieferadresse: 'Hafenstr. 12, 20459 Hamburg', rechnungsadresse: 'Hafenstr. 12, 20459 Hamburg' },
+  { id: 'K-002', name: 'Schmidt & Partner', typ: 'Firma', ansprechpartner: 'Anna Schmidt', email: 'a.schmidt@sp-kg.de', telefon: '030 98765-10', ort: 'Berlin', umsatz: '31.500 €', status: 'Aktiv', website: 'https://www.sp-kg.de', strasse: 'Unter den Linden 5', plz: '10117' },
+  { id: 'K-003', name: 'Technik Nord AG', typ: 'Firma', ansprechpartner: 'Lars Brandt', email: 'l.brandt@techniknord.de', telefon: '0511 44400', ort: 'Hannover', umsatz: '127.800 €', status: 'Aktiv', strasse: 'Industrieweg 88', plz: '30175' },
   { id: 'K-004', name: 'Hans Werner', typ: 'Privat', ansprechpartner: 'Hans Werner', email: 'h.werner@web.de', telefon: '0172 5551234', ort: 'Bremen', umsatz: '4.600 €', status: 'Aktiv' },
-  { id: 'K-005', name: 'Delta Logistik KG', typ: 'Firma', ansprechpartner: 'Sandra Koch', email: 's.koch@delta-log.de', telefon: '0211 3330', ort: 'Düsseldorf', umsatz: '56.100 €', status: 'Aktiv' },
-  { id: 'K-006', name: 'Ritter Elektro GmbH', typ: 'Firma', ansprechpartner: 'Jens Ritter', email: 'j.ritter@ritter-e.de', telefon: '089 10203', ort: 'München', umsatz: '19.200 €', status: 'Inaktiv' },
+  { id: 'K-005', name: 'Delta Logistik KG', typ: 'Firma', ansprechpartner: 'Sandra Koch', email: 's.koch@delta-log.de', telefon: '0211 3330', ort: 'Düsseldorf', umsatz: '56.100 €', status: 'Aktiv', website: 'https://www.delta-log.de', strasse: 'Logistikpark 1', plz: '40221' },
+  { id: 'K-006', name: 'Ritter Elektro GmbH', typ: 'Firma', ansprechpartner: 'Jens Ritter', email: 'j.ritter@ritter-e.de', telefon: '089 10203', ort: 'München', umsatz: '19.200 €', status: 'Inaktiv', strasse: 'Elektrostr. 7', plz: '80331' },
+]
+
+export const demoAnsprechpartner: KundeAnsprechpartner[] = [
+  { id: 'AP-001', kunde_id: 'K-001', name: 'Thomas Müller', email: 't.mueller@muellerbu.de', telefon: '040 12345-0', position: 'Geschäftsführer' },
+  { id: 'AP-002', kunde_id: 'K-001', name: 'Petra Müller', email: 'p.mueller@muellerbu.de', telefon: '040 12345-20', position: 'Buchhaltung' },
+  { id: 'AP-003', kunde_id: 'K-003', name: 'Lars Brandt', email: 'l.brandt@techniknord.de', telefon: '0511 44400', position: 'Einkauf' },
+]
+
+export const demoBueroZeiterfassung: BueroZeiterfassung[] = [
+  { id: 'ZE-001', kunde_id: 'K-001', kunde: 'Müller Bau GmbH', datum: '19.05.2026', von: '08:00', bis: '12:00', stundensatz: 95, beschreibung: 'Projektbesprechung Hallenerweiterung' },
+  { id: 'ZE-002', kunde_id: 'K-003', kunde: 'Technik Nord AG', datum: '18.05.2026', von: '09:00', bis: '17:00', stundensatz: 110, beschreibung: 'Wartungsarbeiten Q2' },
+  { id: 'ZE-003', kunde_id: 'K-005', kunde: 'Delta Logistik KG', datum: '17.05.2026', von: '13:00', bis: '16:00', stundensatz: 85, beschreibung: 'Instandhaltung Förderanlage' },
+]
+
+export const demoBueroArtikel: BueroArtikel[] = [
+  { id: 'ART-001', artikelnummer: '10001', name: 'Stahlträger HEA 200', kategorie: 'Stahl', einheit: 'Stk', einkaufspreis: 85, verkaufspreis: 145, mwst: 19, beschreibung: 'Warmgewalzter I-Träger', aktiv: true },
+  { id: 'ART-002', artikelnummer: '10002', name: 'Schweißdraht 1,0mm', kategorie: 'Verbrauchsmaterial', einheit: 'Rolle', einkaufspreis: 18, verkaufspreis: 32, mwst: 19, aktiv: true },
+  { id: 'ART-003', artikelnummer: '20001', name: 'Wartungsstunde', kategorie: 'Dienstleistung', einheit: 'Std', verkaufspreis: 95, mwst: 19, beschreibung: 'Mechanische Wartung', aktiv: true },
+  { id: 'ART-004', artikelnummer: '20002', name: 'Anfahrtspauschale', kategorie: 'Dienstleistung', einheit: 'pauschal', verkaufspreis: 45, mwst: 19, aktiv: true },
+  { id: 'ART-005', artikelnummer: '10003', name: 'Schrauben M8x30 (100 Stk)', kategorie: 'Kleinteile', einheit: 'Pkg', einkaufspreis: 4.5, verkaufspreis: 9.9, mwst: 19, aktiv: true },
 ]
 
 export const demoAngebote: Angebot[] = [

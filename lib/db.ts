@@ -1323,6 +1323,7 @@ export async function upsertBueroKunde(k: {
   id: string; name: string; typ?: string; ansprechpartner?: string
   email?: string; telefon?: string; ort?: string; umsatz?: string; status?: string
   auth_user_id?: string; source?: string; billing_subscription_id?: string; software_enabled?: boolean
+  website?: string; strasse?: string; plz?: string; lieferadresse?: string; rechnungsadresse?: string
 }) {
   const { data, error } = await db()
     .from('buero_kunden')

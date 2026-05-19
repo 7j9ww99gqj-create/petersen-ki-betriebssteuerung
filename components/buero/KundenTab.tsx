@@ -4,8 +4,8 @@ import { getBueroKunden, upsertBueroKunde, deleteBueroKunde, anonymisiereBueroKu
 import { useRole, PERMISSIONS } from '@/lib/roles'
 import { genId } from '@/lib/ids'
 import { Toast, Modal, StatusBadgeAngebot, StatusBadgeAuftrag, StatusBadgeRechnung, labelStyle } from './shared'
-import type { Kunde, Angebot, Auftrag, Rechnung } from '@/types/buero'
-import { demoKunden, parseBetrag } from '@/types/buero'
+import type { Kunde, Angebot, Auftrag, Rechnung, KundeAnsprechpartner } from '@/types/buero'
+import { demoKunden, demoAnsprechpartner, parseBetrag } from '@/types/buero'
 
 function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolean; auftraege: Auftrag[]; rechnungen: Rechnung[]; angebote: Angebot[] }) {
   const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
@@ -17,13 +17,18 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
   const [loading, setLoading] = useState(!isDemo)
   const [loadError, setLoadError] = useState('')
   const [retryKey, setRetryKey] = useState(0)
-  const [form, setForm] = useState({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '' })
-  const [cockpitTab, setCockpitTab] = useState<'angebote' | 'auftraege' | 'rechnungen'>('auftraege')
+  const [form, setForm] = useState({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '', website: '', strasse: '', plz: '', lieferadresse: '', rechnungsadresse: '' })
+  const [cockpitTab, setCockpitTab] = useState<'angebote' | 'auftraege' | 'rechnungen' | 'ansprechpartner'>('auftraege')
   const [anonConfirm, setAnonConfirm] = useState<string | null>(null)
   const [duplikatWarnung, setDuplikatWarnung] = useState<string | null>(null)
   const [editKunde, setEditKunde] = useState<Kunde | null>(null)
-  const [editKundeForm, setEditKundeForm] = useState({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '', status: 'Aktiv' as Kunde['status'] })
+  const [editKundeForm, setEditKundeForm] = useState({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '', status: 'Aktiv' as Kunde['status'], website: '', strasse: '', plz: '', lieferadresse: '', rechnungsadresse: '' })
   const [deleteKundeConfirm, setDeleteKundeConfirm] = useState<string | null>(null)
+  const [ansprechpartner, setAnsprechpartner] = useState<KundeAnsprechpartner[]>(isDemo ? demoAnsprechpartner : [])
+  const [apForm, setApForm] = useState({ name: '', email: '', telefon: '', position: '' })
+  const [showApForm, setShowApForm] = useState(false)
+  const [editAp, setEditAp] = useState<KundeAnsprechpartner | null>(null)
+  const [deleteApConfirm, setDeleteApConfirm] = useState<string | null>(null)
   const { role } = useRole()
 
   useEffect(() => {
@@ -64,12 +69,17 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
       ansprechpartner: form.ansprechpartner || form.name,
       email: form.email, telefon: form.telefon, ort: form.ort,
       umsatz: '0 €', status: 'Aktiv',
+      website: form.website || undefined,
+      strasse: form.strasse || undefined,
+      plz: form.plz || undefined,
+      lieferadresse: form.lieferadresse || undefined,
+      rechnungsadresse: form.rechnungsadresse || undefined,
     }
     if (!isDemo) {
       try { await upsertBueroKunde(newKunde) } catch { showToast('Fehler beim Speichern', true); return }
     }
     setKunden(prev => [newKunde, ...prev])
-    setForm({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '' })
+    setForm({ name: '', typ: 'Firma', ansprechpartner: '', email: '', telefon: '', ort: '', website: '', strasse: '', plz: '', lieferadresse: '', rechnungsadresse: '' })
     setDuplikatWarnung(null)
     setShowForm(false)
     showToast(`✅ Kunde "${newKunde.name}" wurde erfolgreich angelegt (${newKunde.id})`)
@@ -77,12 +87,19 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
 
   const openEditKunde = (k: Kunde) => {
     setEditKunde(k)
-    setEditKundeForm({ name: k.name, typ: k.typ, ansprechpartner: k.ansprechpartner, email: k.email, telefon: k.telefon, ort: k.ort, status: k.status })
+    setEditKundeForm({ name: k.name, typ: k.typ, ansprechpartner: k.ansprechpartner, email: k.email, telefon: k.telefon, ort: k.ort, status: k.status, website: k.website ?? '', strasse: k.strasse ?? '', plz: k.plz ?? '', lieferadresse: k.lieferadresse ?? '', rechnungsadresse: k.rechnungsadresse ?? '' })
   }
 
   const handleEditKundeSave = async () => {
     if (!editKunde || !editKundeForm.name || !editKundeForm.email) return
-    const updated: Kunde = { ...editKunde, ...editKundeForm, typ: editKundeForm.typ as Kunde['typ'] }
+    const updated: Kunde = {
+      ...editKunde, ...editKundeForm, typ: editKundeForm.typ as Kunde['typ'],
+      website: editKundeForm.website || undefined,
+      strasse: editKundeForm.strasse || undefined,
+      plz: editKundeForm.plz || undefined,
+      lieferadresse: editKundeForm.lieferadresse || undefined,
+      rechnungsadresse: editKundeForm.rechnungsadresse || undefined,
+    }
     if (!isDemo) {
       try { await upsertBueroKunde(updated) } catch { showToast('Fehler beim Speichern', true); return }
     }
@@ -90,6 +107,21 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
     if (selected?.id === updated.id) setSelected(updated)
     setEditKunde(null)
     showToast(`✅ Kunde "${updated.name}" wurde aktualisiert`)
+  }
+
+  const handleSaveAnsprechpartner = () => {
+    if (!selected || !apForm.name) return
+    if (editAp) {
+      const updated: KundeAnsprechpartner = { ...editAp, ...apForm }
+      setAnsprechpartner(prev => prev.map(a => a.id === editAp.id ? updated : a))
+      setEditAp(null); setShowApForm(false)
+      showToast('✅ Ansprechpartner aktualisiert')
+    } else {
+      const neu: KundeAnsprechpartner = { id: genId('AP'), kunde_id: selected.id, ...apForm }
+      setAnsprechpartner(prev => [...prev, neu])
+      setApForm({ name: '', email: '', telefon: '', position: '' }); setShowApForm(false)
+      showToast('✅ Ansprechpartner angelegt')
+    }
   }
 
   const handleDeleteKunde = async (id: string) => {
@@ -167,8 +199,28 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
               <input className="pk-input" value={editKundeForm.telefon} onChange={e => setEditKundeForm(p => ({ ...p, telefon: e.target.value }))} />
             </div>
             <div>
+              <label style={labelStyle}>Webseite</label>
+              <input className="pk-input" placeholder="https://…" value={editKundeForm.website} onChange={e => setEditKundeForm(p => ({ ...p, website: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Straße + Hausnr.</label>
+              <input className="pk-input" value={editKundeForm.strasse} onChange={e => setEditKundeForm(p => ({ ...p, strasse: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>PLZ</label>
+              <input className="pk-input" value={editKundeForm.plz} onChange={e => setEditKundeForm(p => ({ ...p, plz: e.target.value }))} />
+            </div>
+            <div>
               <label style={labelStyle}>Ort</label>
               <input className="pk-input" value={editKundeForm.ort} onChange={e => setEditKundeForm(p => ({ ...p, ort: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={labelStyle}>Lieferadresse (vollständig)</label>
+              <input className="pk-input" placeholder="Str. 1, 12345 Stadt" value={editKundeForm.lieferadresse} onChange={e => setEditKundeForm(p => ({ ...p, lieferadresse: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={labelStyle}>Rechnungsadresse (vollständig)</label>
+              <input className="pk-input" placeholder="Str. 1, 12345 Stadt" value={editKundeForm.rechnungsadresse} onChange={e => setEditKundeForm(p => ({ ...p, rechnungsadresse: e.target.value }))} />
             </div>
             <div>
               <label style={labelStyle}>Status</label>
@@ -193,6 +245,7 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
     const kundAngebote = angebote.filter(matchKunde)
     const kundAuftraege = auftraege.filter(matchKunde)
     const kundRechnungen = rechnungen.filter(matchKunde)
+    const kundAnsprechpartner = ansprechpartner.filter(a => a.kunde_id === selected.id)
     const umsatzBezahlt = kundRechnungen
       .filter(r => r.status === 'Bezahlt')
       .reduce((s, r) => s + parseBetrag(r.betrag), 0)
@@ -207,14 +260,21 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
 
         {/* Cockpit Header */}
         <div className="pk-card" style={{ marginBottom: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(32,200,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+          {/* Name + Kunden-Nr + Anschrift */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
+            <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(32,200,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
               {selected.typ === 'Firma' ? '🏢' : '👤'}
             </div>
-            <div style={{ flex: 1, minWidth: 160 }}>
-              <div style={{ fontWeight: 900, fontSize: 18 }}>{selected.name}</div>
-              <div style={{ color: '#aeb9c8', fontSize: 13 }}>{selected.id} · {selected.typ} · {selected.ort}</div>
-              <div style={{ color: '#aeb9c8', fontSize: 12, marginTop: 2 }}>{selected.ansprechpartner} · {selected.email} · {selected.telefon}</div>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ fontWeight: 900, fontSize: 20, letterSpacing: '-.02em' }}>{selected.name}</div>
+              <div style={{ color: '#aeb9c8', fontSize: 13, marginTop: 2 }}>
+                Kunden-Nr.: <strong style={{ color: '#f8fbff' }}>{selected.id}</strong> · {selected.typ}
+              </div>
+              {(selected.strasse || selected.ort) && (
+                <div style={{ color: '#aeb9c8', fontSize: 13, marginTop: 2 }}>
+                  📍 {[selected.strasse, selected.plz && selected.ort ? `${selected.plz} ${selected.ort}` : selected.ort].filter(Boolean).join(', ')}
+                </div>
+              )}
             </div>
             <span className={`badge ${selected.status === 'Aktiv' ? 'badge-green' : 'badge-gray'}`}>{selected.status}</span>
             {PERMISSIONS.canEdit(role) && (
@@ -243,6 +303,43 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
               )
             )}
           </div>
+
+          {/* Kommunikation Icons */}
+          <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+            <a href={`tel:${selected.telefon}`}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 10, background: 'rgba(37,211,102,.1)', border: '1px solid rgba(37,211,102,.25)', color: '#4ddb7e', textDecoration: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+              📞 Anrufen
+            </a>
+            {selected.website && (
+              <a href={selected.website} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 10, background: 'rgba(22,132,255,.1)', border: '1px solid rgba(22,132,255,.25)', color: '#1684ff', textDecoration: 'none', fontSize: 14, fontWeight: 700 }}>
+                🌐 Webseite
+              </a>
+            )}
+            <a href={`mailto:${selected.email}`}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 10, background: 'rgba(32,200,255,.1)', border: '1px solid rgba(32,200,255,.25)', color: '#20c8ff', textDecoration: 'none', fontSize: 14, fontWeight: 700 }}>
+              ✉️ E-Mail
+            </a>
+          </div>
+
+          {/* Adressen */}
+          {(selected.lieferadresse || selected.rechnungsadresse) && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 16 }}>
+              {selected.lieferadresse && (
+                <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>📦 Lieferadresse</div>
+                  <div style={{ fontSize: 14 }}>{selected.lieferadresse}</div>
+                </div>
+              )}
+              {selected.rechnungsadresse && (
+                <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>💶 Rechnungsadresse</div>
+                  <div style={{ fontSize: 14 }}>{selected.rechnungsadresse}</div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* KPI-Zeile */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginTop: 16 }}>
             {[
@@ -261,7 +358,7 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
 
         {/* Cockpit Tabs */}
         <div className="pk-tab-bar" style={{ marginBottom: 14 }}>
-          {([['auftraege', `Aufträge (${kundAuftraege.length})`], ['angebote', `Angebote (${kundAngebote.length})`], ['rechnungen', `Rechnungen (${kundRechnungen.length})`]] as const).map(([t, label]) => (
+          {([['auftraege', `Aufträge (${kundAuftraege.length})`], ['angebote', `Angebote (${kundAngebote.length})`], ['rechnungen', `Rechnungen (${kundRechnungen.length})`], ['ansprechpartner', `Ansprechpartner (${kundAnsprechpartner.length})`]] as const).map(([t, label]) => (
             <button key={t} onClick={() => setCockpitTab(t)}
               className={cockpitTab === t ? 'pk-btn' : 'pk-btn-ghost'}
               style={{ fontSize: 13, padding: '8px 14px' }}>
@@ -270,7 +367,7 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
           ))}
         </div>
 
-        <div className="pk-card" style={{ padding: 0 }}>
+        <div className="pk-card" style={{ padding: cockpitTab === 'ansprechpartner' ? 20 : 0 }}>
           {cockpitTab === 'angebote' && (
             <table className="pk-table">
               <thead><tr><th>Nr.</th><th>Titel</th><th>Betrag</th><th>Datum</th><th>Status</th></tr></thead>
@@ -325,6 +422,87 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
               </tbody>
             </table>
           )}
+          {cockpitTab === 'ansprechpartner' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>👥 Ansprechpartner für {selected.name}</h4>
+                <button className="pk-btn" style={{ fontSize: 12 }}
+                  onClick={() => { setEditAp(null); setApForm({ name: '', email: '', telefon: '', position: '' }); setShowApForm(f => !f) }}>
+                  {showApForm && !editAp ? '✕ Abbrechen' : '+ Ansprechpartner'}
+                </button>
+              </div>
+              {showApForm && (
+                <div className="pk-card fade-in" style={{ marginBottom: 16, border: '1px solid rgba(32,200,255,.2)', padding: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+                    <div>
+                      <label style={labelStyle}>Name *</label>
+                      <input className="pk-input" placeholder="Vor- und Nachname" value={apForm.name} onChange={e => setApForm(p => ({ ...p, name: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Position / Abteilung</label>
+                      <input className="pk-input" placeholder="z.B. Einkauf" value={apForm.position} onChange={e => setApForm(p => ({ ...p, position: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>E-Mail</label>
+                      <input className="pk-input" type="email" value={apForm.email} onChange={e => setApForm(p => ({ ...p, email: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Telefon</label>
+                      <input className="pk-input" value={apForm.telefon} onChange={e => setApForm(p => ({ ...p, telefon: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                    <button className="pk-btn" onClick={handleSaveAnsprechpartner} style={{ fontSize: 13 }}>Speichern</button>
+                    <button className="pk-btn-ghost" onClick={() => { setShowApForm(false); setEditAp(null) }} style={{ fontSize: 13 }}>Abbrechen</button>
+                  </div>
+                </div>
+              )}
+              {kundAnsprechpartner.length === 0 && !showApForm ? (
+                <div style={{ textAlign: 'center', padding: '24px 0', color: '#aeb9c8', fontSize: 13 }}>
+                  Noch keine weiteren Ansprechpartner angelegt.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {kundAnsprechpartner.map(ap => (
+                    <div key={ap.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.06)', flexWrap: 'wrap' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(32,200,255,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>👤</div>
+                      <div style={{ flex: 1, minWidth: 140 }}>
+                        <div style={{ fontWeight: 700 }}>{ap.name}</div>
+                        {ap.position && <div style={{ fontSize: 12, color: '#aeb9c8' }}>{ap.position}</div>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {ap.telefon && (
+                          <a href={`tel:${ap.telefon}`} style={{ fontSize: 12, color: '#4ddb7e', textDecoration: 'none', padding: '4px 10px', borderRadius: 6, background: 'rgba(37,211,102,.1)', border: '1px solid rgba(37,211,102,.2)' }}>
+                            📞 {ap.telefon}
+                          </a>
+                        )}
+                        {ap.email && (
+                          <a href={`mailto:${ap.email}`} style={{ fontSize: 12, color: '#20c8ff', textDecoration: 'none', padding: '4px 10px', borderRadius: 6, background: 'rgba(32,200,255,.1)', border: '1px solid rgba(32,200,255,.2)' }}>
+                            ✉️ {ap.email}
+                          </a>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button onClick={() => { setEditAp(ap); setApForm({ name: ap.name, email: ap.email, telefon: ap.telefon, position: ap.position ?? '' }); setShowApForm(true) }}
+                          style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(32,200,255,.3)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>✏️</button>
+                        {deleteApConfirm === ap.id ? (
+                          <>
+                            <button onClick={() => { setAnsprechpartner(prev => prev.filter(a => a.id !== ap.id)); setDeleteApConfirm(null); showToast('🗑️ Ansprechpartner gelöscht') }}
+                              style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.12)', color: '#ff8080', cursor: 'pointer', fontWeight: 700 }}>Ja</button>
+                            <button onClick={() => setDeleteApConfirm(null)}
+                              style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+                          </>
+                        ) : (
+                          <button onClick={() => setDeleteApConfirm(ap.id)}
+                            style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,80,80,.2)', background: 'rgba(255,80,80,.05)', color: '#ff8080', cursor: 'pointer' }}>🗑️</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -371,8 +549,28 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
               <input className="pk-input" placeholder="040 123456" value={form.telefon} onChange={e => setForm(p => ({ ...p, telefon: e.target.value }))} />
             </div>
             <div>
+              <label style={labelStyle}>Webseite</label>
+              <input className="pk-input" placeholder="https://…" value={form.website} onChange={e => setForm(p => ({ ...p, website: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Straße + Hausnr.</label>
+              <input className="pk-input" placeholder="Musterstr. 1" value={form.strasse} onChange={e => setForm(p => ({ ...p, strasse: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>PLZ</label>
+              <input className="pk-input" placeholder="12345" value={form.plz} onChange={e => setForm(p => ({ ...p, plz: e.target.value }))} />
+            </div>
+            <div>
               <label style={labelStyle}>Ort</label>
               <input className="pk-input" placeholder="Stadt" value={form.ort} onChange={e => setForm(p => ({ ...p, ort: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={labelStyle}>Lieferadresse (vollständig)</label>
+              <input className="pk-input" placeholder="Str. 1, 12345 Stadt" value={form.lieferadresse} onChange={e => setForm(p => ({ ...p, lieferadresse: e.target.value }))} />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={labelStyle}>Rechnungsadresse (vollständig)</label>
+              <input className="pk-input" placeholder="Str. 1, 12345 Stadt (leer = wie Lieferadresse)" value={form.rechnungsadresse} onChange={e => setForm(p => ({ ...p, rechnungsadresse: e.target.value }))} />
             </div>
           </div>
           <div style={{ marginTop: 16 }}>
