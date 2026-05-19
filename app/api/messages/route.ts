@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import {
   getUserMessages,
   insertUserMessage,
@@ -8,6 +10,14 @@ import {
   insertBroadcastMessage,
   getOwnerSentMessages,
 } from '@/lib/db'
+
+const Schema = z.object({
+  action: z.enum(['send', 'broadcast', 'mark_read']).optional(),
+  subject: z.string().trim().max(300).optional(),
+  body: z.string().trim().max(8000).optional(),
+  recipient_user_id: z.string().trim().max(100).optional().nullable(),
+  messageId: z.string().trim().max(100).optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,7 +62,9 @@ export async function POST(request: NextRequest) {
     const access = await getRouteAccess(request)
     if (access.error) return access.error
 
-    const body = await request.json()
+    const parsedBody = await parseBody(request, Schema)
+    if (!parsedBody.ok) return parsedBody.error
+    const body = parsedBody.data
     const { action, subject, body: messageBody, recipient_user_id } = body
 
     if (action === 'send') {
