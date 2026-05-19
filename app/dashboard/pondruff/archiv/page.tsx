@@ -14,6 +14,8 @@ type Item = {
   meta: string
   href: string
   image?: string
+  syncedBuero?: boolean
+  syncedWiso?: boolean
 }
 
 const KIND_META: Record<Kind, { icon: string; label: string; color: string }> = {
@@ -46,6 +48,7 @@ export default function ArchivPage() {
       customer: r.customer,
       meta: [r.operator, r.status].filter(Boolean).join(' · '),
       href: '/dashboard/pondruff/wareneingang',
+      syncedBuero: !!r.synced_buero_dokument_id,
     }))
     ;(pa.data || []).forEach(r => {
       const k: Kind = r.status === 'rechnung' ? 'rechnung' : r.status === 'auftragsbestaetigung' ? 'auftragsbestaetigung' : 'preisauftrag'
@@ -55,6 +58,8 @@ export default function ArchivPage() {
         customer: r.customer,
         meta: `${Number(r.total || 0).toFixed(2)} € · ${(r.rows || []).length} Pos.`,
         href: '/dashboard/pondruff/buero-wiso',
+        syncedBuero: !!r.synced_buero_auftrag_id,
+        syncedWiso: !!r.synced_wiso_at,
       })
     })
     ;(bt.data || []).forEach(r => arr.push({
@@ -122,6 +127,20 @@ export default function ArchivPage() {
                     <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>
                       {it.customer || '—'} {it.meta ? '· ' + it.meta : ''} · <span style={{ color: km.color }}>{km.label}</span>
                     </div>
+                    {(it.syncedBuero || it.syncedWiso) && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                        {it.syncedBuero && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'rgba(32,200,255,.12)', color: '#20c8ff', border: '1px solid rgba(32,200,255,.3)' }}>
+                            → Büro ✓
+                          </span>
+                        )}
+                        {it.syncedWiso && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'rgba(245,158,11,.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,.3)' }}>
+                            → WISO ✓
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </button>
               )

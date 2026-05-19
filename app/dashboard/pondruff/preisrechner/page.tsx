@@ -121,6 +121,16 @@ export default function PreisrechnerPage() {
   const { flags: pondFlags } = usePondruffFlags()
   const ocrEnabled = pondFlags.ocr_preisrechner
 
+  type OcrReview = {
+    positions: PricePosition[]
+    enabled: boolean[]
+    customer: string
+    delivery_id: string
+    purchase_order: string
+    ocr_note: string
+  }
+  const [review, setReview] = useState<OcrReview | null>(null)
+
   useEffect(() => {
     if (sp.get('prefill') !== '1' || typeof window === 'undefined') return
     const raw = sessionStorage.getItem('pondruff_prefill')
@@ -193,12 +203,15 @@ export default function PreisrechnerPage() {
           source: 'ki',
         } as PricePosition
       })
-      setPositions(arr)
-      if (data.customer) setCustomer(normalizePriceCustomer(data.customer))
-      if (data.delivery_id) setProject(data.delivery_id)
-      if (data.purchase_order) setGlobalPO(data.purchase_order)
-      setOcrNote(data.ocr_note || '')
-      showToast(`${arr.length} Position(en) erkannt`)
+      setReview({
+        positions: arr,
+        enabled: arr.map(() => true),
+        customer: normalizePriceCustomer(String(data.customer || '')),
+        delivery_id: String(data.delivery_id || ''),
+        purchase_order: String(data.purchase_order || ''),
+        ocr_note: String(data.ocr_note || ''),
+      })
+      showToast(`${arr.length} Position(en) erkannt — bitte pruefen`)
     } catch (e) {
       showToast((e instanceof Error ? e.message : String(e)) || 'OCR-Fehler', false)
     } finally { setBusy(false) }
@@ -319,6 +332,24 @@ export default function PreisrechnerPage() {
         </>
       )}
 
+      {review && (
+        <OcrReviewModal
+          review={review}
+          onChange={setReview}
+          onCancel={() => setReview(null)}
+          onAccept={() => {
+            const picked = review.positions.filter((_, i) => review.enabled[i])
+            setPositions(picked)
+            if (review.customer) setCustomer(review.customer)
+            if (review.delivery_id) setProject(review.delivery_id)
+            if (review.purchase_order) setGlobalPO(review.purchase_order)
+            setOcrNote(review.ocr_note)
+            setReview(null)
+            showToast(`${picked.length} Position(en) übernommen`)
+          }}
+        />
+      )}
+
       {toast && (
         <div style={{
           position: 'fixed', bottom: 90, right: 24, zIndex: 9999, padding: '14px 20px', borderRadius: 12, maxWidth: 380,
@@ -327,6 +358,180 @@ export default function PreisrechnerPage() {
           color: toast.ok ? '#4ddb7e' : '#ff8080', fontSize: 14, fontWeight: 600,
         }}>{toast.msg}</div>
       )}
+    </div>
+  )
+}
+
+type OcrReviewState = {
+  positions: PricePosition[]
+  enabled: boolean[]
+  customer: string
+  delivery_id: string
+  purchase_order: string
+  ocr_note: string
+}
+
+function OcrReviewModal({
+  review, onChange, onAccept, onCancel,
+}: {
+  review: OcrReviewState
+  onChange: (r: OcrReviewState) => void
+  onAccept: () => void
+  onCancel: () => void
+}) {
+  const [matches, setMatches] = useState<Array<{ id: string; name: string; score: number }>>([])
+  useEffect(() => {
+    if (!review.customer.trim()) { setMatches([]); return }
+    const ctrl = new AbortController()
+    const t = setTimeout(() => {
+      fetch('/api/pondruff/match-kunde', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: review.customer }), signal: ctrl.signal,
+      })
+        .then(r => r.json())
+        .then(d => setMatches(Array.isArray(d.matches) ? d.matches : []))
+        .catch(() => {})
+    }, 350)
+    return () => { clearTimeout(t); ctrl.abort() }
+  }, [review.customer])
+
+  const setPos = (i: number, patch: Partial<PricePosition>) => {
+    onChange({
+      ...review,
+      positions: review.positions.map((p, j) => j === i ? { ...p, ...patch } : p),
+    })
+  }
+  const toggle = (i: number) => {
+    onChange({ ...review, enabled: review.enabled.map((e, j) => j === i ? !e : e) })
+  }
+  const selectedCount = review.enabled.filter(Boolean).length
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }} onClick={onCancel}>
+      <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 760, maxHeight: '92vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 900 }}>🤖 OCR-Ergebnis prüfen</h3>
+          <button onClick={onCancel} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 22, cursor: 'pointer' }}>✕</button>
+        </div>
+        <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 10 }}>
+          Korrigiere erkannte Werte hier <b>bevor</b> sie in den Preisrechner übernommen werden. Häkchen entfernen blendet Positionen aus.
+        </div>
+
+        {review.ocr_note && (
+          <div style={{ marginBottom: 12, padding: 10, borderRadius: 10, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.25)', fontSize: 12 }}>
+            ℹ️ {review.ocr_note}
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 4 }}>
+          <label><div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Kunde</div>
+            <input className="pk-input" value={review.customer} onChange={e => onChange({ ...review, customer: e.target.value })} />
+          </label>
+          <label><div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Lieferschein</div>
+            <input className="pk-input" value={review.delivery_id} onChange={e => onChange({ ...review, delivery_id: e.target.value })} />
+          </label>
+          <label><div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Bestell-Nr.</div>
+            <input className="pk-input" value={review.purchase_order} onChange={e => onChange({ ...review, purchase_order: e.target.value })} />
+          </label>
+        </div>
+        {matches.length > 0 && !matches.some(m => m.name === review.customer) && (
+          <div style={{ marginBottom: 14, padding: 10, borderRadius: 10, background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.25)' }}>
+            <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 6 }}>
+              💡 Existierende Kunden in BüroPilot — verhindert Duplikate:
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {matches.map(m => (
+                <button key={m.id}
+                  className="pk-btn-ghost"
+                  onClick={() => onChange({ ...review, customer: m.name })}
+                  style={{ fontSize: 11, padding: '4px 10px' }}
+                >
+                  {m.name} <span style={{ color: '#4ddb7e', marginLeft: 4 }}>{m.score}%</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {matches.length === 0 || !matches.some(m => m.name === review.customer)
+          ? null
+          : (
+            <div style={{ marginBottom: 14, fontSize: 11, color: '#4ddb7e' }}>
+              ✓ Kunde bereits in BüroPilot vorhanden
+            </div>
+          )
+        }
+
+        <div style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
+          {review.positions.map((p, i) => (
+            <div key={i} style={{
+              padding: 12, borderRadius: 10,
+              border: `1px solid ${review.enabled[i] ? 'rgba(229,9,9,.25)' : 'rgba(255,255,255,.08)'}`,
+              background: review.enabled[i] ? 'rgba(229,9,9,.04)' : 'rgba(255,255,255,.02)',
+              opacity: review.enabled[i] ? 1 : .6,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 800 }}>
+                  <input type="checkbox" checked={review.enabled[i]} onChange={() => toggle(i)} />
+                  Position {i + 1}
+                </label>
+                <span style={{ fontSize: 11, color: '#aeb9c8' }}>{p.shape} · {p.coating}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+                <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>Bezeichnung</div>
+                  <input className="pk-input" value={p.description} onChange={e => setPos(i, { description: e.target.value })} />
+                </label>
+                <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>Artikel-Nr.</div>
+                  <input className="pk-input" value={p.article_no} onChange={e => setPos(i, { article_no: e.target.value })} />
+                </label>
+                <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>Menge</div>
+                  <input className="pk-input" type="number" min={1} value={p.quantity} onChange={e => setPos(i, { quantity: Math.max(1, parseInt(e.target.value) || 1) })} />
+                </label>
+                <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>Schicht</div>
+                  <select className="pk-input" value={p.coating} onChange={e => {
+                    const c = normalizePriceCoating(e.target.value)
+                    setPos(i, { coating: c, factor: priceDefaultFactor(c) })
+                  }}>
+                    {PRICE_COATINGS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </label>
+                {p.shape === 'Rund' ? (
+                  <>
+                    <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>Ø (mm)</div>
+                      <input className="pk-input" type="number" step="0.1" min={0} value={p.diameter} onChange={e => setPos(i, { diameter: parseFloat(e.target.value) || 0 })} />
+                    </label>
+                    <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>Länge (mm)</div>
+                      <input className="pk-input" type="number" step="0.1" min={0} value={p.length} onChange={e => setPos(i, { length: parseFloat(e.target.value) || 0 })} />
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>L (mm)</div>
+                      <input className="pk-input" type="number" step="0.1" min={0} value={p.length} onChange={e => setPos(i, { length: parseFloat(e.target.value) || 0 })} />
+                    </label>
+                    <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>B (mm)</div>
+                      <input className="pk-input" type="number" step="0.1" min={0} value={p.width} onChange={e => setPos(i, { width: parseFloat(e.target.value) || 0 })} />
+                    </label>
+                    <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>H (mm)</div>
+                      <input className="pk-input" type="number" step="0.1" min={0} value={p.height} onChange={e => setPos(i, { height: parseFloat(e.target.value) || 0 })} />
+                    </label>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+          {review.positions.length === 0 && (
+            <div style={{ color: '#aeb9c8', fontSize: 13, textAlign: 'center', padding: 20 }}>
+              Keine Positionen erkannt. Trag sie manuell im Preisrechner ein.
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, position: 'sticky', bottom: 0, background: 'var(--card)', paddingTop: 10 }}>
+          <button className="pk-btn-ghost" onClick={onCancel} style={{ flex: 1 }}>Verwerfen</button>
+          <button className="pk-btn" onClick={onAccept} disabled={selectedCount === 0} style={{ flex: 2 }}>
+            ✓ {selectedCount} Position(en) übernehmen
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

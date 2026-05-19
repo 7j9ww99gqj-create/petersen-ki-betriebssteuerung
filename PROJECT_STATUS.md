@@ -26,7 +26,7 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Storage-Sprint** (Artikel-Bilder, OCR-Archiv, DB-Backup, Logo-Kompression).
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Pondruff-Workflow-Sprint** (Feature-Flags, OCR-Review-Modal, Kunde-Auto-Match, Sync-Badges, Resync-Button, BüroPilot-Pondruff-Quelle, Workflow-Stepper, Positions-Sync-Fix).
 - Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main, HTTP 307 → OK).
 - TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19).
 - Supabase Storage: ~100 GB Plan — neue Buckets `lager-bilder`, `ocr-originale`, `firma-branding`, `db-backups` (alle privat, user-scoped RLS).
@@ -250,6 +250,20 @@
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+
+- **Zuletzt erledigt (2026-05-19 – Pondruff-Workflow-Sprint, Commits `56854e2` – aktueller HEAD):**
+  - **Inhaber-Feature-Flags** (`56854e2`): Tabelle `pondruff_feature_flags` (4 Boolean-Schalter: `ocr_wareneingang`, `ocr_preisrechner`, `ki_bauteilsuche`, `wiso_sync`, Default true, RLS select_self). Panel `OwnerPondruffFeaturesPanel` in Einstellungen → Kundensteuerung. API `/api/owner/pondruff-flags` (GET/POST, nur Inhaber-Email + Service-Role-Upsert). Server-Guard `requirePondruffFeature()` in 5 API-Routes (`ocr-price`, `ocr-lieferschein`, `bauteil-suche`, `wiso-export(-wareneingang)`). Client-Hook `usePondruffFlags` für UI-Disabled-Zustände.
+  - **OCR-Bugfix Preisrechner** (`56854e2`): Smartphone-Fotos scheiterten am 4.5 MB Vercel-Body-Limit. Neuer Helper `compressImageDataUrl` (2000px / JPEG 85%) in `lib/pondruff.ts`. Eingebunden in Preisrechner, Wareneingang, KI-Suche.
+  - **Preisrechner-UI Bereinigung** (`0354736`): Orange Regeln-Box und manuelle Prüf­tabelle entfernt.
+  - **Sync Pondruff→Büro Positionen-Fix** (`727e3c2`): Neue Migration `20260519450000_buero_auftrag_positionen.sql` (Spalte `positionen jsonb`). `sync-buero-auftrag` baut jetzt PDFPosition[] aus `rows` und schreibt sie separat in die Spalte; `beschreibung` enthält nur noch kurze Kontextzeile. Pondruff-AB-PDF-Texte: introText "wir bestätigen … und beginnen mit der Bearbeitung." (vor Tabelle), closing nur "Vielen Dank für Ihren Auftrag." (nach Tabelle). `handleAuftragZuRechnung` reicht positionen automatisch in die Rechnung weiter.
+  - **PDF-Hotfix Legacy-Parser** (`c180318`): `parseLegacyBeschreibungPositionen()` in `lib/pondruff-pdf.ts` — wenn `positionen` leer aber `beschreibung` im alten Format `01. NAME (Nx PREIS €)`, werden Positionen automatisch rekonstruiert. Existierender Auftrag `PREIS-20260519-133913` per Direct-API auf neues Format gebacked-fillt.
+  - **Pondruff 1 — OCR-Korrektur-Modal**: Im Preisrechner zeigt sich nach OCR-Lauf das Modal `OcrReviewModal` mit allen erkannten Positionen + Customer/Lieferschein/Bestell-Nr. User kann editieren, Positionen per Checkbox aus-/einblenden, dann übernehmen oder verwerfen.
+  - **Pondruff 2 — Kunde-Auto-Match**: Route `/api/pondruff/match-kunde` (Token-Overlap-Score gegen `buero_kunden`). Im Review-Modal Top-3-Vorschläge mit Match-% — verhindert Duplikate.
+  - **Pondruff 3 — Sync-Badges im Archiv**: Pondruff-Archiv zeigt je Eintrag Badges `→ Büro ✓` und `→ WISO ✓` basierend auf `synced_buero_*` und `synced_wiso_*`.
+  - **Pondruff 4 — Resync-Button**: In Büro/WISO-Seite kann ein bereits gesynced Auftrag jetzt erneut zu BüroPilot synct werden (orange 🔄-Button + Inline-Bestätigung).
+  - **BüroPilot 1 — Pondruff-Quelle sichtbar**: In AuftraegeTab-Card erkennt das Frontend Pondruff-Aufträge an `id.startsWith('PREIS-')` und zeigt rotes 🔗-Pondruff-Badge mit Link zum Pondruff-Bereich.
+  - **BüroPilot 2 — Workflow-Stepper**: Visuelles Stepper-Widget `WorkflowStepper` (AB → Versendet → In Arbeit → Fertig) je Auftrag-Card; aktiver Schritt blau, erledigte grün.
+
 - **Zuletzt erledigt (2026-05-18 – 14-Task-Sprint, Commits `…`–`e325d19`):**
   - **Task 1 — Messaging SQL-Schema** (`20260519010000_messaging_schema.sql`): Tabellen `user_messages` + `broadcast_messages` + RLS-Policies + Indexes als Migration. ⚠️ Noch manuell in Supabase einzuspielen.
   - **Task 2 — pilot-documents Bucket** (`20260518210000_pilot_documents.sql`): Migration verifiziert + Timestamp-Konflikt behoben (umbenannt auf `20260518211000`). ⚠️ Bucket `pilot-documents` manuell erstellen.

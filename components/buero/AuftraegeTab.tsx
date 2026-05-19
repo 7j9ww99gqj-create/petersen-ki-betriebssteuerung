@@ -429,10 +429,20 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
                 <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 2 }}>{a.beschreibung}</div>
                 <div style={{ color: '#aeb9c8', fontSize: 13 }}>🏢 {a.kunde}</div>
                 {a.ab_nummer && (
-                  <div style={{ marginTop: 4 }}>
+                  <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(22,132,255,.12)', border: '1px solid rgba(22,132,255,.3)', color: '#1684ff', fontFamily: 'monospace' }}>
                       AB: {a.ab_nummer}
                     </span>
+                    {a.id.startsWith('PREIS-') && (
+                      <a
+                        href="/dashboard/pondruff/buero-wiso"
+                        onClick={e => e.stopPropagation()}
+                        style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(229,9,9,.12)', border: '1px solid rgba(229,9,9,.3)', color: '#ff6b6b', textDecoration: 'none', fontWeight: 700 }}
+                        title="Aus Pondruff-Preisrechner — im Pondruff-Bereich öffnen"
+                      >
+                        🔗 Pondruff
+                      </a>
+                    )}
                   </div>
                 )}
                 <div style={{ color: '#aeb9c8', fontSize: 12, marginTop: 4 }}>Dokument: {linkedDokument?.name ?? '—'}</div>
@@ -443,6 +453,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
               </div>
             </div>
             <ProgressBar value={a.fortschritt} color={statusColor[a.status]} />
+            <WorkflowStepper status={a.status} />
             <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               {a.status === 'AB erforderlich' && (
                 <button onClick={e => { e.stopPropagation(); handleABErstellen(a.id) }} style={{ fontSize: 12, padding: '6px 16px', borderRadius: 999, border: '1px solid rgba(245,158,11,.4)', background: 'rgba(245,158,11,.1)', color: '#f59e0b', cursor: 'pointer', fontWeight: 700 }}>
@@ -551,3 +562,45 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
 }
 
 export default AuftraegeTab
+
+function WorkflowStepper({ status }: { status: Auftrag['status'] }) {
+  const steps: Array<{ key: Auftrag['status']; label: string; icon: string }> = [
+    { key: 'AB erforderlich', label: 'AB', icon: '📋' },
+    { key: 'AB versendet', label: 'Versendet', icon: '✉️' },
+    { key: 'In Bearbeitung', label: 'In Arbeit', icon: '🔧' },
+    { key: 'Abgeschlossen', label: 'Fertig', icon: '✅' },
+  ]
+  const order: Record<string, number> = {
+    'AB erforderlich': 0,
+    'AB erstellt': 0,
+    'AB versendet': 1,
+    'In Bearbeitung': 2,
+    'Geplant': 2,
+    'Pausiert': 2,
+    'Abgeschlossen': 3,
+  }
+  const current = order[status] ?? 0
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 10, marginBottom: 2, flexWrap: 'wrap' }}>
+      {steps.map((s, i) => {
+        const done = i < current
+        const active = i === current
+        const color = done ? '#4ddb7e' : active ? '#20c8ff' : '#3a4452'
+        return (
+          <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div title={s.label} style={{
+              fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
+              border: `1px solid ${color}55`, background: active ? `${color}22` : 'transparent',
+              color: done || active ? color : '#7f8da3',
+            }}>
+              {done ? '✓' : s.icon} {s.label}
+            </div>
+            {i < steps.length - 1 && (
+              <div style={{ width: 14, height: 2, background: i < current ? '#4ddb7e55' : '#3a445255', borderRadius: 1 }} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}

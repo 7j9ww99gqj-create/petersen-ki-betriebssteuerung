@@ -57,6 +57,7 @@ export default function BueroWisoPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [delConfirm, setDelConfirm] = useState<string | null>(null)
+  const [resyncConfirm, setResyncConfirm] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const { flags: pondFlags } = usePondruffFlags()
   const wisoEnabled = pondFlags.wiso_sync
@@ -207,9 +208,22 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
                     <td>{(o.rows || []).length}</td>
                     <td>{Number(o.total || 0).toFixed(2)} €</td>
                     <td onClick={e => e.stopPropagation()}>
-                      {o.synced_buero_auftrag_id
-                        ? <span style={{ color: '#4ddb7e', fontSize: 11 }}>✓ {o.synced_buero_auftrag_id}</span>
-                        : <button className="pk-btn-ghost" disabled={busy} onClick={() => syncBueroAuftrag(o)} style={{ fontSize: 11 }}>→ BüroPilot</button>}
+                      {o.synced_buero_auftrag_id ? (
+                        resyncConfirm === o.id ? (
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <span style={{ fontSize: 10, color: '#fbbf24' }}>Überschreiben?</span>
+                            <button onClick={() => { setResyncConfirm(null); syncBueroAuftrag(o) }} style={{ background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}>Ja</button>
+                            <button onClick={() => setResyncConfirm(null)} style={{ background: 'transparent', color: '#aeb9c8', border: '1px solid rgba(255,255,255,.2)', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}>X</button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <span style={{ color: '#4ddb7e', fontSize: 11 }}>✓ {o.synced_buero_auftrag_id}</span>
+                            <button onClick={() => setResyncConfirm(o.id)} title="Erneut synchronisieren (überschreibt Auftrag)" style={{ background: 'rgba(245,158,11,.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,.3)', borderRadius: 6, padding: '2px 6px', fontSize: 10, cursor: 'pointer' }}>🔄</button>
+                          </div>
+                        )
+                      ) : (
+                        <button className="pk-btn-ghost" disabled={busy} onClick={() => syncBueroAuftrag(o)} style={{ fontSize: 11 }}>→ BüroPilot</button>
+                      )}
                     </td>
                     <td onClick={e => e.stopPropagation()}>
                       {o.synced_wiso_at
