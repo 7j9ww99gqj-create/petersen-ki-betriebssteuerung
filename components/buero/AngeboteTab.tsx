@@ -761,12 +761,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
         const angebot = angebote.find(a => a.id === angebotMailTarget.id)
         if (!angebot) return null
         return (
-          <div role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setAngebotMailTarget(null)} onKeyDown={e => { if (e.key === 'Escape') setAngebotMailTarget(null) }}>
-            <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 460 }} role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>✉️ Angebot per Mail senden</h3>
-                <button onClick={() => setAngebotMailTarget(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
-              </div>
+          <Modal title="✉️ Angebot per Mail senden" onClose={() => setAngebotMailTarget(null)} maxWidth={460}>
               <div style={{ fontSize: 13, color: '#aeb9c8', marginBottom: 14 }}>
                 <strong style={{ color: '#f8fbff' }}>{angebot.titel || angebot.id}</strong> — {angebot.kunde} — {angebot.betrag}
               </div>
@@ -796,8 +791,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                   {angebotMailSending ? '⏳ Sende…' : '✉️ Jetzt senden'}
                 </button>
               </div>
-            </div>
-          </div>
+          </Modal>
         )
       })()}
     </div>

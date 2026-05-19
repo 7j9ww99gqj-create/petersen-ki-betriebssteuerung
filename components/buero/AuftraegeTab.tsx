@@ -519,12 +519,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
         const auftrag = auftraege.find(a => a.id === auftragMailTarget.id)
         if (!auftrag) return null
         return (
-          <div role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setAuftragMailTarget(null)} onKeyDown={e => { if (e.key === 'Escape') setAuftragMailTarget(null) }}>
-            <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 460 }} role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>✉️ Auftragsbestätigung senden</h3>
-                <button onClick={() => setAuftragMailTarget(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
-              </div>
+          <Modal title="✉️ Auftragsbestätigung senden" onClose={() => setAuftragMailTarget(null)} maxWidth={460}>
               <div style={{ fontSize: 13, color: '#aeb9c8', marginBottom: 14 }}>
                 <strong style={{ color: '#f8fbff' }}>{auftrag.ab_nummer || auftrag.id}</strong> — {auftrag.kunde} — {auftrag.wert}
               </div>
@@ -554,8 +549,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
                   {auftragMailSending ? '⏳ Sende…' : '✉️ Jetzt senden'}
                 </button>
               </div>
-            </div>
-          </div>
+          </Modal>
         )
       })()}
     </div>
