@@ -11,6 +11,8 @@ import { useRole } from '@/lib/roles'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import dynamic from 'next/dynamic'
 import { downloadElsterXml } from '@/lib/steuer-export'
+import { Modal } from '@/components/ui/Modal'
+import { useGlobalToast } from '@/components/ui/ToastProvider'
 
 // Lazy-load schwere Tabs
 const SteuerFixkostenTab      = dynamic(() => import('@/components/steuer/SteuerFixkosten'), { ssr: false })
@@ -136,14 +138,6 @@ function calcVst(brutto: number, satz: number): number {
 
 // ── Sub-Komponenten ────────────────────────────────────────────────────────────
 
-function Toast({ msg, type = 'success' }: { msg: string; type?: 'success' | 'error' }) {
-  if (!msg) return null
-  const isErr = type === 'error'
-  return (
-    <div style={{ position: 'fixed', bottom: 90, right: 24, zIndex: 9999, padding: '14px 20px', borderRadius: 12, maxWidth: 360, background: isErr ? 'rgba(255,80,80,.15)' : 'rgba(37,211,102,.12)', border: `1px solid ${isErr ? 'rgba(255,80,80,.4)' : 'rgba(37,211,102,.35)'}`, color: isErr ? '#ff8080' : '#4ddb7e', fontSize: 14, fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,.4)' }}>{msg}</div>
-  )
-}
-
 function KpiCard({ label, value, sub, color, onClick }: { label: string; value: string; sub?: string; color?: string; onClick?: () => void }) {
   return (
     <div className="pk-card" style={{ padding: '18px 20px', cursor: onClick ? 'pointer' : undefined }} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined} onClick={onClick} onKeyDown={onClick ? (e => { if (e.key === 'Enter' || e.key === ' ') onClick() }) : undefined}>
@@ -164,20 +158,6 @@ function StatusBadge({ status }: { status: string }) {
   }
   const s = map[status] ?? { label: status, cls: 'badge badge-gray' }
   return <span className={s.cls}>{s.label}</span>
-}
-
-function Modal({ title, onClose, children, maxWidth = 560 }: { title: string; onClose: () => void; children: React.ReactNode; maxWidth?: number }) {
-  return (
-    <div role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }}>
-      <div className="pk-card fade-in" style={{ width: '100%', maxWidth, maxHeight: '90vh', overflowY: 'auto' }} role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
 }
 
 function WarnBadge({ type }: { type: Warning['type'] }) {
@@ -208,8 +188,7 @@ export default function SteuerPilotPage() {
   const [warnings, setWarnings] = useState<Warning[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [toast, setToast] = useState('')
-  const [toastType, setToastType] = useState<'success' | 'error'>('success')
+  const toast = useGlobalToast()
   const [selectedMonat, setSelectedMonat] = useState(currentMonthStr())
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [editBeleg, setEditBeleg] = useState<Partial<Beleg> | null>(null)
@@ -247,8 +226,7 @@ export default function SteuerPilotPage() {
   const newBelegFileRef = useRef<HTMLInputElement>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-    setToast(msg); setToastType(type)
-    setTimeout(() => setToast(''), 3500)
+    if (type === 'error') toast.error(msg); else toast.success(msg)
   }
 
   const loadData = async () => {
@@ -1984,7 +1962,6 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
         </div>
       )}
 
-      <Toast msg={toast} type={toastType} />
     </div>
   )
 }
