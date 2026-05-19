@@ -48,15 +48,25 @@ Regeln:
 - Wenn Mengen nicht sicher sind, setze quantity auf 1.
 - Erlaubte Beschichtungen: ${PRICE_COATINGS.join(', ')}.
 
-WICHTIG zu Zahlen:
+WICHTIG zu Zahlen — bitte sehr genau lesen:
 - Deutsche Dokumente nutzen Komma als Dezimaltrenner: "4,4" bedeutet 4.4 (vier Komma vier).
 - "1.234,56" bedeutet 1234.56.
 - Gib alle Zahlenwerte im JSON IMMER als JSON-Number mit Punkt zurueck (z.B. 4.4, NICHT "4,4" und NICHT 4).
 - Wenn auf dem Beleg "4,4" steht, MUSS das Feld den Wert 4.4 haben — verliere die Nachkommastelle nicht.
 - Wenn ein Mass mit Einheit "mm" oder "Ø" markiert ist, uebernimm exakt den Zahlenwert inkl. Kommastellen.
 
+Häufige Lesefehler — VERMEIDE diese:
+- Verwechsle NIE die fuehrende Ziffer mit 0. Eine "4" am Anfang ist eine 4, kein Komma.
+  Falsch: "4,4" als 0.4 lesen.   Richtig: "4,4" als 4.4 lesen.
+- Bauteilmaße bei Pondruff liegen üblicherweise im Bereich 1-500mm — bei unsicherer
+  Lesung lieber die plausiblere groessere Variante waehlen.
+
+Zur Verifikation:
+- Setze fuer JEDE Position das Feld "raw_dimension_text" auf den GENAUEN Original-Text der
+  Mass-Zeile wie er auf dem Beleg steht (z.B. "Ø 4,4 x 50 mm" oder "12 x 8 x 4,4 mm").
+
 JSON Schema:
-{"delivery_id":"","customer":"","project":"","purchase_order":"","confidence":0,"ocr_note":"","detected_position_count":0,"detected_coating_count":0,"detected_polishing_count":0,"detected_polishing_price_count":0,"detected_stripping_count":0,"detected_stripping_price_count":0,"validation_notes":[],"positions":[{"description":"","article_no":"","position_no":"","order_no":"","cost_center":"","purchase_order":"","quantity":1,"shape":"Rund oder Eckig","diameter":0,"length":0,"width":0,"height":0,"coating":"","discount":0,"note":""}]}`
+{"delivery_id":"","customer":"","project":"","purchase_order":"","confidence":0,"ocr_note":"","detected_position_count":0,"detected_coating_count":0,"detected_polishing_count":0,"detected_polishing_price_count":0,"detected_stripping_count":0,"detected_stripping_price_count":0,"validation_notes":[],"positions":[{"description":"","article_no":"","position_no":"","order_no":"","cost_center":"","purchase_order":"","quantity":1,"shape":"Rund oder Eckig","diameter":0,"length":0,"width":0,"height":0,"coating":"","discount":0,"note":"","raw_dimension_text":""}]}`
 
   const result = await runVisionOcr({ apiKey, prompt, images, maxTokens: 4096 })
   if (!result.ok) return result.response

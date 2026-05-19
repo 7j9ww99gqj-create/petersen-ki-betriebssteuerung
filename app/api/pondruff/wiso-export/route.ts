@@ -2,68 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
 import { requirePondruffFeature } from '@/lib/pondruff-server'
 import { POND_USER_EMAIL, money } from '@/lib/pondruff'
+import { getWisoToken, wisoRequest } from '@/lib/wiso'
 
 // WISO MeinBüro REST API Direkt-Export eines Pondruff-Preisauftrags.
 // Erwartet ENV: WISO_MEINBUERO_API_KEY, WISO_MEINBUERO_API_SECRET, WISO_MEINBUERO_OWNERSHIP_ID.
-// Port der Logik aus dem Streamlit-Tool (app.py wiso_get_token / wiso_find_customer_id / create_wiso_meinbuero_order).
 
 export const maxDuration = 60
-
-const API_BASE = 'https://api.meinbuero.de/openapi'
-const LEGACY_BASE = 'https://api.meinbuero.de'
-
-type Headers = Record<string, string>
-
-async function wisoRequest(method: string, path: string, opts: {
-  token?: string
-  basic?: string
-  payload?: unknown
-  formPayload?: Record<string, string>
-  base?: string
-  ownershipId?: string
-} = {}): Promise<{ ok: true; data: unknown } | { ok: false; status: number; message: string }> {
-  const base = opts.base || API_BASE
-  const headers: Headers = { Accept: 'application/json' }
-  let body: BodyInit | undefined
-  if (opts.formPayload) {
-    body = new URLSearchParams(opts.formPayload).toString()
-    headers['Content-Type'] = 'application/x-www-form-urlencoded'
-  } else if (opts.payload !== undefined) {
-    body = JSON.stringify(opts.payload)
-    headers['Content-Type'] = 'application/json'
-  }
-  if (opts.token) headers['Authorization'] = `Bearer ${opts.token}`
-  if (opts.basic) headers['Authorization'] = `Basic ${opts.basic}`
-  if (opts.ownershipId) headers['x-authorization-ownershipid'] = opts.ownershipId
-
-  const r = await fetch(`${base}${path}`, { method, headers, body })
-  const text = await r.text()
-  if (!r.ok) {
-    let msg = text
-    try { const j = JSON.parse(text); msg = j.message || JSON.stringify(j) } catch {}
-    return { ok: false, status: r.status, message: msg.slice(0, 500) }
-  }
-  try { return { ok: true, data: text ? JSON.parse(text) : {} } } catch { return { ok: true, data: {} } }
-}
-
-async function getWisoToken(apiKey: string, apiSecret: string, ownershipId: string): Promise<string> {
-  const basic = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')
-  // Versuch 1: neue API
-  const r1 = await wisoRequest('POST', '/auth/token', { basic, payload: { ownershipId }, ownershipId })
-  if (r1.ok) {
-    const d = r1.data as Record<string, unknown>
-    const t = String(d.token || d.access_token || '')
-    if (t) return t
-  }
-  // Versuch 2: legacy
-  const r2 = await wisoRequest('POST', '/auth/token', { basic, formPayload: { grant_type: 'ownership', ownershipId }, base: LEGACY_BASE, ownershipId })
-  if (r2.ok) {
-    const d = r2.data as Record<string, unknown>
-    const t = String(d.token || d.access_token || '')
-    if (t) return t
-  }
-  throw new Error(`WISO Token-Holen fehlgeschlagen: ${(r1 as { message?: string }).message || ''} | ${(r2 as { message?: string }).message || ''}`)
-}
 
 function compactMatch(v: string): string { return v.toLowerCase().replace(/[^a-z0-9]+/g, '') }
 

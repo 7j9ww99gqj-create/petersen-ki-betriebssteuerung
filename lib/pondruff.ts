@@ -60,6 +60,10 @@ export interface PricePosition {
   discount: number
   note: string
   source: string
+  // Original-Text der Mass-Zeile vom Beleg (gefüllt durch OCR). Hilft
+  // beim Verifizieren: wenn der UI-Wert "0.4" zeigt aber raw "4,4" sagt,
+  // ist sofort sichtbar dass die OCR sich verlesen hat.
+  raw_dimension_text?: string
 }
 
 export function priceDefaultFactor(coating: string): number {
@@ -334,9 +338,14 @@ export function wisoClipboardPlainTsv(order: WisoOrder): string {
 }
 
 // Client-side: Bild auf maxSide skalieren + als JPEG mit quality re-encodieren.
-// Smartphone-Fotos (4-6 MB) werden so auf ~300-800 KB reduziert → Vercel 4.5 MB
+// Smartphone-Fotos (4-6 MB) werden so auf ~500 KB-1.5 MB reduziert → Vercel 4.5 MB
 // Body-Limit wird auch bei mehreren Bildern eingehalten.
-export async function compressImageDataUrl(file: File, maxSide = 2000, quality = 0.85): Promise<string> {
+//
+// Default: 2400px / 92% — höher als zuvor (85%) weil kleine Ziffern und
+// Komma-Trenner bei zu starker Kompression verloren gehen (z.B. "4,4" wurde
+// als "0,4" gelesen). Bei mehreren Bildern auf Mobile sollte der Aufrufer
+// gegebenenfalls niedrigere Werte übergeben.
+export async function compressImageDataUrl(file: File, maxSide = 2400, quality = 0.92): Promise<string> {
   if (typeof window === 'undefined') throw new Error('compressImageDataUrl: nur im Browser')
   const dataUrl = await new Promise<string>((res, rej) => {
     const r = new FileReader()

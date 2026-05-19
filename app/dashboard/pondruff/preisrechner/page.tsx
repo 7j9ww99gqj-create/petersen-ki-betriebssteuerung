@@ -103,6 +103,13 @@ function Pos({ pos, idx, onChange, onDelete, isFirst, globalPO, setGlobalPO }: {
         Standardfaktor für {pos.coating}: {priceDefaultFactor(pos.coating).toFixed(2)} · Volumen: {r.volume.toFixed(0)} mm³
       </div>
 
+      {pos.raw_dimension_text && (
+        <div style={{ marginBottom: 10, padding: '6px 10px', borderRadius: 8, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', fontSize: 11, color: '#fbbf24' }}>
+          📝 KI-Original vom Beleg: <b style={{ color: '#fde68a' }}>{pos.raw_dimension_text}</b>
+          {' '}— stimmt das mit den Werten oben überein? Wenn nicht, bitte korrigieren.
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
         <Metric label="Preis / Stk." value={`${r.unit_price.toFixed(2)} €`} />
         <Metric label="Normalpreis" value={`${r.normal_total.toFixed(2)} €`} />
@@ -160,7 +167,7 @@ export default function PreisrechnerPage() {
       if (ad?.purchase_order) setGlobalPO(String(ad.purchase_order))
       if (Array.isArray(pf.positions) && pf.positions.length) {
         const arr: PricePosition[] = pf.positions.map((raw, i) => {
-          const p = raw as Partial<PricePosition>
+          const p = raw as Partial<PricePosition> & { raw_dimension_text?: unknown }
           const base = blankPricePosition(p.shape === 'Rund' ? 'Rund' : 'Eckig')
           const c = normalizePriceCoating(String(p.coating || 'TiCN'))
           return {
@@ -172,6 +179,7 @@ export default function PreisrechnerPage() {
             height: parseDecimal(p.height),
             discount: parseDecimal(p.discount),
             coating: c, factor: priceDefaultFactor(c),
+            raw_dimension_text: typeof p.raw_dimension_text === 'string' ? p.raw_dimension_text : undefined,
             purchase_order: i === 0 ? String(p.purchase_order || ad?.purchase_order || '') : '', source: 'ki',
           } as PricePosition
         })
@@ -231,6 +239,7 @@ export default function PreisrechnerPage() {
           factor: priceDefaultFactor(c),
           discount: globalDiscount,
           purchase_order: i === 0 ? (String(p.purchase_order || data.purchase_order || '')) : '',
+          raw_dimension_text: typeof raw.raw_dimension_text === 'string' ? raw.raw_dimension_text : undefined,
           source: 'ki',
         } as PricePosition
       })
@@ -506,6 +515,11 @@ function OcrReviewModal({
                 </label>
                 <span style={{ fontSize: 11, color: '#aeb9c8' }}>{p.shape} · {p.coating}</span>
               </div>
+              {p.raw_dimension_text && (
+                <div style={{ marginBottom: 8, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', fontSize: 11, color: '#fbbf24' }}>
+                  📝 KI las vom Beleg: <b style={{ color: '#fde68a' }}>{p.raw_dimension_text}</b>
+                </div>
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
                 <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>Bezeichnung</div>
                   <input className="pk-input" value={p.description} onChange={e => setPos(i, { description: e.target.value })} />
