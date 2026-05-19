@@ -26,12 +26,29 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Code-Qualität-Sprint** (Commit `d28aa39`): 10-Aufgaben-Optimierung — Vitest + 40 Tests, Service-Worker + Offline-Cache, KI-Streaming-Support, db.ts/lager.tsx Soft-Splits, Vision-Fallback raus, OCR-Konsolidierung, zentrale UI-Komponenten, Demo-Wrapper, JSON-Preis-Konfig.
-- Vorheriger Sprint (2026-05-19, Commit `3665a28`): Pondruff-Workflow + Komma-Zahlen-Fix (DecimalInput, parseDecimal, deutsche Dezimal-OCR).
-- Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main, HTTP 307 → OK).
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Quick-Wins-Sprint** (Commit `5db72fb`): 6 Quick-Win-Aufgaben — Sentry, Error Boundaries, Loading-Skeletons, CI-Pipeline, README+ARCHITECTURE, jsx-a11y.
+- Vorheriger Sprint (2026-05-19, Commit `d28aa39`): Code-Qualität-Sprint — Vitest + 40 Tests, Service-Worker + Offline-Cache, KI-Streaming-Support, db.ts/lager.tsx Soft-Splits.
+- Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main).
 - TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19).
 - Tests: `npm test` — ✅ 40 Tests (3 Files: pondruff-price, demo-helpers, lager-helpers).
+- CI: GitHub Actions (tsc + test + build) — ✅ Workflow aktiv auf main.
 - Supabase Storage: ~100 GB Plan — neue Buckets `lager-bilder`, `ocr-originale`, `firma-branding`, `db-backups` (alle privat, user-scoped RLS).
+
+### Quick-Wins-Sprint (2026-05-19) — 6 Aufgaben aus Optimierungs-Plan
+
+| # | Aufgabe | Dateien | Commit | Status |
+|---|---------|---------|--------|--------|
+| 1 | Sentry Error-Tracking | `sentry.client/server/edge.config.ts`, `next.config.js`, `@sentry/nextjs` | `4dc83a1` | ✅ |
+| 2 | React Error Boundaries | `components/ErrorBoundary.tsx`, `app/dashboard/layout.tsx` | `d3a38c0` | ✅ |
+| 3 | Loading-Skeletons (10 Piloten) | `components/ui/SkeletonCard.tsx`, `PilotSkeleton.tsx`, `*/loading.tsx` | `8ea13c4` | ✅ |
+| 4 | GitHub Actions CI-Pipeline | `.github/workflows/ci.yml` | `c25e6c2` | ✅ |
+| 5 | README.md + ARCHITECTURE.md | `README.md`, `ARCHITECTURE.md` | `aaf8dbd` | ✅ |
+| 6 | eslint-plugin-jsx-a11y | `.eslintrc.json`, `eslint-plugin-jsx-a11y` | `5db72fb` | ✅ |
+
+**Offene jsx-a11y Folge-Aufgaben (nur Warnings, kein Build-Blocker):**
+- 299× `label-has-associated-control`: `<label><span>...</span><input/></label>` Pattern — valides HTML, Plugin erkennt Nesting nicht. Fix: `htmlFor`+`id` bei jedem Input ergänzen oder `eslint-disable` per File.
+- 62× `click-events-have-key-events` + 61× `no-static-element-interactions`: `<div onClick>` Patterns — Fix: auf `<button>` oder `role="button"` + `onKeyDown` umstellen.
+- 5× `no-img-element`: `<img>` statt `<Image>` — Fix: `next/image` verwenden.
 
 ### Code-Qualität-Sprint (2026-05-19) — 10-Aufgaben-Optimierung
 Pragmatischer Soft-Split-Ansatz: kleine sichere Wins zuerst live, große Refactorings als Vorbereitung für Folge-Sessions.
