@@ -254,9 +254,9 @@ Pragmatischer Soft-Split-Ansatz: kleine sichere Wins zuerst live, große Refacto
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-19, **Storage-Sprint abgeschlossen** (6 Aufgaben, 4 neue Buckets, 3 Migrations)  
-**Letzte Session:** Artikel-Bilder mit Kompression+CDN, OCR-Original-Archiv (GoBD), nightly DB-Backup mit Retention, Logo-Kompression  
-**Nächster Focus:** UI-Test der Bild-Uploads im Live-Deploy, evtl. PDF-Anhänge für Rechnungen archivieren  
+**Letzter Stand:** 2026-05-19, **Dual-Sprint A+B+C** (Pondruff Datenverlust-Fix + UX, Owner-Härtung) — 10 Aufgaben, HEAD `dcf29bb`  
+**Letzte Session:** Pondruff-Härtung (raw_dimension_text persistiert, Büro-Sync idempotent, Doppel-Klick-Schutz WISO, OCR-Fehlerdetail, Operator/Status durchgereicht, Zurück-Button, Mobile-Kamera, Preistabellen-Admin-Panel Teil-Lösung) + Owner-Härtung (case-insensitive Mail-Check, owner_audit_log Tabelle + UI-Viewer, OpenAI-Usage 1h-Cache + Refresh-Button)  
+**Nächster Focus:** C4 Voll-Integration (Preisrechner `getPriceConfig()` async aus DB), UI-Test in Production, Inhaber-Workflow Sprint-D (CSV-Export, Pending-Payment-Reminder)  
 **Blocker:** Keine  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
@@ -274,7 +274,21 @@ Pragmatischer Soft-Split-Ansatz: kleine sichere Wins zuerst live, große Refacto
 
 ## 2. Aktueller Arbeitsstand
 
-- **Zuletzt erledigt (2026-05-19 – Pondruff-Workflow-Sprint, Commits `56854e2` – aktueller HEAD):**
+- **Zuletzt erledigt (2026-05-19 — Dual-Sprint A+B+C, HEAD `dcf29bb`):**
+  - **Sprint A — Pondruff Datenverlust-/Duplikat-Risiko (3 Aufgaben):**
+    - A1 (`e1c52d7`): `raw_dimension_text` durchgereicht von OCR → sessionStorage → Preisrechner → `pondruff_preisauftraege.positions` (jsonb) → BüroPilot-Sync → Detail-View. Wird im Auftrag-Detail unter den Positions-Mass-Zeilen als gelber Hinweis angezeigt.
+    - A2 (`9a1d5fa`): `sync-buero-wareneingang` und `sync-buero-auftrag` auf `upsert` umgestellt mit ID-Wiederverwendung. Resync aktualisiert bestehende `buero_auftraege`-Zeile statt zu duplizieren.
+    - A3 (`b55dd76`, `0dc021b`): Doppel-Klick-Schutz in beiden WISO-Routes (`wiso-export`, `wiso-export-wareneingang`) — `synced_wiso_at` / `ai_data.wiso.synced_at` Check vor erstem POST, gibt vorhandene Response zurück. OCR-Fehler liefern jetzt `detail` durchgereicht ins UI.
+  - **Sprint B — Owner-Härtung (3 Aufgaben):**
+    - B1 (`298e343`): Case-insensitive E-Mail-Vergleich in `app/api/owner/openai-usage/route.ts` — Line 30 + 59 nutzen jetzt `.toLowerCase()` einheitlich.
+    - B2 (in Sammel-Commits): Neue Tabelle `owner_audit_log` (Migration `20260519700000_owner_audit_log.sql`, RLS aktiv, nur Service-Role). Helper `lib/audit-log.ts` mit `logOwnerAction()` + `listOwnerAuditLog()`. Eingehängt in `OwnerCustomerControlPanel` (unlock/suspend/status/invoice.create) und `pondruff-flags` Route (alt/neu Werte). UI-Viewer `OwnerAuditLogPanel.tsx` zeigt letzte 20 Einträge in Einstellungen → Kundensteuerung.
+    - B3 (in Sammel-Commits): OpenAI-Usage In-Memory-Cache (Map<monthKey, {fetchedAt, data}>, 1h TTL). `?refresh=1` für Bypass. Response um `cached_at` + `from_cache` erweitert. `OwnerOpenAiCostsPanel`: 🔄 Refresh-Button + Cache-Status-Zeile + Skeleton-Loader.
+  - **Sprint C — Pondruff UX (4 Aufgaben):**
+    - C1+C2 (`556c52e`): `operator` + `status` ins sessionStorage-Prefill aufgenommen und im Preisrechner als Read-only Info-Box "🧑 Bediener: X · Status: Y" angezeigt. "← Zurück zum Wareneingang"-Button erscheint wenn `prefill=1` UND `delivery_id` vorhanden. sessionStorage wird erst nach `saveOrder()` gelöscht.
+    - C3 (`9725e10`): `capture="environment"` ergänzt auf allen Pondruff Foto-Inputs (Wareneingang, Preisrechner, KI-Bauteilsuche). Auf iOS/Android öffnet sich jetzt Kamera direkt mit Option Galerie statt umgekehrt.
+    - C4 (`dcf29bb`, **Teil-Lösung**): Tabelle `pondruff_price_config` (Migration `20260519800000_pondruff_price_config.sql`). Route `app/api/pondruff/admin-price-config` (GET/POST, nur Inhaber). UI-Panel `/dashboard/pondruff/admin/page.tsx` zum Editieren von Preistabelle/Faktoren/Multipliern. ⚠️ Voll-Integration aufgeschoben: `lib/pondruff.ts` liest noch sync aus JSON-Datei — Preisrechner muss `getPriceConfig()` async aus DB laden, um Live-Wirksamkeit zu erreichen.
+
+- **Vorheriger Stand (2026-05-19 — Pondruff Komma-Zahlen-Fix, HEAD `ec679ac`):**
   - **Inhaber-Feature-Flags** (`56854e2`): Tabelle `pondruff_feature_flags` (4 Boolean-Schalter: `ocr_wareneingang`, `ocr_preisrechner`, `ki_bauteilsuche`, `wiso_sync`, Default true, RLS select_self). Panel `OwnerPondruffFeaturesPanel` in Einstellungen → Kundensteuerung. API `/api/owner/pondruff-flags` (GET/POST, nur Inhaber-Email + Service-Role-Upsert). Server-Guard `requirePondruffFeature()` in 5 API-Routes (`ocr-price`, `ocr-lieferschein`, `bauteil-suche`, `wiso-export(-wareneingang)`). Client-Hook `usePondruffFlags` für UI-Disabled-Zustände.
   - **OCR-Bugfix Preisrechner** (`56854e2`): Smartphone-Fotos scheiterten am 4.5 MB Vercel-Body-Limit. Neuer Helper `compressImageDataUrl` (2000px / JPEG 85%) in `lib/pondruff.ts`. Eingebunden in Preisrechner, Wareneingang, KI-Suche.
   - **Preisrechner-UI Bereinigung** (`0354736`): Orange Regeln-Box und manuelle Prüf­tabelle entfernt.
