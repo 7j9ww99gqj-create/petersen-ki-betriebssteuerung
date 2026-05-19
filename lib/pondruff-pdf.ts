@@ -43,8 +43,23 @@ async function isCurrentPondruff(): Promise<boolean> {
   } catch { return false }
 }
 
-export async function generateRechnungPDFAuto(rechnung: PDFRechnung, kundenName: string) {
-  if (await isCurrentPondruff()) return generatePondruffRechnungPDF(rechnung, kundenName)
+export async function generateRechnungPDFAuto(rechnung: PDFRechnung, kundenName: string, opts?: { archive?: boolean }) {
+  const isPond = await isCurrentPondruff()
+  // Archiv-Modus: PDF als Base64 generieren, in Storage uploaden, anschließend Download triggern
+  if (opts?.archive) {
+    const base64 = isPond
+      ? await generatePondruffRechnungPDF(rechnung, kundenName, true) as string
+      : await (await import('./pdf')).generateRechnungPDF(rechnung, kundenName, true) as string
+    if (base64) {
+      try {
+        const { archiveRechnungPdf } = await import('./db')
+        await archiveRechnungPdf({ rechnungId: rechnung.id, rechnungNummer: rechnung.nummer, pdfBase64: base64 })
+      } catch (e) { console.warn('PDF-Archivierung fehlgeschlagen', e) }
+      triggerDownloadFromBase64(base64, `Rechnung_${rechnung.nummer || rechnung.id}.pdf`)
+    }
+    return
+  }
+  if (isPond) return generatePondruffRechnungPDF(rechnung, kundenName)
   const { generateRechnungPDF } = await import('./pdf')
   return generateRechnungPDF(rechnung, kundenName)
 }
@@ -55,10 +70,38 @@ export async function generateAuftragsbestaetigungPDFAuto(auftrag: PDFAuftragsbe
   return generateAuftragsbestaetigungPDF(auftrag, kundenName)
 }
 
-export async function generateAngebotPDFAuto(angebot: PDFAngebot, kundenName: string) {
-  if (await isCurrentPondruff()) return generatePondruffAngebotPDF(angebot, kundenName)
+export async function generateAngebotPDFAuto(angebot: PDFAngebot, kundenName: string, opts?: { archive?: boolean }) {
+  const isPond = await isCurrentPondruff()
+  if (opts?.archive) {
+    const base64 = isPond
+      ? await generatePondruffAngebotPDF(angebot, kundenName, true) as string
+      : await (await import('./pdf')).generateAngebotPDF(angebot, kundenName, true) as string
+    if (base64) {
+      try {
+        const { archiveAngebotPdf } = await import('./db')
+        await archiveAngebotPdf({ angebotId: angebot.id, angebotNummer: (angebot as { nummer?: string }).nummer, pdfBase64: base64 })
+      } catch (e) { console.warn('PDF-Archivierung fehlgeschlagen', e) }
+      triggerDownloadFromBase64(base64, `Angebot_${(angebot as { nummer?: string }).nummer || angebot.id}.pdf`)
+    }
+    return
+  }
+  if (isPond) return generatePondruffAngebotPDF(angebot, kundenName)
   const { generateAngebotPDF } = await import('./pdf')
   return generateAngebotPDF(angebot, kundenName)
+}
+
+function triggerDownloadFromBase64(base64: string, filename: string) {
+  if (typeof window === 'undefined') return
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+  const blob = new Blob([bytes], { type: 'application/pdf' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 5000)
 }
 
 const POND_RED: [number, number, number] = [229, 9, 9]
