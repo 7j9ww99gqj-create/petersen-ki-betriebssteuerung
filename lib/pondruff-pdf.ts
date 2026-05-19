@@ -6,6 +6,35 @@ import type { PDFPosition, PDFRechnung, PDFAngebot, PDFAuftragsbestaetigung } fr
 import { isPondruffUser } from './pondruff'
 import { createSupabaseClient } from './supabase'
 
+// Fallback: parsed Multi-Line-Beschreibungen im Format
+//   "01. NAME (Nx PREIS €)"
+// die der alte sync-Code (vor 2026-05-19) als beschreibung statt positionen
+// abgelegt hat. Wenn positionen leer aber beschreibung dieses Muster hat,
+// rekonstruieren wir die Positionen, damit die PDF-Tabelle nicht leer bleibt.
+export function parseLegacyBeschreibungPositionen(beschreibung: string | null | undefined): PDFPosition[] {
+  if (!beschreibung) return []
+  const lines = beschreibung.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+  const re = /^(\d{1,3})[\.\)]\s*(.+?)\s*\((\d+)\s*x\s*([0-9.,]+)\s*€?\)\s*$/i
+  const positionen: PDFPosition[] = []
+  for (const line of lines) {
+    const m = line.match(re)
+    if (!m) continue
+    const idx = m[1]
+    const desc = m[2].trim()
+    const menge = Number(m[3]) || 1
+    const preisStr = m[4].replace(/\./g, '').replace(',', '.')
+    const einzelpreis = Number.parseFloat(preisStr) || 0
+    positionen.push({
+      id: `L-P${idx.padStart(2, '0')}`,
+      beschreibung: desc,
+      menge,
+      einheit: 'Stk',
+      einzelpreis,
+    })
+  }
+  return positionen
+}
+
 // Prüft den aktuell eingeloggten User. Wenn Pondruff → Pondruff-PDF, sonst Standard.
 async function isCurrentPondruff(): Promise<boolean> {
   try {
@@ -280,7 +309,10 @@ async function buildPdf(c: ContentBlock, filename: string, returnBase64?: boolea
 }
 
 export async function generatePondruffRechnungPDF(rechnung: PDFRechnung, kundenName: string, returnBase64?: boolean): Promise<string | void> {
-  const positionen = rechnung.positionen || []
+  const raw = rechnung.positionen || []
+  const positionen = raw.length > 0
+    ? raw
+    : parseLegacyBeschreibungPositionen((rechnung as { beschreibung?: string }).beschreibung)
   const netto = typeof rechnung.netto === 'number' ? rechnung.netto : positionen.reduce((s, p) => s + p.menge * p.einzelpreis, 0)
   const satz = typeof rechnung.steuer_satz === 'number' ? rechnung.steuer_satz : 19
   const steuer = typeof rechnung.steuerbetrag === 'number' ? rechnung.steuerbetrag : Math.round(netto * satz) / 100
@@ -303,7 +335,8 @@ export async function generatePondruffRechnungPDF(rechnung: PDFRechnung, kundenN
 }
 
 export async function generatePondruffAuftragsbestaetigungPDF(auftrag: PDFAuftragsbestaetigung, kundenName: string, returnBase64?: boolean): Promise<string | void> {
-  const positionen = auftrag.positionen || []
+  const raw = auftrag.positionen || []
+  const positionen = raw.length > 0 ? raw : parseLegacyBeschreibungPositionen(auftrag.beschreibung)
   const netto = positionen.reduce((s, p) => s + p.menge * p.einzelpreis, 0) || parseMoney(auftrag.wert) / 1.19
   const satz = 19
   const steuer = Math.round(netto * satz) / 100
