@@ -157,7 +157,7 @@ export default function ZeiterfassungTab({ isDemo, kunden }: { isDemo: boolean; 
         <div className="pk-card" style={{ textAlign: 'center', padding: 48, color: '#aeb9c8' }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>🕐</div>
           <div style={{ fontWeight: 700, marginBottom: 6 }}>Noch keine Zeiteinträge</div>
-          <div style={{ fontSize: 13 }}>Klicke „+ Zeit erfassen", um den ersten Eintrag anzulegen</div>
+          <div style={{ fontSize: 13 }}>Klicke &quot;+ Zeit erfassen&quot;, um den ersten Eintrag anzulegen</div>
         </div>
       ) : (
         <div className="pk-card" style={{ padding: 0 }}>
