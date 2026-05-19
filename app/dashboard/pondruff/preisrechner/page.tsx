@@ -120,7 +120,6 @@ export default function PreisrechnerPage() {
   const [ocrNote, setOcrNote] = useState('')
   const { flags: pondFlags } = usePondruffFlags()
   const ocrEnabled = pondFlags.ocr_preisrechner
-  const [expected, setExpected] = useState({ positions: 0, coatings: 0, polishing: 0, stripping: 0 })
 
   useEffect(() => {
     if (sp.get('prefill') !== '1' || typeof window === 'undefined') return
@@ -232,10 +231,6 @@ export default function PreisrechnerPage() {
 
   return (
     <div>
-      <div className="pk-card" style={{ marginBottom: 14, background: 'rgba(245,158,11,.06)', borderColor: 'rgba(245,158,11,.25)' }}>
-        <strong>Regeln:</strong> Polierpreise handschriftlich auf dem LS/Pos notieren mit <b>Pol</b> + Preis z. B. <b>Pol35</b>. Entschichten mit <b>Ent</b> + Preis z. B. <b>Ent20</b>.
-      </div>
-
       <div className="pk-card" style={{ marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           <div>
@@ -254,16 +249,6 @@ export default function PreisrechnerPage() {
                 ℹ️ Positionen-OCR ist aktuell durch den Inhaber deaktiviert. Positionen können weiterhin manuell angelegt werden.
               </div>
             )}
-          </div>
-
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Prüftabelle (manuell)</div>
-            {(['positions','coatings','polishing','stripping'] as const).map(k => (
-              <label key={k} style={{ display: 'block', marginBottom: 6 }}>
-                <div style={lblStyle}>{k === 'positions' ? 'Positionen' : k === 'coatings' ? 'Beschichtungen' : k === 'polishing' ? 'Polieren' : 'Entschichten'}</div>
-                <input className="pk-input" type="number" min={0} step={1} value={expected[k]} onChange={e => setExpected(prev => ({ ...prev, [k]: Math.max(0, parseInt(e.target.value) || 0) }))} />
-              </label>
-            ))}
           </div>
 
           <div>

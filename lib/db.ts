@@ -1232,6 +1232,7 @@ export async function upsertLagerArtikel(artikel: {
   id: string; name: string; kategorie?: string; bestand?: number
   einheit?: string; lagerplatz?: string; status?: string; mindestbestand?: number
   lieferant_id?: string | null; einkaufspreis?: number
+  bild_path?: string | null
 }) {
   const { data, error } = await db()
     .from('lager_artikel')
@@ -1242,8 +1243,68 @@ export async function upsertLagerArtikel(artikel: {
 }
 
 export async function deleteLagerArtikel(id: string) {
+  // Bild aus Storage entfernen (Cleanup), bevor DB-Zeile gelöscht wird
+  try {
+    const { data: row } = await db().from('lager_artikel').select('bild_path').eq('id', id).maybeSingle()
+    const path = (row as { bild_path?: string | null } | null)?.bild_path
+    if (path) {
+      await db().storage.from('lager-bilder').remove([path])
+    }
+  } catch {
+    // Cleanup ist best-effort, blockiert das Löschen nicht
+  }
   const { error } = await db().from('lager_artikel').delete().eq('id', id)
   if (error) throw error
+}
+
+// Lädt eine signed URL für ein Artikelbild (1h Gültigkeit, CDN-cached)
+export async function getLagerBildSignedUrl(path: string, expiresIn = 3600): Promise<string | null> {
+  if (!path) return null
+  const { data } = await db().storage.from('lager-bilder').createSignedUrl(path, expiresIn)
+  return data?.signedUrl ?? null
+}
+
+// Lädt mehrere signed URLs in einem Batch (effizienter als N Einzelaufrufe)
+export async function getLagerBildSignedUrls(paths: string[], expiresIn = 3600): Promise<Record<string, string>> {
+  const filtered = paths.filter(Boolean)
+  if (filtered.length === 0) return {}
+  const { data } = await db().storage.from('lager-bilder').createSignedUrls(filtered, expiresIn)
+  const map: Record<string, string> = {}
+  ;(data ?? []).forEach((r: { path?: string | null; signedUrl?: string | null }) => {
+    if (r.path && r.signedUrl) map[r.path] = r.signedUrl
+  })
+  return map
+}
+
+// Lädt ein neues Artikelbild hoch + entfernt das alte (falls vorhanden)
+// User-ID wird aus der aktuellen Session ermittelt (Pfad-Konvention für RLS)
+export async function uploadLagerArtikelBild(opts: {
+  artikelId: string
+  blob: Blob
+  ext: string
+  oldPath?: string | null
+}): Promise<string> {
+  const { artikelId, blob, ext, oldPath } = opts
+  const { data: userData, error: userErr } = await db().auth.getUser()
+  if (userErr || !userData?.user) throw new Error('Nicht angemeldet')
+  const userId = userData.user.id
+  const safeId = artikelId.replace(/[^a-zA-Z0-9_-]/g, '_')
+  const path = `${userId}/${safeId}.${ext}`
+  const { error } = await db().storage.from('lager-bilder').upload(path, blob, {
+    upsert: true,
+    contentType: blob.type || 'image/webp',
+    cacheControl: '3600',
+  })
+  if (error) throw error
+  if (oldPath && oldPath !== path) {
+    await db().storage.from('lager-bilder').remove([oldPath]).catch(() => {})
+  }
+  return path
+}
+
+export async function deleteLagerArtikelBild(path: string): Promise<void> {
+  if (!path) return
+  await db().storage.from('lager-bilder').remove([path]).catch(() => {})
 }
 
 // ── LAGER BESTAND-SNAPSHOTS ───────────────────────────────────────────────────
