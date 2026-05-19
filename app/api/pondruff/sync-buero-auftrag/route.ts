@@ -34,13 +34,22 @@ export async function POST(req: NextRequest) {
     const n = Number.parseFloat(t)
     return Number.isFinite(n) ? n : 0
   }
-  const positionen = rows.map((r: Record<string, unknown>, i: number) => ({
-    id: `${auftragId}-P${String(i + 1).padStart(2, '0')}`,
-    beschreibung: String(r['Beschreibung'] || '').replace(/\r/g, '').trim(),
-    menge: Number(r['Menge']) || 1,
-    einheit: 'Stk',
-    einzelpreis: parseMoney(r['Einzelpreis']),
-  }))
+  const srcPositions: Record<string, unknown>[] = Array.isArray(src.positions) ? src.positions : []
+  const positionen = rows.map((r: Record<string, unknown>, i: number) => {
+    const rawDim = typeof srcPositions[i]?.raw_dimension_text === 'string'
+      ? String(srcPositions[i].raw_dimension_text).trim()
+      : ''
+    const baseDesc = String(r['Beschreibung'] || '').replace(/\r/g, '').trim()
+    const beschreibung = rawDim ? `${baseDesc}\n📝 KI las vom Beleg: ${rawDim}` : baseDesc
+    return {
+      id: `${auftragId}-P${String(i + 1).padStart(2, '0')}`,
+      beschreibung,
+      menge: Number(r['Menge']) || 1,
+      einheit: 'Stk',
+      einzelpreis: parseMoney(r['Einzelpreis']),
+      raw_dimension_text: rawDim || undefined,
+    }
+  })
 
   // Brieftext bleibt sauber — Positionen kommen in die Tabelle, nicht in den Fliesstext.
   const beschreibung = src.purchase_order

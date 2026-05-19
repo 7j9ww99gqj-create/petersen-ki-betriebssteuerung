@@ -301,13 +301,22 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
           <div className="pk-table-wrap" style={{ overflowX: 'auto', marginBottom: 10 }}>
             <table className="pk-table" style={{ width: '100%', fontSize: 12 }}>
               <thead><tr>{['Pos.','Menge','Artikel-Nr.','Beschreibung','Listenpreis','Rabatt %','Einzelpreis','Gesamt'].map(h => <th key={h}>{h}</th>)}</tr></thead>
-              <tbody>{(selected.rows || []).map((r, i) => (
-                <tr key={i}>
-                  <td>{r['Pos.']}</td><td>{r.Menge}</td><td>{r['Artikel-Nr.']}</td>
-                  <td style={{ whiteSpace: 'pre-line' }}>{r.Beschreibung}</td>
-                  <td>{r.Listenpreis}</td><td>{r['Rabatt (%)']}</td><td>{r.Einzelpreis}</td><td>{r.Gesamtpreis}</td>
-                </tr>
-              ))}</tbody>
+              <tbody>{(selected.rows || []).map((r, i) => {
+                const posArr = Array.isArray(selected.positions) ? selected.positions as Record<string, unknown>[] : []
+                const rawDim = typeof posArr[i]?.raw_dimension_text === 'string' ? String(posArr[i].raw_dimension_text) : ''
+                return (
+                  <tr key={i}>
+                    <td>{r['Pos.']}</td><td>{r.Menge}</td><td>{r['Artikel-Nr.']}</td>
+                    <td style={{ whiteSpace: 'pre-line' }}>
+                      {r.Beschreibung}
+                      {rawDim && (
+                        <div style={{ marginTop: 4, fontSize: 11, color: '#fbbf24' }}>📝 KI las vom Beleg: <b>{rawDim}</b></div>
+                      )}
+                    </td>
+                    <td>{r.Listenpreis}</td><td>{r['Rabatt (%)']}</td><td>{r.Einzelpreis}</td><td>{r.Gesamtpreis}</td>
+                  </tr>
+                )
+              })}</tbody>
             </table>
           </div>
           <pre style={{ fontSize: 11, background: 'rgba(0,0,0,.3)', padding: 10, borderRadius: 8, overflowX: 'auto', maxHeight: 240 }}>{wisoOrderTsv(toWiso(selected))}</pre>
