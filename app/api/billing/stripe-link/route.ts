@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
+import { parseBody } from '@/lib/validation'
 import { getRouteAccess } from '@/lib/server-auth'
 import { createStripeInvoiceCheckoutSession, buildStripeInvoiceReference } from '@/lib/stripe'
 import { genId } from '@/lib/ids'
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from '@/lib/supabase-admin'
+
+const Schema = z.object({
+  invoiceId: z.string().trim().max(100).optional(),
+  subscriptionId: z.string().trim().max(100).optional(),
+})
 
 export async function POST(req: NextRequest) {
   const access = await getRouteAccess(req)
@@ -12,11 +19,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Stripe-Checkout ist im Demo-Modus nicht verfuegbar.' }, { status: 400 })
   }
 
-  const body = await req.json().catch(() => null) as { invoiceId?: string; subscriptionId?: string } | null
-  let invoiceId = body?.invoiceId?.trim()
+  const parsed = await parseBody(req, Schema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
+  let invoiceId = body.invoiceId?.trim()
 
   // Kein Invoice vorhanden – direkt mit Server-Client anlegen
-  if (!invoiceId && body?.subscriptionId) {
+  if (!invoiceId && body.subscriptionId) {
     const subResult = await access.supabase
       .from('billing_subscriptions')
       .select('*')

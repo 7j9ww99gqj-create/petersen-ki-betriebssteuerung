@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
+import { parseBody } from '@/lib/validation'
 import { getRouteAccess } from '@/lib/server-auth'
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from '@/lib/supabase-admin'
 import { isStripeConfigured } from '@/lib/stripe'
 import { syncStripeInvoiceState } from '@/lib/stripe-sync'
+
+const Schema = z.object({
+  invoiceId: z.string().trim().max(100).optional(),
+})
 
 export async function POST(req: NextRequest) {
   const access = await getRouteAccess(req, ['Inhaber'])
@@ -12,13 +18,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: 'missing_server_config' }, { status: 503 })
   }
 
-  const body = await req.json().catch(() => null) as { invoiceId?: string } | null
+  const parsed = await parseBody(req, Schema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
   const admin = createSupabaseAdminClient()
   const baseQuery = admin
     .from('buero_rechnungen')
     .select('id, nummer, status, summe, kunde, billing_subscription_id, payment_link_id, payment_link_status, payment_link_reference, bezahlt_am')
 
-  const invoiceQuery = body?.invoiceId
+  const invoiceQuery = body.invoiceId
     ? baseQuery.eq('id', body.invoiceId).limit(1)
     : baseQuery.eq('payment_provider', 'stripe').order('updated_at', { ascending: false }).limit(25)
   const invoicesResult = await invoiceQuery
