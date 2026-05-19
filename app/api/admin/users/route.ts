@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
+import { parseBody } from '@/lib/validation'
 import { getAccessProfile, normalizeAccessExpiry, normalizeAccessMode, normalizeAccessStatus, normalizeAllowedPilotIds } from '@/lib/access'
 import { genId } from '@/lib/ids'
 import type { PilotId } from '@/lib/pricingConfig'
@@ -208,6 +210,33 @@ function generateTemporaryPassword() {
   return `Pk!${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}9a`
 }
 
+const PostSchema = z.object({
+  mode: z.enum(['invite', 'create']).optional(),
+  email: z.string().trim().max(320).optional(),
+  fullName: z.string().trim().max(200).optional(),
+  role: z.string().trim().max(40).optional(),
+  password: z.string().max(200).optional(),
+})
+
+const PatchSchema = z.object({
+  userId: z.string().trim().min(1).max(100).optional(),
+  role: z.string().trim().max(40).optional(),
+  accessStatus: z.string().trim().max(40).optional(),
+  accessMode: z.string().trim().max(40).optional(),
+  accessExpiresAt: z.string().max(60).nullable().optional(),
+  allowedPilotIds: z.array(z.string().trim().max(60)).max(100).optional(),
+})
+
+const DeleteSchema = z.object({
+  userId: z.string().trim().min(1).max(100).optional(),
+})
+
+const PutSchema = z.object({
+  action: z.string().trim().max(60).optional(),
+  userId: z.string().trim().max(100).optional(),
+  email: z.string().trim().max(320).optional(),
+})
+
 async function insertAuditLog(admin: ReturnType<typeof createSupabaseAdminClient>, input: {
   actorUserId: string
   ownerUserId?: string
@@ -261,19 +290,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Supabase-Service-Role ist serverseitig nicht konfiguriert.' }, { status: 503 })
   }
 
-  const body = await req.json().catch(() => null) as {
-    mode?: 'invite' | 'create'
-    email?: string
-    fullName?: string
-    role?: string
-    password?: string
-  } | null
+  const parsed = await parseBody(req, PostSchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
 
-  const mode = body?.mode === 'create' ? 'create' : 'invite'
-  const email = body?.email?.trim().toLowerCase() ?? ''
-  const fullName = body?.fullName?.trim() ?? ''
-  const nextRole = normalizeManagedRole(body?.role)
-  const password = body?.password?.trim() ?? ''
+  const mode = body.mode === 'create' ? 'create' : 'invite'
+  const email = body.email?.trim().toLowerCase() ?? ''
+  const fullName = body.fullName?.trim() ?? ''
+  const nextRole = normalizeManagedRole(body.role)
+  const password = body.password?.trim() ?? ''
 
   if (!email || !isValidEmail(email)) {
     return NextResponse.json({ error: 'Bitte eine gueltige E-Mail angeben.' }, { status: 400 })
@@ -396,25 +421,20 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Supabase-Service-Role ist serverseitig nicht konfiguriert.' }, { status: 503 })
   }
 
-  const body = await req.json().catch(() => null) as {
-    userId?: string
-    role?: string
-    accessStatus?: string
-    accessMode?: string
-    accessExpiresAt?: string | null
-    allowedPilotIds?: string[]
-  } | null
-  const userId = body?.userId?.trim()
-  const nextRole = normalizeManagedRole(body?.role)
-  const nextAccessStatus = body?.accessStatus ? normalizeAccessStatus(body.accessStatus) : null
-  const nextAccessMode = body?.accessMode ? normalizeAccessMode(body.accessMode) : null
-  const nextAccessExpiresAt = body && 'accessExpiresAt' in body ? normalizeAccessExpiry(body.accessExpiresAt) : undefined
-  const nextAllowedPilotIds = Array.isArray(body?.allowedPilotIds) ? normalizeAllowedPilotIds(body?.allowedPilotIds) : null
+  const parsed = await parseBody(req, PatchSchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
+  const userId = body.userId?.trim()
+  const nextRole = normalizeManagedRole(body.role)
+  const nextAccessStatus = body.accessStatus ? normalizeAccessStatus(body.accessStatus) : null
+  const nextAccessMode = body.accessMode ? normalizeAccessMode(body.accessMode) : null
+  const nextAccessExpiresAt = 'accessExpiresAt' in body ? normalizeAccessExpiry(body.accessExpiresAt) : undefined
+  const nextAllowedPilotIds = Array.isArray(body.allowedPilotIds) ? normalizeAllowedPilotIds(body.allowedPilotIds) : null
 
   if (!userId) {
     return NextResponse.json({ error: 'userId fehlt.' }, { status: 400 })
   }
-  if (access.user.id === userId && typeof body?.role === 'string') {
+  if (access.user.id === userId && typeof body.role === 'string') {
     return NextResponse.json({ error: 'Die eigene Rolle kann hier nicht geaendert werden.' }, { status: 400 })
   }
 
@@ -436,7 +456,7 @@ export async function PATCH(req: NextRequest) {
 
   const appMetadata = {
     ...(targetUser.app_metadata ?? {}),
-    ...(typeof body?.role === 'string' ? { role: nextRole } : {}),
+    ...(typeof body.role === 'string' ? { role: nextRole } : {}),
     ...(nextAccessStatus ? { access_status: nextAccessStatus } : {}),
     ...(nextAccessMode ? { access_mode: nextAccessMode } : {}),
     ...(nextAccessExpiresAt !== undefined ? { access_expires_at: nextAccessExpiresAt } : {}),
@@ -444,7 +464,7 @@ export async function PATCH(req: NextRequest) {
   }
   const userMetadata = {
     ...(targetUser.user_metadata ?? {}),
-    ...(typeof body?.role === 'string' ? { role: nextRole } : {}),
+    ...(typeof body.role === 'string' ? { role: nextRole } : {}),
     ...(nextAccessStatus ? { access_status: nextAccessStatus } : {}),
     ...(nextAccessMode ? { access_mode: nextAccessMode } : {}),
     ...(nextAccessExpiresAt !== undefined ? { access_expires_at: nextAccessExpiresAt } : {}),
@@ -466,7 +486,7 @@ export async function PATCH(req: NextRequest) {
     targetId: userId,
     payload: {
       previous_role: currentRole,
-      next_role: typeof body?.role === 'string' ? nextRole : currentRole,
+      next_role: typeof body.role === 'string' ? nextRole : currentRole,
       previous_access_status: currentAccess.status,
       next_access_status: nextAccessStatus ?? currentAccess.status,
       previous_access_mode: currentAccess.mode,
@@ -495,8 +515,10 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Supabase-Service-Role ist serverseitig nicht konfiguriert.' }, { status: 503 })
   }
 
-  const body = await req.json().catch(() => null) as { userId?: string } | null
-  const userId = body?.userId?.trim()
+  const parsed = await parseBody(req, DeleteSchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
+  const userId = body.userId?.trim()
 
   if (!userId) {
     return NextResponse.json({ error: 'userId fehlt.' }, { status: 400 })
@@ -545,15 +567,13 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Supabase-Service-Role ist serverseitig nicht konfiguriert.' }, { status: 503 })
   }
 
-  const body = await req.json().catch(() => null) as {
-    action?: string
-    userId?: string
-    email?: string
-  } | null
-  const action = body?.action?.trim()
+  const parsed = await parseBody(req, PutSchema)
+  if (!parsed.ok) return parsed.error
+  const body = parsed.data
+  const action = body.action?.trim()
 
   if (action === 'resend-invite') {
-    const email = body?.email?.trim().toLowerCase()
+    const email = body.email?.trim().toLowerCase()
     if (!email || !isValidEmail(email)) {
       return NextResponse.json({ error: 'Bitte eine gueltige E-Mail angeben.' }, { status: 400 })
     }
@@ -574,7 +594,7 @@ export async function PUT(req: NextRequest) {
   }
 
   if (action === 'disable') {
-    const userId = body?.userId?.trim()
+    const userId = body.userId?.trim()
     if (!userId) {
       return NextResponse.json({ error: 'userId fehlt.' }, { status: 400 })
     }

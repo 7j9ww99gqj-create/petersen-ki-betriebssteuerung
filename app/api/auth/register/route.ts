@@ -1,35 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
+import { parseBody } from '@/lib/validation'
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from '@/lib/supabase-admin'
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
+const Schema = z.object({
+  email: z.string().trim().max(320).optional(),
+  password: z.string().max(200).optional(),
+  fullName: z.string().trim().max(200).optional(),
+  company: z.string().trim().max(200).optional(),
+  strasse: z.string().trim().max(200).optional(),
+  plz: z.string().trim().max(20).optional(),
+  stadt: z.string().trim().max(120).optional(),
+  interessiertePiloten: z.array(z.string().trim().max(60)).max(50).optional(),
+})
+
 export async function POST(req: NextRequest) {
   if (!isSupabaseAdminConfigured()) {
     return NextResponse.json({ error: 'Registrierung ist serverseitig noch nicht konfiguriert.' }, { status: 503 })
   }
 
-  const body = await req.json().catch(() => null) as {
-    email?: string
-    password?: string
-    fullName?: string
-    company?: string
-    strasse?: string
-    plz?: string
-    stadt?: string
-    interessiertePiloten?: string[]
-  } | null
+  const result = await parseBody(req, Schema)
+  if (!result.ok) return result.error
+  const body = result.data
 
-  const email = body?.email?.trim().toLowerCase() ?? ''
-  const password = body?.password ?? ''
-  const fullName = body?.fullName?.trim() || email.split('@')[0] || 'Neuer Kunde'
-  const company = body?.company?.trim() ?? ''
-  const strasse = body?.strasse?.trim() ?? ''
-  const plz = body?.plz?.trim() ?? ''
-  const stadt = body?.stadt?.trim() ?? ''
-  const interessiertePiloten: string[] = Array.isArray(body?.interessiertePiloten) ? body.interessiertePiloten : []
+  const email = body.email?.trim().toLowerCase() ?? ''
+  const password = body.password ?? ''
+  const fullName = body.fullName?.trim() || email.split('@')[0] || 'Neuer Kunde'
+  const company = body.company?.trim() ?? ''
+  const strasse = body.strasse?.trim() ?? ''
+  const plz = body.plz?.trim() ?? ''
+  const stadt = body.stadt?.trim() ?? ''
+  const interessiertePiloten: string[] = Array.isArray(body.interessiertePiloten) ? body.interessiertePiloten : []
 
   if (!email || !isValidEmail(email)) {
     return NextResponse.json({ error: 'Bitte eine gueltige E-Mail angeben.' }, { status: 400 })
