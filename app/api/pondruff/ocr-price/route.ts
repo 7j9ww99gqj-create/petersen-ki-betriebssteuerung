@@ -39,8 +39,19 @@ Ziel:
 - Erkenne ALLE Positionen auf allen Bildern.
 - Jede Position soll fuer den Preisrechner vorbereitet werden.
 - Erkenne je Position Artikelnummer, Positionsnummer, Auftragsnummer, Kostenstelle und Bestellnummer, falls vorhanden.
-- Falls eine Bestellnummer nur global auf dem Dokument steht, gib sie oben als purchase_order zurueck.
 - Erkenne handschriftliche Leistungen wie "Pol35" oder "Ent20".
+
+WICHTIG — Bestellnummer (purchase_order) hat höchste Priorität:
+- Mehrere Bilder koennen GEMISCHT sein: Lieferschein UND separates Bestelldokument ("Bestellung", "Order", "Purchase Order").
+- Auf Bestellungen steht die Bestell-Nr. oft groß oben oder in einer Box mit Beschriftung wie:
+  "Bestell-Nr.", "Bestellnummer", "Best.-Nr.", "Bestell-Nummer", "Auftrag von Ihnen",
+  "Ihre Bestellung", "Ihre Bestell-Nr.", "PO", "PO Number", "Order No."
+- WENN du irgendwo auf einem der Bilder eine Bestellnummer findest (egal in welcher Schreibweise),
+  setze sie OBEN als globales Feld "purchase_order".
+- Wenn die Bestellnummer pro Position unterschiedlich ist, setze sie zusaetzlich pro Position.
+- Bestellnummern bestehen meist aus 4-12 Zeichen (Zahlen + ggf. Buchstaben/Bindestriche). Beispiele:
+  "BN-12345", "Bestell 2024-091", "4500123456", "P/89321".
+- Verwechsle nicht mit der Auftrags-Nr. (interne Auftragsnummer des Kunden) — die kommt ins Feld "order_no".
 
 Regeln:
 - Fuer runde Teile nutze shape = "Rund" und fuelle diameter + length.

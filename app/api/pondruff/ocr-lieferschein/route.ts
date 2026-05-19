@@ -39,10 +39,20 @@ Positionen:
 - Fuer runde Teile shape = "Rund" + diameter + length.
 - Fuer eckige Teile shape = "Eckig" + length + width + height.
 - Wenn nur EINE Position erkennbar ist, fuelle die Top-Level-Felder (article_no, description, ...) zusaetzlich.
-- Falls eine Bestellnummer global auf dem Dokument steht, gib sie als top-level purchase_order zurueck.
 - Erkenne handschriftliche Leistungen wie "Pol35" oder "Ent20".
 - Erlaubte Beschichtungen: ${PRICE_COATINGS.join(', ')}.
 - Wenn quantity nicht sicher: 1.
+
+WICHTIG — Bestellnummer (purchase_order) hat höchste Priorität:
+- Auf dem Dokument steht die Bestell-Nr. oft mit Beschriftung wie:
+  "Bestell-Nr.", "Bestellnummer", "Best.-Nr.", "Ihre Bestellung", "Ihre Bestell-Nr.",
+  "Bestell-Nummer", "PO", "PO Number", "Order No.".
+- Wenn auf dem Bild auch eine "Bestellung" (separates Dokument) sichtbar ist, dort steht
+  die Bestell-Nr. oft groß oben oder in einer eingerahmten Box.
+- Setze die globale Bestell-Nr. IMMER in Top-Level "purchase_order".
+- Bestellnummern bestehen meist aus 4-12 Zeichen (Zahlen + ggf. Buchstaben/Bindestriche). Beispiele:
+  "BN-12345", "Bestell 2024-091", "4500123456", "P/89321".
+- Verwechsle nicht mit Auftrags-Nr. (Kundenauftrag intern → order_no) oder Lieferschein-Nr (→ id).
 
 WICHTIG zu Zahlen — bitte sehr genau lesen:
 - Deutsche Dokumente nutzen Komma als Dezimaltrenner: "4,4" bedeutet 4.4 (vier Komma vier).

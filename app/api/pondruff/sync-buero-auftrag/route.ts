@@ -39,8 +39,11 @@ export async function POST(req: NextRequest) {
     const rawDim = typeof srcPositions[i]?.raw_dimension_text === 'string'
       ? String(srcPositions[i].raw_dimension_text).trim()
       : ''
-    const baseDesc = String(r['Beschreibung'] || '').replace(/\r/g, '').trim()
-    const beschreibung = rawDim ? `${baseDesc}\n📝 KI las vom Beleg: ${rawDim}` : baseDesc
+    // PDF-Beschreibung bleibt sauber — KEINE raw_dimension_text Zeile.
+    // jsPDF (Helvetica) kann Emojis nicht und der "📝 KI las vom Beleg:"-Hinweis
+    // war ohnehin nur als UI-Verifikation gedacht, nicht als Brief-Inhalt.
+    // raw_dimension_text wird separat als Feld mitgespeichert für die UI-Anzeige.
+    const beschreibung = String(r['Beschreibung'] || '').replace(/\r/g, '').trim()
     return {
       id: `${auftragId}-P${String(i + 1).padStart(2, '0')}`,
       beschreibung,
@@ -74,13 +77,24 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Default-Status: 'AB erstellt' — damit greift der BüroPilot-Workflow:
+  // 1) "✉️ AB verschicken" sichtbar  →  per Mail an Kunde
+  // 2) Status wird automatisch "AB versendet"
+  // 3) "▶ Auftrag starten" → "In Bearbeitung"
+  // 4) "→ Rechnung erstellen" wird sichtbar
+  // Sonderfälle: rechnung → Abgeschlossen (direkt zur Rechnung), bereits versendet → AB versendet
+  const initialStatus =
+    src.status === 'rechnung' ? 'Abgeschlossen'
+    : src.confirmed_at ? 'AB versendet'
+    : 'AB erstellt'
+
   const { error: e2 } = await sb.from('buero_auftraege').upsert({
     id: auftragId,
     user_id: access.user.id,
     kunde_id, kunde: src.customer,
     beschreibung,
     wert,
-    status: src.status === 'rechnung' ? 'Abgeschlossen' : 'In Bearbeitung',
+    status: initialStatus,
     start: new Date().toISOString().slice(0, 10),
     ab_nummer: src.order_id,
     ab_verschickt_am: src.confirmed_at ? new Date(src.confirmed_at).toISOString().slice(0, 10) : null,
