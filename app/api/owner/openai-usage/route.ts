@@ -55,8 +55,8 @@ export async function GET(req: NextRequest) {
   const access = await getRouteAccess(req, ['Admin', 'Inhaber'])
   if (access.error) return access.error
 
-  const userEmail = access.user?.email
-  if (userEmail !== OWNER_EMAIL) {
+  const userEmail = access.user?.email?.toLowerCase()
+  if (userEmail !== OWNER_EMAIL.toLowerCase()) {
     return NextResponse.json({ error: 'Nur fuer den Inhaber-Account verfuegbar.' }, { status: 403 })
   }
 
