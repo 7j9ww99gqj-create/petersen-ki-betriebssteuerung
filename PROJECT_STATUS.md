@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Compliance-Sprint** (Aufgaben 15-18): DSGVO-Export UI-Button, CONTRIBUTING+PR-Template, Backup-Restore-Drill.
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Demo-Mode-Foundation-Sprint** (Aufgabe 20A+B+C+E): Demo-User als echter Supabase-Account, Seed-SQL, Reset-CRON, Login-Flow, UI-Banner.
+- Davor: **Compliance-Sprint** (Aufgaben 15-18): DSGVO-Export UI-Button, CONTRIBUTING+PR-Template, Backup-Restore-Drill.
 - Davor: **Optimierungs-Sprint Phase-3** (HEAD `c0bbb45`): 13 Verbesserungen live (paralleler Agent).
 - Davor: **Phase-2-Sprint** (HEAD `0e89a9f`): Audit-Logs, OpenAI-Cost-Tracking, Modal/Toast-Konsolidierung, Test-Coverage +47, API-Versionierung.
 - Davor: **Security-Sprint** (Commits `bb920c0`–`4ceb16d`): Zod, Rate-Limiting, KI-Cache.
@@ -35,6 +36,21 @@
 - Tests: `npm test` — ✅ **87 Tests** in 7 Files.
 - CI: GitHub Actions (tsc + test + build) — ✅ Workflow aktiv auf main.
 - Supabase Storage: ~100 GB Plan — neue Buckets `lager-bilder`, `ocr-originale`, `firma-branding`, `db-backups` (alle privat, user-scoped RLS).
+
+### Demo-Mode-Foundation-Sprint (2026-05-19) — Aufgabe 20A+B+C+E aus Optimierungs-Plan
+
+Foundation für RLS-basierten Demo-Mode gelegt — Demo-User ist jetzt ein echter Supabase-Account mit echten Daten in der DB statt hardcoded Frontend-Konstanten.
+
+| Phase | Aufgabe | Commit |
+|---|---|---|
+| A | Demo-User in `auth.users` angelegt (UUID `5ff2cb0a-1ea0-4ba5-a6cc-54762710b68f`) + Seed-SQL mit 46 Datensätzen in 11 Tabellen | `3fbafed` |
+| B | `/api/admin/demo-reset` Endpoint (GET, Auth via CRON_SECRET) — löscht alle 35 user-scoped Tabellen + Storage-Files + spielt Seed neu ein. Vercel-CRON 03:00 Uhr UTC in `vercel.json` | `29f3bbe` |
+| C | `app/login/page.tsx` — Demo-Login läuft jetzt über echte `supabase.auth.signInWithPassword`-Session; `pk_demo`-Cookie wird zusätzlich gesetzt (nur noch für UI-Banner, kein Auth-Pfad mehr) | `e79c224` |
+| E | `components/DemoBanner.tsx` — sichtbarer 🧪-Hinweis im Dashboard-Layout bei aktiver Demo-Session, per X dismissible (sessionStorage) | `c80e2e4` |
+
+**Seed-Inhalt (46 Datensätze):** firma_einstellungen (1), lager_artikel (8), lager_stellplaetze (6), lager_bewegungen (6), buero_kunden (5), einkauf_lieferanten (4), werkstatt_karten (4), planung_projekte (3), marketing_kampagnen (3), marketing_leads (3), steuer_belege (3).
+
+**Phase D bleibt offen** (graduelle Code-Migration): 580+ `if (isDemo)`-Branches in den Pilot-Pages → schrittweise pro Pilot entfernen. Demo-User kann jetzt zwar bereits den echten Daten-Pfad nutzen, aber die alten Branches blocken ihn noch teils. Empfehlung: pro Pilot ein PR, getestet mit Demo-Login.
 
 ### Zod-Hardening-Sprint (2026-05-19) — Aufgabe 17 aus Optimierungs-Plan
 
