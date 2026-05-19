@@ -146,7 +146,7 @@ function Toast({ msg, type = 'success' }: { msg: string; type?: 'success' | 'err
 
 function KpiCard({ label, value, sub, color, onClick }: { label: string; value: string; sub?: string; color?: string; onClick?: () => void }) {
   return (
-    <div className="pk-card" style={{ padding: '18px 20px', cursor: onClick ? 'pointer' : undefined }} onClick={onClick}>
+    <div className="pk-card" style={{ padding: '18px 20px', cursor: onClick ? 'pointer' : undefined }} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined} onClick={onClick} onKeyDown={onClick ? (e => { if (e.key === 'Enter' || e.key === ' ') onClick() }) : undefined}>
       <div style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 900, color: color ?? '#f8fbff', lineHeight: 1.1 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: '#4a5568', marginTop: 4 }}>{sub}</div>}
@@ -168,8 +168,8 @@ function StatusBadge({ status }: { status: string }) {
 
 function Modal({ title, onClose, children, maxWidth = 560 }: { title: string; onClose: () => void; children: React.ReactNode; maxWidth?: number }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
-      <div className="pk-card fade-in" style={{ width: '100%', maxWidth, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+    <div role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }}>
+      <div className="pk-card fade-in" style={{ width: '100%', maxWidth, maxHeight: '90vh', overflowY: 'auto' }} role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{title}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
@@ -720,8 +720,8 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
         <div>
           {/* Monatsauswahl */}
           <div style={{ marginBottom: 20 }}>
-            <label style={{ fontSize: 13, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 6 }}>Betrachtungsmonat</label>
-            <select className="pk-input" value={selectedMonat} onChange={e => setSelectedMonat(e.target.value)} style={{ maxWidth: 240 }}>
+            <label htmlFor="field-betrachtungsmonat" style={{ fontSize: 13, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 6 }}>Betrachtungsmonat</label>
+            <select id="field-betrachtungsmonat" className="pk-input" value={selectedMonat} onChange={e => setSelectedMonat(e.target.value)} style={{ maxWidth: 240 }}>
               {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
             </select>
           </div>
@@ -898,8 +898,8 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
       {tab === 'einnahmen' && (
         <div>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 13, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 6 }}>Monat</label>
-            <select className="pk-input" value={selectedMonat} onChange={e => setSelectedMonat(e.target.value)} style={{ maxWidth: 240 }}>
+            <label htmlFor="field-monat" style={{ fontSize: 13, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 6 }}>Monat</label>
+            <select id="field-monat" className="pk-input" value={selectedMonat} onChange={e => setSelectedMonat(e.target.value)} style={{ maxWidth: 240 }}>
               {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
             </select>
           </div>
@@ -1076,26 +1076,26 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
                   <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>📎 Beleg hochladen</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
                     <div>
-                      <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Kategorie</label>
-                      <select className="pk-input" value={uploadForm.kategorie} onChange={e => setUploadForm(p => ({ ...p, kategorie: e.target.value }))}>
+                      <label htmlFor="field-kategorie" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Kategorie</label>
+                      <select id="field-kategorie" className="pk-input" value={uploadForm.kategorie} onChange={e => setUploadForm(p => ({ ...p, kategorie: e.target.value }))}>
                         {KATEGORIEN.map(k => <option key={k} value={k}>{k}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Betrag (€)</label>
-                      <input className="pk-input" type="text" inputMode="decimal" placeholder="0,00" value={uploadForm.betrag} onChange={e => setUploadForm(p => ({ ...p, betrag: e.target.value }))} />
+                      <label htmlFor="field-betrag" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Betrag (€)</label>
+                      <input id="field-betrag" className="pk-input" type="text" inputMode="decimal" placeholder="0,00" value={uploadForm.betrag} onChange={e => setUploadForm(p => ({ ...p, betrag: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Datum</label>
-                      <input className="pk-input" type="date" value={uploadForm.datum} onChange={e => setUploadForm(p => ({ ...p, datum: e.target.value }))} />
+                      <label htmlFor="field-datum" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Datum</label>
+                      <input id="field-datum" className="pk-input" type="date" value={uploadForm.datum} onChange={e => setUploadForm(p => ({ ...p, datum: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Notiz</label>
-                      <input className="pk-input" placeholder="Optional" value={uploadForm.notiz} onChange={e => setUploadForm(p => ({ ...p, notiz: e.target.value }))} />
+                      <label htmlFor="field-notiz" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Notiz</label>
+                      <input id="field-notiz" className="pk-input" placeholder="Optional" value={uploadForm.notiz} onChange={e => setUploadForm(p => ({ ...p, notiz: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Datei *</label>
-                      <input ref={uploadFileRef} type="file" accept="image/*,application/pdf" className="pk-input" style={{ fontSize: 12 }} onChange={e => setUploadFile2(e.target.files?.[0] ?? null)} />
+                      <label htmlFor="field-datei" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Datei *</label>
+                      <input id="field-datei" ref={uploadFileRef} type="file" accept="image/*,application/pdf" className="pk-input" style={{ fontSize: 12 }} onChange={e => setUploadFile2(e.target.files?.[0] ?? null)} />
                     </div>
                   </div>
                   <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
@@ -1237,8 +1237,8 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
         <div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginBottom: 20, flexWrap: 'wrap' }}>
             <div>
-              <label style={{ fontSize: 13, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 6 }}>Monat</label>
-              <select className="pk-input" value={selectedMonat} onChange={e => setSelectedMonat(e.target.value)} style={{ minWidth: 200 }}>
+              <label htmlFor="field-monat-2" style={{ fontSize: 13, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 6 }}>Monat</label>
+              <select id="field-monat-2" className="pk-input" value={selectedMonat} onChange={e => setSelectedMonat(e.target.value)} style={{ minWidth: 200 }}>
                 {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
               </select>
             </div>
@@ -1666,13 +1666,13 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
               )}
             </div>
             <div>
-              <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Lieferant *</label>
-              <input className="pk-input" placeholder="z.B. Büromaterial GmbH" value={editBeleg.lieferant ?? ''} onChange={e => setEditBeleg(p => ({ ...p, lieferant: e.target.value }))} />
+              <label htmlFor="field-lieferant" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Lieferant *</label>
+              <input id="field-lieferant" className="pk-input" placeholder="z.B. Büromaterial GmbH" value={editBeleg.lieferant ?? ''} onChange={e => setEditBeleg(p => ({ ...p, lieferant: e.target.value }))} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Bruttobetrag (€) *</label>
-                <input className="pk-input" type="text" inputMode="decimal" placeholder="0,00" value={editBeleg.betrag != null ? String(editBeleg.betrag) : ''} onChange={e => {
+                <label htmlFor="field-bruttobetrag" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Bruttobetrag (€) *</label>
+                <input id="field-bruttobetrag" className="pk-input" type="text" inputMode="decimal" placeholder="0,00" value={editBeleg.betrag != null ? String(editBeleg.betrag) : ''} onChange={e => {
                   const raw = e.target.value
                   setEditBeleg(p => {
                     const normalized = raw.replace(',', '.')
@@ -1685,8 +1685,8 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
                 }} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Steuerbetrag (€)</label>
-                <input className="pk-input" type="text" inputMode="decimal" placeholder="0,00" value={editBeleg.steuerbetrag != null ? String(editBeleg.steuerbetrag) : ''} onChange={e => {
+                <label htmlFor="field-steuerbetrag" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Steuerbetrag (€)</label>
+                <input id="field-steuerbetrag" className="pk-input" type="text" inputMode="decimal" placeholder="0,00" value={editBeleg.steuerbetrag != null ? String(editBeleg.steuerbetrag) : ''} onChange={e => {
                   const normalized = e.target.value.replace(',', '.')
                   const val = parseFloat(normalized)
                   setEditBeleg(p => ({ ...p, steuerbetrag: Number.isFinite(val) ? val : undefined }))
@@ -1695,8 +1695,8 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Steuersatz</label>
-                <select className="pk-input" value={editBeleg.steuersatz ?? 19} onChange={e => {
+                <label htmlFor="field-steuersatz" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Steuersatz</label>
+                <select id="field-steuersatz" className="pk-input" value={editBeleg.steuersatz ?? 19} onChange={e => {
                   const satz = Number(e.target.value)
                   const brutto = Number(editBeleg.betrag ?? 0)
                   const steuer = satz > 0 ? Math.round(brutto / (1 + satz / 100) * (satz / 100) * 100) / 100 : 0
@@ -1706,28 +1706,28 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Datum *</label>
-                <input className="pk-input" type="date" value={editBeleg.datum ?? new Date().toISOString().split('T')[0]} onChange={e => setEditBeleg(p => ({ ...p, datum: e.target.value }))} />
+                <label htmlFor="field-datum-2" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Datum *</label>
+                <input id="field-datum-2" className="pk-input" type="date" value={editBeleg.datum ?? new Date().toISOString().split('T')[0]} onChange={e => setEditBeleg(p => ({ ...p, datum: e.target.value }))} />
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Status</label>
-                <select className="pk-input" value={editBeleg.status ?? 'offen'} onChange={e => setEditBeleg(p => ({ ...p, status: e.target.value as Beleg['status'] }))}>
+                <label htmlFor="field-status" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Status</label>
+                <select id="field-status" className="pk-input" value={editBeleg.status ?? 'offen'} onChange={e => setEditBeleg(p => ({ ...p, status: e.target.value as Beleg['status'] }))}>
                   <option value="offen">Offen</option>
                   <option value="geprüft">Geprüft</option>
                   <option value="exportiert">Exportiert</option>
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Beleg (Datei)</label>
-                <input ref={fileRef} type="file" accept="image/*,application/pdf" className="pk-input" onChange={e => setUploadFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12 }} />
+                <label htmlFor="field-beleg-datei" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Beleg (Datei)</label>
+                <input id="field-beleg-datei" ref={fileRef} type="file" accept="image/*,application/pdf" className="pk-input" onChange={e => setUploadFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12 }} />
                 {editBeleg.datei_url && !uploadFile && <a href={editBeleg.datei_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#1684ff', display: 'block', marginTop: 4 }}>Beleg ansehen →</a>}
               </div>
             </div>
             <div>
-              <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Notiz</label>
-              <input className="pk-input" placeholder="Kommentar zum Beleg" value={editBeleg.notiz ?? ''} onChange={e => setEditBeleg(p => ({ ...p, notiz: e.target.value }))} />
+              <label htmlFor="field-notiz-2" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Notiz</label>
+              <input id="field-notiz-2" className="pk-input" placeholder="Kommentar zum Beleg" value={editBeleg.notiz ?? ''} onChange={e => setEditBeleg(p => ({ ...p, notiz: e.target.value }))} />
             </div>
             {(editBeleg.betrag ?? 0) > 0 && (
               <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.2)', fontSize: 13, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
@@ -1770,17 +1770,21 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
       {/* ── 3-stufiges Beleg-Erfassungs-Modal ─────────────────────────────────── */}
       {showNewBelegModal && (
         <div
+          role="presentation"
           style={{
             position: 'fixed', inset: 0, zIndex: 500,
             background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
           }}
           onClick={() => setShowNewBelegModal(false)}
+          onKeyDown={e => { if (e.key === 'Escape') setShowNewBelegModal(false) }}
         >
           <div
             className="pk-card fade-in"
             style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }}
+            role="presentation"
             onClick={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -1895,8 +1899,8 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div style={{ display: 'flex', gap: 12 }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6, fontWeight: 600 }}>Betrag (€) *</label>
-                      <input
+                      <label htmlFor="field-betrag-2" style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6, fontWeight: 600 }}>Betrag (€) *</label>
+                      <input id="field-betrag-2"
                         className="pk-input"
                         type="text"
                         inputMode="decimal"
@@ -1906,8 +1910,8 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
                       />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6, fontWeight: 600 }}>Datum *</label>
-                      <input
+                      <label htmlFor="field-datum-3" style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6, fontWeight: 600 }}>Datum *</label>
+                      <input id="field-datum-3"
                         className="pk-input"
                         type="date"
                         value={newBelegDetails.datum}
@@ -1917,8 +1921,8 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6, fontWeight: 600 }}>Beschreibung (optional)</label>
-                    <textarea
+                    <label htmlFor="field-beschreibung-optional" style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6, fontWeight: 600 }}>Beschreibung (optional)</label>
+                    <textarea id="field-beschreibung-optional"
                       className="pk-input"
                       placeholder="Kurze Beschreibung des Belegs…"
                       value={newBelegDetails.beschreibung}
@@ -1930,9 +1934,13 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
 
                   {/* Datei-Upload */}
                   <div>
+                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                     <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6, fontWeight: 600 }}>Beleg-Datei (optional)</label>
                     <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => newBelegFileRef.current?.click()}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') newBelegFileRef.current?.click() }}
                       style={{
                         border: `2px dashed ${newBelegFile ? STEUER_COLOR : 'rgba(255,255,255,.2)'}`,
                         borderRadius: 10, padding: '14px 16px', textAlign: 'center',

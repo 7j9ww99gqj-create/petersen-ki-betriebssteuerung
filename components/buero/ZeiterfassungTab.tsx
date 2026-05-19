@@ -108,23 +108,23 @@ export default function ZeiterfassungTab({ isDemo, kunden }: { isDemo: boolean; 
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
             <div>
-              <label style={labelStyle}>Kunde</label>
-              <select className="pk-input" value={form.kunde_id} onChange={e => setForm(p => ({ ...p, kunde_id: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-kunde" style={labelStyle}>Kunde</label>
+              <select id="field-kunde" className="pk-input" value={form.kunde_id} onChange={e => setForm(p => ({ ...p, kunde_id: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option value="">— Kein Kunde —</option>
                 {kunden.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Datum *</label>
-              <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.datum} onChange={e => setForm(p => ({ ...p, datum: e.target.value }))} />
+              <label htmlFor="field-datum" style={labelStyle}>Datum *</label>
+              <input id="field-datum" className="pk-input" placeholder="TT.MM.JJJJ" value={form.datum} onChange={e => setForm(p => ({ ...p, datum: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Von *</label>
-              <input className="pk-input" type="time" value={form.von} onChange={e => setForm(p => ({ ...p, von: e.target.value }))} />
+              <label htmlFor="field-von" style={labelStyle}>Von *</label>
+              <input id="field-von" className="pk-input" type="time" value={form.von} onChange={e => setForm(p => ({ ...p, von: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Bis *</label>
-              <input className="pk-input" type="time" value={form.bis} onChange={e => setForm(p => ({ ...p, bis: e.target.value }))} />
+              <label htmlFor="field-bis" style={labelStyle}>Bis *</label>
+              <input id="field-bis" className="pk-input" type="time" value={form.bis} onChange={e => setForm(p => ({ ...p, bis: e.target.value }))} />
               {form.von && form.bis && (
                 <div style={{ fontSize: 12, color: '#a78bfa', marginTop: 4 }}>
                   = {calcStunden(form.von, form.bis).toFixed(2)} Std
@@ -132,12 +132,12 @@ export default function ZeiterfassungTab({ isDemo, kunden }: { isDemo: boolean; 
               )}
             </div>
             <div>
-              <label style={labelStyle}>Stundensatz (€)</label>
-              <input className="pk-input" type="number" min="0" step="0.01" value={form.stundensatz} onChange={e => setForm(p => ({ ...p, stundensatz: parseFloat(e.target.value) || 0 }))} />
+              <label htmlFor="field-stundensatz" style={labelStyle}>Stundensatz (€)</label>
+              <input id="field-stundensatz" className="pk-input" type="number" min="0" step="0.01" value={form.stundensatz} onChange={e => setForm(p => ({ ...p, stundensatz: parseFloat(e.target.value) || 0 }))} />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Beschreibung</label>
-              <input className="pk-input" placeholder="Tätigkeitsbeschreibung…" value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} />
+              <label htmlFor="field-beschreibung" style={labelStyle}>Beschreibung</label>
+              <input id="field-beschreibung" className="pk-input" placeholder="Tätigkeitsbeschreibung…" value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} />
             </div>
           </div>
           {form.von && form.bis && form.stundensatz > 0 && calcStunden(form.von, form.bis) > 0 && (
@@ -190,7 +190,7 @@ export default function ZeiterfassungTab({ isDemo, kunden }: { isDemo: boolean; 
                     <td style={{ fontWeight: 700, color: '#25d366' }}>{betrag.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</td>
                     <td style={{ color: '#aeb9c8', fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.beschreibung}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: 4 }} onClick={ev => ev.stopPropagation()}>
+                      <div role="presentation" style={{ display: 'flex', gap: 4 }} onClick={ev => ev.stopPropagation()} onKeyDown={ev => ev.stopPropagation()}>
                         <button onClick={() => handleEdit(e)} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(32,200,255,.3)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>✏️</button>
                         {deleteConfirm === e.id ? (
                           <>

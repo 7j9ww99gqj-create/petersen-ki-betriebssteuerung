@@ -92,51 +92,51 @@ export default function ArtikelTab({ isDemo }: { isDemo: boolean }) {
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
             <div>
-              <label style={labelStyle}>Artikelnummer</label>
-              <input className="pk-input" placeholder="z.B. 10001" value={form.artikelnummer ?? ''} onChange={e => setForm(p => ({ ...p, artikelnummer: e.target.value }))} />
+              <label htmlFor="field-artikelnummer" style={labelStyle}>Artikelnummer</label>
+              <input id="field-artikelnummer" className="pk-input" placeholder="z.B. 10001" value={form.artikelnummer ?? ''} onChange={e => setForm(p => ({ ...p, artikelnummer: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Name / Bezeichnung *</label>
-              <input className="pk-input" placeholder="Artikelname" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+              <label htmlFor="field-name-bezeichnung" style={labelStyle}>Name / Bezeichnung *</label>
+              <input id="field-name-bezeichnung" className="pk-input" placeholder="Artikelname" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Kategorie</label>
-              <select className="pk-input" value={form.kategorie ?? ''} onChange={e => setForm(p => ({ ...p, kategorie: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-kategorie" style={labelStyle}>Kategorie</label>
+              <select id="field-kategorie" className="pk-input" value={form.kategorie ?? ''} onChange={e => setForm(p => ({ ...p, kategorie: e.target.value }))} style={{ cursor: 'pointer' }}>
                 {KATEGORIEN.map(k => <option key={k}>{k}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Einheit *</label>
-              <select className="pk-input" value={form.einheit} onChange={e => setForm(p => ({ ...p, einheit: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-einheit" style={labelStyle}>Einheit *</label>
+              <select id="field-einheit" className="pk-input" value={form.einheit} onChange={e => setForm(p => ({ ...p, einheit: e.target.value }))} style={{ cursor: 'pointer' }}>
                 {EINHEITEN.map(e => <option key={e}>{e}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Einkaufspreis (€)</label>
-              <input className="pk-input" type="number" min="0" step="0.01" placeholder="0,00" value={form.einkaufspreis ?? ''} onChange={e => setForm(p => ({ ...p, einkaufspreis: e.target.value ? parseFloat(e.target.value) : undefined }))} />
+              <label htmlFor="field-einkaufspreis" style={labelStyle}>Einkaufspreis (€)</label>
+              <input id="field-einkaufspreis" className="pk-input" type="number" min="0" step="0.01" placeholder="0,00" value={form.einkaufspreis ?? ''} onChange={e => setForm(p => ({ ...p, einkaufspreis: e.target.value ? parseFloat(e.target.value) : undefined }))} />
             </div>
             <div>
-              <label style={labelStyle}>Verkaufspreis (€) *</label>
-              <input className="pk-input" type="number" min="0" step="0.01" placeholder="0,00" value={form.verkaufspreis ?? ''} onChange={e => setForm(p => ({ ...p, verkaufspreis: e.target.value ? parseFloat(e.target.value) : undefined }))} />
+              <label htmlFor="field-verkaufspreis" style={labelStyle}>Verkaufspreis (€) *</label>
+              <input id="field-verkaufspreis" className="pk-input" type="number" min="0" step="0.01" placeholder="0,00" value={form.verkaufspreis ?? ''} onChange={e => setForm(p => ({ ...p, verkaufspreis: e.target.value ? parseFloat(e.target.value) : undefined }))} />
             </div>
             <div>
-              <label style={labelStyle}>MwSt (%)</label>
-              <select className="pk-input" value={form.mwst ?? 19} onChange={e => setForm(p => ({ ...p, mwst: parseInt(e.target.value) }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-mwst" style={labelStyle}>MwSt (%)</label>
+              <select id="field-mwst" className="pk-input" value={form.mwst ?? 19} onChange={e => setForm(p => ({ ...p, mwst: parseInt(e.target.value) }))} style={{ cursor: 'pointer' }}>
                 <option value={19}>19 %</option>
                 <option value={7}>7 %</option>
                 <option value={0}>0 %</option>
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Status</label>
-              <select className="pk-input" value={form.aktiv ? 'aktiv' : 'inaktiv'} onChange={e => setForm(p => ({ ...p, aktiv: e.target.value === 'aktiv' }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-status" style={labelStyle}>Status</label>
+              <select id="field-status" className="pk-input" value={form.aktiv ? 'aktiv' : 'inaktiv'} onChange={e => setForm(p => ({ ...p, aktiv: e.target.value === 'aktiv' }))} style={{ cursor: 'pointer' }}>
                 <option value="aktiv">Aktiv</option>
                 <option value="inaktiv">Inaktiv</option>
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Beschreibung</label>
-              <input className="pk-input" placeholder="Kurzbeschreibung…" value={form.beschreibung ?? ''} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} />
+              <label htmlFor="field-beschreibung" style={labelStyle}>Beschreibung</label>
+              <input id="field-beschreibung" className="pk-input" placeholder="Kurzbeschreibung…" value={form.beschreibung ?? ''} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} />
             </div>
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>

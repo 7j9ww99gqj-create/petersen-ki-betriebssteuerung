@@ -150,25 +150,25 @@ export default function RegisterPage() {
               <form onSubmit={handleRegister}>
                 {/* Kontaktdaten */}
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>E-Mail Adresse</label>
-                  <input className="pk-input" type="email" placeholder="name@betrieb.de" value={email}
+                  <label htmlFor="field-e-mail-adresse" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>E-Mail Adresse</label>
+                  <input id="field-e-mail-adresse" className="pk-input" type="email" placeholder="name@betrieb.de" value={email}
                     onChange={e => setEmail(e.target.value)} autoComplete="email" disabled={loading} />
                 </div>
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Name</label>
-                  <input className="pk-input" placeholder="Max Mustermann" value={fullName}
+                  <label htmlFor="field-name" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Name</label>
+                  <input id="field-name" className="pk-input" placeholder="Max Mustermann" value={fullName}
                     onChange={e => setFullName(e.target.value)} autoComplete="name" disabled={loading} />
                 </div>
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Firma</label>
-                  <input className="pk-input" placeholder="Musterbetrieb GmbH" value={company}
+                  <label htmlFor="field-firma" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Firma</label>
+                  <input id="field-firma" className="pk-input" placeholder="Musterbetrieb GmbH" value={company}
                     onChange={e => setCompany(e.target.value)} autoComplete="organization" disabled={loading} />
                 </div>
 
                 {/* Adresse */}
                 <div style={{ marginBottom: 6 }}>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Straße &amp; Hausnummer</label>
-                  <input className="pk-input" placeholder="Musterstraße 12" value={strasse}
+                  <label htmlFor="field-strae-amp-hausnummer" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Straße &amp; Hausnummer</label>
+                  <input id="field-strae-amp-hausnummer" className="pk-input" placeholder="Musterstraße 12" value={strasse}
                     onChange={e => setStrasse(e.target.value)} autoComplete="street-address" disabled={loading} />
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
@@ -186,9 +186,9 @@ export default function RegisterPage() {
 
                 {/* Piloten-Interesse */}
                 <div style={{ marginBottom: 14, position: 'relative' }}>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>
+                  <span style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>
                     Interesse an Piloten <span style={{ color: '#4a5568', fontWeight: 400 }}>(optional)</span>
-                  </label>
+                  </span>
                   <button
                     type="button"
                     onClick={() => setShowPiloten(v => !v)}
@@ -242,13 +242,13 @@ export default function RegisterPage() {
 
                 {/* Passwort */}
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Passwort</label>
-                  <input className="pk-input" type="password" placeholder="Min. 6 Zeichen" value={password}
+                  <label htmlFor="field-passwort" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Passwort</label>
+                  <input id="field-passwort" className="pk-input" type="password" placeholder="Min. 6 Zeichen" value={password}
                     onChange={e => setPassword(e.target.value)} autoComplete="new-password" disabled={loading} />
                 </div>
                 <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Passwort bestätigen</label>
-                  <input className="pk-input" type="password" placeholder="Passwort wiederholen" value={confirm}
+                  <label htmlFor="field-passwort-besttigen" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Passwort bestätigen</label>
+                  <input id="field-passwort-besttigen" className="pk-input" type="password" placeholder="Passwort wiederholen" value={confirm}
                     onChange={e => setConfirm(e.target.value)} autoComplete="new-password" disabled={loading} />
                 </div>
 

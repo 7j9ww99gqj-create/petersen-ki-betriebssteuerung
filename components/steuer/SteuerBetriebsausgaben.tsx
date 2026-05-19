@@ -141,6 +141,7 @@ export default function SteuerBetriebsausgabenTab({
     <div>
       {/* Monat + KPIs */}
       <div style={{ marginBottom: 16 }}>
+        {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
         <label style={{ fontSize: 13, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 6 }}>Monat</label>
         <MonthSelector value={selectedMonat} onChange={setSelectedMonat} months={months} />
       </div>

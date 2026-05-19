@@ -585,7 +585,10 @@ export default function CloudPage() {
               {backups.map((b, idx) => (
                 <div key={b.id}>
                   <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setExpandedBackup(expandedBackup === b.id ? null : b.id)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setExpandedBackup(expandedBackup === b.id ? null : b.id) }}
                     style={{
                       padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
                       background: idx === 0 ? 'rgba(22,132,255,.06)' : 'rgba(255,255,255,.03)',

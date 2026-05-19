@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createSupabaseClient } from '@/lib/supabase'
 import { genId } from '@/lib/ids'
 import { isDemoUser, hasDemoCookie, performLogout } from '@/lib/auth'
@@ -693,20 +694,20 @@ export default function EinstellungenPage() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Name *</label>
-                    <input className="pk-input" value={profil.name} onChange={e => setProfil(p => ({ ...p, name: e.target.value }))} placeholder="Vollständiger Name" />
+                    <label htmlFor="field-name" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Name *</label>
+                    <input id="field-name" className="pk-input" value={profil.name} onChange={e => setProfil(p => ({ ...p, name: e.target.value }))} placeholder="Vollständiger Name" />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>E-Mail</label>
-                    <input className="pk-input" value={profil.email} disabled style={{ opacity: .5, cursor: 'not-allowed' }} />
+                    <label htmlFor="field-e-mail" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>E-Mail</label>
+                    <input id="field-e-mail" className="pk-input" value={profil.email} disabled style={{ opacity: .5, cursor: 'not-allowed' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Firma</label>
-                    <input className="pk-input" value={profil.firma} onChange={e => setProfil(p => ({ ...p, firma: e.target.value }))} placeholder="Firmenname" />
+                    <label htmlFor="field-firma" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Firma</label>
+                    <input id="field-firma" className="pk-input" value={profil.firma} onChange={e => setProfil(p => ({ ...p, firma: e.target.value }))} placeholder="Firmenname" />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Rolle</label>
-                    <input className="pk-input" value={profil.role} disabled style={{ opacity: .5, cursor: 'not-allowed' }} />
+                    <label htmlFor="field-rolle" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Rolle</label>
+                    <input id="field-rolle" className="pk-input" value={profil.role} disabled style={{ opacity: .5, cursor: 'not-allowed' }} />
                   </div>
                 </div>
                 <div style={{ marginTop: 16 }}>
@@ -719,12 +720,12 @@ export default function EinstellungenPage() {
                   <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>🔑 Passwort ändern</h3>
                   <div style={{ display: 'grid', gap: 14, maxWidth: 400 }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Neues Passwort</label>
-                      <input className="pk-input" type="password" placeholder="Min. 6 Zeichen" value={pwForm.neu} onChange={e => setPwForm(p => ({ ...p, neu: e.target.value }))} />
+                      <label htmlFor="field-neues-passwort" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Neues Passwort</label>
+                      <input id="field-neues-passwort" className="pk-input" type="password" placeholder="Min. 6 Zeichen" value={pwForm.neu} onChange={e => setPwForm(p => ({ ...p, neu: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Passwort bestätigen</label>
-                      <input className="pk-input" type="password" placeholder="Passwort wiederholen" value={pwForm.bestaetigung} onChange={e => setPwForm(p => ({ ...p, bestaetigung: e.target.value }))} />
+                      <label htmlFor="field-passwort-besttigen" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Passwort bestätigen</label>
+                      <input id="field-passwort-besttigen" className="pk-input" type="password" placeholder="Passwort wiederholen" value={pwForm.bestaetigung} onChange={e => setPwForm(p => ({ ...p, bestaetigung: e.target.value }))} />
                     </div>
                     <button className="pk-btn" onClick={handlePwSave} style={{ fontWeight: 700, width: 'fit-content' }}>Passwort ändern</button>
                   </div>
@@ -2745,8 +2746,8 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
   const inputDisabled = !canEdit
   const input = (key: keyof FirmaEinstellungen, label: string, placeholder = '', type = 'text') => (
     <div>
-      <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{label}</label>
-      <input className="pk-input" type={type} disabled={inputDisabled} value={String(firma[key] ?? '')} onChange={e => setField(key, e.target.value as never)} placeholder={placeholder} />
+      <label htmlFor="field-label" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{label}</label>
+      <input id="field-label" className="pk-input" type={type} disabled={inputDisabled} value={String(firma[key] ?? '')} onChange={e => setField(key, e.target.value as never)} placeholder={placeholder} />
     </div>
   )
   const requiredDocumentFields: Array<[keyof FirmaEinstellungen, string]> = [
@@ -2807,8 +2808,8 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
       <div className="pk-card">
         <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800 }}>🏢 Firmendaten & Logo</h3>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
-          <div style={{ width: 74, height: 74, borderRadius: 16, overflow: 'hidden', background: 'rgba(32,200,255,.12)', border: '1px solid rgba(32,200,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 900, color: '#20c8ff' }}>
-            {firma.logo_url ? <img src={firma.logo_url} alt="Firmenlogo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (firma.firmenname || 'F').slice(0, 2).toUpperCase()}
+          <div style={{ width: 74, height: 74, borderRadius: 16, overflow: 'hidden', background: 'rgba(32,200,255,.12)', border: '1px solid rgba(32,200,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 900, color: '#20c8ff', position: 'relative' }}>
+            {firma.logo_url ? <Image src={firma.logo_url} alt="Firmenlogo" fill style={{ objectFit: 'cover' }} /> : (firma.firmenname || 'F').slice(0, 2).toUpperCase()}
           </div>
           <label className="pk-btn-ghost" style={{ cursor: canEdit ? 'pointer' : 'not-allowed', opacity: canEdit ? 1 : .5 }}>
             {logoUploading ? '⏳ Logo…' : 'Logo hochladen'}
@@ -2851,7 +2852,7 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
 
         {/* Template selector */}
         <div style={{ marginBottom: 20 }}>
-          <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 10, fontWeight: 700, textTransform: 'uppercase' }}>Briefpapier-Vorlage</label>
+          <span style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 10, fontWeight: 700, textTransform: 'uppercase' }}>Briefpapier-Vorlage</span>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
             {([
               {
@@ -3022,18 +3023,18 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Logo-Position</label>
-            <select className="pk-input" disabled={inputDisabled} value={String(layout.logoPosition ?? 'links')} onChange={e => setLayout('logoPosition', e.target.value)}>
+            <label htmlFor="field-logo-position" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Logo-Position</label>
+            <select id="field-logo-position" className="pk-input" disabled={inputDisabled} value={String(layout.logoPosition ?? 'links')} onChange={e => setLayout('logoPosition', e.target.value)}>
               <option value="links">links</option><option value="mitte">mitte</option><option value="rechts">rechts</option>
             </select>
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Akzentfarbe</label>
-            <input className="pk-input" type="color" disabled={inputDisabled} value={String(layout.akzentfarbe ?? '#20c8ff')} onChange={e => setLayout('akzentfarbe', e.target.value)} />
+            <label htmlFor="field-akzentfarbe" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Akzentfarbe</label>
+            <input id="field-akzentfarbe" className="pk-input" type="color" disabled={inputDisabled} value={String(layout.akzentfarbe ?? '#20c8ff')} onChange={e => setLayout('akzentfarbe', e.target.value)} />
           </div>
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Fußzeile</label>
-            <textarea className="pk-input" rows={3} disabled={inputDisabled} value={firma.dokument_footer ?? ''} onChange={e => setField('dokument_footer', e.target.value)} />
+            <label htmlFor="field-fuzeile" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Fußzeile</label>
+            <textarea id="field-fuzeile" className="pk-input" rows={3} disabled={inputDisabled} value={firma.dokument_footer ?? ''} onChange={e => setField('dokument_footer', e.target.value)} />
           </div>
         </div>
         <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 6 }}>
@@ -3357,10 +3358,13 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
 
           {/* Drag & Drop zone */}
           <div
+            role="button"
+            tabIndex={0}
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click() }}
             style={{
               border: `2px dashed ${dragOver ? '#1684ff' : 'rgba(255,255,255,.15)'}`,
               borderRadius: 14, padding: '36px 24px', textAlign: 'center', cursor: 'pointer',
@@ -3622,8 +3626,8 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
       </div>
 
       {delDialog && (
-        <div onClick={() => setDelDialog(null)} style={{ position: 'fixed', inset: 0, zIndex: 1500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} className="pk-card" style={{ maxWidth: 520, width: '100%', padding: 24 }}>
+        <div role="presentation" onClick={() => setDelDialog(null)} onKeyDown={e => { if (e.key === 'Escape') setDelDialog(null) }} style={{ position: 'fixed', inset: 0, zIndex: 1500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()} className="pk-card" style={{ maxWidth: 520, width: '100%', padding: 24 }}>
             <h3 style={{ margin: '0 0 10px', fontSize: 17, fontWeight: 800 }}>Import löschen?</h3>
             <p style={{ margin: '0 0 18px', color: '#aeb9c8', fontSize: 13, lineHeight: 1.5 }}>
               Wähle, wie das Protokoll entfernt werden soll. <strong>Achtung:</strong> „Mit Daten&ldquo; entfernt zusätzlich

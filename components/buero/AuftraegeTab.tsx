@@ -247,30 +247,30 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
         <Modal title={`✅ Auftrag bearbeiten – ${editAuftrag.id}`} onClose={() => setEditAuftrag(null)}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Beschreibung *</label>
-              <input className="pk-input" value={editForm.beschreibung} onChange={e => setEditForm(p => ({ ...p, beschreibung: e.target.value }))} />
+              <label htmlFor="field-beschreibung" style={labelStyle}>Beschreibung *</label>
+              <input id="field-beschreibung" className="pk-input" value={editForm.beschreibung} onChange={e => setEditForm(p => ({ ...p, beschreibung: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Kunde</label>
-              <select className="pk-input" value={editForm.kunde} onChange={e => setEditForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-kunde" style={labelStyle}>Kunde</label>
+              <select id="field-kunde" className="pk-input" value={editForm.kunde} onChange={e => setEditForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
                 {kunden.map(k => <option key={k.id}>{k.name}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Wert (€)</label>
-              <input className="pk-input" value={editForm.wert} onChange={e => setEditForm(p => ({ ...p, wert: e.target.value }))} />
+              <label htmlFor="field-wert" style={labelStyle}>Wert (€)</label>
+              <input id="field-wert" className="pk-input" value={editForm.wert} onChange={e => setEditForm(p => ({ ...p, wert: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Start</label>
-              <input className="pk-input" placeholder="TT.MM.JJJJ" value={editForm.start} onChange={e => setEditForm(p => ({ ...p, start: e.target.value }))} />
+              <label htmlFor="field-start" style={labelStyle}>Start</label>
+              <input id="field-start" className="pk-input" placeholder="TT.MM.JJJJ" value={editForm.start} onChange={e => setEditForm(p => ({ ...p, start: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Ende</label>
-              <input className="pk-input" placeholder="TT.MM.JJJJ" value={editForm.ende} onChange={e => setEditForm(p => ({ ...p, ende: e.target.value }))} />
+              <label htmlFor="field-ende" style={labelStyle}>Ende</label>
+              <input id="field-ende" className="pk-input" placeholder="TT.MM.JJJJ" value={editForm.ende} onChange={e => setEditForm(p => ({ ...p, ende: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Status</label>
-              <select className="pk-input" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value as Auftrag['status'] }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-status" style={labelStyle}>Status</label>
+              <select id="field-status" className="pk-input" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value as Auftrag['status'] }))} style={{ cursor: 'pointer' }}>
                 <option>AB erforderlich</option>
                 <option>AB erstellt</option>
                 <option>AB versendet</option>
@@ -281,12 +281,12 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Fortschritt: {editForm.fortschritt}%</label>
-              <input type="range" min={0} max={100} value={editForm.fortschritt} onChange={e => setEditForm(p => ({ ...p, fortschritt: Number(e.target.value) }))} style={{ width: '100%', cursor: 'pointer', accentColor: '#20c8ff' }} />
+              <label htmlFor="field-fortschritt-editformforts" style={labelStyle}>Fortschritt: {editForm.fortschritt}%</label>
+              <input id="field-fortschritt-editformforts" type="range" min={0} max={100} value={editForm.fortschritt} onChange={e => setEditForm(p => ({ ...p, fortschritt: Number(e.target.value) }))} style={{ width: '100%', cursor: 'pointer', accentColor: '#20c8ff' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Verknüpftes Dokument</label>
-              <select className="pk-input" value={editForm.dokumentId} onChange={e => setEditForm(p => ({ ...p, dokumentId: e.target.value }))}>
+              <label htmlFor="field-verknpftes-dokument" style={labelStyle}>Verknüpftes Dokument</label>
+              <select id="field-verknpftes-dokument" className="pk-input" value={editForm.dokumentId} onChange={e => setEditForm(p => ({ ...p, dokumentId: e.target.value }))}>
                 <option value="">Kein Dokument verknüpft</option>
                 {dokumentOptionen.map(doc => <option key={doc.id} value={doc.id}>{doc.name} ({doc.datum})</option>)}
               </select>
@@ -321,8 +321,8 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
           <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>✅ Neuen Auftrag anlegen</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             <div>
-              <label style={labelStyle}>Kunde *</label>
-              <select className="pk-input" value={form.kunde} onChange={e => setForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-kunde-2" style={labelStyle}>Kunde *</label>
+              <select id="field-kunde-2" className="pk-input" value={form.kunde} onChange={e => setForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option value="">Kunde wählen…</option>
                 {kunden.map(k => <option key={k.id}>{k.name}</option>)}
               </select>
@@ -358,7 +358,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
                   const price = form.tier ? pkg.prices[form.tier as EmployeeTierId] : null
                   const isSelected = form.paketId === pkg.id
                   return (
-                    <div key={pkg.id} onClick={() => {
+                    <button key={pkg.id} type="button" onClick={() => {
                       const tierLabel = EMPLOYEE_TIERS.find(t => t.id === form.tier)?.label ?? ''
                       const newSelected = !isSelected
                       setForm(p => ({
@@ -371,6 +371,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
                       padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
                       border: `2px solid ${isSelected ? '#20c8ff' : 'rgba(255,255,255,.08)'}`,
                       background: isSelected ? 'rgba(32,200,255,.12)' : 'rgba(255,255,255,.02)',
+                      textAlign: 'left', width: '100%',
                     }}>
                       <div style={{ fontWeight: 800, fontSize: 13, color: isSelected ? '#20c8ff' : '#f8fbff', marginBottom: 3 }}>{pkg.icon} {pkg.name}</div>
                       <div style={{ fontSize: 12, color: isSelected ? '#7ee8ff' : '#aeb9c8', fontWeight: 700 }}>
@@ -379,30 +380,30 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
                       <div style={{ fontSize: 10, color: '#6b7a8d', marginTop: 5, lineHeight: 1.4 }}>
                         {pkg.included.slice(0, 3).join(' · ')}{pkg.included.length > 3 ? ' …' : ''}
                       </div>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Beschreibung *</label>
-              <input className="pk-input" placeholder="z.B. Wartungsarbeiten Q3" value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} />
+              <label htmlFor="field-beschreibung-2" style={labelStyle}>Beschreibung *</label>
+              <input id="field-beschreibung-2" className="pk-input" placeholder="z.B. Wartungsarbeiten Q3" value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Wert (€) *</label>
-              <input className="pk-input" placeholder="z.B. 3.500,00" value={form.wert} onChange={e => setForm(p => ({ ...p, wert: e.target.value }))} />
+              <label htmlFor="field-wert-2" style={labelStyle}>Wert (€) *</label>
+              <input id="field-wert-2" className="pk-input" placeholder="z.B. 3.500,00" value={form.wert} onChange={e => setForm(p => ({ ...p, wert: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Start</label>
-              <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.start} onChange={e => setForm(p => ({ ...p, start: e.target.value }))} />
+              <label htmlFor="field-start-2" style={labelStyle}>Start</label>
+              <input id="field-start-2" className="pk-input" placeholder="TT.MM.JJJJ" value={form.start} onChange={e => setForm(p => ({ ...p, start: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Ende</label>
-              <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.ende} onChange={e => setForm(p => ({ ...p, ende: e.target.value }))} />
+              <label htmlFor="field-ende-2" style={labelStyle}>Ende</label>
+              <input id="field-ende-2" className="pk-input" placeholder="TT.MM.JJJJ" value={form.ende} onChange={e => setForm(p => ({ ...p, ende: e.target.value }))} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Verknüpftes Dokument</label>
-              <select className="pk-input" value={form.dokumentId} onChange={e => setForm(p => ({ ...p, dokumentId: e.target.value }))}>
+              <label htmlFor="field-verknpftes-dokument-2" style={labelStyle}>Verknüpftes Dokument</label>
+              <select id="field-verknpftes-dokument-2" className="pk-input" value={form.dokumentId} onChange={e => setForm(p => ({ ...p, dokumentId: e.target.value }))}>
                 <option value="">Kein Dokument verknüpft</option>
                 {dokumentOptionen.map(doc => <option key={doc.id} value={doc.id}>{doc.name} ({doc.datum})</option>)}
               </select>
@@ -419,7 +420,7 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
           (() => {
             const linkedDokument = getLinkedDokument(dokumente, 'auftrag_id', a.id)
             return (
-          <div key={a.id} className="pk-card" style={{ border: `1px solid ${statusColor[a.status]}20`, cursor: 'pointer' }} onClick={() => openEdit(a)}>
+          <div key={a.id} className="pk-card" style={{ border: `1px solid ${statusColor[a.status]}20`, cursor: 'pointer' }} role="button" tabIndex={0} onClick={() => openEdit(a)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') openEdit(a) }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -518,8 +519,8 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
         const auftrag = auftraege.find(a => a.id === auftragMailTarget.id)
         if (!auftrag) return null
         return (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setAuftragMailTarget(null)}>
-            <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+          <div role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setAuftragMailTarget(null)} onKeyDown={e => { if (e.key === 'Escape') setAuftragMailTarget(null) }}>
+            <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 460 }} role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
                 <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>✉️ Auftragsbestätigung senden</h3>
                 <button onClick={() => setAuftragMailTarget(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
@@ -527,8 +528,8 @@ function AuftraegeTab({ isDemo, auftraege, setAuftraege, kunden, setTab, setRech
               <div style={{ fontSize: 13, color: '#aeb9c8', marginBottom: 14 }}>
                 <strong style={{ color: '#f8fbff' }}>{auftrag.ab_nummer || auftrag.id}</strong> — {auftrag.kunde} — {auftrag.wert}
               </div>
-              <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>E-Mail-Adresse des Empfängers</label>
-              <input
+              <label htmlFor="field-e-mail-adresse-des-empfng" style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>E-Mail-Adresse des Empfängers</label>
+              <input id="field-e-mail-adresse-des-empfng"
                 className="pk-input"
                 type="email"
                 value={auftragMailTarget.email}

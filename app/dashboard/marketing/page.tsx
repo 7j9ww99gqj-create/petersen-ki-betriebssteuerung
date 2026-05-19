@@ -1004,8 +1004,8 @@ function KampagnenTab({
   return (
     <div>
       {editItem && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setEditItem(null)}>
-          <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+        <div role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setEditItem(null)} onKeyDown={e => { if (e.key === 'Escape') setEditItem(null) }}>
+          <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }} role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Kampagne bearbeiten</h3>
               <button onClick={() => setEditItem(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
@@ -1019,13 +1019,13 @@ function KampagnenTab({
                 { label: 'Budget (€)', key: 'budget', placeholder: 'z.B. 1200' },
               ] as const).map(field => (
                 <div key={field.key}>
-                  <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{field.label}</label>
-                  <input className="pk-input" placeholder={field.placeholder} value={(editForm as Record<string, string>)[field.key]} onChange={e => setEditForm(prev => ({ ...prev, [field.key]: e.target.value }))} />
+                  <label htmlFor="field-fieldlabel" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{field.label}</label>
+                  <input id="field-fieldlabel" className="pk-input" placeholder={field.placeholder} value={(editForm as Record<string, string>)[field.key]} onChange={e => setEditForm(prev => ({ ...prev, [field.key]: e.target.value }))} />
                 </div>
               ))}
               <div>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
-                <select className="pk-input" value={editForm.typ} onChange={e => setEditForm(prev => ({ ...prev, typ: e.target.value }))}>
+                <label htmlFor="field-typ" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
+                <select id="field-typ" className="pk-input" value={editForm.typ} onChange={e => setEditForm(prev => ({ ...prev, typ: e.target.value }))}>
                   {['E-Mail', 'Social Media', 'Newsletter', 'Anzeige'].map(t => <option key={t}>{t}</option>)}
                 </select>
               </div>
@@ -1094,13 +1094,13 @@ function KampagnenTab({
               { label: 'Budget (€)', key: 'budget', placeholder: 'z.B. 1200' },
             ].map(field => (
               <div key={field.key}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{field.label}</label>
-                <input className="pk-input" placeholder={field.placeholder} value={(form as Record<string, string>)[field.key]} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
+                <label htmlFor="field-fieldlabel-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{field.label}</label>
+                <input id="field-fieldlabel-2" className="pk-input" placeholder={field.placeholder} value={(form as Record<string, string>)[field.key]} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
               </div>
             ))}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
-              <select className="pk-input" value={form.typ} onChange={event => setForm(prev => ({ ...prev, typ: event.target.value }))}>
+              <label htmlFor="field-typ-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
+              <select id="field-typ-2" className="pk-input" value={form.typ} onChange={event => setForm(prev => ({ ...prev, typ: event.target.value }))}>
                 {['E-Mail', 'Social Media', 'Newsletter', 'Anzeige'].map(type => <option key={type}>{type}</option>)}
               </select>
             </div>
@@ -1333,8 +1333,8 @@ function LeadsTab({
   return (
     <div>
       {editLead && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setEditLead(null)}>
-          <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+        <div role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setEditLead(null)} onKeyDown={e => { if (e.key === 'Escape') setEditLead(null) }}>
+          <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }} role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Lead bearbeiten</h3>
               <button onClick={() => setEditLead(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
@@ -1349,13 +1349,13 @@ function LeadsTab({
                 { label: 'Betreuer', key: 'betreuer', placeholder: 'Mitarbeitername' },
               ] as const).map(field => (
                 <div key={field.key}>
-                  <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{field.label}</label>
-                  <input className="pk-input" placeholder={field.placeholder} value={(editLeadForm as Record<string, string>)[field.key]} onChange={e => setEditLeadForm(prev => ({ ...prev, [field.key]: e.target.value }))} />
+                  <label htmlFor="field-fieldlabel-3" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{field.label}</label>
+                  <input id="field-fieldlabel-3" className="pk-input" placeholder={field.placeholder} value={(editLeadForm as Record<string, string>)[field.key]} onChange={e => setEditLeadForm(prev => ({ ...prev, [field.key]: e.target.value }))} />
                 </div>
               ))}
               <div>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Quelle</label>
-                <select className="pk-input" value={editLeadForm.quelle} onChange={e => setEditLeadForm(prev => ({ ...prev, quelle: e.target.value }))}>
+                <label htmlFor="field-quelle" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Quelle</label>
+                <select id="field-quelle" className="pk-input" value={editLeadForm.quelle} onChange={e => setEditLeadForm(prev => ({ ...prev, quelle: e.target.value }))}>
                   {['Website', 'Empfehlung', 'Messe', 'Social Media', 'Kaltakquise', 'Sonstiges'].map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
@@ -1449,13 +1449,13 @@ function LeadsTab({
               { label: 'Betreuer', key: 'betreuer', placeholder: 'Mitarbeitername' },
             ].map(field => (
               <div key={field.key}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{field.label}</label>
-                <input className="pk-input" placeholder={field.placeholder} value={(form as Record<string, string>)[field.key]} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
+                <label htmlFor="field-fieldlabel-4" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{field.label}</label>
+                <input id="field-fieldlabel-4" className="pk-input" placeholder={field.placeholder} value={(form as Record<string, string>)[field.key]} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
               </div>
             ))}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Quelle</label>
-              <select className="pk-input" value={form.quelle} onChange={event => setForm(prev => ({ ...prev, quelle: event.target.value }))}>
+              <label htmlFor="field-quelle-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Quelle</label>
+              <select id="field-quelle-2" className="pk-input" value={form.quelle} onChange={event => setForm(prev => ({ ...prev, quelle: event.target.value }))}>
                 {['Website', 'Empfehlung', 'Messe', 'Social Media', 'Kaltakquise', 'Sonstiges'].map(source => <option key={source}>{source}</option>)}
               </select>
             </div>
@@ -1650,29 +1650,29 @@ function NewsletterTab({
   return (
     <div>
       {editNewsletter && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setEditNewsletter(null)}>
-          <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+        <div role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setEditNewsletter(null)} onKeyDown={e => { if (e.key === 'Escape') setEditNewsletter(null) }}>
+          <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }} role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Newsletter bearbeiten</h3>
               <button onClick={() => setEditNewsletter(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ display: 'grid', gap: 14 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Betreff *</label>
-                <input className="pk-input" value={editNlForm.betreff} onChange={e => setEditNlForm(prev => ({ ...prev, betreff: e.target.value }))} />
+                <label htmlFor="field-betreff" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Betreff *</label>
+                <input id="field-betreff" className="pk-input" value={editNlForm.betreff} onChange={e => setEditNlForm(prev => ({ ...prev, betreff: e.target.value }))} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Vorschautext</label>
-                <input className="pk-input" value={editNlForm.vorschau} onChange={e => setEditNlForm(prev => ({ ...prev, vorschau: e.target.value }))} />
+                <label htmlFor="field-vorschautext" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Vorschautext</label>
+                <input id="field-vorschautext" className="pk-input" value={editNlForm.vorschau} onChange={e => setEditNlForm(prev => ({ ...prev, vorschau: e.target.value }))} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Versanddatum</label>
-                  <input className="pk-input" placeholder="TT.MM.JJJJ" value={editNlForm.datum} onChange={e => setEditNlForm(prev => ({ ...prev, datum: e.target.value }))} />
+                  <label htmlFor="field-versanddatum" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Versanddatum</label>
+                  <input id="field-versanddatum" className="pk-input" placeholder="TT.MM.JJJJ" value={editNlForm.datum} onChange={e => setEditNlForm(prev => ({ ...prev, datum: e.target.value }))} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Empfänger</label>
-                  <input className="pk-input" type="number" value={editNlForm.empfaenger} onChange={e => setEditNlForm(prev => ({ ...prev, empfaenger: e.target.value }))} />
+                  <label htmlFor="field-empfnger" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Empfänger</label>
+                  <input id="field-empfnger" className="pk-input" type="number" value={editNlForm.empfaenger} onChange={e => setEditNlForm(prev => ({ ...prev, empfaenger: e.target.value }))} />
                 </div>
               </div>
             </div>
@@ -1733,16 +1733,16 @@ function NewsletterTab({
           <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>Neuen Newsletter erstellen</h3>
           <div style={{ display: 'grid', gap: 14 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Betreff *</label>
-              <input className="pk-input" placeholder="E-Mail-Betreff eingeben..." value={form.betreff} onChange={event => setForm(prev => ({ ...prev, betreff: event.target.value }))} />
+              <label htmlFor="field-betreff-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Betreff *</label>
+              <input id="field-betreff-2" className="pk-input" placeholder="E-Mail-Betreff eingeben..." value={form.betreff} onChange={event => setForm(prev => ({ ...prev, betreff: event.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Vorschautext</label>
-              <input className="pk-input" placeholder="Kurze Vorschau fuer den Posteingang..." value={form.vorschau} onChange={event => setForm(prev => ({ ...prev, vorschau: event.target.value }))} />
+              <label htmlFor="field-vorschautext-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Vorschautext</label>
+              <input id="field-vorschautext-2" className="pk-input" placeholder="Kurze Vorschau fuer den Posteingang..." value={form.vorschau} onChange={event => setForm(prev => ({ ...prev, vorschau: event.target.value }))} />
             </div>
             <div style={{ maxWidth: 260 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Versanddatum</label>
-              <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.datum} onChange={event => setForm(prev => ({ ...prev, datum: event.target.value }))} />
+              <label htmlFor="field-versanddatum-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Versanddatum</label>
+              <input id="field-versanddatum-2" className="pk-input" placeholder="TT.MM.JJJJ" value={form.datum} onChange={event => setForm(prev => ({ ...prev, datum: event.target.value }))} />
             </div>
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
@@ -1916,13 +1916,13 @@ function SeoTab({
               { label: 'Klicks', key: 'klicks', placeholder: '18' },
             ].map(field => (
               <div key={field.key}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>{field.label}</label>
-                <input className="pk-input" value={(form as Record<string, string>)[field.key]} placeholder={field.placeholder} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
+                <label htmlFor="field-fieldlabel-5" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>{field.label}</label>
+                <input id="field-fieldlabel-5" className="pk-input" value={(form as Record<string, string>)[field.key]} placeholder={field.placeholder} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
               </div>
             ))}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Intent</label>
-              <select className="pk-input" value={form.intent} onChange={event => setForm(prev => ({ ...prev, intent: event.target.value }))}>
+              <label htmlFor="field-intent" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Intent</label>
+              <select id="field-intent" className="pk-input" value={form.intent} onChange={event => setForm(prev => ({ ...prev, intent: event.target.value }))}>
                 {['Informativ', 'Transaktional', 'Lokal', 'Brand'].map(intent => <option key={intent}>{intent}</option>)}
               </select>
             </div>
@@ -2042,19 +2042,19 @@ function ContentTab({
               { label: 'CTA', key: 'cta', placeholder: 'Demo buchen' },
             ].map(field => (
               <div key={field.key}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>{field.label}</label>
-                <input className="pk-input" value={(form as Record<string, string>)[field.key]} placeholder={field.placeholder} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
+                <label htmlFor="field-fieldlabel-6" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>{field.label}</label>
+                <input id="field-fieldlabel-6" className="pk-input" value={(form as Record<string, string>)[field.key]} placeholder={field.placeholder} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
               </div>
             ))}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Kanal</label>
-              <select className="pk-input" value={form.kanal} onChange={event => setForm(prev => ({ ...prev, kanal: event.target.value }))}>
+              <label htmlFor="field-kanal" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Kanal</label>
+              <select id="field-kanal" className="pk-input" value={form.kanal} onChange={event => setForm(prev => ({ ...prev, kanal: event.target.value }))}>
                 {['LinkedIn', 'Instagram', 'Facebook', 'Newsletter', 'Blog', 'WhatsApp'].map(channel => <option key={channel}>{channel}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Keyword</label>
-              <select className="pk-input" value={form.keyword} onChange={event => setForm(prev => ({ ...prev, keyword: event.target.value }))}>
+              <label htmlFor="field-keyword" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Keyword</label>
+              <select id="field-keyword" className="pk-input" value={form.keyword} onChange={event => setForm(prev => ({ ...prev, keyword: event.target.value }))}>
                 {seoKeywords.map(item => <option key={item.id} value={item.keyword}>{item.keyword}</option>)}
               </select>
             </div>
@@ -2166,19 +2166,19 @@ function PostingTab({
               { label: 'Owner', key: 'owner', placeholder: 'Marketing' },
             ].map(field => (
               <div key={field.key}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>{field.label}</label>
-                <input className="pk-input" value={(form as Record<string, string>)[field.key]} placeholder={field.placeholder} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
+                <label htmlFor="field-fieldlabel-7" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>{field.label}</label>
+                <input id="field-fieldlabel-7" className="pk-input" value={(form as Record<string, string>)[field.key]} placeholder={field.placeholder} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
               </div>
             ))}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Kanal</label>
-              <select className="pk-input" value={form.kanal} onChange={event => setForm(prev => ({ ...prev, kanal: event.target.value }))}>
+              <label htmlFor="field-kanal-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Kanal</label>
+              <select id="field-kanal-2" className="pk-input" value={form.kanal} onChange={event => setForm(prev => ({ ...prev, kanal: event.target.value }))}>
                 {['LinkedIn', 'Instagram', 'Facebook', 'Newsletter', 'Blog', 'WhatsApp'].map(channel => <option key={channel}>{channel}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Quelle</label>
-              <select className="pk-input" value={form.quelle} onChange={event => setForm(prev => ({ ...prev, quelle: event.target.value }))}>
+              <label htmlFor="field-quelle-3" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Quelle</label>
+              <select id="field-quelle-3" className="pk-input" value={form.quelle} onChange={event => setForm(prev => ({ ...prev, quelle: event.target.value }))}>
                 <option value="Manuell">Manuell</option>
                 {contentIdeas.map(item => <option key={item.id} value={item.id}>{item.titel}</option>)}
               </select>
@@ -2309,13 +2309,13 @@ function AutomationenTab({
               { label: 'Owner', key: 'owner', placeholder: 'Vertrieb' },
             ].map(field => (
               <div key={field.key}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>{field.label}</label>
-                <input className="pk-input" value={(form as Record<string, string>)[field.key]} placeholder={field.placeholder} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
+                <label htmlFor="field-fieldlabel-8" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>{field.label}</label>
+                <input id="field-fieldlabel-8" className="pk-input" value={(form as Record<string, string>)[field.key]} placeholder={field.placeholder} onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))} />
               </div>
             ))}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Kanal</label>
-              <select className="pk-input" value={form.kanal} onChange={event => setForm(prev => ({ ...prev, kanal: event.target.value }))}>
+              <label htmlFor="field-kanal-3" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700 }}>Kanal</label>
+              <select id="field-kanal-3" className="pk-input" value={form.kanal} onChange={event => setForm(prev => ({ ...prev, kanal: event.target.value }))}>
                 {['CRM', 'E-Mail', 'WhatsApp', 'LinkedIn'].map(channel => <option key={channel}>{channel}</option>)}
               </select>
             </div>
@@ -2719,7 +2719,7 @@ export default function MarketingPilotPage() {
           { label: 'Leads gesamt', value: String(totalLeads), icon: '👥', color: '#1684ff', tab: 'leads' as Tab },
           { label: 'E-Mails versendet', value: sentEmails.toLocaleString('de-DE'), icon: '✉️', color: '#10b981', tab: 'newsletter' as Tab },
         ].map(item => (
-          <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px', cursor: 'pointer' }} onClick={() => setTab(item.tab)}>
+          <div key={item.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px', cursor: 'pointer' }} role="button" tabIndex={0} onClick={() => setTab(item.tab)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setTab(item.tab) }}>
             <div style={{ fontSize: 22, marginBottom: 4 }}>{item.icon}</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: item.color }}>{item.value}</div>
             <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{item.label}</div>

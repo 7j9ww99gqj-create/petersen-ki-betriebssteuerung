@@ -16,7 +16,9 @@ export default function PondruffSheet({ open, onClose }: { open: boolean; onClos
   return (
     <>
       <div
+        role="presentation"
         onClick={onClose}
+        onKeyDown={e => { if (e.key === 'Escape') onClose() }}
         style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)' }}
       />
       <div

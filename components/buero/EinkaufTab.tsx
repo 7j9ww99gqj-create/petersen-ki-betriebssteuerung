@@ -225,18 +225,18 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
                 {editLieferant ? `✏️ Lieferant bearbeiten: ${editLieferant.name}` : '🏭 Neuen Lieferanten anlegen'}
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-                <div><label style={labelStyle}>Name *</label><input className="pk-input" placeholder="Firmenname" value={lfForm.name} onChange={e => setLfForm(p => ({ ...p, name: e.target.value }))} /></div>
-                <div><label style={labelStyle}>Ansprechpartner</label><input className="pk-input" placeholder="Vor- und Nachname" value={lfForm.kontakt} onChange={e => setLfForm(p => ({ ...p, kontakt: e.target.value }))} /></div>
-                <div><label style={labelStyle}>E-Mail *</label><input className="pk-input" type="email" placeholder="email@lieferant.de" value={lfForm.email} onChange={e => setLfForm(p => ({ ...p, email: e.target.value }))} /></div>
-                <div><label style={labelStyle}>Telefon</label><input className="pk-input" placeholder="040 12345" value={lfForm.telefon} onChange={e => setLfForm(p => ({ ...p, telefon: e.target.value }))} /></div>
-                <div><label style={labelStyle}>Ort</label><input className="pk-input" placeholder="Stadt" value={lfForm.ort} onChange={e => setLfForm(p => ({ ...p, ort: e.target.value }))} /></div>
-                <div><label style={labelStyle}>Kategorie</label>
-                  <select className="pk-input" value={lfForm.kategorie} onChange={e => setLfForm(p => ({ ...p, kategorie: e.target.value }))}>
+                <div><label htmlFor="field-name" style={labelStyle}>Name *</label><input id="field-name" className="pk-input" placeholder="Firmenname" value={lfForm.name} onChange={e => setLfForm(p => ({ ...p, name: e.target.value }))} /></div>
+                <div><label htmlFor="field-ansprechpartner" style={labelStyle}>Ansprechpartner</label><input id="field-ansprechpartner" className="pk-input" placeholder="Vor- und Nachname" value={lfForm.kontakt} onChange={e => setLfForm(p => ({ ...p, kontakt: e.target.value }))} /></div>
+                <div><label htmlFor="field-e-mail" style={labelStyle}>E-Mail *</label><input id="field-e-mail" className="pk-input" type="email" placeholder="email@lieferant.de" value={lfForm.email} onChange={e => setLfForm(p => ({ ...p, email: e.target.value }))} /></div>
+                <div><label htmlFor="field-telefon" style={labelStyle}>Telefon</label><input id="field-telefon" className="pk-input" placeholder="040 12345" value={lfForm.telefon} onChange={e => setLfForm(p => ({ ...p, telefon: e.target.value }))} /></div>
+                <div><label htmlFor="field-ort" style={labelStyle}>Ort</label><input id="field-ort" className="pk-input" placeholder="Stadt" value={lfForm.ort} onChange={e => setLfForm(p => ({ ...p, ort: e.target.value }))} /></div>
+                <div><label htmlFor="field-kategorie" style={labelStyle}>Kategorie</label>
+                  <select id="field-kategorie" className="pk-input" value={lfForm.kategorie} onChange={e => setLfForm(p => ({ ...p, kategorie: e.target.value }))}>
                     {KATEGORIEN_LF.map(k => <option key={k}>{k}</option>)}
                   </select>
                 </div>
-                <div><label style={labelStyle}>Zahlungsziel</label>
-                  <select className="pk-input" value={lfForm.zahlungsziel} onChange={e => setLfForm(p => ({ ...p, zahlungsziel: e.target.value }))}>
+                <div><label htmlFor="field-zahlungsziel" style={labelStyle}>Zahlungsziel</label>
+                  <select id="field-zahlungsziel" className="pk-input" value={lfForm.zahlungsziel} onChange={e => setLfForm(p => ({ ...p, zahlungsziel: e.target.value }))}>
                     {['Sofort', '7 Tage netto', '14 Tage 2% Skonto', '21 Tage netto', '30 Tage netto', '60 Tage netto'].map(z => <option key={z}>{z}</option>)}
                   </select>
                 </div>
@@ -296,15 +296,15 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
           {selectedBestellung && (
             <Modal title={`🛒 Bestellung ${selectedBestellung.id}`} onClose={() => setSelectedBestellung(null)}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
-                <div><label style={labelStyle}>Lieferant</label><div className="pk-input">{selectedBestellung.lieferant}</div></div>
-                <div><label style={labelStyle}>Artikel</label><div className="pk-input">{selectedBestellung.artikel}</div></div>
-                <div><label style={labelStyle}>Menge</label><div className="pk-input">{selectedBestellung.menge} {selectedBestellung.einheit}</div></div>
-                <div><label style={labelStyle}>Status</label><div className="pk-input">{selectedBestellung.status}</div></div>
-                <div><label style={labelStyle}>EK-Preis</label><div className="pk-input">{selectedBestellung.einkaufspreis}</div></div>
-                <div><label style={labelStyle}>Gesamt</label><div className="pk-input">{selectedBestellung.gesamt}</div></div>
-                <div><label style={labelStyle}>Bestellt am</label><div className="pk-input">{selectedBestellung.bestellt_am}</div></div>
-                <div><label style={labelStyle}>Erwartet</label><div className="pk-input">{selectedBestellung.erwartet_am || '—'}</div></div>
-                <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Notiz</label><div className="pk-input">{selectedBestellung.notiz || '—'}</div></div>
+                <div><span style={labelStyle}>Lieferant</span><div className="pk-input">{selectedBestellung.lieferant}</div></div>
+                <div><span style={labelStyle}>Artikel</span><div className="pk-input">{selectedBestellung.artikel}</div></div>
+                <div><span style={labelStyle}>Menge</span><div className="pk-input">{selectedBestellung.menge} {selectedBestellung.einheit}</div></div>
+                <div><span style={labelStyle}>Status</span><div className="pk-input">{selectedBestellung.status}</div></div>
+                <div><span style={labelStyle}>EK-Preis</span><div className="pk-input">{selectedBestellung.einkaufspreis}</div></div>
+                <div><span style={labelStyle}>Gesamt</span><div className="pk-input">{selectedBestellung.gesamt}</div></div>
+                <div><span style={labelStyle}>Bestellt am</span><div className="pk-input">{selectedBestellung.bestellt_am}</div></div>
+                <div><span style={labelStyle}>Erwartet</span><div className="pk-input">{selectedBestellung.erwartet_am || '—'}</div></div>
+                <div style={{ gridColumn: '1 / -1' }}><span style={labelStyle}>Notiz</span><div className="pk-input">{selectedBestellung.notiz || '—'}</div></div>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
                 {selectedBestellung.status === 'Entwurf' && <button className="pk-btn" onClick={() => { handleBestellungAusloesen(selectedBestellung.id); setSelectedBestellung(null) }}>Auslösen</button>}
@@ -324,22 +324,22 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
             <div className="pk-card fade-in" style={{ marginBottom: 20, border: '1px solid rgba(32,200,255,.2)' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>🛒 Neue Einkaufsbestellung</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-                <div><label style={labelStyle}>Lieferant *</label>
-                  <select className="pk-input" value={bsForm.lieferant} onChange={e => setBsForm(p => ({ ...p, lieferant: e.target.value }))}>
+                <div><label htmlFor="field-lieferant" style={labelStyle}>Lieferant *</label>
+                  <select id="field-lieferant" className="pk-input" value={bsForm.lieferant} onChange={e => setBsForm(p => ({ ...p, lieferant: e.target.value }))}>
                     <option value="">Lieferant wählen…</option>
                     {lieferanten.filter(l => l.status === 'Aktiv').map(l => <option key={l.id}>{l.name}</option>)}
                   </select>
                 </div>
-                <div><label style={labelStyle}>Artikel *</label><input className="pk-input" placeholder="z.B. Stahlrohr 40x40" value={bsForm.artikel} onChange={e => setBsForm(p => ({ ...p, artikel: e.target.value }))} /></div>
-                <div><label style={labelStyle}>Menge *</label><input className="pk-input" type="number" min="1" placeholder="100" value={bsForm.menge} onChange={e => setBsForm(p => ({ ...p, menge: e.target.value }))} /></div>
-                <div><label style={labelStyle}>Einheit</label>
-                  <select className="pk-input" value={bsForm.einheit} onChange={e => setBsForm(p => ({ ...p, einheit: e.target.value }))}>
+                <div><label htmlFor="field-artikel" style={labelStyle}>Artikel *</label><input id="field-artikel" className="pk-input" placeholder="z.B. Stahlrohr 40x40" value={bsForm.artikel} onChange={e => setBsForm(p => ({ ...p, artikel: e.target.value }))} /></div>
+                <div><label htmlFor="field-menge" style={labelStyle}>Menge *</label><input id="field-menge" className="pk-input" type="number" min="1" placeholder="100" value={bsForm.menge} onChange={e => setBsForm(p => ({ ...p, menge: e.target.value }))} /></div>
+                <div><label htmlFor="field-einheit" style={labelStyle}>Einheit</label>
+                  <select id="field-einheit" className="pk-input" value={bsForm.einheit} onChange={e => setBsForm(p => ({ ...p, einheit: e.target.value }))}>
                     {EINHEITEN_LF.map(e => <option key={e}>{e}</option>)}
                   </select>
                 </div>
-                <div><label style={labelStyle}>EK-Preis / Einheit *</label><input className="pk-input" placeholder="z.B. 8,50" value={bsForm.einkaufspreis} onChange={e => setBsForm(p => ({ ...p, einkaufspreis: e.target.value }))} /></div>
-                <div><label style={labelStyle}>Erwartet am</label><input className="pk-input" placeholder="TT.MM.JJJJ" value={bsForm.erwartet_am} onChange={e => setBsForm(p => ({ ...p, erwartet_am: e.target.value }))} /></div>
-                <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Notiz</label><input className="pk-input" placeholder="Optionale Hinweise…" value={bsForm.notiz} onChange={e => setBsForm(p => ({ ...p, notiz: e.target.value }))} /></div>
+                <div><label htmlFor="field-ek-preis-einheit" style={labelStyle}>EK-Preis / Einheit *</label><input id="field-ek-preis-einheit" className="pk-input" placeholder="z.B. 8,50" value={bsForm.einkaufspreis} onChange={e => setBsForm(p => ({ ...p, einkaufspreis: e.target.value }))} /></div>
+                <div><label htmlFor="field-erwartet-am" style={labelStyle}>Erwartet am</label><input id="field-erwartet-am" className="pk-input" placeholder="TT.MM.JJJJ" value={bsForm.erwartet_am} onChange={e => setBsForm(p => ({ ...p, erwartet_am: e.target.value }))} /></div>
+                <div style={{ gridColumn: '1 / -1' }}><label htmlFor="field-notiz" style={labelStyle}>Notiz</label><input id="field-notiz" className="pk-input" placeholder="Optionale Hinweise…" value={bsForm.notiz} onChange={e => setBsForm(p => ({ ...p, notiz: e.target.value }))} /></div>
               </div>
               <div style={{ marginTop: 14 }}>
                 <button className="pk-btn" onClick={handleBestellungSave} style={{ fontWeight: 700 }}>Als Entwurf speichern</button>
@@ -403,8 +403,8 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
             <div className="pk-card fade-in" style={{ marginBottom: 20, border: '1px solid rgba(32,200,255,.2)' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>📥 Wareneingang buchen</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-                <div><label style={labelStyle}>Bestellung *</label>
-                  <select className="pk-input" value={weForm.bestellung_id} onChange={e => {
+                <div><label htmlFor="field-bestellung" style={labelStyle}>Bestellung *</label>
+                  <select id="field-bestellung" className="pk-input" value={weForm.bestellung_id} onChange={e => {
                     const b = bestellungen.find(x => x.id === e.target.value)
                     setWeForm(p => ({ ...p, bestellung_id: e.target.value, lieferant: b?.lieferant || '', artikel: b?.artikel || '', menge: String(b?.menge || ''), einheit: b?.einheit || 'Stk' }))
                   }}>
@@ -414,19 +414,19 @@ function EinkaufTab({ isDemo }: { isDemo: boolean }) {
                     ))}
                   </select>
                 </div>
-                <div><label style={labelStyle}>Artikel</label><input className="pk-input" value={weForm.artikel} onChange={e => setWeForm(p => ({ ...p, artikel: e.target.value }))} placeholder="Artikelname" /></div>
-                <div><label style={labelStyle}>Gelieferte Menge *</label><input className="pk-input" type="number" min="1" value={weForm.menge} onChange={e => setWeForm(p => ({ ...p, menge: e.target.value }))} /></div>
-                <div><label style={labelStyle}>Einheit</label>
-                  <select className="pk-input" value={weForm.einheit} onChange={e => setWeForm(p => ({ ...p, einheit: e.target.value }))}>
+                <div><label htmlFor="field-artikel-2" style={labelStyle}>Artikel</label><input id="field-artikel-2" className="pk-input" value={weForm.artikel} onChange={e => setWeForm(p => ({ ...p, artikel: e.target.value }))} placeholder="Artikelname" /></div>
+                <div><label htmlFor="field-gelieferte-menge" style={labelStyle}>Gelieferte Menge *</label><input id="field-gelieferte-menge" className="pk-input" type="number" min="1" value={weForm.menge} onChange={e => setWeForm(p => ({ ...p, menge: e.target.value }))} /></div>
+                <div><label htmlFor="field-einheit-2" style={labelStyle}>Einheit</label>
+                  <select id="field-einheit-2" className="pk-input" value={weForm.einheit} onChange={e => setWeForm(p => ({ ...p, einheit: e.target.value }))}>
                     {EINHEITEN_LF.map(e => <option key={e}>{e}</option>)}
                   </select>
                 </div>
-                <div><label style={labelStyle}>Qualität</label>
-                  <select className="pk-input" value={weForm.qualitaet} onChange={e => setWeForm(p => ({ ...p, qualitaet: e.target.value as Wareneingang['qualitaet'] }))}>
+                <div><label htmlFor="field-qualitt" style={labelStyle}>Qualität</label>
+                  <select id="field-qualitt" className="pk-input" value={weForm.qualitaet} onChange={e => setWeForm(p => ({ ...p, qualitaet: e.target.value as Wareneingang['qualitaet'] }))}>
                     <option>OK</option><option>Mängel</option><option>Abgelehnt</option>
                   </select>
                 </div>
-                <div><label style={labelStyle}>Mitarbeiter</label><input className="pk-input" placeholder="Name" value={weForm.mitarbeiter} onChange={e => setWeForm(p => ({ ...p, mitarbeiter: e.target.value }))} /></div>
+                <div><label htmlFor="field-mitarbeiter" style={labelStyle}>Mitarbeiter</label><input id="field-mitarbeiter" className="pk-input" placeholder="Name" value={weForm.mitarbeiter} onChange={e => setWeForm(p => ({ ...p, mitarbeiter: e.target.value }))} /></div>
               </div>
               <div style={{ marginTop: 14 }}>
                 <button className="pk-btn" onClick={handleWareneingangSave} style={{ fontWeight: 700 }}>📥 Wareneingang buchen</button>

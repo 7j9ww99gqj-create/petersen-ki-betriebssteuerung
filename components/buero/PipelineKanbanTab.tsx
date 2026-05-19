@@ -74,7 +74,7 @@ function PipelineKanbanTab({ angebote, auftraege, rechnungen, setTab }: {
               const status = (item as Angebot | Auftrag | Rechnung).status
               const targetTab: Tab = isAngebot ? 'angebote' : isRechnung ? 'rechnungen' : 'auftraege'
               return (
-                <div key={item.id} style={cardStyle} onClick={() => setTab(targetTab)}
+                <div key={item.id} style={cardStyle} role="button" tabIndex={0} onClick={() => setTab(targetTab)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setTab(targetTab) }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.08)') }
                   onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,.04)') }
                 >

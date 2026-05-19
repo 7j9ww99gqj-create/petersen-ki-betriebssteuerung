@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/label-has-associated-control */
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -469,8 +470,8 @@ function OcrReviewModal({
   }
   const selectedCount = review.enabled.filter(Boolean).length
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }} onClick={onCancel}>
-      <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 760, maxHeight: '92vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+    <div role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }} onClick={onCancel} onKeyDown={e => { if (e.key === 'Escape') onCancel() }}>
+      <div role="presentation" className="pk-card fade-in" style={{ width: '100%', maxWidth: 760, maxHeight: '92vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 900 }}>🤖 OCR-Ergebnis prüfen</h3>
           <button onClick={onCancel} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 22, cursor: 'pointer' }}>✕</button>

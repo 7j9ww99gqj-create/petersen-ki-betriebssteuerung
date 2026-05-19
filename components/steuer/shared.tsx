@@ -174,7 +174,10 @@ export function KpiCard({
     <div
       className="pk-card"
       style={{ padding: '18px 20px', cursor: onClick ? 'pointer' : undefined }}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
+      onKeyDown={onClick ? (e => { if (e.key === 'Enter' || e.key === ' ') onClick() }) : undefined}
     >
       <div style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 900, color: color ?? '#f8fbff', lineHeight: 1.1 }}>{value}</div>
@@ -191,12 +194,16 @@ export function Modal({
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      role="presentation"
       onClick={onClose}
+      onKeyDown={e => { if (e.key === 'Escape') onClose() }}
     >
       <div
         className="pk-card fade-in"
         style={{ width: '100%', maxWidth, maxHeight: '90vh', overflowY: 'auto' }}
+        role="presentation"
         onClick={e => e.stopPropagation()}
+        onKeyDown={e => e.stopPropagation()}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{title}</h3>

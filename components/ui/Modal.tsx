@@ -19,6 +19,7 @@ export function Modal({ title, onClose, children, maxWidth = 600 }: ModalProps) 
   }, [onClose])
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
       role="dialog"
       aria-modal="true"
@@ -32,6 +33,7 @@ export function Modal({ title, onClose, children, maxWidth = 600 }: ModalProps) 
         overflowY: 'auto',
       }}
       onClick={onClose}
+      onKeyDown={e => { if (e.key === 'Escape') onClose() }}
     >
       <div
         className="pk-card fade-in"
@@ -41,7 +43,9 @@ export function Modal({ title, onClose, children, maxWidth = 600 }: ModalProps) 
           maxHeight: 'calc(100vh - 64px)', overflowY: 'auto',
           position: 'relative', margin: 'auto 0',
         }}
+        role="presentation"
         onClick={e => e.stopPropagation()}
+        onKeyDown={e => e.stopPropagation()}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{title}</h3>
@@ -68,7 +72,9 @@ export type DeleteConfirmProps = {
 export function DeleteConfirm({ label, onConfirm, onCancel }: DeleteConfirmProps) {
   return (
     <div
+      role="presentation"
       onClick={e => e.stopPropagation()}
+      onKeyDown={e => e.stopPropagation()}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
         borderRadius: 8, background: 'rgba(255,80,80,.08)',

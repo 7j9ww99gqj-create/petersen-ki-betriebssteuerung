@@ -202,8 +202,8 @@ function Toast({ msg, isError }: { msg: string; isError?: boolean }) {
 // Modal-Pattern
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
-      <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', position: 'relative' }} onClick={e => e.stopPropagation()}>
+    <div role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }}>
+      <div role="presentation" className="pk-card fade-in" style={{ width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', position: 'relative' }} onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{title}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
@@ -257,50 +257,51 @@ function EditKarteModal({ karte, onClose, onSave, mitarbeiterNamen, bereichNamen
     <Modal title={`✏️ Arbeitskarte bearbeiten – ${karte.id}`} onClose={onClose}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
         <div>
-          <label style={labelStyle}>Auftragsnummer *</label>
-          <input className="pk-input" value={form.auftragsnr} onChange={e => setForm(p => ({ ...p, auftragsnr: e.target.value }))} />
+          <label htmlFor="wk-auftragsnr" style={labelStyle}>Auftragsnummer *</label>
+          <input id="wk-auftragsnr" className="pk-input" value={form.auftragsnr} onChange={e => setForm(p => ({ ...p, auftragsnr: e.target.value }))} />
         </div>
         <div style={{ gridColumn: 'span 2' }}>
-          <label style={labelStyle}>Beschreibung *</label>
-          <input className="pk-input" value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} />
+          <label htmlFor="wk-beschreibung" style={labelStyle}>Beschreibung *</label>
+          <input id="wk-beschreibung" className="pk-input" value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} />
         </div>
         <div>
-          <label style={labelStyle}>Mitarbeiter *</label>
-          <select className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
+          <label htmlFor="wk-mitarbeiter" style={labelStyle}>Mitarbeiter *</label>
+          <select id="wk-mitarbeiter" className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
             <option value="">Mitarbeiter wählen…</option>
             {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Maschine / Bereich</label>
-          <select className="pk-input" value={form.maschine} onChange={e => setForm(p => ({ ...p, maschine: e.target.value }))} style={{ cursor: 'pointer' }}>
+          <label htmlFor="wk-maschine" style={labelStyle}>Maschine / Bereich</label>
+          <select id="wk-maschine" className="pk-input" value={form.maschine} onChange={e => setForm(p => ({ ...p, maschine: e.target.value }))} style={{ cursor: 'pointer' }}>
             <option value="">Maschine wählen…</option>
             {bereichNamen.map(m => <option key={m}>{m}</option>)}
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Priorität</label>
-          <select className="pk-input" value={form.prioritaet} onChange={e => setForm(p => ({ ...p, prioritaet: e.target.value as Prioritaet }))} style={{ cursor: 'pointer' }}>
+          <label htmlFor="wk-prioritaet" style={labelStyle}>Priorität</label>
+          <select id="wk-prioritaet" className="pk-input" value={form.prioritaet} onChange={e => setForm(p => ({ ...p, prioritaet: e.target.value as Prioritaet }))} style={{ cursor: 'pointer' }}>
             <option>Niedrig</option><option>Mittel</option><option>Hoch</option><option>Kritisch</option>
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Status</label>
-          <select className="pk-input" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as AKStatus }))} style={{ cursor: 'pointer' }}>
+          <label htmlFor="wk-status" style={labelStyle}>Status</label>
+          <select id="wk-status" className="pk-input" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as AKStatus }))} style={{ cursor: 'pointer' }}>
             <option>Offen</option><option>In Arbeit</option><option>Warten</option><option>Fertig</option><option>Storniert</option>
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Geplant bis</label>
-          <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.geplant} onChange={e => setForm(p => ({ ...p, geplant: e.target.value }))} />
+          <label htmlFor="wk-geplant" style={labelStyle}>Geplant bis</label>
+          <input id="wk-geplant" className="pk-input" placeholder="TT.MM.JJJJ" value={form.geplant} onChange={e => setForm(p => ({ ...p, geplant: e.target.value }))} />
         </div>
         <div>
-          <label style={labelStyle}>Geplante Stunden</label>
-          <input className="pk-input" type="number" value={form.stunden} onChange={e => setForm(p => ({ ...p, stunden: e.target.value }))} />
+          <label htmlFor="wk-stunden" style={labelStyle}>Geplante Stunden</label>
+          <input id="wk-stunden" className="pk-input" type="number" value={form.stunden} onChange={e => setForm(p => ({ ...p, stunden: e.target.value }))} />
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
-          <label style={labelStyle}>Fortschritt: {form.fortschritt}%</label>
+          <label htmlFor="wk-fortschritt" style={labelStyle}>Fortschritt: {form.fortschritt}%</label>
           <input
+            id="wk-fortschritt"
             type="range" min={0} max={100} step={5} value={form.fortschritt}
             onChange={e => setForm(p => ({ ...p, fortschritt: Number(e.target.value) }))}
             style={{ width: '100%', accentColor: '#7c3aed', cursor: 'pointer' }}
@@ -542,8 +543,8 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
             {bueroAuftraege.length > 0 && (
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>BüroPilot Auftrag verknüpfen (optional)</label>
-                <select className="pk-input" value={form.buero_auftrag_id} onChange={e => {
+                <label htmlFor="wk-buero-auftrag" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>BüroPilot Auftrag verknüpfen (optional)</label>
+                <select id="wk-buero-auftrag" className="pk-input" value={form.buero_auftrag_id} onChange={e => {
                   const id = e.target.value
                   const auftrag = bueroAuftraege.find(a => a.id === id)
                   setForm(p => ({
@@ -563,31 +564,31 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
               </div>
             )}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Auftragsnummer *</label>
-              <input className="pk-input" placeholder="z.B. A-2025-035" value={form.auftragsnr} onChange={e => setForm(p => ({ ...p, auftragsnr: e.target.value }))} />
+              <label htmlFor="wk-new-auftragsnr" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Auftragsnummer *</label>
+              <input id="wk-new-auftragsnr" className="pk-input" placeholder="z.B. A-2025-035" value={form.auftragsnr} onChange={e => setForm(p => ({ ...p, auftragsnr: e.target.value }))} />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Beschreibung *</label>
-              <input className="pk-input" placeholder="Aufgabenbeschreibung eingeben…" value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} />
+              <label htmlFor="wk-new-beschreibung" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Beschreibung *</label>
+              <input id="wk-new-beschreibung" className="pk-input" placeholder="Aufgabenbeschreibung eingeben…" value={form.beschreibung} onChange={e => setForm(p => ({ ...p, beschreibung: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Mitarbeiter *</label>
-              <select className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="wk-new-mitarbeiter" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Mitarbeiter *</label>
+              <select id="wk-new-mitarbeiter" className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option value="">Mitarbeiter wählen…</option>
                 {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Maschine / Bereich</label>
-              <select className="pk-input" value={form.maschine} onChange={e => setForm(p => ({ ...p, maschine: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="wk-new-maschine" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Maschine / Bereich</label>
+              <select id="wk-new-maschine" className="pk-input" value={form.maschine} onChange={e => setForm(p => ({ ...p, maschine: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option value="">Maschine wählen…</option>
                 {bereichNamen.map(m => <option key={m}>{m}</option>)}
               </select>
               {bereichNamen.length === 0 && <div style={{ marginTop: 5, fontSize: 11, color: '#f59e0b' }}>Noch keine Maschinen/Bereiche angelegt.</div>}
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Priorität</label>
-              <select className="pk-input" value={form.prioritaet} onChange={e => setForm(p => ({ ...p, prioritaet: e.target.value as Prioritaet }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="wk-new-prioritaet" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Priorität</label>
+              <select id="wk-new-prioritaet" className="pk-input" value={form.prioritaet} onChange={e => setForm(p => ({ ...p, prioritaet: e.target.value as Prioritaet }))} style={{ cursor: 'pointer' }}>
                 <option>Niedrig</option>
                 <option>Mittel</option>
                 <option>Hoch</option>
@@ -595,20 +596,20 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Status</label>
-              <select className="pk-input" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as AKStatus }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="wk-new-status" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Status</label>
+              <select id="wk-new-status" className="pk-input" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as AKStatus }))} style={{ cursor: 'pointer' }}>
                 <option>Offen</option>
                 <option>In Arbeit</option>
                 <option>Warten</option>
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Geplant bis</label>
-              <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.geplant} onChange={e => setForm(p => ({ ...p, geplant: e.target.value }))} />
+              <label htmlFor="wk-new-geplant" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Geplant bis</label>
+              <input id="wk-new-geplant" className="pk-input" placeholder="TT.MM.JJJJ" value={form.geplant} onChange={e => setForm(p => ({ ...p, geplant: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Geplante Stunden</label>
-              <input className="pk-input" placeholder="z.B. 8" type="number" value={form.stunden} onChange={e => setForm(p => ({ ...p, stunden: e.target.value }))} />
+              <label htmlFor="wk-new-stunden" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Geplante Stunden</label>
+              <input id="wk-new-stunden" className="pk-input" placeholder="z.B. 8" type="number" value={form.stunden} onChange={e => setForm(p => ({ ...p, stunden: e.target.value }))} />
             </div>
           </div>
           <div style={{ marginTop: 18, display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -822,23 +823,23 @@ function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitar
         <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 800 }}>⏱️ Stunden buchen</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Mitarbeiter</label>
-            <select className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
+            <label htmlFor="zeit-mitarbeiter" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Mitarbeiter</label>
+            <select id="zeit-mitarbeiter" className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
               <option value="">Wählen…</option>
               {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Auftrag</label>
-            <input className="pk-input" placeholder="z.B. A-2025-034" value={form.auftragsnr} onChange={e => setForm(p => ({ ...p, auftragsnr: e.target.value }))} />
+            <label htmlFor="zeit-auftrag" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Auftrag</label>
+            <input id="zeit-auftrag" className="pk-input" placeholder="z.B. A-2025-034" value={form.auftragsnr} onChange={e => setForm(p => ({ ...p, auftragsnr: e.target.value }))} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Stunden</label>
-            <input className="pk-input" placeholder="z.B. 2.5" type="number" step="0.5" value={form.stunden} onChange={e => setForm(p => ({ ...p, stunden: e.target.value }))} />
+            <label htmlFor="zeit-stunden" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Stunden</label>
+            <input id="zeit-stunden" className="pk-input" placeholder="z.B. 2.5" type="number" step="0.5" value={form.stunden} onChange={e => setForm(p => ({ ...p, stunden: e.target.value }))} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Tätigkeit</label>
-            <input className="pk-input" placeholder="Kurzbeschreibung" value={form.taetigkeit} onChange={e => setForm(p => ({ ...p, taetigkeit: e.target.value }))} />
+            <label htmlFor="zeit-taetigkeit" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Tätigkeit</label>
+            <input id="zeit-taetigkeit" className="pk-input" placeholder="Kurzbeschreibung" value={form.taetigkeit} onChange={e => setForm(p => ({ ...p, taetigkeit: e.target.value }))} />
           </div>
         </div>
         <button className="pk-btn" style={{ marginTop: 14, background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', fontSize: 13 }} onClick={handleSave}>
@@ -997,8 +998,9 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Artikel</label>
+            <label htmlFor="mat-artikel" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Artikel</label>
             <input
+              id="mat-artikel"
               className="pk-input"
               placeholder="Artikelname"
               list="lager-artikel-list"
@@ -1028,22 +1030,22 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
             })()}
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Menge</label>
-            <input className="pk-input" placeholder="Anzahl" type="number" value={form.menge} onChange={e => setForm(p => ({ ...p, menge: e.target.value }))} />
+            <label htmlFor="mat-menge" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Menge</label>
+            <input id="mat-menge" className="pk-input" placeholder="Anzahl" type="number" value={form.menge} onChange={e => setForm(p => ({ ...p, menge: e.target.value }))} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Einheit</label>
-            <select className="pk-input" value={form.einheit} onChange={e => setForm(p => ({ ...p, einheit: e.target.value }))} style={{ cursor: 'pointer' }}>
+            <label htmlFor="mat-einheit" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Einheit</label>
+            <select id="mat-einheit" className="pk-input" value={form.einheit} onChange={e => setForm(p => ({ ...p, einheit: e.target.value }))} style={{ cursor: 'pointer' }}>
               {['Stk', 'Liter', 'Rollen', 'Meter', 'kg', 'Paar'].map(e => <option key={e}>{e}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Auftrag</label>
-            <input className="pk-input" placeholder="A-2025-XXX" value={form.auftragsnr} onChange={e => setForm(p => ({ ...p, auftragsnr: e.target.value }))} />
+            <label htmlFor="mat-auftrag" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Auftrag</label>
+            <input id="mat-auftrag" className="pk-input" placeholder="A-2025-XXX" value={form.auftragsnr} onChange={e => setForm(p => ({ ...p, auftragsnr: e.target.value }))} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Mitarbeiter</label>
-            <select className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
+            <label htmlFor="mat-mitarbeiter" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Mitarbeiter</label>
+            <select id="mat-mitarbeiter" className="pk-input" value={form.mitarbeiter} onChange={e => setForm(p => ({ ...p, mitarbeiter: e.target.value }))} style={{ cursor: 'pointer' }}>
               <option value="">Wählen…</option>
               {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
             </select>
@@ -1254,16 +1256,16 @@ function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeit
         <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 800 }}>➕ Prüfpunkt hinzufügen</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Auftrag</label>
-            <input className="pk-input" placeholder="A-2025-XXX" value={form.auftragsnr} onChange={e => setForm(p => ({ ...p, auftragsnr: e.target.value }))} />
+            <label htmlFor="pruef-auftrag" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Auftrag</label>
+            <input id="pruef-auftrag" className="pk-input" placeholder="A-2025-XXX" value={form.auftragsnr} onChange={e => setForm(p => ({ ...p, auftragsnr: e.target.value }))} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Prüfpunkt</label>
-            <input className="pk-input" placeholder="z.B. Drehmoment 120 Nm" value={form.pruefpunkt} onChange={e => setForm(p => ({ ...p, pruefpunkt: e.target.value }))} />
+            <label htmlFor="pruef-pruefpunkt" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Prüfpunkt</label>
+            <input id="pruef-pruefpunkt" className="pk-input" placeholder="z.B. Drehmoment 120 Nm" value={form.pruefpunkt} onChange={e => setForm(p => ({ ...p, pruefpunkt: e.target.value }))} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Prüfer</label>
-            <select className="pk-input" value={form.pruefer} onChange={e => setForm(p => ({ ...p, pruefer: e.target.value }))} style={{ cursor: 'pointer' }}>
+            <label htmlFor="pruef-pruefer" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 700, textTransform: 'uppercase' }}>Prüfer</label>
+            <select id="pruef-pruefer" className="pk-input" value={form.pruefer} onChange={e => setForm(p => ({ ...p, pruefer: e.target.value }))} style={{ cursor: 'pointer' }}>
               <option value="">Wählen…</option>
               {mitarbeiterNamen.map(m => <option key={m}>{m}</option>)}
             </select>
@@ -2097,7 +2099,10 @@ function FertigungsleitstandTab({ isDemo, karten, setKarten, mitarbeiterNamen }:
                   return (
                     <div
                       key={k.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => toggleSelect(k.id)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') toggleSelect(k.id) }}
                       style={{
                         padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
                         background: isSelected ? 'rgba(167,139,250,.15)' : 'rgba(255,255,255,.03)',
@@ -2245,7 +2250,7 @@ export default function WerkstattPilotPage() {
           { label: 'Wartung fällig', value: String(faelligeWartungen), icon: '🧰', color: faelligeWartungen > 0 ? '#f59e0b' : '#10b981', tab: 'wartung' as Tab },
           { label: 'Störungen offen', value: String(offeneStoerungen), icon: '🚨', color: offeneStoerungen > 0 ? '#f43f5e' : '#10b981', tab: 'stoerungen' as Tab },
         ].map(s => (
-          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px', cursor: 'pointer' }} onClick={() => setTab(s.tab)}>
+          <div key={s.label} role="button" tabIndex={0} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px', cursor: 'pointer' }} onClick={() => setTab(s.tab)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setTab(s.tab) }}>
             <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>

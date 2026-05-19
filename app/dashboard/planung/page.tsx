@@ -204,15 +204,17 @@ const terminTypColor: Record<Termin['typ'], string> = {
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div style={{
+    <div role="presentation" style={{
       position: 'fixed', inset: 0, zIndex: 500,
       background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-    }} onClick={onClose}>
+    }} onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }}>
       <div
         className="pk-card fade-in"
         style={{ width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}
+        role="presentation"
         onClick={e => e.stopPropagation()}
+        onKeyDown={e => e.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{title}</h3>
@@ -405,24 +407,24 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             {(['name', 'kunde', 'verantwortlich', 'budget', 'start', 'ende'] as const).map(k => (
               <div key={k}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{LABEL[k]}</label>
-                <input className="pk-input" placeholder={PLACEHOLDER[k]} value={createForm[k]} onChange={e => setCreateForm(p => ({ ...p, [k]: e.target.value }))} />
+                <label htmlFor="field-labelk" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{LABEL[k]}</label>
+                <input id="field-labelk" className="pk-input" placeholder={PLACEHOLDER[k]} value={createForm[k]} onChange={e => setCreateForm(p => ({ ...p, [k]: e.target.value }))} />
               </div>
             ))}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Status</label>
-              <select className="pk-input" value={createForm.status} onChange={e => setCreateForm(p => ({ ...p, status: e.target.value as ProjektStatus }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-status" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Status</label>
+              <select id="field-status" className="pk-input" value={createForm.status} onChange={e => setCreateForm(p => ({ ...p, status: e.target.value as ProjektStatus }))} style={{ cursor: 'pointer' }}>
                 {(['Planung', 'Aktiv', 'Pausiert', 'Kritisch', 'Abgeschlossen'] as const).map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Beschreibung</label>
-              <input className="pk-input" placeholder={PLACEHOLDER.beschreibung} value={createForm.beschreibung} onChange={e => setCreateForm(p => ({ ...p, beschreibung: e.target.value }))} />
+              <label htmlFor="field-beschreibung" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Beschreibung</label>
+              <input id="field-beschreibung" className="pk-input" placeholder={PLACEHOLDER.beschreibung} value={createForm.beschreibung} onChange={e => setCreateForm(p => ({ ...p, beschreibung: e.target.value }))} />
             </div>
             {auftraege.length > 0 && (
               <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Verknüpfter Auftrag (Büro)</label>
-                <select className="pk-input" value={createForm.auftrag_id} onChange={e => setCreateForm(p => ({ ...p, auftrag_id: e.target.value }))} style={{ cursor: 'pointer' }}>
+                <label htmlFor="field-verknpfter-auftrag-bro" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Verknüpfter Auftrag (Büro)</label>
+                <select id="field-verknpfter-auftrag-bro" className="pk-input" value={createForm.auftrag_id} onChange={e => setCreateForm(p => ({ ...p, auftrag_id: e.target.value }))} style={{ cursor: 'pointer' }}>
                   <option value="">— Kein Auftrag —</option>
                   {auftraege.map(a => <option key={a.id} value={a.id}>{a.id} – {a.kunde} – {a.beschreibung}</option>)}
                 </select>
@@ -486,8 +488,8 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
                 <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
                   {p.meilensteine.map((m, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: m.erledigt ? 'rgba(37,211,102,.06)' : 'rgba(255,255,255,.03)', border: `1px solid ${m.erledigt ? 'rgba(37,211,102,.2)' : 'rgba(255,255,255,.06)'}` }}>
-                      <span style={{ fontSize: 18, cursor: 'pointer', flexShrink: 0 }} onClick={() => toggleMeilenstein(p.id, i)}>{m.erledigt ? '✅' : '⬜'}</span>
-                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => toggleMeilenstein(p.id, i)}>
+                      <span role="button" tabIndex={0} style={{ fontSize: 18, cursor: 'pointer', flexShrink: 0 }} onClick={() => toggleMeilenstein(p.id, i)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') toggleMeilenstein(p.id, i) }}>{m.erledigt ? '✅' : '⬜'}</span>
+                      <div role="button" tabIndex={0} style={{ flex: 1, cursor: 'pointer' }} onClick={() => toggleMeilenstein(p.id, i)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') toggleMeilenstein(p.id, i) }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: m.erledigt ? '#4ddb7e' : '#f8fbff', textDecoration: m.erledigt ? 'line-through' : 'none' }}>{m.name}</div>
                         <div style={{ fontSize: 11, color: '#aeb9c8' }}>📅 {m.datum}</div>
                       </div>
@@ -529,24 +531,24 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             {(['name', 'kunde', 'verantwortlich', 'budget', 'start', 'ende'] as const).map(k => (
               <div key={k}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{LABEL[k]}</label>
-                <input className="pk-input" placeholder={PLACEHOLDER[k]} value={editForm[k]} onChange={e => setEditForm(p => ({ ...p, [k]: e.target.value }))} />
+                <label htmlFor="field-labelk-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{LABEL[k]}</label>
+                <input id="field-labelk-2" className="pk-input" placeholder={PLACEHOLDER[k]} value={editForm[k]} onChange={e => setEditForm(p => ({ ...p, [k]: e.target.value }))} />
               </div>
             ))}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Status</label>
-              <select className="pk-input" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value as ProjektStatus }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-status-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Status</label>
+              <select id="field-status-2" className="pk-input" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value as ProjektStatus }))} style={{ cursor: 'pointer' }}>
                 {(['Planung', 'Aktiv', 'Pausiert', 'Kritisch', 'Abgeschlossen'] as const).map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Beschreibung</label>
-              <input className="pk-input" placeholder={PLACEHOLDER.beschreibung} value={editForm.beschreibung} onChange={e => setEditForm(p => ({ ...p, beschreibung: e.target.value }))} />
+              <label htmlFor="field-beschreibung-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Beschreibung</label>
+              <input id="field-beschreibung-2" className="pk-input" placeholder={PLACEHOLDER.beschreibung} value={editForm.beschreibung} onChange={e => setEditForm(p => ({ ...p, beschreibung: e.target.value }))} />
             </div>
             {auftraege.length > 0 && (
               <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Verknüpfter Auftrag (Büro)</label>
-                <select className="pk-input" value={editForm.auftrag_id} onChange={e => setEditForm(p => ({ ...p, auftrag_id: e.target.value }))} style={{ cursor: 'pointer' }}>
+                <label htmlFor="field-verknpfter-auftrag-bro-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Verknüpfter Auftrag (Büro)</label>
+                <select id="field-verknpfter-auftrag-bro-2" className="pk-input" value={editForm.auftrag_id} onChange={e => setEditForm(p => ({ ...p, auftrag_id: e.target.value }))} style={{ cursor: 'pointer' }}>
                   <option value="">— Kein Auftrag —</option>
                   {auftraege.map(a => <option key={a.id} value={a.id}>{a.id} – {a.kunde} – {a.beschreibung}</option>)}
                 </select>
@@ -667,13 +669,13 @@ function KalenderTab({ isDemo }: { isDemo: boolean }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>
             {(['titel', 'datum', 'uhrzeit', 'projekt', 'teilnehmer'] as const).map(k => (
               <div key={k}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{LABEL[k]}</label>
-                <input className="pk-input" placeholder={PLACEHOLDER[k]} value={form[k]} onChange={e => setForm(p => ({ ...p, [k]: e.target.value }))} />
+                <label htmlFor="field-labelk-3" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{LABEL[k]}</label>
+                <input id="field-labelk-3" className="pk-input" placeholder={PLACEHOLDER[k]} value={form[k]} onChange={e => setForm(p => ({ ...p, [k]: e.target.value }))} />
               </div>
             ))}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
-              <select className="pk-input" value={form.typ} onChange={e => setForm(p => ({ ...p, typ: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-typ" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
+              <select id="field-typ" className="pk-input" value={form.typ} onChange={e => setForm(p => ({ ...p, typ: e.target.value }))} style={{ cursor: 'pointer' }}>
                 {['Meeting', 'Deadline', 'Lieferung', 'Wartung'].map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
@@ -732,13 +734,13 @@ function KalenderTab({ isDemo }: { isDemo: boolean }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>
             {(['titel', 'datum', 'uhrzeit', 'projekt', 'teilnehmer'] as const).map(k => (
               <div key={k}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{LABEL[k]}</label>
-                <input className="pk-input" placeholder={PLACEHOLDER[k]} value={editForm[k]} onChange={e => setEditForm(p => ({ ...p, [k]: e.target.value }))} />
+                <label htmlFor="field-labelk-4" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{LABEL[k]}</label>
+                <input id="field-labelk-4" className="pk-input" placeholder={PLACEHOLDER[k]} value={editForm[k]} onChange={e => setEditForm(p => ({ ...p, [k]: e.target.value }))} />
               </div>
             ))}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
-              <select className="pk-input" value={editForm.typ} onChange={e => setEditForm(p => ({ ...p, typ: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-typ-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
+              <select id="field-typ-2" className="pk-input" value={editForm.typ} onChange={e => setEditForm(p => ({ ...p, typ: e.target.value }))} style={{ cursor: 'pointer' }}>
                 {['Meeting', 'Deadline', 'Lieferung', 'Wartung'].map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
@@ -849,19 +851,19 @@ function RessourcenTab({ isDemo }: { isDemo: boolean }) {
         { k: 'projekt', label: 'Aktuelles Projekt', placeholder: 'PRJ-XXX oder leer' },
       ].map(({ k, label, placeholder }) => (
         <div key={k}>
-          <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{label}</label>
-          <input className="pk-input" placeholder={placeholder} value={(f as Record<string, string>)[k]} onChange={e => onChange(k as keyof RessourceFormState, e.target.value)} />
+          <label htmlFor="field-label" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{label}</label>
+          <input id="field-label" className="pk-input" placeholder={placeholder} value={(f as Record<string, string>)[k]} onChange={e => onChange(k as keyof RessourceFormState, e.target.value)} />
         </div>
       ))}
       <div>
-        <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
-        <select className="pk-input" value={f.typ} onChange={e => onChange('typ', e.target.value)} style={{ cursor: 'pointer' }}>
+        <label htmlFor="field-typ-3" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Typ</label>
+        <select id="field-typ-3" className="pk-input" value={f.typ} onChange={e => onChange('typ', e.target.value)} style={{ cursor: 'pointer' }}>
           {['Person', 'Maschine', 'Fahrzeug'].map(t => <option key={t}>{t}</option>)}
         </select>
       </div>
       <div>
-        <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Status</label>
-        <select className="pk-input" value={f.status} onChange={e => onChange('status', e.target.value)} style={{ cursor: 'pointer' }}>
+        <label htmlFor="field-status-3" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Status</label>
+        <select id="field-status-3" className="pk-input" value={f.status} onChange={e => onChange('status', e.target.value)} style={{ cursor: 'pointer' }}>
           {['Verfügbar', 'Belegt', 'Wartung'].map(s => <option key={s}>{s}</option>)}
         </select>
       </div>
@@ -1121,21 +1123,21 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
           <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>✏️ Neue Aufgabe erstellen</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Aufgabe *</label>
-              <input className="pk-input" placeholder="Aufgabenbeschreibung eingeben…" value={form.titel} onChange={e => setForm(p => ({ ...p, titel: e.target.value }))} />
+              <label htmlFor="field-aufgabe" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Aufgabe *</label>
+              <input id="field-aufgabe" className="pk-input" placeholder="Aufgabenbeschreibung eingeben…" value={form.titel} onChange={e => setForm(p => ({ ...p, titel: e.target.value }))} />
             </div>
             {([
               { k: 'projekt', label: 'Projekt', placeholder: 'PRJ-XXX' },
               { k: 'faellig', label: 'Fällig am', placeholder: 'TT.MM.JJJJ' },
             ] as const).map(f => (
               <div key={f.k}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{f.label}</label>
-                <input className="pk-input" placeholder={f.placeholder} value={form[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))} />
+                <label htmlFor="field-flabel" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{f.label}</label>
+                <input id="field-flabel" className="pk-input" placeholder={f.placeholder} value={form[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))} />
               </div>
             ))}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Verantwortlich</label>
-              <input className="pk-input" placeholder="Mitarbeitername" value={form.verantwortlich} onChange={e => setForm(p => ({ ...p, verantwortlich: e.target.value }))} list="ressourcen-list" />
+              <label htmlFor="field-verantwortlich" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Verantwortlich</label>
+              <input id="field-verantwortlich" className="pk-input" placeholder="Mitarbeitername" value={form.verantwortlich} onChange={e => setForm(p => ({ ...p, verantwortlich: e.target.value }))} list="ressourcen-list" />
               <datalist id="ressourcen-list">{ressourcen.map(r => <option key={r.id} value={r.name} />)}</datalist>
               {form.verantwortlich && (() => {
                 const res = ressourcen.find(r => r.name === form.verantwortlich)
@@ -1146,18 +1148,18 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
               })()}
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Priorität</label>
-              <select className="pk-input" value={form.prioritaet} onChange={e => setForm(p => ({ ...p, prioritaet: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-prioritt" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Priorität</label>
+              <select id="field-prioritt" className="pk-input" value={form.prioritaet} onChange={e => setForm(p => ({ ...p, prioritaet: e.target.value }))} style={{ cursor: 'pointer' }}>
                 {['Niedrig', 'Mittel', 'Hoch', 'Kritisch'].map(p => <option key={p}>{p}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Std. Soll</label>
-              <input className="pk-input" type="number" min="0" step="0.5" placeholder="z.B. 8" value={form.stunden_soll} onChange={e => setForm(p => ({ ...p, stunden_soll: e.target.value }))} />
+              <label htmlFor="field-std-soll" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Std. Soll</label>
+              <input id="field-std-soll" className="pk-input" type="number" min="0" step="0.5" placeholder="z.B. 8" value={form.stunden_soll} onChange={e => setForm(p => ({ ...p, stunden_soll: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Std. Ist</label>
-              <input className="pk-input" type="number" min="0" step="0.5" placeholder="z.B. 4" value={form.stunden_ist} onChange={e => setForm(p => ({ ...p, stunden_ist: e.target.value }))} />
+              <label htmlFor="field-std-ist" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Std. Ist</label>
+              <input id="field-std-ist" className="pk-input" type="number" min="0" step="0.5" placeholder="z.B. 4" value={form.stunden_ist} onChange={e => setForm(p => ({ ...p, stunden_ist: e.target.value }))} />
             </div>
           </div>
           <button className="pk-btn" style={{ marginTop: 16, background: 'linear-gradient(135deg, #e11d48, #9f1239)' }} onClick={handleCreate}>Aufgabe erstellen</button>
@@ -1248,8 +1250,8 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
         <Modal title={`✏️ Aufgabe bearbeiten`} onClose={() => setEditAufgabe(null)}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Aufgabe *</label>
-              <input className="pk-input" value={editForm.titel} onChange={e => setEditForm(p => ({ ...p, titel: e.target.value }))} />
+              <label htmlFor="field-aufgabe-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Aufgabe *</label>
+              <input id="field-aufgabe-2" className="pk-input" value={editForm.titel} onChange={e => setEditForm(p => ({ ...p, titel: e.target.value }))} />
             </div>
             {([
               { k: 'projekt', label: 'Projekt', placeholder: 'PRJ-XXX' },
@@ -1257,29 +1259,29 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
               { k: 'faellig', label: 'Fällig am', placeholder: 'TT.MM.JJJJ' },
             ] as const).map(f => (
               <div key={f.k}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{f.label}</label>
-                <input className="pk-input" placeholder={f.placeholder} value={editForm[f.k]} onChange={e => setEditForm(p => ({ ...p, [f.k]: e.target.value }))} />
+                <label htmlFor="field-flabel-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>{f.label}</label>
+                <input id="field-flabel-2" className="pk-input" placeholder={f.placeholder} value={editForm[f.k]} onChange={e => setEditForm(p => ({ ...p, [f.k]: e.target.value }))} />
               </div>
             ))}
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Priorität</label>
-              <select className="pk-input" value={editForm.prioritaet} onChange={e => setEditForm(p => ({ ...p, prioritaet: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-prioritt-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Priorität</label>
+              <select id="field-prioritt-2" className="pk-input" value={editForm.prioritaet} onChange={e => setEditForm(p => ({ ...p, prioritaet: e.target.value }))} style={{ cursor: 'pointer' }}>
                 {['Niedrig', 'Mittel', 'Hoch', 'Kritisch'].map(p => <option key={p}>{p}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Status</label>
-              <select className="pk-input" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value as AufgabeStatus }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-status-4" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Status</label>
+              <select id="field-status-4" className="pk-input" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value as AufgabeStatus }))} style={{ cursor: 'pointer' }}>
                 {(['Offen', 'In Arbeit', 'Blockiert', 'Erledigt'] as const).map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Std. Soll</label>
-              <input className="pk-input" type="number" min="0" step="0.5" placeholder="z.B. 8" value={editForm.stunden_soll} onChange={e => setEditForm(p => ({ ...p, stunden_soll: e.target.value }))} />
+              <label htmlFor="field-std-soll-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Std. Soll</label>
+              <input id="field-std-soll-2" className="pk-input" type="number" min="0" step="0.5" placeholder="z.B. 8" value={editForm.stunden_soll} onChange={e => setEditForm(p => ({ ...p, stunden_soll: e.target.value }))} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Std. Ist</label>
-              <input className="pk-input" type="number" min="0" step="0.5" placeholder="z.B. 4" value={editForm.stunden_ist} onChange={e => setEditForm(p => ({ ...p, stunden_ist: e.target.value }))} />
+              <label htmlFor="field-std-ist-2" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Std. Ist</label>
+              <input id="field-std-ist-2" className="pk-input" type="number" min="0" step="0.5" placeholder="z.B. 4" value={editForm.stunden_ist} onChange={e => setEditForm(p => ({ ...p, stunden_ist: e.target.value }))} />
             </div>
           </div>
           {editForm.stunden_soll && parseFloat(editForm.stunden_soll) > 0 && (
@@ -1416,7 +1418,7 @@ export default function PlanungPilotPage() {
           { label: '🔴 Kritisch', value: String(kritischeAufgaben), icon: '⚠️', color: kritischeAufgaben > 0 ? '#f43f5e' : '#4a5568', tab: 'aufgaben' as Tab },
           { label: 'Team-Auslastung', value: `${kapazitaet}%`, icon: '⚡', color: kapazitaet > 85 ? '#f43f5e' : '#10b981', tab: 'ressourcen' as Tab },
         ].map(s => (
-          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px', cursor: 'pointer' }} onClick={() => setTab(s.tab)}>
+          <div key={s.label} className="pk-card" style={{ textAlign: 'center', padding: '16px 12px', cursor: 'pointer' }} role="button" tabIndex={0} onClick={() => setTab(s.tab)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setTab(s.tab) }}>
             <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>{s.label}</div>

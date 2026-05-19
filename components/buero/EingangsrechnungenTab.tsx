@@ -327,19 +327,19 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
       {showForm && (
         <Modal title={editRechnung ? `📥 Eingangsrechnung bearbeiten – ${editRechnung.id}` : '📥 Eingangsrechnung hinzufügen'} onClose={() => { setShowForm(false); setEditRechnung(null) }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
-            <div><label style={labelStyle}>Lieferant *</label><input className="pk-input" value={form.lieferant} onChange={e => setForm(p => ({ ...p, lieferant: e.target.value }))} /></div>
-            <div><label style={labelStyle}>Rechnungsnummer</label><input className="pk-input" value={form.rechnungsnummer} onChange={e => setForm(p => ({ ...p, rechnungsnummer: e.target.value }))} /></div>
-            <div><label style={labelStyle}>Rechnungsdatum</label><input className="pk-input" type="date" value={form.rechnungsdatum} onChange={e => setForm(p => ({ ...p, rechnungsdatum: e.target.value }))} /></div>
-            <div><label style={labelStyle}>Fälligkeit</label><input className="pk-input" type="date" value={form.faelligkeit} onChange={e => setForm(p => ({ ...p, faelligkeit: e.target.value }))} /></div>
-            <div><label style={labelStyle}>Netto</label><input className="pk-input" type="number" step="0.01" value={form.betrag_netto} onChange={e => setForm(p => ({ ...p, betrag_netto: e.target.value }))} /></div>
-            <div><label style={labelStyle}>MwSt</label><input className="pk-input" type="number" step="0.01" value={form.mwst} onChange={e => setForm(p => ({ ...p, mwst: e.target.value }))} /></div>
-            <div><label style={labelStyle}>Brutto</label><input className="pk-input" type="number" step="0.01" value={form.betrag_brutto} onChange={e => setForm(p => ({ ...p, betrag_brutto: e.target.value }))} /></div>
-            <div><label style={labelStyle}>Status</label><select className="pk-input" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as EingangsrechnungStatus }))}>{(['offen', 'geprüft', 'freigegeben', 'bezahlt', 'überfällig', 'abgelehnt'] as const).map(s => <option key={s}>{s}</option>)}</select></div>
-            <div><label style={labelStyle}>Kategorie</label><input className="pk-input" value={form.kategorie} onChange={e => setForm(p => ({ ...p, kategorie: e.target.value }))} /></div>
-            <div><label style={labelStyle}>IBAN</label><input className="pk-input" value={form.iban} onChange={e => setForm(p => ({ ...p, iban: e.target.value }))} /></div>
+            <div><label htmlFor="field-lieferant" style={labelStyle}>Lieferant *</label><input id="field-lieferant" className="pk-input" value={form.lieferant} onChange={e => setForm(p => ({ ...p, lieferant: e.target.value }))} /></div>
+            <div><label htmlFor="field-rechnungsnummer" style={labelStyle}>Rechnungsnummer</label><input id="field-rechnungsnummer" className="pk-input" value={form.rechnungsnummer} onChange={e => setForm(p => ({ ...p, rechnungsnummer: e.target.value }))} /></div>
+            <div><label htmlFor="field-rechnungsdatum" style={labelStyle}>Rechnungsdatum</label><input id="field-rechnungsdatum" className="pk-input" type="date" value={form.rechnungsdatum} onChange={e => setForm(p => ({ ...p, rechnungsdatum: e.target.value }))} /></div>
+            <div><label htmlFor="field-flligkeit" style={labelStyle}>Fälligkeit</label><input id="field-flligkeit" className="pk-input" type="date" value={form.faelligkeit} onChange={e => setForm(p => ({ ...p, faelligkeit: e.target.value }))} /></div>
+            <div><label htmlFor="field-netto" style={labelStyle}>Netto</label><input id="field-netto" className="pk-input" type="number" step="0.01" value={form.betrag_netto} onChange={e => setForm(p => ({ ...p, betrag_netto: e.target.value }))} /></div>
+            <div><label htmlFor="field-mwst" style={labelStyle}>MwSt</label><input id="field-mwst" className="pk-input" type="number" step="0.01" value={form.mwst} onChange={e => setForm(p => ({ ...p, mwst: e.target.value }))} /></div>
+            <div><label htmlFor="field-brutto" style={labelStyle}>Brutto</label><input id="field-brutto" className="pk-input" type="number" step="0.01" value={form.betrag_brutto} onChange={e => setForm(p => ({ ...p, betrag_brutto: e.target.value }))} /></div>
+            <div><label htmlFor="field-status" style={labelStyle}>Status</label><select id="field-status" className="pk-input" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as EingangsrechnungStatus }))}>{(['offen', 'geprüft', 'freigegeben', 'bezahlt', 'überfällig', 'abgelehnt'] as const).map(s => <option key={s}>{s}</option>)}</select></div>
+            <div><label htmlFor="field-kategorie" style={labelStyle}>Kategorie</label><input id="field-kategorie" className="pk-input" value={form.kategorie} onChange={e => setForm(p => ({ ...p, kategorie: e.target.value }))} /></div>
+            <div><label htmlFor="field-iban" style={labelStyle}>IBAN</label><input id="field-iban" className="pk-input" value={form.iban} onChange={e => setForm(p => ({ ...p, iban: e.target.value }))} /></div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Verknüpftes Dokument</label>
-              <select
+              <label htmlFor="field-verknpftes-dokument" style={labelStyle}>Verknüpftes Dokument</label>
+              <select id="field-verknpftes-dokument"
                 className="pk-input"
                 value={form.dokument_id}
                 onChange={e => setForm(p => ({ ...p, dokument_id: e.target.value, dokument_url: '' }))}
@@ -352,8 +352,8 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
                 ))}
               </select>
             </div>
-            <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Verwendungszweck</label><input className="pk-input" value={form.verwendungszweck} onChange={e => setForm(p => ({ ...p, verwendungszweck: e.target.value }))} /></div>
-            <div style={{ gridColumn: '1 / -1' }}><label style={labelStyle}>Notiz</label><textarea className="pk-input" rows={3} value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} /></div>
+            <div style={{ gridColumn: '1 / -1' }}><label htmlFor="field-verwendungszweck" style={labelStyle}>Verwendungszweck</label><input id="field-verwendungszweck" className="pk-input" value={form.verwendungszweck} onChange={e => setForm(p => ({ ...p, verwendungszweck: e.target.value }))} /></div>
+            <div style={{ gridColumn: '1 / -1' }}><label htmlFor="field-notiz" style={labelStyle}>Notiz</label><textarea id="field-notiz" className="pk-input" rows={3} value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} /></div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
             <button className="pk-btn-ghost" onClick={() => { setShowForm(false); setEditRechnung(null) }}>Abbrechen</button>

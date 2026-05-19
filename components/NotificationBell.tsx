@@ -159,7 +159,9 @@ export default function NotificationBell() {
         <>
           {/* Backdrop für mobile */}
           <div
+            role="presentation"
             onClick={() => setOpen(false)}
+            onKeyDown={e => { if (e.key === 'Escape') setOpen(false) }}
             style={{
               position: 'fixed', inset: 0, zIndex: 9988,
               background: 'rgba(0,0,0,.4)',

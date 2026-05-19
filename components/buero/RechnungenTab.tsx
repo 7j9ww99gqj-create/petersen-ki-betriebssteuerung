@@ -317,25 +317,25 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
         <Modal title={`💶 Rechnung bearbeiten – ${editRechnung.id}`} onClose={() => setEditRechnung(null)}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
-              <label style={labelStyle}>Kunde</label>
-              <select className="pk-input" value={editForm.kunde} onChange={e => setEditForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-kunde" style={labelStyle}>Kunde</label>
+              <select id="field-kunde" className="pk-input" value={editForm.kunde} onChange={e => setEditForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
                 {kunden.map(k => <option key={k.id}>{k.name}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Betrag (€) {editPositionen.length > 0 ? '(automatisch)' : ''}</label>
-              <input className="pk-input" value={editPositionen.length > 0 ? berechneBetragAusPositionen(editPositionen) : editForm.betrag} onChange={e => { if (editPositionen.length === 0) setEditForm(p => ({ ...p, betrag: e.target.value })) }} readOnly={editPositionen.length > 0} style={editPositionen.length > 0 ? { opacity: 0.6 } : {}} />
+              <label htmlFor="field-betrag-editpositionenleng" style={labelStyle}>Betrag (€) {editPositionen.length > 0 ? '(automatisch)' : ''}</label>
+              <input id="field-betrag-editpositionenleng" className="pk-input" value={editPositionen.length > 0 ? berechneBetragAusPositionen(editPositionen) : editForm.betrag} onChange={e => { if (editPositionen.length === 0) setEditForm(p => ({ ...p, betrag: e.target.value })) }} readOnly={editPositionen.length > 0} style={editPositionen.length > 0 ? { opacity: 0.6 } : {}} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <PositionenEditor positionen={editPositionen} onChange={setEditPositionen} />
             </div>
             <div>
-              <label style={labelStyle}>Fällig am</label>
-              <input className="pk-input" placeholder="TT.MM.JJJJ" value={editForm.faellig} onChange={e => setEditForm(p => ({ ...p, faellig: e.target.value }))} />
+              <label htmlFor="field-fllig-am" style={labelStyle}>Fällig am</label>
+              <input id="field-fllig-am" className="pk-input" placeholder="TT.MM.JJJJ" value={editForm.faellig} onChange={e => setEditForm(p => ({ ...p, faellig: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Status</label>
-              <select className="pk-input" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value as Rechnung['status'] }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-status" style={labelStyle}>Status</label>
+              <select id="field-status" className="pk-input" value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value as Rechnung['status'] }))} style={{ cursor: 'pointer' }}>
                 <option>Offen</option>
                 <option>Bezahlt</option>
                 <option>Überfällig</option>
@@ -343,8 +343,8 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
               </select>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Verknüpftes Dokument</label>
-              <select className="pk-input" value={editForm.dokumentId} onChange={e => setEditForm(p => ({ ...p, dokumentId: e.target.value }))}>
+              <label htmlFor="field-verknpftes-dokument" style={labelStyle}>Verknüpftes Dokument</label>
+              <select id="field-verknpftes-dokument" className="pk-input" value={editForm.dokumentId} onChange={e => setEditForm(p => ({ ...p, dokumentId: e.target.value }))}>
                 <option value="">Kein Dokument verknüpft</option>
                 {dokumentOptionen.map(doc => <option key={doc.id} value={doc.id}>{doc.name} ({doc.datum})</option>)}
               </select>
@@ -424,26 +424,26 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
           <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>💶 Neue Rechnung erstellen</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             <div>
-              <label style={labelStyle}>Kunde *</label>
-              <select className="pk-input" value={form.kunde} onChange={e => setForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-kunde-2" style={labelStyle}>Kunde *</label>
+              <select id="field-kunde-2" className="pk-input" value={form.kunde} onChange={e => setForm(p => ({ ...p, kunde: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option value="">Kunde wählen…</option>
                 {kunden.map(k => <option key={k.id}>{k.name}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Betrag (€) {formPositionen.length > 0 ? '(automatisch)' : '*'}</label>
-              <input className="pk-input" placeholder="z.B. 2.400,00" value={formPositionen.length > 0 ? berechneBetragAusPositionen(formPositionen) : form.betrag} onChange={e => { if (formPositionen.length === 0) setForm(p => ({ ...p, betrag: e.target.value })) }} readOnly={formPositionen.length > 0} style={formPositionen.length > 0 ? { opacity: 0.6 } : {}} />
+              <label htmlFor="field-betrag-formpositionenleng" style={labelStyle}>Betrag (€) {formPositionen.length > 0 ? '(automatisch)' : '*'}</label>
+              <input id="field-betrag-formpositionenleng" className="pk-input" placeholder="z.B. 2.400,00" value={formPositionen.length > 0 ? berechneBetragAusPositionen(formPositionen) : form.betrag} onChange={e => { if (formPositionen.length === 0) setForm(p => ({ ...p, betrag: e.target.value })) }} readOnly={formPositionen.length > 0} style={formPositionen.length > 0 ? { opacity: 0.6 } : {}} />
             </div>
             <div>
-              <label style={labelStyle}>Fällig am</label>
-              <input className="pk-input" placeholder="TT.MM.JJJJ" value={form.faellig} onChange={e => setForm(p => ({ ...p, faellig: e.target.value }))} />
+              <label htmlFor="field-fllig-am-2" style={labelStyle}>Fällig am</label>
+              <input id="field-fllig-am-2" className="pk-input" placeholder="TT.MM.JJJJ" value={form.faellig} onChange={e => setForm(p => ({ ...p, faellig: e.target.value }))} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <PositionenEditor positionen={formPositionen} onChange={setFormPositionen} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Verknüpftes Dokument</label>
-              <select className="pk-input" value={form.dokumentId} onChange={e => setForm(p => ({ ...p, dokumentId: e.target.value }))}>
+              <label htmlFor="field-verknpftes-dokument-2" style={labelStyle}>Verknüpftes Dokument</label>
+              <select id="field-verknpftes-dokument-2" className="pk-input" value={form.dokumentId} onChange={e => setForm(p => ({ ...p, dokumentId: e.target.value }))}>
                 <option value="">Kein Dokument verknüpft</option>
                 {dokumentOptionen.map(doc => <option key={doc.id} value={doc.id}>{doc.name} ({doc.datum})</option>)}
               </select>
@@ -561,8 +561,8 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
         const rechnung = rechnungen.find(r => r.id === mailTarget.id)
         if (!rechnung) return null
         return (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setMailTarget(null)}>
-            <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+          <div role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setMailTarget(null)} onKeyDown={e => { if (e.key === 'Escape') setMailTarget(null) }}>
+            <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 460 }} role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
                 <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>✉️ Rechnung per Mail senden</h3>
                 <button onClick={() => setMailTarget(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
@@ -570,8 +570,8 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
               <div style={{ fontSize: 13, color: '#aeb9c8', marginBottom: 14 }}>
                 <strong style={{ color: '#f8fbff' }}>{rechnung.nummer || rechnung.id}</strong> — {rechnung.kunde} — {rechnung.betrag}
               </div>
-              <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>E-Mail-Adresse des Empfängers</label>
-              <input
+              <label htmlFor="field-e-mail-adresse-des-empfng" style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>E-Mail-Adresse des Empfängers</label>
+              <input id="field-e-mail-adresse-des-empfng"
                 className="pk-input"
                 type="email"
                 value={mailTarget.email}

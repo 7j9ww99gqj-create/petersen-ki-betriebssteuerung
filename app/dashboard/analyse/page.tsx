@@ -119,7 +119,7 @@ function KPICard({ icon, label, value, delta, color, sub, onClick }: {
   icon: string; label: string; value: string; delta?: string; color: string; sub?: string; onClick?: () => void
 }) {
   return (
-    <div className="pk-card" style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: onClick ? 'pointer' : 'default', padding: '12px 14px' }} onClick={onClick}>
+    <div className="pk-card" style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: onClick ? 'pointer' : 'default', padding: '12px 14px' }} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined} onClick={onClick} onKeyDown={onClick ? (e => { if (e.key === 'Enter' || e.key === ' ') onClick() }) : undefined}>
       <div style={{
         width: 42, height: 42, borderRadius: 12, flexShrink: 0,
         background: color + '18', border: `1px solid ${color}30`,

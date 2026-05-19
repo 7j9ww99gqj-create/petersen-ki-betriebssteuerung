@@ -275,60 +275,61 @@ function ArtikelModal({ artikel, bildUrl, onSave, onClose, lieferanten }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} />
+      <div role="presentation" onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} />
       <div className="pk-card fade-in-scale" style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 480, padding: 28 }}>
         <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 800 }}>
           {artikel ? '✏️ Artikel bearbeiten' : '➕ Neuer Artikel'}
         </h3>
         <div style={{ display: 'grid', gap: 14 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikelnummer *</label>
-            <input className="pk-input" placeholder="z.B. ST-40X40 oder ART-001" value={form.id} onChange={set('id')} disabled={Boolean(artikel)} style={{ opacity: artikel ? .65 : 1, cursor: artikel ? 'not-allowed' : 'text' }} />
+            <label htmlFor="lager-artikelnummer" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikelnummer *</label>
+            <input id="lager-artikelnummer" className="pk-input" placeholder="z.B. ST-40X40 oder ART-001" value={form.id} onChange={set('id')} disabled={Boolean(artikel)} style={{ opacity: artikel ? .65 : 1, cursor: artikel ? 'not-allowed' : 'text' }} />
             {artikel && <div style={{ marginTop: 5, fontSize: 11, color: '#7f8ea3' }}>Artikelnummern bleiben beim Bearbeiten unverändert.</div>}
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikelbezeichnung *</label>
-            <input className="pk-input" placeholder="z.B. Stahlrohr 40x40" value={form.name} onChange={set('name')} />
+            <label htmlFor="lager-artikelname" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikelbezeichnung *</label>
+            <input id="lager-artikelname" className="pk-input" placeholder="z.B. Stahlrohr 40x40" value={form.name} onChange={set('name')} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Kategorie</label>
-              <select className="pk-input" value={form.kategorie} onChange={set('kategorie')}>
+              <label htmlFor="lager-kategorie" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Kategorie</label>
+              <select id="lager-kategorie" className="pk-input" value={form.kategorie} onChange={set('kategorie')}>
                 {KATEGORIEN.map(k => <option key={k}>{k}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Einheit</label>
-              <select className="pk-input" value={form.einheit} onChange={set('einheit')}>
+              <label htmlFor="lager-einheit" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Einheit</label>
+              <select id="lager-einheit" className="pk-input" value={form.einheit} onChange={set('einheit')}>
                 {EINHEITEN.map(e => <option key={e}>{e}</option>)}
               </select>
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Mindestbestand ⚠️</label>
-              <input className="pk-input" type="number" min="0" value={form.mindestbestand} onChange={set('mindestbestand')} />
+              <label htmlFor="lager-mindestbestand" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Mindestbestand ⚠️</label>
+              <input id="lager-mindestbestand" className="pk-input" type="number" min="0" value={form.mindestbestand} onChange={set('mindestbestand')} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Einkaufspreis (€)</label>
-              <input className="pk-input" type="number" min="0" step="0.01" placeholder="0.00" value={form.einkaufspreis} onChange={set('einkaufspreis')} />
+              <label htmlFor="lager-einkaufspreis" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Einkaufspreis (€)</label>
+              <input id="lager-einkaufspreis" className="pk-input" type="number" min="0" step="0.01" placeholder="0.00" value={form.einkaufspreis} onChange={set('einkaufspreis')} />
             </div>
           </div>
           <div style={{ marginTop: -8, fontSize: 11, color: '#7f8ea3' }}>Menge und Stellplatz werden erst bei der Einlagerung gebucht.</div>
           {lieferanten && lieferanten.length > 0 && (
             <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Stammlieferant</label>
-              <select className="pk-input" value={form.lieferant_id} onChange={set('lieferant_id')}>
+              <label htmlFor="lager-stammlieferant" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Stammlieferant</label>
+              <select id="lager-stammlieferant" className="pk-input" value={form.lieferant_id} onChange={set('lieferant_id')}>
                 <option value="">— kein Stammlieferant —</option>
                 {lieferanten.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
             </div>
           )}
           <div>
-            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikelbild (optional, 1 Bild)</label>
+            <span style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikelbild (optional, 1 Bild)</span>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div style={{ width: 80, height: 80, borderRadius: 10, background: '#0b1420', border: '1px dashed #2a3a52', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
                 {preview
+                  // eslint-disable-next-line @next/next/no-img-element
                   ? <img src={preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   : <span style={{ fontSize: 24, color: '#4a5568' }}>📦</span>}
               </div>
@@ -374,7 +375,7 @@ function BestellDetailModal({ artikel, menge, onConfirm, onClose }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(4px)' }} />
+      <div role="presentation" onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(4px)' }} />
       <div className="pk-card fade-in-scale" style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: 28, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>🛒 Bestellung auslösen</h3>
@@ -408,9 +409,10 @@ function BestellDetailModal({ artikel, menge, onConfirm, onClose }: {
 
         {/* Bestellmenge */}
         <div style={{ marginBottom: 18 }}>
-          <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Bestellmenge *</label>
+          <label htmlFor="lager-bestellmenge" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Bestellmenge *</label>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <input
+              id="lager-bestellmenge"
               className="pk-input"
               type="number" min="1"
               value={m}
@@ -500,31 +502,31 @@ function StellplatzModal({ stellplatz, onSave, onClose }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} />
+      <div role="presentation" onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} />
       <div className="pk-card fade-in-scale" style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: 28, maxHeight: '90vh', overflowY: 'auto' }}>
         <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 800 }}>
           {stellplatz ? '✏️ Stellplatz bearbeiten' : '📍 Neuer Stellplatz'}
         </h3>
         <div style={{ display: 'grid', gap: 14 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Stellplatz-Code * <span style={{ color: '#aeb9c8', fontWeight: 400 }}>(z.B. TL-A-01-02)</span></label>
-            <input className="pk-input" placeholder="TL-A-01-02" value={form.code} onChange={set('code')} />
+            <label htmlFor="sp-code" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Stellplatz-Code * <span style={{ color: '#aeb9c8', fontWeight: 400 }}>(z.B. TL-A-01-02)</span></label>
+            <input id="sp-code" className="pk-input" placeholder="TL-A-01-02" value={form.code} onChange={set('code')} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Bezeichnung</label>
-            <input className="pk-input" placeholder="z.B. Trockenlager A Regal 1 Fach 2" value={form.name} onChange={set('name')} />
+            <label htmlFor="sp-bezeichnung" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Bezeichnung</label>
+            <input id="sp-bezeichnung" className="pk-input" placeholder="z.B. Trockenlager A Regal 1 Fach 2" value={form.name} onChange={set('name')} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Bereich</label>
-              <select className="pk-input" value={form.bereich} onChange={set('bereich')}>
+              <label htmlFor="sp-bereich" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Bereich</label>
+              <select id="sp-bereich" className="pk-input" value={form.bereich} onChange={set('bereich')}>
                 <option value="">— Bereich wählen —</option>
                 {SP_BEREICHE.map(b => <option key={b}>{b}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Typ</label>
-              <select className="pk-input" value={form.typ} onChange={set('typ')}>
+              <label htmlFor="sp-typ" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Typ</label>
+              <select id="sp-typ" className="pk-input" value={form.typ} onChange={set('typ')}>
                 {SP_TYPEN.map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
@@ -532,44 +534,44 @@ function StellplatzModal({ stellplatz, onSave, onClose }: {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
             {([['zone', 'Zone'], ['gang', 'Gang'], ['regal', 'Regal'], ['ebene', 'Ebene']] as [keyof StellplatzForm, string][]).map(([k, label]) => (
               <div key={k}>
-                <label style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 600 }}>{label}</label>
-                <input className="pk-input" placeholder={label} value={form[k] as string} onChange={set(k)} />
+                <label htmlFor={`sp-${k}`} style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 5, fontWeight: 600 }}>{label}</label>
+                <input id={`sp-${k}`} className="pk-input" placeholder={label} value={form[k] as string} onChange={set(k)} />
               </div>
             ))}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Fach</label>
-              <input className="pk-input" placeholder="z.B. 03" value={form.fach} onChange={set('fach')} />
+              <label htmlFor="sp-fach" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Fach</label>
+              <input id="sp-fach" className="pk-input" placeholder="z.B. 03" value={form.fach} onChange={set('fach')} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Temperaturzone</label>
-              <input className="pk-input" placeholder="z.B. +15°C bis +25°C" value={form.temperaturzone} onChange={set('temperaturzone')} />
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Warengruppe</label>
-              <input className="pk-input" placeholder="z.B. Metallwaren" value={form.warengruppe} onChange={set('warengruppe')} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Warenobergruppe</label>
-              <input className="pk-input" placeholder="z.B. Rohstoffe" value={form.warenobergruppe} onChange={set('warenobergruppe')} />
+              <label htmlFor="sp-temperaturzone" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Temperaturzone</label>
+              <input id="sp-temperaturzone" className="pk-input" placeholder="z.B. +15°C bis +25°C" value={form.temperaturzone} onChange={set('temperaturzone')} />
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Max. Gewicht (kg)</label>
-              <input className="pk-input" type="number" min="0" placeholder="z.B. 500" value={form.max_gewicht} onChange={set('max_gewicht')} />
+              <label htmlFor="sp-warengruppe" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Warengruppe</label>
+              <input id="sp-warengruppe" className="pk-input" placeholder="z.B. Metallwaren" value={form.warengruppe} onChange={set('warengruppe')} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Max. Volumen (m³)</label>
-              <input className="pk-input" type="number" min="0" step="0.01" placeholder="z.B. 2.5" value={form.max_volumen} onChange={set('max_volumen')} />
+              <label htmlFor="sp-warenobergruppe" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Warenobergruppe</label>
+              <input id="sp-warenobergruppe" className="pk-input" placeholder="z.B. Rohstoffe" value={form.warenobergruppe} onChange={set('warenobergruppe')} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label htmlFor="sp-max-gewicht" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Max. Gewicht (kg)</label>
+              <input id="sp-max-gewicht" className="pk-input" type="number" min="0" placeholder="z.B. 500" value={form.max_gewicht} onChange={set('max_gewicht')} />
+            </div>
+            <div>
+              <label htmlFor="sp-max-volumen" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Max. Volumen (m³)</label>
+              <input id="sp-max-volumen" className="pk-input" type="number" min="0" step="0.01" placeholder="z.B. 2.5" value={form.max_volumen} onChange={set('max_volumen')} />
             </div>
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Notiz</label>
-            <input className="pk-input" placeholder="Optionale Hinweise" value={form.notiz} onChange={set('notiz')} />
+            <label htmlFor="sp-notiz" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Notiz</label>
+            <input id="sp-notiz" className="pk-input" placeholder="Optionale Hinweise" value={form.notiz} onChange={set('notiz')} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <input
@@ -614,7 +616,7 @@ function LagerBuchungModal({ form, artikel, stellplaetze, stellplatzBestand, sav
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} />
+      <div role="presentation" onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} />
       <div className="pk-card fade-in-scale" style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 620, padding: 26, maxHeight: '90vh', overflowY: 'auto' }}>
         <h3 style={{ margin: '0 0 18px', fontSize: 18, fontWeight: 900 }}>
           {isEinlagern ? '📥 Artikel auf Stellplatz buchen' : '📤 Artikel aus Regal entnehmen'}
@@ -637,15 +639,15 @@ function LagerBuchungModal({ form, artikel, stellplaetze, stellplatzBestand, sav
           {isEinlagern ? (
             <>
               <div>
-                <label style={labelStyle}>Artikel *</label>
-                <select className="pk-input" value={form.artikelId} onChange={e => set('artikelId', e.target.value)}>
+                <label htmlFor="buchung-artikel" style={labelStyle}>Artikel *</label>
+                <select id="buchung-artikel" className="pk-input" value={form.artikelId} onChange={e => set('artikelId', e.target.value)}>
                   <option value="">Artikel wählen…</option>
                   {artikel.map(a => <option key={a.id} value={a.id}>{a.id} · {a.name} ({a.bestand} {a.einheit})</option>)}
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Ziel-Stellplatz *</label>
-                <select className="pk-input" value={form.stellplatzId} onChange={e => set('stellplatzId', e.target.value)}>
+                <label htmlFor="buchung-stellplatz" style={labelStyle}>Ziel-Stellplatz *</label>
+                <select id="buchung-stellplatz" className="pk-input" value={form.stellplatzId} onChange={e => set('stellplatzId', e.target.value)}>
                   <option value="">Stellplatz wählen…</option>
                   {stellplaetze.filter(sp => sp.aktiv !== false).map(sp => <option key={sp.id} value={sp.id}>{sp.code} · {sp.bereich ?? 'ohne Bereich'}</option>)}
                 </select>
@@ -653,8 +655,8 @@ function LagerBuchungModal({ form, artikel, stellplaetze, stellplatzBestand, sav
             </>
           ) : (
             <div>
-              <label style={labelStyle}>Position im Regal *</label>
-              <select className="pk-input" value={form.bestandId} onChange={e => {
+              <label htmlFor="buchung-bestand" style={labelStyle}>Position im Regal *</label>
+              <select id="buchung-bestand" className="pk-input" value={form.bestandId} onChange={e => {
                 const sb = stellplatzBestand.find(x => x.id === e.target.value)
                 onChange({
                   ...form,
@@ -676,16 +678,16 @@ function LagerBuchungModal({ form, artikel, stellplaetze, stellplatzBestand, sav
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
             <div>
-              <label style={labelStyle}>Menge *</label>
-              <input className="pk-input" type="number" min="1" max={!isEinlagern && selectedBestand ? selectedBestand.menge : undefined} value={form.menge} onChange={e => set('menge', e.target.value)} />
+              <label htmlFor="buchung-menge" style={labelStyle}>Menge *</label>
+              <input id="buchung-menge" className="pk-input" type="number" min="1" max={!isEinlagern && selectedBestand ? selectedBestand.menge : undefined} value={form.menge} onChange={e => set('menge', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Charge</label>
-              <input className="pk-input" value={form.charge} onChange={e => set('charge', e.target.value)} disabled={!isEinlagern} />
+              <label htmlFor="buchung-charge" style={labelStyle}>Charge</label>
+              <input id="buchung-charge" className="pk-input" value={form.charge} onChange={e => set('charge', e.target.value)} disabled={!isEinlagern} />
             </div>
             <div>
-              <label style={labelStyle}>MHD</label>
-              <input className="pk-input" type="date" value={form.mhd} onChange={e => set('mhd', e.target.value)} disabled={!isEinlagern} />
+              <label htmlFor="buchung-mhd" style={labelStyle}>MHD</label>
+              <input id="buchung-mhd" className="pk-input" type="date" value={form.mhd} onChange={e => set('mhd', e.target.value)} disabled={!isEinlagern} />
             </div>
           </div>
 
@@ -703,8 +705,8 @@ function LagerBuchungModal({ form, artikel, stellplaetze, stellplatzBestand, sav
           </div>
 
           <div>
-            <label style={labelStyle}>Notiz</label>
-            <textarea className="pk-input" rows={3} value={form.notiz} onChange={e => set('notiz', e.target.value)} placeholder="Optionaler Buchungshinweis…" />
+            <label htmlFor="buchung-notiz" style={labelStyle}>Notiz</label>
+            <textarea id="buchung-notiz" className="pk-input" rows={3} value={form.notiz} onChange={e => set('notiz', e.target.value)} placeholder="Optionaler Buchungshinweis…" />
           </div>
         </div>
 
@@ -762,11 +764,12 @@ function LabelModal({ target, onClose }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.74)', backdropFilter: 'blur(4px)' }} />
+      <div role="presentation" onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.74)', backdropFilter: 'blur(4px)' }} />
       <div className="pk-card fade-in-scale" style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 430, padding: 26 }}>
         <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900 }}>🏷️ QR-/Barcode-Etikett</h3>
         <div style={{ color: '#aeb9c8', fontSize: 13, marginBottom: 18 }}>{subtitle}</div>
         <div style={{ borderRadius: 14, background: '#fff', padding: 18, display: 'grid', justifyItems: 'center', gap: 10 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           {qrDataUrl ? <img src={qrDataUrl} alt={`QR-Code ${title}`} style={{ width: 220, height: 220 }} /> : <div style={{ color: '#111', padding: 40 }}>QR wird erzeugt…</div>}
           <div style={{ color: '#111', fontWeight: 900, fontSize: 17, textAlign: 'center' }}>{title}</div>
           <code style={{ color: '#111', fontSize: 12, wordBreak: 'break-all', textAlign: 'center' }}>{value}</code>
@@ -850,7 +853,7 @@ function ScannerModal({ onClose, onScan }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 245, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.76)', backdropFilter: 'blur(4px)' }} />
+      <div role="presentation" onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.76)', backdropFilter: 'blur(4px)' }} />
       <div className="pk-card fade-in-scale" style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: 24 }}>
         <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900 }}>📷 Lager-Scan</h3>
         <div style={{ color: '#aeb9c8', fontSize: 13, marginBottom: 16 }}>QR-Code von Artikel oder Stellplatz scannen oder Code manuell eingeben.</div>
@@ -2129,6 +2132,7 @@ export default function LagerPilotPage() {
                     <tr key={a.id} style={{ cursor: 'pointer' }} onClick={() => setModal(a)}>
                       <td style={{ padding: '6px 8px' }}>
                         {a.bild_path && bildUrls[a.bild_path] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={bildUrls[a.bild_path]} alt="" loading="lazy" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', display: 'block' }} />
                         ) : (
                           <div style={{ width: 36, height: 36, borderRadius: 6, background: '#0b1420', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: '#4a5568' }}>📦</div>
@@ -2236,8 +2240,8 @@ export default function LagerPilotPage() {
             <h3 style={{ margin: '0 0 18px', fontSize: 16, fontWeight: 800 }}>📥 Wareneingang buchen</h3>
             <div style={{ display: 'grid', gap: 14 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikel *</label>
-                <input className="pk-input" placeholder="Artikelname eingeben oder auswählen" value={newEingang.artikel} onChange={e => setNewEingang(p => ({ ...p, artikel: e.target.value }))} list="ei-artikel-list" />
+                <label htmlFor="eingang-artikel" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikel *</label>
+                <input id="eingang-artikel" className="pk-input" placeholder="Artikelname eingeben oder auswählen" value={newEingang.artikel} onChange={e => setNewEingang(p => ({ ...p, artikel: e.target.value }))} list="ei-artikel-list" />
                 <datalist id="ei-artikel-list">{artikel.map(a => <option key={a.id} value={a.name} />)}</datalist>
                 {newEingang.artikel && artikel.find(a => a.name === newEingang.artikel) && (() => {
                   const found = artikel.find(a => a.name === newEingang.artikel)!
@@ -2273,17 +2277,17 @@ export default function LagerPilotPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Menge *</label>
-                  <input className="pk-input" placeholder="z.B. 100" type="number" min="1" value={newEingang.menge} onChange={e => setNewEingang(p => ({ ...p, menge: e.target.value }))} />
+                  <label htmlFor="eingang-menge" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Menge *</label>
+                  <input id="eingang-menge" className="pk-input" placeholder="z.B. 100" type="number" min="1" value={newEingang.menge} onChange={e => setNewEingang(p => ({ ...p, menge: e.target.value }))} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Lagerplatz</label>
-                  <input className="pk-input" placeholder="z.B. A-01-03" value={newEingang.lagerplatz} onChange={e => setNewEingang(p => ({ ...p, lagerplatz: e.target.value }))} />
+                  <label htmlFor="eingang-lagerplatz" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Lagerplatz</label>
+                  <input id="eingang-lagerplatz" className="pk-input" placeholder="z.B. A-01-03" value={newEingang.lagerplatz} onChange={e => setNewEingang(p => ({ ...p, lagerplatz: e.target.value }))} />
                 </div>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Mitarbeiter</label>
-                <input className="pk-input" placeholder="Name des Mitarbeiters" value={newEingang.mitarbeiter} onChange={e => setNewEingang(p => ({ ...p, mitarbeiter: e.target.value }))} />
+                <label htmlFor="eingang-mitarbeiter" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Mitarbeiter</label>
+                <input id="eingang-mitarbeiter" className="pk-input" placeholder="Name des Mitarbeiters" value={newEingang.mitarbeiter} onChange={e => setNewEingang(p => ({ ...p, mitarbeiter: e.target.value }))} />
               </div>
               <button className="pk-btn" onClick={handleEingang} disabled={saving || !newEingang.artikel || !newEingang.menge} style={{ fontWeight: 700, minHeight: 44 }}>
                 {saving ? '⏳ Wird gebucht…' : '📥 Wareneingang buchen'}
@@ -2310,8 +2314,8 @@ export default function LagerPilotPage() {
             <h3 style={{ margin: '0 0 18px', fontSize: 16, fontWeight: 800 }}>📤 Warenausgang buchen</h3>
             <div style={{ display: 'grid', gap: 14 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikel *</label>
-                <input className="pk-input" placeholder="Artikelname eingeben oder auswählen" value={newAusgang.artikel} onChange={e => setNewAusgang(p => ({ ...p, artikel: e.target.value }))} list="au-artikel-list" />
+                <label htmlFor="ausgang-artikel" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikel *</label>
+                <input id="ausgang-artikel" className="pk-input" placeholder="Artikelname eingeben oder auswählen" value={newAusgang.artikel} onChange={e => setNewAusgang(p => ({ ...p, artikel: e.target.value }))} list="au-artikel-list" />
                 <datalist id="au-artikel-list">{artikel.map(a => <option key={a.id} value={a.name} />)}</datalist>
                 {newAusgang.artikel && (() => {
                   const found = artikel.find(a => a.name === newAusgang.artikel)
@@ -2352,17 +2356,17 @@ export default function LagerPilotPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Menge *</label>
-                  <input className="pk-input" placeholder="z.B. 50" type="number" min="1" value={newAusgang.menge} onChange={e => setNewAusgang(p => ({ ...p, menge: e.target.value }))} />
+                  <label htmlFor="ausgang-menge" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Menge *</label>
+                  <input id="ausgang-menge" className="pk-input" placeholder="z.B. 50" type="number" min="1" value={newAusgang.menge} onChange={e => setNewAusgang(p => ({ ...p, menge: e.target.value }))} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Empfänger / Auftrag</label>
-                  <input className="pk-input" placeholder="z.B. A-2025-034" value={newAusgang.empfaenger} onChange={e => setNewAusgang(p => ({ ...p, empfaenger: e.target.value }))} />
+                  <label htmlFor="ausgang-empfaenger" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Empfänger / Auftrag</label>
+                  <input id="ausgang-empfaenger" className="pk-input" placeholder="z.B. A-2025-034" value={newAusgang.empfaenger} onChange={e => setNewAusgang(p => ({ ...p, empfaenger: e.target.value }))} />
                 </div>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Mitarbeiter</label>
-                <input className="pk-input" placeholder="Name des Mitarbeiters" value={newAusgang.mitarbeiter} onChange={e => setNewAusgang(p => ({ ...p, mitarbeiter: e.target.value }))} />
+                <label htmlFor="ausgang-mitarbeiter" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Mitarbeiter</label>
+                <input id="ausgang-mitarbeiter" className="pk-input" placeholder="Name des Mitarbeiters" value={newAusgang.mitarbeiter} onChange={e => setNewAusgang(p => ({ ...p, mitarbeiter: e.target.value }))} />
               </div>
               <button className="pk-btn" onClick={handleAusgang} disabled={saving || !newAusgang.artikel || !newAusgang.menge} style={{ fontWeight: 700, minHeight: 44, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
                 {saving ? '⏳ Wird gebucht…' : '📤 Warenausgang buchen'}
@@ -2946,8 +2950,9 @@ export default function LagerPilotPage() {
 
                 {/* Quell-Position */}
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Quell-Position * <span style={{ fontWeight: 400 }}>(Stellplatz + Artikel)</span></label>
+                  <label htmlFor="uml-quelle" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Quell-Position * <span style={{ fontWeight: 400 }}>(Stellplatz + Artikel)</span></label>
                   <select
+                    id="uml-quelle"
                     className="pk-input"
                     value={umlForm.vonBestandId}
                     onChange={e => setUmlForm(p => ({ ...p, vonBestandId: e.target.value, menge: '' }))}
@@ -2976,10 +2981,11 @@ export default function LagerPilotPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   {/* Menge */}
                   <div>
-                    <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>
+                    <label htmlFor="uml-menge" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>
                       Menge * {vonBestand && <span style={{ color: '#aeb9c8', fontWeight: 400 }}>(max. {vonBestand.menge})</span>}
                     </label>
                     <input
+                      id="uml-menge"
                       className="pk-input"
                       type="number"
                       min="1"
@@ -2992,8 +2998,9 @@ export default function LagerPilotPage() {
 
                   {/* Ziel-Stellplatz */}
                   <div>
-                    <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Ziel-Stellplatz *</label>
+                    <label htmlFor="uml-ziel" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Ziel-Stellplatz *</label>
                     <select
+                      id="uml-ziel"
                       className="pk-input"
                       value={umlForm.nachStellplatzId}
                       onChange={e => setUmlForm(p => ({ ...p, nachStellplatzId: e.target.value }))}
@@ -3012,8 +3019,9 @@ export default function LagerPilotPage() {
 
                 {/* Grund */}
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Grund</label>
+                  <label htmlFor="uml-grund" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Grund</label>
                   <select
+                    id="uml-grund"
                     className="pk-input"
                     value={umlForm.grund}
                     onChange={e => setUmlForm(p => ({ ...p, grund: e.target.value }))}
@@ -3029,8 +3037,9 @@ export default function LagerPilotPage() {
 
                 {/* Notiz */}
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Notiz</label>
+                  <label htmlFor="uml-notiz" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Notiz</label>
                   <input
+                    id="uml-notiz"
                     className="pk-input"
                     placeholder="Optionale Bemerkung"
                     value={umlForm.notiz}

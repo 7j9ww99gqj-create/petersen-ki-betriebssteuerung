@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { getDocumentDisplayLabel, inferDocumentPreviewType, type StoredDocumentLink } from '@/lib/documents'
 
 type Props = {
@@ -37,12 +38,16 @@ export default function DocumentPreviewModal({
         justifyContent: 'center',
         padding: 20,
       }}
+      role="presentation"
       onClick={onClose}
+      onKeyDown={e => { if (e.key === 'Escape') onClose() }}
     >
       <div
         className="pk-card fade-in"
         style={{ width: 'min(1100px, 100%)', height: 'min(82vh, 920px)', display: 'flex', flexDirection: 'column', gap: 14 }}
+        role="presentation"
         onClick={e => e.stopPropagation()}
+        onKeyDown={e => e.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ minWidth: 0 }}>
@@ -74,6 +79,7 @@ export default function DocumentPreviewModal({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            position: 'relative',
           }}
         >
           {loading ? (
@@ -94,7 +100,7 @@ export default function DocumentPreviewModal({
               Für diesen Eintrag ist keine Datei hinterlegt.
             </div>
           ) : previewType === 'image' ? (
-            <img src={url} alt={title} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            <Image src={url} alt={title} fill style={{ objectFit: 'contain' }} />
           ) : previewType === 'pdf' ? (
             <iframe src={url} title={title} style={{ width: '100%', height: '100%', border: 'none', background: '#fff' }} />
           ) : (

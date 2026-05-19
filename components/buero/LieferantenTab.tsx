@@ -156,44 +156,44 @@ export default function LieferantenTab({ isDemo }: { isDemo: boolean }) {
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
             <div>
-              <label style={labelStyle}>Name / Firma *</label>
-              <input className="pk-input" placeholder="Lieferant GmbH" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+              <label htmlFor="field-name-firma" style={labelStyle}>Name / Firma *</label>
+              <input id="field-name-firma" className="pk-input" placeholder="Lieferant GmbH" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Ansprechpartner</label>
-              <input className="pk-input" placeholder="Vor- und Nachname" value={form.kontakt} onChange={e => setForm(p => ({ ...p, kontakt: e.target.value }))} />
+              <label htmlFor="field-ansprechpartner" style={labelStyle}>Ansprechpartner</label>
+              <input id="field-ansprechpartner" className="pk-input" placeholder="Vor- und Nachname" value={form.kontakt} onChange={e => setForm(p => ({ ...p, kontakt: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>E-Mail *</label>
-              <input className="pk-input" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
+              <label htmlFor="field-e-mail" style={labelStyle}>E-Mail *</label>
+              <input id="field-e-mail" className="pk-input" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Telefon</label>
-              <input className="pk-input" value={form.telefon} onChange={e => setForm(p => ({ ...p, telefon: e.target.value }))} />
+              <label htmlFor="field-telefon" style={labelStyle}>Telefon</label>
+              <input id="field-telefon" className="pk-input" value={form.telefon} onChange={e => setForm(p => ({ ...p, telefon: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Ort</label>
-              <input className="pk-input" value={form.ort} onChange={e => setForm(p => ({ ...p, ort: e.target.value }))} />
+              <label htmlFor="field-ort" style={labelStyle}>Ort</label>
+              <input id="field-ort" className="pk-input" value={form.ort} onChange={e => setForm(p => ({ ...p, ort: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Webseite</label>
-              <input className="pk-input" placeholder="https://…" value={form.website} onChange={e => setForm(p => ({ ...p, website: e.target.value }))} />
+              <label htmlFor="field-webseite" style={labelStyle}>Webseite</label>
+              <input id="field-webseite" className="pk-input" placeholder="https://…" value={form.website} onChange={e => setForm(p => ({ ...p, website: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Kategorie</label>
-              <select className="pk-input" value={form.kategorie} onChange={e => setForm(p => ({ ...p, kategorie: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-kategorie" style={labelStyle}>Kategorie</label>
+              <select id="field-kategorie" className="pk-input" value={form.kategorie} onChange={e => setForm(p => ({ ...p, kategorie: e.target.value }))} style={{ cursor: 'pointer' }}>
                 {['Rohstoffe', 'Kleinteile', 'Betriebsstoffe', 'Büro', 'Schutzausrüstung', 'IT', 'Dienstleistung', 'Sonstiges'].map(k => <option key={k}>{k}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Zahlungsziel</label>
-              <select className="pk-input" value={form.zahlungsziel} onChange={e => setForm(p => ({ ...p, zahlungsziel: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-zahlungsziel" style={labelStyle}>Zahlungsziel</label>
+              <select id="field-zahlungsziel" className="pk-input" value={form.zahlungsziel} onChange={e => setForm(p => ({ ...p, zahlungsziel: e.target.value }))} style={{ cursor: 'pointer' }}>
                 {['sofort', '7 Tage netto', '14 Tage 2% Skonto', '14 Tage netto', '21 Tage netto', '30 Tage netto', '60 Tage netto'].map(z => <option key={z}>{z}</option>)}
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Notiz</label>
-              <input className="pk-input" placeholder="Interne Notiz…" value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} />
+              <label htmlFor="field-notiz" style={labelStyle}>Notiz</label>
+              <input id="field-notiz" className="pk-input" placeholder="Interne Notiz…" value={form.notiz} onChange={e => setForm(p => ({ ...p, notiz: e.target.value }))} />
             </div>
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>

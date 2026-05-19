@@ -194,7 +194,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
+          role="presentation"
           onClick={() => setSidebarOpen(false)}
+          onKeyDown={e => { if (e.key === 'Escape') setSidebarOpen(false) }}
           style={{
             position: 'fixed', inset: 0, zIndex: 40,
             background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(3px)',

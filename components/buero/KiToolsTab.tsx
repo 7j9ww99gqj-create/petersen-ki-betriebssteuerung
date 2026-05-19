@@ -130,8 +130,8 @@ export default function KiToolsTab({ isDemo, rechnungen }: Props) {
 
         <div style={{ display: 'grid', gap: 10 }}>
           <div>
-            <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 5 }}>Kundenanfrage / Was soll beantwortet werden?</label>
-            <textarea
+            <label htmlFor="field-kundenanfrage-was-soll-be" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 5 }}>Kundenanfrage / Was soll beantwortet werden?</label>
+            <textarea id="field-kundenanfrage-was-soll-be"
               className="pk-input"
               value={emailAnfrage}
               onChange={e => setEmailAnfrage(e.target.value)}
@@ -142,12 +142,12 @@ export default function KiToolsTab({ isDemo, rechnungen }: Props) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 5 }}>Empfänger (optional)</label>
-              <input className="pk-input" value={emailEmpfaenger} onChange={e => setEmailEmpfaenger(e.target.value)} placeholder="z.B. Müller GmbH" style={inputStyle} />
+              <label htmlFor="field-empfnger-optional" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 5 }}>Empfänger (optional)</label>
+              <input id="field-empfnger-optional" className="pk-input" value={emailEmpfaenger} onChange={e => setEmailEmpfaenger(e.target.value)} placeholder="z.B. Müller GmbH" style={inputStyle} />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 5 }}>Ton</label>
-              <select value={emailTon} onChange={e => setEmailTon(e.target.value as typeof emailTon)} style={selectStyle}>
+              <label htmlFor="field-ton" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 5 }}>Ton</label>
+              <select id="field-ton" value={emailTon} onChange={e => setEmailTon(e.target.value as typeof emailTon)} style={selectStyle}>
                 <option value="professionell">Professionell</option>
                 <option value="freundlich">Freundlich</option>
                 <option value="formell">Formell</option>
@@ -197,8 +197,8 @@ export default function KiToolsTab({ isDemo, rechnungen }: Props) {
         ) : (
           <div style={{ display: 'grid', gap: 10 }}>
             <div>
-              <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 5 }}>Rechnung auswählen</label>
-              <select
+              <label htmlFor="field-rechnung-auswhlen" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 5 }}>Rechnung auswählen</label>
+              <select id="field-rechnung-auswhlen"
                 value={mahnRechnungId}
                 onChange={e => setMahnRechnungId(e.target.value)}
                 style={selectStyle}
@@ -212,8 +212,8 @@ export default function KiToolsTab({ isDemo, rechnungen }: Props) {
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 5 }}>Ton</label>
-              <select value={mahnTon} onChange={e => setMahnTon(e.target.value as typeof mahnTon)} style={selectStyle}>
+              <label htmlFor="field-ton-2" style={{ fontSize: 12, color: '#aeb9c8', fontWeight: 600, display: 'block', marginBottom: 5 }}>Ton</label>
+              <select id="field-ton-2" value={mahnTon} onChange={e => setMahnTon(e.target.value as typeof mahnTon)} style={selectStyle}>
                 <option value="freundlich">Freundlich (1. Mahnung)</option>
                 <option value="bestimmt">Bestimmt (2. Mahnung)</option>
                 <option value="streng">Streng (3. Mahnung / letzte Warnung)</option>

@@ -1143,7 +1143,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
                 toDocRecord({ id: 'DEMO-DOK-1', name: 'Demo Lieferschein.pdf', result: { documentType: 'lieferschein', summary: 'Demo: Lieferschein LS-2025-08844', confidence: .99, extracted: {}, suggestedActions: [] }, fields: {}, status: 'archiviert' }),
                 toDocRecord({ id: 'DEMO-DOK-2', name: 'Demo Rechnung.pdf', result: { documentType: 'rechnung', summary: 'Demo: Rechnung RE-2025-1123', confidence: .95, extracted: {}, suggestedActions: [] }, fields: {}, status: 'übernommen' }),
               ]).map(r => (
-                <div key={r.id} onClick={() => openSavedDocument(r)} style={{
+                <div key={r.id} role="button" tabIndex={0} onClick={() => openSavedDocument(r)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') openSavedDocument(r) }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0',
                   borderBottom: '1px solid rgba(255,255,255,.05)', width: '100%', color: 'inherit', textAlign: 'left', cursor: 'pointer',
                 }}>

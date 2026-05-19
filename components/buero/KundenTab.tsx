@@ -176,55 +176,55 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
         <Modal title={`👤 Kunde bearbeiten – ${editKunde.id}`} onClose={() => setEditKunde(null)}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             <div>
-              <label style={labelStyle}>Name / Firma *</label>
-              <input className="pk-input" value={editKundeForm.name} onChange={e => setEditKundeForm(p => ({ ...p, name: e.target.value }))} />
+              <label htmlFor="field-name-firma" style={labelStyle}>Name / Firma *</label>
+              <input id="field-name-firma" className="pk-input" value={editKundeForm.name} onChange={e => setEditKundeForm(p => ({ ...p, name: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Typ</label>
-              <select className="pk-input" value={editKundeForm.typ} onChange={e => setEditKundeForm(p => ({ ...p, typ: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-typ" style={labelStyle}>Typ</label>
+              <select id="field-typ" className="pk-input" value={editKundeForm.typ} onChange={e => setEditKundeForm(p => ({ ...p, typ: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option>Firma</option>
                 <option>Privat</option>
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Ansprechpartner</label>
-              <input className="pk-input" value={editKundeForm.ansprechpartner} onChange={e => setEditKundeForm(p => ({ ...p, ansprechpartner: e.target.value }))} />
+              <label htmlFor="field-ansprechpartner" style={labelStyle}>Ansprechpartner</label>
+              <input id="field-ansprechpartner" className="pk-input" value={editKundeForm.ansprechpartner} onChange={e => setEditKundeForm(p => ({ ...p, ansprechpartner: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>E-Mail *</label>
-              <input className="pk-input" type="email" value={editKundeForm.email} onChange={e => setEditKundeForm(p => ({ ...p, email: e.target.value }))} />
+              <label htmlFor="field-e-mail" style={labelStyle}>E-Mail *</label>
+              <input id="field-e-mail" className="pk-input" type="email" value={editKundeForm.email} onChange={e => setEditKundeForm(p => ({ ...p, email: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Telefon</label>
-              <input className="pk-input" value={editKundeForm.telefon} onChange={e => setEditKundeForm(p => ({ ...p, telefon: e.target.value }))} />
+              <label htmlFor="field-telefon" style={labelStyle}>Telefon</label>
+              <input id="field-telefon" className="pk-input" value={editKundeForm.telefon} onChange={e => setEditKundeForm(p => ({ ...p, telefon: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Webseite</label>
-              <input className="pk-input" placeholder="https://…" value={editKundeForm.website} onChange={e => setEditKundeForm(p => ({ ...p, website: e.target.value }))} />
+              <label htmlFor="field-webseite" style={labelStyle}>Webseite</label>
+              <input id="field-webseite" className="pk-input" placeholder="https://…" value={editKundeForm.website} onChange={e => setEditKundeForm(p => ({ ...p, website: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Straße + Hausnr.</label>
-              <input className="pk-input" value={editKundeForm.strasse} onChange={e => setEditKundeForm(p => ({ ...p, strasse: e.target.value }))} />
+              <label htmlFor="field-strae-hausnr" style={labelStyle}>Straße + Hausnr.</label>
+              <input id="field-strae-hausnr" className="pk-input" value={editKundeForm.strasse} onChange={e => setEditKundeForm(p => ({ ...p, strasse: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>PLZ</label>
-              <input className="pk-input" value={editKundeForm.plz} onChange={e => setEditKundeForm(p => ({ ...p, plz: e.target.value }))} />
+              <label htmlFor="field-plz" style={labelStyle}>PLZ</label>
+              <input id="field-plz" className="pk-input" value={editKundeForm.plz} onChange={e => setEditKundeForm(p => ({ ...p, plz: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Ort</label>
-              <input className="pk-input" value={editKundeForm.ort} onChange={e => setEditKundeForm(p => ({ ...p, ort: e.target.value }))} />
+              <label htmlFor="field-ort" style={labelStyle}>Ort</label>
+              <input id="field-ort" className="pk-input" value={editKundeForm.ort} onChange={e => setEditKundeForm(p => ({ ...p, ort: e.target.value }))} />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Lieferadresse (vollständig)</label>
-              <input className="pk-input" placeholder="Str. 1, 12345 Stadt" value={editKundeForm.lieferadresse} onChange={e => setEditKundeForm(p => ({ ...p, lieferadresse: e.target.value }))} />
+              <label htmlFor="field-lieferadresse-vollstndig" style={labelStyle}>Lieferadresse (vollständig)</label>
+              <input id="field-lieferadresse-vollstndig" className="pk-input" placeholder="Str. 1, 12345 Stadt" value={editKundeForm.lieferadresse} onChange={e => setEditKundeForm(p => ({ ...p, lieferadresse: e.target.value }))} />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Rechnungsadresse (vollständig)</label>
-              <input className="pk-input" placeholder="Str. 1, 12345 Stadt" value={editKundeForm.rechnungsadresse} onChange={e => setEditKundeForm(p => ({ ...p, rechnungsadresse: e.target.value }))} />
+              <label htmlFor="field-rechnungsadresse-vollstnd" style={labelStyle}>Rechnungsadresse (vollständig)</label>
+              <input id="field-rechnungsadresse-vollstnd" className="pk-input" placeholder="Str. 1, 12345 Stadt" value={editKundeForm.rechnungsadresse} onChange={e => setEditKundeForm(p => ({ ...p, rechnungsadresse: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Status</label>
-              <select className="pk-input" value={editKundeForm.status} onChange={e => setEditKundeForm(p => ({ ...p, status: e.target.value as Kunde['status'] }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-status" style={labelStyle}>Status</label>
+              <select id="field-status" className="pk-input" value={editKundeForm.status} onChange={e => setEditKundeForm(p => ({ ...p, status: e.target.value as Kunde['status'] }))} style={{ cursor: 'pointer' }}>
                 <option>Aktiv</option>
                 <option>Inaktiv</option>
               </select>
@@ -435,20 +435,20 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
                 <div className="pk-card fade-in" style={{ marginBottom: 16, border: '1px solid rgba(32,200,255,.2)', padding: 16 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
                     <div>
-                      <label style={labelStyle}>Name *</label>
-                      <input className="pk-input" placeholder="Vor- und Nachname" value={apForm.name} onChange={e => setApForm(p => ({ ...p, name: e.target.value }))} />
+                      <label htmlFor="field-name" style={labelStyle}>Name *</label>
+                      <input id="field-name" className="pk-input" placeholder="Vor- und Nachname" value={apForm.name} onChange={e => setApForm(p => ({ ...p, name: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={labelStyle}>Position / Abteilung</label>
-                      <input className="pk-input" placeholder="z.B. Einkauf" value={apForm.position} onChange={e => setApForm(p => ({ ...p, position: e.target.value }))} />
+                      <label htmlFor="field-position-abteilung" style={labelStyle}>Position / Abteilung</label>
+                      <input id="field-position-abteilung" className="pk-input" placeholder="z.B. Einkauf" value={apForm.position} onChange={e => setApForm(p => ({ ...p, position: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={labelStyle}>E-Mail</label>
-                      <input className="pk-input" type="email" value={apForm.email} onChange={e => setApForm(p => ({ ...p, email: e.target.value }))} />
+                      <label htmlFor="field-e-mail-2" style={labelStyle}>E-Mail</label>
+                      <input id="field-e-mail-2" className="pk-input" type="email" value={apForm.email} onChange={e => setApForm(p => ({ ...p, email: e.target.value }))} />
                     </div>
                     <div>
-                      <label style={labelStyle}>Telefon</label>
-                      <input className="pk-input" value={apForm.telefon} onChange={e => setApForm(p => ({ ...p, telefon: e.target.value }))} />
+                      <label htmlFor="field-telefon-2" style={labelStyle}>Telefon</label>
+                      <input id="field-telefon-2" className="pk-input" value={apForm.telefon} onChange={e => setApForm(p => ({ ...p, telefon: e.target.value }))} />
                     </div>
                   </div>
                   <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
@@ -523,54 +523,54 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
           <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>👥 Neuen Kunden anlegen</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             <div>
-              <label style={labelStyle}>Name / Firma *</label>
-              <input className="pk-input" placeholder="z.B. Müller GmbH" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+              <label htmlFor="field-name-firma-2" style={labelStyle}>Name / Firma *</label>
+              <input id="field-name-firma-2" className="pk-input" placeholder="z.B. Müller GmbH" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Typ</label>
-              <select className="pk-input" value={form.typ} onChange={e => setForm(p => ({ ...p, typ: e.target.value }))} style={{ cursor: 'pointer' }}>
+              <label htmlFor="field-typ-2" style={labelStyle}>Typ</label>
+              <select id="field-typ-2" className="pk-input" value={form.typ} onChange={e => setForm(p => ({ ...p, typ: e.target.value }))} style={{ cursor: 'pointer' }}>
                 <option>Firma</option>
                 <option>Privat</option>
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Ansprechpartner</label>
-              <input className="pk-input" placeholder="Vor- und Nachname" value={form.ansprechpartner} onChange={e => setForm(p => ({ ...p, ansprechpartner: e.target.value }))} />
+              <label htmlFor="field-ansprechpartner-2" style={labelStyle}>Ansprechpartner</label>
+              <input id="field-ansprechpartner-2" className="pk-input" placeholder="Vor- und Nachname" value={form.ansprechpartner} onChange={e => setForm(p => ({ ...p, ansprechpartner: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>E-Mail *</label>
-              <input className="pk-input" placeholder="email@beispiel.de" type="email" value={form.email} onChange={e => handleEmailChange(e.target.value)} />
+              <label htmlFor="field-e-mail-3" style={labelStyle}>E-Mail *</label>
+              <input id="field-e-mail-3" className="pk-input" placeholder="email@beispiel.de" type="email" value={form.email} onChange={e => handleEmailChange(e.target.value)} />
               {duplikatWarnung && (
                 <div style={{ marginTop: 4, padding: '6px 10px', borderRadius: 8, background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.35)', color: '#f59e0b', fontSize: 12 }}>{duplikatWarnung}</div>
               )}
             </div>
             <div>
-              <label style={labelStyle}>Telefon</label>
-              <input className="pk-input" placeholder="040 123456" value={form.telefon} onChange={e => setForm(p => ({ ...p, telefon: e.target.value }))} />
+              <label htmlFor="field-telefon-3" style={labelStyle}>Telefon</label>
+              <input id="field-telefon-3" className="pk-input" placeholder="040 123456" value={form.telefon} onChange={e => setForm(p => ({ ...p, telefon: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Webseite</label>
-              <input className="pk-input" placeholder="https://…" value={form.website} onChange={e => setForm(p => ({ ...p, website: e.target.value }))} />
+              <label htmlFor="field-webseite-2" style={labelStyle}>Webseite</label>
+              <input id="field-webseite-2" className="pk-input" placeholder="https://…" value={form.website} onChange={e => setForm(p => ({ ...p, website: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Straße + Hausnr.</label>
-              <input className="pk-input" placeholder="Musterstr. 1" value={form.strasse} onChange={e => setForm(p => ({ ...p, strasse: e.target.value }))} />
+              <label htmlFor="field-strae-hausnr-2" style={labelStyle}>Straße + Hausnr.</label>
+              <input id="field-strae-hausnr-2" className="pk-input" placeholder="Musterstr. 1" value={form.strasse} onChange={e => setForm(p => ({ ...p, strasse: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>PLZ</label>
-              <input className="pk-input" placeholder="12345" value={form.plz} onChange={e => setForm(p => ({ ...p, plz: e.target.value }))} />
+              <label htmlFor="field-plz-2" style={labelStyle}>PLZ</label>
+              <input id="field-plz-2" className="pk-input" placeholder="12345" value={form.plz} onChange={e => setForm(p => ({ ...p, plz: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Ort</label>
-              <input className="pk-input" placeholder="Stadt" value={form.ort} onChange={e => setForm(p => ({ ...p, ort: e.target.value }))} />
+              <label htmlFor="field-ort-2" style={labelStyle}>Ort</label>
+              <input id="field-ort-2" className="pk-input" placeholder="Stadt" value={form.ort} onChange={e => setForm(p => ({ ...p, ort: e.target.value }))} />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Lieferadresse (vollständig)</label>
-              <input className="pk-input" placeholder="Str. 1, 12345 Stadt" value={form.lieferadresse} onChange={e => setForm(p => ({ ...p, lieferadresse: e.target.value }))} />
+              <label htmlFor="field-lieferadresse-vollstndig-2" style={labelStyle}>Lieferadresse (vollständig)</label>
+              <input id="field-lieferadresse-vollstndig-2" className="pk-input" placeholder="Str. 1, 12345 Stadt" value={form.lieferadresse} onChange={e => setForm(p => ({ ...p, lieferadresse: e.target.value }))} />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Rechnungsadresse (vollständig)</label>
-              <input className="pk-input" placeholder="Str. 1, 12345 Stadt (leer = wie Lieferadresse)" value={form.rechnungsadresse} onChange={e => setForm(p => ({ ...p, rechnungsadresse: e.target.value }))} />
+              <label htmlFor="field-rechnungsadresse-vollstnd-2" style={labelStyle}>Rechnungsadresse (vollständig)</label>
+              <input id="field-rechnungsadresse-vollstnd-2" className="pk-input" placeholder="Str. 1, 12345 Stadt (leer = wie Lieferadresse)" value={form.rechnungsadresse} onChange={e => setForm(p => ({ ...p, rechnungsadresse: e.target.value }))} />
             </div>
           </div>
           <div style={{ marginTop: 16 }}>
@@ -604,7 +604,7 @@ function KundenTab({ isDemo, auftraege, rechnungen, angebote }: { isDemo: boolea
                 <td style={{ fontWeight: 700, color: '#20c8ff' }}>{k.umsatz}</td>
                 <td><span className={`badge ${k.status === 'Aktiv' ? 'badge-green' : 'badge-gray'}`}>{k.status}</span></td>
                 <td>
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                  <div role="presentation" style={{ display: 'flex', gap: 4, alignItems: 'center' }} onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
                     {PERMISSIONS.canEdit(role) && (
                       <button onClick={() => openEditKunde(k)} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(32,200,255,.3)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>✏️</button>
                     )}

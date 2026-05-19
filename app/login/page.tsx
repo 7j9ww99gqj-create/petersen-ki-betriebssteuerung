@@ -99,12 +99,12 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>E-Mail Adresse</label>
-              <input className="pk-input" type="email" placeholder="name@betrieb.de" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" disabled={loading} />
+              <label htmlFor="field-e-mail-adresse" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>E-Mail Adresse</label>
+              <input id="field-e-mail-adresse" className="pk-input" type="email" placeholder="name@betrieb.de" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" disabled={loading} />
             </div>
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Passwort</label>
-              <input className="pk-input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" disabled={loading} />
+              <label htmlFor="field-passwort" style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Passwort</label>
+              <input id="field-passwort" className="pk-input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" disabled={loading} />
             </div>
 
             {error && (

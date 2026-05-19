@@ -382,12 +382,16 @@ export default function PilotDocumentArchive({ pilotType }: Props) {
             background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
           }}
+          role="presentation"
           onClick={() => setShowUploadModal(false)}
+          onKeyDown={e => { if (e.key === 'Escape') setShowUploadModal(false) }}
         >
           <div
             className="pk-card fade-in"
             style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }}
+            role="presentation"
             onClick={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Dokument hochladen</h3>
@@ -400,7 +404,10 @@ export default function PilotDocumentArchive({ pilotType }: Props) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Datei-Upload Bereich */}
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => fileInputRef.current?.click()}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click() }}
                 style={{
                   border: `2px dashed ${uploadFile ? color : 'rgba(255,255,255,.2)'}`,
                   borderRadius: 10, padding: '20px 16px', textAlign: 'center',
@@ -431,8 +438,9 @@ export default function PilotDocumentArchive({ pilotType }: Props) {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>Dokumentname *</label>
+                <label htmlFor="upload-document-name" style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>Dokumentname *</label>
                 <input
+                  id="upload-document-name"
                   className="pk-input"
                   value={uploadForm.document_name}
                   onChange={e => setUploadForm(f => ({ ...f, document_name: e.target.value }))}
@@ -442,8 +450,9 @@ export default function PilotDocumentArchive({ pilotType }: Props) {
 
               <div style={{ display: 'flex', gap: 10 }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>Dokumenttyp</label>
+                  <label htmlFor="upload-document-type" style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>Dokumenttyp</label>
                   <select
+                    id="upload-document-type"
                     className="pk-input"
                     value={uploadForm.document_type}
                     onChange={e => setUploadForm(f => ({ ...f, document_type: e.target.value }))}
@@ -452,8 +461,9 @@ export default function PilotDocumentArchive({ pilotType }: Props) {
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>Kategorie</label>
+                  <label htmlFor="upload-category" style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>Kategorie</label>
                   <input
+                    id="upload-category"
                     className="pk-input"
                     value={uploadForm.category}
                     onChange={e => setUploadForm(f => ({ ...f, category: e.target.value }))}
@@ -463,8 +473,9 @@ export default function PilotDocumentArchive({ pilotType }: Props) {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>Beschreibung (optional)</label>
+                <label htmlFor="upload-description" style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>Beschreibung (optional)</label>
                 <textarea
+                  id="upload-description"
                   className="pk-input"
                   value={uploadForm.description}
                   onChange={e => setUploadForm(f => ({ ...f, description: e.target.value }))}
@@ -475,8 +486,9 @@ export default function PilotDocumentArchive({ pilotType }: Props) {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>Tags (kommagetrennt, optional)</label>
+                <label htmlFor="upload-tags" style={{ fontSize: 12, color: '#aeb9c8', display: 'block', marginBottom: 6 }}>Tags (kommagetrennt, optional)</label>
                 <input
+                  id="upload-tags"
                   className="pk-input"
                   value={uploadForm.tags}
                   onChange={e => setUploadForm(f => ({ ...f, tags: e.target.value }))}
