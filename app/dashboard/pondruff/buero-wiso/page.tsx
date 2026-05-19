@@ -59,8 +59,24 @@ export default function BueroWisoPage() {
   const [delConfirm, setDelConfirm] = useState<string | null>(null)
   const [resyncConfirm, setResyncConfirm] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [wisoDebug, setWisoDebug] = useState<Record<string, unknown> | null>(null)
+  const [wisoDebugBusy, setWisoDebugBusy] = useState(false)
   const { flags: pondFlags } = usePondruffFlags()
   const wisoEnabled = pondFlags.wiso_sync
+
+  async function runWisoDebug() {
+    setWisoDebugBusy(true)
+    setWisoDebug(null)
+    try {
+      const r = await fetch('/api/pondruff/wiso-debug', { method: 'POST' })
+      const d = await r.json()
+      setWisoDebug(d)
+    } catch (e) {
+      setWisoDebug({ ok: false, error: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setWisoDebugBusy(false)
+    }
+  }
 
   function showToast(msg: string, ok = true) { setToast({ msg, ok }); setTimeout(() => setToast(null), 4500) }
 
@@ -184,7 +200,51 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
       <div className="pk-card" style={{ marginBottom: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <input className="pk-input" placeholder="🔍 Suche Kunde / Projekt / Lieferschein" value={filter} onChange={e => setFilter(e.target.value)} style={{ flex: 1, minWidth: 220 }} />
         <button className="pk-btn-ghost" onClick={load}>🔄 Neu laden</button>
+        <button className="pk-btn-ghost" onClick={runWisoDebug} disabled={wisoDebugBusy} title="Prüft alle WISO Auth-Pfade und zeigt Server-Antworten">
+          {wisoDebugBusy ? '⏳ teste…' : '🔍 WISO-Verbindung testen'}
+        </button>
       </div>
+
+      {wisoDebug && (
+        <div className="pk-card" style={{ marginBottom: 14, background: 'rgba(0,0,0,.2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: wisoDebug.ok ? '#4ddb7e' : '#ff8080' }}>
+              {wisoDebug.ok ? '✅ WISO-Auth erfolgreich' : '❌ WISO-Auth scheitert'}
+            </h4>
+            <button onClick={() => setWisoDebug(null)} className="pk-btn-ghost" style={{ fontSize: 11 }}>schließen ✕</button>
+          </div>
+          {wisoDebug.env != null && (
+            <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 8 }}>
+              <b>Env in Vercel:</b>
+              <pre style={{ fontSize: 11, background: 'rgba(0,0,0,.3)', padding: 8, borderRadius: 6, marginTop: 4 }}>{JSON.stringify(wisoDebug.env, null, 2)}</pre>
+            </div>
+          )}
+          {wisoDebug.hint != null && (
+            <div style={{ fontSize: 13, color: '#fbbf24', marginBottom: 8 }}>💡 {String(wisoDebug.hint)}</div>
+          )}
+          {Array.isArray(wisoDebug.attempts) && (
+            <div>
+              <b style={{ fontSize: 12, color: '#aeb9c8' }}>Token-Versuche ({wisoDebug.attempts.length}):</b>
+              <div style={{ maxHeight: 360, overflowY: 'auto', marginTop: 6 }}>
+                {(wisoDebug.attempts as Array<Record<string, unknown>>).map((a, i) => (
+                  <div key={i} style={{
+                    background: a.hasToken ? 'rgba(37,211,102,.08)' : a.ok ? 'rgba(251,191,36,.06)' : 'rgba(255,80,80,.05)',
+                    border: `1px solid ${a.hasToken ? 'rgba(37,211,102,.3)' : a.ok ? 'rgba(251,191,36,.2)' : 'rgba(255,80,80,.15)'}`,
+                    padding: 8, borderRadius: 6, marginBottom: 6, fontSize: 11,
+                  }}>
+                    <div style={{ fontWeight: 700, color: a.hasToken ? '#4ddb7e' : '#ff8080' }}>
+                      {a.hasToken ? '✅' : '❌'} HTTP {String(a.status)} — {String(a.label)}
+                    </div>
+                    <div style={{ color: '#aeb9c8', marginTop: 4, fontFamily: 'monospace' }}>{String(a.url)}</div>
+                    {a.bodyPreview ? <div style={{ color: '#aeb9c8', marginTop: 2 }}>Body: <code>{String(a.bodyPreview)}</code></div> : null}
+                    <div style={{ color: '#fbbf24', marginTop: 4 }}>Antwort: <code>{String(a.responseBody).slice(0, 300)}</code></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {section === 'auftraege' && (
         <div className="pk-card">

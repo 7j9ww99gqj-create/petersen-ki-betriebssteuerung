@@ -5,6 +5,8 @@
 
 export const WISO_API_BASE = 'https://api.meinbuero.de/openapi'
 export const WISO_LEGACY_BASE = 'https://api.meinbuero.de'
+// Manche WISO-MeinBüro-Accounts laufen über app.meinbuero.de — wird im Token-Fallback mit-probiert.
+export const WISO_APP_BASE = 'https://app.meinbuero.de/openapi'
 
 type Json = Record<string, unknown>
 
@@ -65,6 +67,9 @@ export async function getWisoToken(apiKey: string, apiSecret: string, ownershipI
     { label: 'openapi JSON {ownershipId}', path: '/auth/token', payload: { ownershipId } },
     { label: 'openapi POST ohne Body', path: '/auth/token' },
     { label: 'openapi grant=ownership form', path: '/auth/token', formPayload: { grant_type: 'ownership', ownershipId } },
+    { label: 'openapi JSON {apiKey,apiSecret,ownershipId} ohne Basic', path: '/auth/token', payload: { apiKey, apiSecret, ownershipId } },
+    { label: 'app-host JSON {ownershipId}', path: '/auth/token', base: WISO_APP_BASE, payload: { ownershipId } },
+    { label: 'app-host JSON {apiKey,apiSecret,ownershipId}', path: '/auth/token', base: WISO_APP_BASE, payload: { apiKey, apiSecret, ownershipId } },
     { label: 'legacy grant=ownership form', path: '/auth/token', base: WISO_LEGACY_BASE, formPayload: { grant_type: 'ownership', ownershipId } },
     { label: 'legacy JSON {ownershipId}', path: '/auth/token', base: WISO_LEGACY_BASE, payload: { ownershipId } },
   ]
