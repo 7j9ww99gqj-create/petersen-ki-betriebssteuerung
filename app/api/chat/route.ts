@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
 import { getServerAiFeatureSettings } from '@/lib/ai-settings'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { getCachedResponse, setCachedResponse, hashCacheKey } from '@/lib/ai-cache'
 
 const ChatRequestSchema = z.object({
   messages: z.array(z.object({
@@ -364,6 +365,19 @@ Regeln:
       }))
       : []
 
+    // KI-Response-Cache nur bei structuredOutput (Tagesbericht): identische
+    // Anfragen innerhalb der TTL liefern den gespeicherten Eintrag → spart Tokens.
+    let cacheKey: string | null = null
+    if (structuredOutput && access.user && access.supabase) {
+      cacheKey = hashCacheKey({ messages, system, context, mode: 'tagesbericht' })
+      const cached = await getCachedResponse<{ reply: string; probleme: unknown[]; actions: unknown[] }>(
+        access.supabase, access.user.id, cacheKey,
+      )
+      if (cached) {
+        return NextResponse.json({ ...cached, cached: true })
+      }
+    }
+
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -458,11 +472,15 @@ Regeln:
         // Fallback, falls das Modell JSON doch als Text kapselt.
         const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
         const parsed = JSON.parse(cleaned) as { message?: string; probleme?: unknown[]; actions?: unknown[] }
-        return NextResponse.json({
+        const payload = {
           reply: parsed.message || rawText,
           probleme: Array.isArray(parsed.probleme) ? parsed.probleme : [],
           actions: Array.isArray(parsed.actions) ? parsed.actions : [],
-        })
+        }
+        if (cacheKey && access.user) {
+          await setCachedResponse(access.supabase, access.user.id, cacheKey, payload, 3600)
+        }
+        return NextResponse.json(payload)
       } catch {
         // Fallback: Antwort als plain text, keine Aktionen
         return NextResponse.json({ reply: rawText, actions: [] })
