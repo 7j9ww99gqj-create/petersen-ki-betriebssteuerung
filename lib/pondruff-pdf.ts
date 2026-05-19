@@ -347,7 +347,11 @@ async function buildPdf(c: ContentBlock, filename: string, returnBase64?: boolea
     if (briefpapier) doc.addImage(briefpapier, 'PNG', 0, 0, 210, 297)
   }
 
-  if (returnBase64) return doc.output('datauristring')
+  // Wichtig: doc.output('datauristring') liefert "data:application/pdf;base64,XXX".
+  // Aufrufer (archiveRechnungPdf, triggerDownloadFromBase64) erwarten reines Base64
+  // ohne Prefix — wie bei lib/pdf.ts. Den Prefix abschneiden, sonst wirft atob()
+  // DOMException und das archivierte PDF ist kaputt (leere Seite / 404 beim Öffnen).
+  if (returnBase64) return doc.output('datauristring').split(',')[1] || ''
   doc.save(filename)
 }
 
