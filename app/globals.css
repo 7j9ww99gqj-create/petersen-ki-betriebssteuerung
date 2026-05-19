@@ -278,12 +278,26 @@ select.pk-input { appearance: none; }
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  /* min-width:0 löst das klassische Flex-Layout-Problem:
+     ohne das dehnt sich der Container bei überbreiten Kindern (Tabellen, Cards)
+     und schießt rechts über den Viewport hinaus. */
+  min-width: 0;
 }
 
 .main-inner {
   flex: 1;
   padding: 24px 28px;
+  min-width: 0;
+  max-width: 100%;
+  /* Übergreifende horizontale Scrolls auf Seitenebene unterdrücken —
+     einzelne pk-table-wrap-Container haben ihren eigenen overflow-x:auto. */
+  overflow-x: hidden;
 }
+
+/* Innerhalb des Content-Bereichs nichts breiter als 100% erlauben */
+.main-inner > * { max-width: 100%; }
+.main-inner table { max-width: 100%; }
+.main-inner .pk-card { min-width: 0; }
 
 /* ── Tables: horizontal scroll on small screens ──────────────────────────── */
 
