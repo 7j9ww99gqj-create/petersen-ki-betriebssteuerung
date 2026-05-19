@@ -4,6 +4,7 @@ import { createSupabaseClient } from '@/lib/supabase'
 import { wisoOrderTsv, type WisoOrder, type WisoOrderRow } from '@/lib/pondruff'
 import { generatePondruffOrderPDF, type PondPreisauftrag } from '@/lib/pondruff-pdf'
 import { usePondruffFlags } from '@/components/pondruff/usePondruffFlags'
+import { useGlobalToast } from '@/components/ui/ToastProvider'
 
 type Saved = {
   id: string
@@ -55,7 +56,7 @@ export default function BueroWisoPage() {
   const [wareneingaenge, setWareneingaenge] = useState<SavedWE[]>([])
   const [filter, setFilter] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const toast = useGlobalToast()
   const [delConfirm, setDelConfirm] = useState<string | null>(null)
   const [resyncConfirm, setResyncConfirm] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -78,7 +79,7 @@ export default function BueroWisoPage() {
     }
   }
 
-  function showToast(msg: string, ok = true) { setToast({ msg, ok }); setTimeout(() => setToast(null), 4500) }
+  function showToast(msg: string, ok = true) { if (ok) toast.success(msg); else toast.error(msg) }
 
   async function load() {
     const sb = createSupabaseClient()
@@ -383,14 +384,6 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
         </div>
       )}
 
-      {toast && (
-        <div style={{
-          position: 'fixed', bottom: 90, right: 24, zIndex: 9999, padding: '14px 20px', borderRadius: 12, maxWidth: 380,
-          background: toast.ok ? 'rgba(37,211,102,.12)' : 'rgba(255,80,80,.15)',
-          border: `1px solid ${toast.ok ? 'rgba(37,211,102,.35)' : 'rgba(255,80,80,.4)'}`,
-          color: toast.ok ? '#4ddb7e' : '#ff8080', fontSize: 14, fontWeight: 600,
-        }}>{toast.msg}</div>
-      )}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
 import { compressImageDataUrl } from '@/lib/pondruff'
 import { usePondruffFlags } from '@/components/pondruff/usePondruffFlags'
+import { useGlobalToast } from '@/components/ui/ToastProvider'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type Entry = {
@@ -25,7 +26,7 @@ export default function WareneingangPage() {
   const router = useRouter()
   const [entries, setEntries] = useState<Entry[]>([])
   const [busy, setBusy] = useState(false)
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const toast = useGlobalToast()
   const [form, setForm] = useState({
     delivery_id: '', customer: '', operator: '', status: 'offen', note: '',
   })
@@ -38,7 +39,7 @@ export default function WareneingangPage() {
   const [aiPositions, setAiPositions] = useState<Record<string, unknown>[]>([])
 
   function showToast(msg: string, ok = true) {
-    setToast({ msg, ok }); setTimeout(() => setToast(null), 3500)
+    if (ok) toast.success(msg); else toast.error(msg)
   }
 
   async function load() {
@@ -241,14 +242,6 @@ export default function WareneingangPage() {
         )}
       </div>
 
-      {toast && (
-        <div style={{
-          position: 'fixed', bottom: 90, right: 24, zIndex: 9999, padding: '14px 20px', borderRadius: 12, maxWidth: 380,
-          background: toast.ok ? 'rgba(37,211,102,.12)' : 'rgba(255,80,80,.15)',
-          border: `1px solid ${toast.ok ? 'rgba(37,211,102,.35)' : 'rgba(255,80,80,.4)'}`,
-          color: toast.ok ? '#4ddb7e' : '#ff8080', fontSize: 14, fontWeight: 600,
-        }}>{toast.msg}</div>
-      )}
     </div>
   )
 }

@@ -10,6 +10,7 @@ import {
 } from '@/lib/pondruff'
 import { usePondruffFlags } from '@/components/pondruff/usePondruffFlags'
 import { DecimalInput } from '@/components/pondruff/DecimalInput'
+import { useGlobalToast } from '@/components/ui/ToastProvider'
 
 function Pos({ pos, idx, onChange, onDelete, isFirst, globalPO, setGlobalPO }: {
   pos: PricePosition; idx: number;
@@ -141,7 +142,7 @@ export default function PreisrechnerPage() {
   const [globalPO, setGlobalPO] = useState('')
   const [globalDiscount, setGlobalDiscount] = useState(0)
   const [busy, setBusy] = useState(false)
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const toast = useGlobalToast()
   const [files, setFiles] = useState<File[]>([])
   const [ocrNote, setOcrNote] = useState('')
   const { flags: pondFlags } = usePondruffFlags()
@@ -194,8 +195,7 @@ export default function PreisrechnerPage() {
       }
       // Prefill NICHT direkt löschen — bleibt erhalten, wenn User zurück navigiert.
       // Wird erst nach saveOrder() oder explizitem Verlassen entfernt.
-      setToast({ msg: `${pf.positions?.length || 0} Position(en) aus Wareneingang übernommen`, ok: true })
-      setTimeout(() => setToast(null), 3500)
+      toast.success(`${pf.positions?.length || 0} Position(en) aus Wareneingang übernommen`)
     } catch {}
   }, [sp])
 
@@ -219,7 +219,7 @@ export default function PreisrechnerPage() {
   }
 
   function showToast(msg: string, ok = true) {
-    setToast({ msg, ok }); setTimeout(() => setToast(null), 3500)
+    if (ok) toast.success(msg); else toast.error(msg)
   }
 
   async function runOcr() {
@@ -414,14 +414,6 @@ export default function PreisrechnerPage() {
         />
       )}
 
-      {toast && (
-        <div style={{
-          position: 'fixed', bottom: 90, right: 24, zIndex: 9999, padding: '14px 20px', borderRadius: 12, maxWidth: 380,
-          background: toast.ok ? 'rgba(37,211,102,.12)' : 'rgba(255,80,80,.15)',
-          border: `1px solid ${toast.ok ? 'rgba(37,211,102,.35)' : 'rgba(255,80,80,.4)'}`,
-          color: toast.ok ? '#4ddb7e' : '#ff8080', fontSize: 14, fontWeight: 600,
-        }}>{toast.msg}</div>
-      )}
     </div>
   )
 }
