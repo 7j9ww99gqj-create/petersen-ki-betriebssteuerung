@@ -36,6 +36,27 @@
 - CI: GitHub Actions (tsc + test + build) — ✅ Workflow aktiv auf main.
 - Supabase Storage: ~100 GB Plan — neue Buckets `lager-bilder`, `ocr-originale`, `firma-branding`, `db-backups` (alle privat, user-scoped RLS).
 
+### Zod-Hardening-Sprint (2026-05-19) — Aufgabe 17 aus Optimierungs-Plan
+
+22 API-Routen mit Zod-Schemas abgesichert (zusätzlich zu den 5 in Aufgabe 7). Insgesamt sind jetzt **27 Routen Zod-validiert** — alle eingehenden JSON-Bodies werden geprüft, 400 + detaillierte Issues bei ungültigem Input.
+
+| Cluster | Commit | Routen |
+|---------|--------|--------|
+| Admin + Auth | `d589806` | admin/users (POST/PATCH/DELETE/PUT), auth/register |
+| Billing | `23fee88` | billing/stripe-link, billing/stripe-sync |
+| KI/OCR/Generator | `31d7df7` | generate-angebot, ocr-beleg |
+| Marketing | `9f529ca` | marketing/{autopilot, content-daily, sales-assistant} |
+| Messages | `69c09fe` | messages |
+| Owner | `3eb364d` | owner/{audit-log, pondruff-flags} |
+| Pondruff (10) | `ede7084` | pondruff/{admin-price-config, bauteil-suche, embed-bauteil, match-kunde, ocr-lieferschein, ocr-price, sync-buero-auftrag, sync-buero-wareneingang, wiso-export, wiso-export-wareneingang} |
+| Push | `51539b9` | push (POST/DELETE), push/send |
+
+**Übersprungen (kein JSON-Body):**
+- `document-ai/route.ts` — Multipart-Upload via `req.formData()`
+- `pondruff/embed-backfill/route.ts` — kein Body, nur Background-Trigger
+- `pondruff/wiso-debug/route.ts` — kein Body, nur ENV-Check
+- `billing/stripe-webhook/route.ts` — eigene Stripe-Signatur-Validierung
+
 ### Compliance-Sprint (2026-05-19) — Aufgaben 15, 16, 18 aus Optimierungs-Plan
 
 | # | Aufgabe | Dateien |
@@ -44,7 +65,7 @@
 | 16 | Vercel Preview-Branches Workflow | `CONTRIBUTING.md` (Feature-Branch-Strategie, Direct-Push vs PR, Commit-Konvention)<br>`.github/PULL_REQUEST_TEMPLATE.md` (Checkliste, Test-Hinweise) |
 | 18 | Backup-Restore-Drill | `docs/RESTORE.md` (3 Szenarien: Einzeltabelle / User-Recovery / Catastrophe-Recovery, 6-Monats-Drill-Plan, JSONB-Restore-Approach) |
 
-**Aufgabe 17 (Zod auf restliche ~30 Routen)** bleibt offen — wird im nächsten Sprint mechanisch durchgezogen, sobald alle parallelen Routen-Edits stabil sind.
+**Phase-3 (Compliance & Ops) komplett abgeschlossen**: Aufgaben 15, 16, 17, 18 alle live. Übrig aus 20-Tasks-Plan: nur noch Phase-4-Refactorings (19 db.ts-Split bereits done durch parallelen Agent; 20 Demo-RLS offen).
 
 ### Optimierungs-Sprint Phase-3 (2026-05-19) — 13 Verbesserungen aus CTO-Analyse
 
