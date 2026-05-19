@@ -445,11 +445,9 @@ export default function DashboardPage() {
 
       {isPondruff && (
         <div style={{ marginBottom: 28 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>Pondruff Polier-Service</h2>
-              <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 4 }}>Wareneingang · Preisrechner · Büro/WISO</div>
-            </div>
+          <div style={{ marginBottom: 14 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/pondruff/banner.png" alt="Pondruff Polier-Service · Wareneingangs-Tool" style={{ width: '100%', maxWidth: 1000, height: 'auto', display: 'block', borderRadius: 18, boxShadow: '0 8px 32px rgba(229,9,9,.18)' }} />
           </div>
           <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
             {pondruffTiles.map(t => (

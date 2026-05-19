@@ -29,12 +29,9 @@ export default function PondruffLayout({ children }: { children: React.ReactNode
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#e50909,#b80000)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#fff' }}>P</div>
-        <div>
-          <div style={{ fontSize: 12, color: '#aeb9c8', textTransform: 'uppercase', letterSpacing: '.06em' }}>Pondruff Polier-Service</div>
-          <div style={{ fontSize: 18, fontWeight: 900 }}>Wareneingang · Preisrechner · WISO</div>
-        </div>
+      <div style={{ marginBottom: 18 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/pondruff/banner.png" alt="Pondruff WE" style={{ width: '100%', maxWidth: 900, height: 'auto', display: 'block', borderRadius: 16 }} />
       </div>
       <div className="pk-tab-bar" style={{ display: 'flex', gap: 8, marginBottom: 18, overflowX: 'auto' }}>
         {TABS.map(t => (

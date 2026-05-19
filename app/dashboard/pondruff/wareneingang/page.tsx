@@ -26,6 +26,8 @@ export default function WareneingangPage() {
     delivery_id: '', customer: '', operator: '', status: 'offen', note: '',
   })
   const [files, setFiles] = useState<{ receipt?: File; parts?: File; packaging?: File }>({})
+  const [ocrBusy, setOcrBusy] = useState(false)
+  const [aiData, setAiData] = useState<Record<string, unknown> | null>(null)
 
   function showToast(msg: string, ok = true) {
     setToast({ msg, ok }); setTimeout(() => setToast(null), 3500)
@@ -37,6 +39,31 @@ export default function WareneingangPage() {
     if (!error && data) setEntries(data as Entry[])
   }
   useEffect(() => { load() }, [])
+
+  async function runOcr() {
+    if (!files.receipt) { showToast('Bitte zuerst Lieferschein-Bild auswählen', false); return }
+    setOcrBusy(true)
+    try {
+      const image = await new Promise<string>((res, rej) => {
+        const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(files.receipt!)
+      })
+      const resp = await fetch('/api/pondruff/ocr-lieferschein', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image }),
+      })
+      const data = await resp.json()
+      if (!resp.ok) throw new Error(data?.error || 'OCR fehlgeschlagen')
+      setAiData(data)
+      setForm(f => ({
+        ...f,
+        delivery_id: f.delivery_id || String(data.id || ''),
+        customer: f.customer || String(data.customer || ''),
+        note: f.note || String(data.description || data.ocr_note || ''),
+      }))
+      showToast(`Erkannt: ${data.customer || '—'} · ${data.article_no || ''}`)
+    } catch (e) {
+      showToast((e instanceof Error ? e.message : String(e)) || 'OCR-Fehler', false)
+    } finally { setOcrBusy(false) }
+  }
 
   async function upload(supabase: SupabaseClient, userId: string, key: 'receipt' | 'parts' | 'packaging'): Promise<string | null> {
     const f = files[key]
@@ -63,11 +90,12 @@ export default function WareneingangPage() {
         upload(supabase, user.id, 'packaging'),
       ])
       const { error } = await supabase.from('pondruff_wareneingaenge').insert({
-        user_id: user.id, ...form, receipt_url, parts_url, packaging_url,
+        user_id: user.id, ...form, receipt_url, parts_url, packaging_url, ai_data: aiData,
       })
       if (error) throw error
       setForm({ delivery_id: '', customer: '', operator: '', status: 'offen', note: '' })
       setFiles({})
+      setAiData(null)
       showToast('Wareneingang gespeichert')
       load()
     } catch (e) {
@@ -104,6 +132,16 @@ export default function WareneingangPage() {
           <label><div style={lbl}>Bauteile-Bild</div><input type="file" accept="image/*" onChange={e => setFiles(f => ({ ...f, parts: e.target.files?.[0] }))} /></label>
           <label><div style={lbl}>Verpackung-Bild</div><input type="file" accept="image/*" onChange={e => setFiles(f => ({ ...f, packaging: e.target.files?.[0] }))} /></label>
         </div>
+
+        <button className="pk-btn-ghost" disabled={ocrBusy || !files.receipt} onClick={runOcr} style={{ marginTop: 10, width: '100%' }}>
+          {ocrBusy ? '⏳ GPT-4 liest…' : '🤖 GPT-4 Lieferschein auslesen'}
+        </button>
+        {aiData && (
+          <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.25)', fontSize: 11 }}>
+            <b>KI-Erkennung:</b> Kunde <b>{String(aiData.customer || '—')}</b> · Artikel-Nr. {String(aiData.article_no || '—')} · {String(aiData.description || '')}
+            {aiData.ocr_note ? <div style={{ marginTop: 4, color: '#aeb9c8' }}>ℹ️ {String(aiData.ocr_note)}</div> : null}
+          </div>
+        )}
 
         <label style={{ display: 'block', marginTop: 10 }}>
           <div style={lbl}>Notiz</div>
