@@ -165,6 +165,42 @@ Pragmatischer Soft-Split-Ansatz: kleine sichere Wins zuerst live, große Refacto
 - ⚠️ Ausstehend: Supabase Storage Bucket `pilot-documents` manuell im Dashboard erstellen.
 - Produktivlage: Kernsystem vollständig; alle Hauptmodule produktionsreif und erweitert.
 
+### 0.1.1 Optimierungs-Plan 2026-05-19 (20 Tasks, autonomes Abarbeiten)
+
+Aus Software-Entwicklungsfirma-Audit. Reihenfolge: Quick Wins → Security → Hardening → große Refactorings. Aufruf-Befehl: `Aufgabe N starten` oder `Aufgaben 1-6 abarbeiten`.
+
+**Quick Wins (1–3h, low-risk):**
+1. Sentry Error-Tracking einrichten
+2. React Error Boundaries für Dashboard
+3. Loading-Skeletons pro Pilot
+4. GitHub Actions CI-Pipeline (tsc + test + build)
+5. README.md + ARCHITECTURE.md für Menschen
+6. eslint-plugin-jsx-a11y + Auto-Fixes
+
+**Security & Hardening (3–8h, mittel-risk):**
+7. Zod-Validation-Helper + 5 kritische Routen
+8. Rate-Limiting auf KI/OCR-Routen
+9. KI-Response-Caching für Tagesbericht
+10. Audit-Logs auf kritische Aktionen
+11. OpenAI-Cost-Tracking pro User
+12. Modal/Toast überall konsolidieren
+13. Test-Coverage auf 60% — Phase 1
+14. API-Versionierung Strategie /api/v1/
+
+**Compliance & Operations (4–6h):**
+15. DSGVO Datenexport für Nutzer (Art. 15)
+16. Vercel Preview-Branches Workflow
+17. Zod-Validation auf restliche 30 Routen
+18. Backup-Restore-Drill dokumentieren
+
+**Große Refactorings (1+ Tage, hoch-risk):**
+19. lib/db.ts Full-Split nach Domains
+20. Demo-Mode auf RLS-basiert umstellen
+
+Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
+
+---
+
 ### 0.2 Top-Offene Aufgaben (Priorisiert)
 - ✅ ~~**Stripe Webhook-URL** im Stripe-Dashboard prüfen und echten End-to-End-Test validieren.~~ **Erledigt 2026-05-18**.
 - ✅ ~~**BüroPilot: Paketauswahl + 1-Klick-Konvertierung**~~ **Erledigt 2026-05-18**.
