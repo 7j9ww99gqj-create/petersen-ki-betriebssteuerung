@@ -31,6 +31,14 @@
 - TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19).
 - Supabase Storage: ~100 GB Plan — neue Buckets `lager-bilder`, `ocr-originale`, `firma-branding`, `db-backups` (alle privat, user-scoped RLS).
 
+### Rechnungs-/Angebots-Archiv (2026-05-19) — GoBD-konform
+- **Bucket** `rechnungen-archiv` (privat, user-scoped RLS, KEIN delete-policy für anon/auth → unveränderlich)
+- **Migration** `20260519600000_rechnungen_archiv.sql`: 3 neue Spalten je Tabelle `buero_rechnungen` + `buero_angebote`: `pdf_path`, `pdf_hash` (SHA-256), `pdf_archived_at`
+- **`lib/db.ts`**: `archiveRechnungPdf()`, `archiveAngebotPdf()`, `getArchivPdfSignedUrl()` — Base64 → SHA-256 → Blob → Upload → DB-Update
+- **`lib/pondruff-pdf.ts`**: Auto-Wrapper bekommen `opts?: { archive?: boolean }`. Bei `archive: true` wird PDF mit `returnBase64=true` generiert, in Storage geuploadet, und parallel zum Download getriggert
+- **`RechnungenTab.tsx`** + **`AngeboteTab.tsx`**: PDF-Button archiviert standardmäßig (BüroPilot-Workflow). Zusätzlicher `📎 Archiv`-Button öffnet die archivierte Version via Signed URL (1h TTL)
+- **Pfad-Konvention**: `<user_id>/<jahr>/rechnung_<nummer>.pdf` (Jahresordner für einfache Steuer-Übergabe)
+
 ### Storage-Sprint (2026-05-19) — Nutzung erweiterten Supabase-Storages
 | # | Aufgabe | Dateien | Status |
 |---|---------|---------|--------|
