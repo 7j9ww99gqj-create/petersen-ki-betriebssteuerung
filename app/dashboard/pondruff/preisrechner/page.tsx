@@ -1,5 +1,6 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
 import {
   PRICE_COATINGS, blankPricePosition, calcPricePosition, priceDefaultFactor,
@@ -106,6 +107,7 @@ function Metric({ label, value, highlight }: { label: string; value: string; hig
 const lblStyle: React.CSSProperties = { fontSize: 11, color: '#aeb9c8', marginBottom: 4 }
 
 export default function PreisrechnerPage() {
+  const sp = useSearchParams()
   const [positions, setPositions] = useState<PricePosition[]>([])
   const [customer, setCustomer] = useState('')
   const [project, setProject] = useState('')
@@ -116,6 +118,32 @@ export default function PreisrechnerPage() {
   const [files, setFiles] = useState<File[]>([])
   const [ocrNote, setOcrNote] = useState('')
   const [expected, setExpected] = useState({ positions: 0, coatings: 0, polishing: 0, stripping: 0 })
+
+  useEffect(() => {
+    if (sp.get('prefill') !== '1' || typeof window === 'undefined') return
+    const raw = sessionStorage.getItem('pondruff_prefill')
+    if (!raw) return
+    try {
+      const pf = JSON.parse(raw) as { customer?: string; delivery_id?: string; positions?: Record<string, unknown>[]; ai_data?: Record<string, unknown> }
+      if (pf.customer) setCustomer(normalizePriceCustomer(pf.customer))
+      if (pf.delivery_id) setProject(pf.delivery_id)
+      const ad = pf.ai_data as Record<string, unknown> | undefined
+      if (ad?.purchase_order) setGlobalPO(String(ad.purchase_order))
+      if (Array.isArray(pf.positions) && pf.positions.length) {
+        const arr: PricePosition[] = pf.positions.map((raw, i) => {
+          const p = raw as Partial<PricePosition>
+          const base = blankPricePosition(p.shape === 'Rund' ? 'Rund' : 'Eckig')
+          const c = normalizePriceCoating(String(p.coating || 'TiCN'))
+          return { ...base, ...p, coating: c, factor: priceDefaultFactor(c),
+            purchase_order: i === 0 ? String(p.purchase_order || ad?.purchase_order || '') : '', source: 'ki' } as PricePosition
+        })
+        setPositions(arr)
+      }
+      sessionStorage.removeItem('pondruff_prefill')
+      setToast({ msg: `${pf.positions?.length || 0} Position(en) aus Wareneingang übernommen`, ok: true })
+      setTimeout(() => setToast(null), 3500)
+    } catch {}
+  }, [sp])
 
   const totals = useMemo(() => {
     let n = 0, f = 0

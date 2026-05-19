@@ -10,6 +10,8 @@ import { hasDemoCookie } from '@/lib/auth'
 import { getAccessProfile } from '@/lib/access'
 import { ROLE_LABELS, loadRole, type AppRole } from '@/lib/roles'
 import { getFirmaEinstellungen, upsertFirmaEinstellungen, uploadFirmenLogo, type FirmaEinstellungen } from '@/lib/db'
+import { isPondruffUser } from '@/lib/pondruff'
+import PondruffSheet from '@/components/pondruff/PondruffSheet'
 
 // Bottom-Nav Einträge (Mobile)
 const bottomNavItems = [
@@ -30,6 +32,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [role, setRoleState] = useState<AppRole>('Admin')
   const [allowedPilotIds, setAllowedPilotIds] = useState<string[]>(['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer'])
+  const [isPondruff, setIsPondruff] = useState(false)
+  const [pondruffSheet, setPondruffSheet] = useState(false)
   const [companyChecked, setCompanyChecked] = useState(false)
   const [showCompanyOnboarding, setShowCompanyOnboarding] = useState(false)
   const [companySaving, setCompanySaving] = useState(false)
@@ -93,6 +97,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (!session) { router.push('/login'); return }
         setUserName((session.user.email ?? '').split('@')[0])
         setAllowedPilotIds(getAccessProfile(session.user).allowedPilotIds)
+        setIsPondruff(isPondruffUser(session.user.email))
         setChecked(true)
       }).catch(() => router.push('/login'))
 
@@ -176,9 +181,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (item.href === '#menu' || item.href === '/dashboard') return true
     if (item.href === '/dashboard/lager') return allowedPilotIds.includes('lager')
     if (item.href === '/dashboard/buero') return allowedPilotIds.includes('buero')
-    if (item.href === '/dashboard/werkstatt') return allowedPilotIds.includes('werkstatt')
-    if (item.href === '/dashboard/steuer') return allowedPilotIds.includes('steuer')
-    if (item.href === '/dashboard/ki-erkennung') return allowedPilotIds.length > 0
+    // Pondruff-Account ersetzt Werkstatt durch eigenes Sheet-Item
+    if (item.href === '/dashboard/werkstatt') return !isPondruff && allowedPilotIds.includes('werkstatt')
+    if (item.href === '/dashboard/steuer') return !isPondruff && allowedPilotIds.includes('steuer')
+    if (item.href === '/dashboard/ki-erkennung') return !isPondruff && allowedPilotIds.length > 0
     return true
   })
 
@@ -400,7 +406,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
           )
         })}
+        {isPondruff && (
+          <button
+            className={`bottom-nav-item${pathname.startsWith('/dashboard/pondruff') ? ' active' : ''}`}
+            onClick={() => setPondruffSheet(true)}
+            aria-label="Pondruff Menü"
+            style={{ color: pathname.startsWith('/dashboard/pondruff') ? '#ff6b6b' : undefined }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/pondruff/icon.png" alt="Pondruff" style={{ width: 24, height: 24, borderRadius: 6, objectFit: 'cover' }} />
+            <span>Pondruff</span>
+          </button>
+        )}
       </nav>
+
+      {isPondruff && <PondruffSheet open={pondruffSheet} onClose={() => setPondruffSheet(false)} />}
 
       <SupportButton />
     </div>

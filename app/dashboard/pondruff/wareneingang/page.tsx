@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -19,15 +20,18 @@ type Entry = {
 const STATUS = ['offen', 'in Bearbeitung', 'fertig']
 
 export default function WareneingangPage() {
+  const router = useRouter()
   const [entries, setEntries] = useState<Entry[]>([])
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [form, setForm] = useState({
     delivery_id: '', customer: '', operator: '', status: 'offen', note: '',
   })
-  const [files, setFiles] = useState<{ receipt?: File; parts?: File; packaging?: File }>({})
+  const [receiptFiles, setReceiptFiles] = useState<File[]>([])
+  const [files, setFiles] = useState<{ parts?: File; packaging?: File }>({})
   const [ocrBusy, setOcrBusy] = useState(false)
   const [aiData, setAiData] = useState<Record<string, unknown> | null>(null)
+  const [aiPositions, setAiPositions] = useState<Record<string, unknown>[]>([])
 
   function showToast(msg: string, ok = true) {
     setToast({ msg, ok }); setTimeout(() => setToast(null), 3500)
@@ -41,35 +45,52 @@ export default function WareneingangPage() {
   useEffect(() => { load() }, [])
 
   async function runOcr() {
-    if (!files.receipt) { showToast('Bitte zuerst Lieferschein-Bild auswählen', false); return }
+    if (!receiptFiles.length) { showToast('Bitte mindestens ein Lieferschein-Bild auswählen', false); return }
     setOcrBusy(true)
     try {
-      const image = await new Promise<string>((res, rej) => {
-        const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(files.receipt!)
-      })
-      const resp = await fetch('/api/pondruff/ocr-lieferschein', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image }),
+      const images = await Promise.all(receiptFiles.map(f => new Promise<string>((res, rej) => {
+        const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f)
+      })))
+      // Bei mehreren Bildern: nutzen die Preis-OCR (Multi-File-fähig + Positionen)
+      const endpoint = images.length > 1 ? '/api/pondruff/ocr-price' : '/api/pondruff/ocr-lieferschein'
+      const body = images.length > 1 ? { images } : { image: images[0] }
+      const resp = await fetch(endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       })
       const data = await resp.json()
       if (!resp.ok) throw new Error(data?.error || 'OCR fehlgeschlagen')
       setAiData(data)
+      const positions = Array.isArray(data.positions) ? data.positions : []
+      setAiPositions(positions)
       setForm(f => ({
         ...f,
-        delivery_id: f.delivery_id || String(data.id || ''),
+        delivery_id: f.delivery_id || String(data.id || data.delivery_id || ''),
         customer: f.customer || String(data.customer || ''),
         note: f.note || String(data.description || data.ocr_note || ''),
       }))
-      showToast(`Erkannt: ${data.customer || '—'} · ${data.article_no || ''}`)
+      const detail = positions.length ? `${positions.length} Position(en)` : (data.article_no || '—')
+      showToast(`Erkannt: ${data.customer || '—'} · ${detail}`)
     } catch (e) {
       showToast((e instanceof Error ? e.message : String(e)) || 'OCR-Fehler', false)
     } finally { setOcrBusy(false) }
   }
 
-  async function upload(supabase: SupabaseClient, userId: string, key: 'receipt' | 'parts' | 'packaging'): Promise<string | null> {
-    const f = files[key]
+  function openInPriceCalc() {
+    // Stellt OCR-Daten in sessionStorage und navigiert zum Preisrechner
+    if (typeof window === 'undefined') return
+    sessionStorage.setItem('pondruff_prefill', JSON.stringify({
+      customer: form.customer,
+      delivery_id: form.delivery_id,
+      positions: aiPositions,
+      ai_data: aiData,
+    }))
+    router.push('/dashboard/pondruff/preisrechner?prefill=1')
+  }
+
+  async function uploadFile(supabase: SupabaseClient, userId: string, folder: string, f: File): Promise<string | null> {
     if (!f) return null
     const ext = f.name.split('.').pop() || 'jpg'
-    const path = `${userId}/${key}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const path = `${userId}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
     const { error } = await supabase.storage.from('pondruff').upload(path, f, { upsert: false })
     if (error) throw error
     return path
@@ -84,18 +105,34 @@ export default function WareneingangPage() {
       const supabase = createSupabaseClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Nicht eingeloggt')
-      const [receipt_url, parts_url, packaging_url] = await Promise.all([
-        upload(supabase, user.id, 'receipt'),
-        upload(supabase, user.id, 'parts'),
-        upload(supabase, user.id, 'packaging'),
+      const [receiptPaths, parts_url, packaging_url] = await Promise.all([
+        Promise.all(receiptFiles.map(f => uploadFile(supabase, user.id, 'receipt', f))),
+        files.parts ? uploadFile(supabase, user.id, 'parts', files.parts) : Promise.resolve(null),
+        files.packaging ? uploadFile(supabase, user.id, 'packaging', files.packaging) : Promise.resolve(null),
       ])
-      const { error } = await supabase.from('pondruff_wareneingaenge').insert({
-        user_id: user.id, ...form, receipt_url, parts_url, packaging_url, ai_data: aiData,
-      })
+      const receipt_url = receiptPaths.filter(Boolean).join('|') || null
+      const { data: ins, error } = await supabase.from('pondruff_wareneingaenge').insert({
+        user_id: user.id, ...form, receipt_url, parts_url, packaging_url, ai_data: { ...aiData, positions: aiPositions },
+      }).select().single()
       if (error) throw error
+      // Bauteil-Asset speichern (für KI-Suche)
+      if (parts_url && ins) {
+        await supabase.from('pondruff_bauteile').insert({
+          user_id: user.id,
+          customer: form.customer || null,
+          delivery_id: form.delivery_id || null,
+          article_no: String((aiData as Record<string, unknown> | null)?.article_no || ''),
+          description: String((aiData as Record<string, unknown> | null)?.description || form.note || ''),
+          image_url: parts_url,
+          wareneingang_id: ins.id,
+          note: form.note || null,
+        })
+      }
       setForm({ delivery_id: '', customer: '', operator: '', status: 'offen', note: '' })
+      setReceiptFiles([])
       setFiles({})
       setAiData(null)
+      setAiPositions([])
       showToast('Wareneingang gespeichert')
       load()
     } catch (e) {
@@ -128,17 +165,28 @@ export default function WareneingangPage() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginTop: 10 }}>
-          <label><div style={lbl}>Lieferschein-Bild</div><input type="file" accept="image/*" onChange={e => setFiles(f => ({ ...f, receipt: e.target.files?.[0] }))} /></label>
+          <label><div style={lbl}>Lieferschein-Bild(er) — mehrere möglich</div><input type="file" accept="image/*" multiple onChange={e => setReceiptFiles(Array.from(e.target.files || []))} /></label>
           <label><div style={lbl}>Bauteile-Bild</div><input type="file" accept="image/*" onChange={e => setFiles(f => ({ ...f, parts: e.target.files?.[0] }))} /></label>
           <label><div style={lbl}>Verpackung-Bild</div><input type="file" accept="image/*" onChange={e => setFiles(f => ({ ...f, packaging: e.target.files?.[0] }))} /></label>
         </div>
+        {receiptFiles.length > 0 && <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 6 }}>{receiptFiles.length} Lieferschein-Bild(er) ausgewählt</div>}
 
-        <button className="pk-btn-ghost" disabled={ocrBusy || !files.receipt} onClick={runOcr} style={{ marginTop: 10, width: '100%' }}>
-          {ocrBusy ? '⏳ GPT-4 liest…' : '🤖 GPT-4 Lieferschein auslesen'}
-        </button>
+        <div style={{ display: 'grid', gridTemplateColumns: aiPositions.length ? '1fr 1fr' : '1fr', gap: 10, marginTop: 10 }}>
+          <button className="pk-btn-ghost" disabled={ocrBusy || !receiptFiles.length} onClick={runOcr} style={{ width: '100%' }}>
+            {ocrBusy ? '⏳ GPT-4 liest…' : `🤖 GPT-4 Lieferschein auslesen${receiptFiles.length > 1 ? ' (mehrere)' : ''}`}
+          </button>
+          {aiPositions.length > 0 && (
+            <button className="pk-btn" onClick={openInPriceCalc} style={{ width: '100%', background: 'linear-gradient(180deg,#e50909,#b80000)', border: '1px solid rgba(229,9,9,.6)' }}>
+              💶 In Preisrechner öffnen ({aiPositions.length} Pos.)
+            </button>
+          )}
+        </div>
         {aiData && (
           <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.25)', fontSize: 11 }}>
-            <b>KI-Erkennung:</b> Kunde <b>{String(aiData.customer || '—')}</b> · Artikel-Nr. {String(aiData.article_no || '—')} · {String(aiData.description || '')}
+            <b>KI-Erkennung:</b> Kunde <b>{String(aiData.customer || '—')}</b>
+            {aiPositions.length > 0
+              ? <> · {aiPositions.length} Positionen erkannt</>
+              : <> · Artikel-Nr. {String(aiData.article_no || '—')}{aiData.description ? ' · ' + String(aiData.description) : ''}</>}
             {aiData.ocr_note ? <div style={{ marginTop: 4, color: '#aeb9c8' }}>ℹ️ {String(aiData.ocr_note)}</div> : null}
           </div>
         )}

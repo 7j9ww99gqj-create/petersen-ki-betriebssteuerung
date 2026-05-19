@@ -20,7 +20,27 @@ type Saved = {
   confirmed_at: string | null
   invoice_no: string | null
   invoice_date: string | null
+  synced_buero_auftrag_id: string | null
+  synced_buero_at: string | null
+  synced_wiso_at: string | null
 }
+
+type SavedWE = {
+  id: string
+  created_at: string
+  delivery_id: string | null
+  customer: string | null
+  operator: string | null
+  status: string | null
+  note: string | null
+  receipt_url: string | null
+  parts_url: string | null
+  packaging_url: string | null
+  synced_buero_dokument_id: string | null
+  synced_buero_at: string | null
+}
+
+type Section = 'auftraege' | 'wareneingaenge'
 
 function toWiso(o: Saved): WisoOrder {
   return {
@@ -42,7 +62,9 @@ const TABS: { key: Status; label: string; icon: string; color: string }[] = [
 ]
 
 export default function BueroWisoPage() {
+  const [section, setSection] = useState<Section>('auftraege')
   const [orders, setOrders] = useState<Saved[]>([])
+  const [wareneingaenge, setWareneingaenge] = useState<SavedWE[]>([])
   const [filter, setFilter] = useState('')
   const [tab, setTab] = useState<Status>('preisauftrag')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -54,10 +76,56 @@ export default function BueroWisoPage() {
 
   async function load() {
     const supabase = createSupabaseClient()
-    const { data, error } = await supabase.from('pondruff_preisauftraege').select('*').order('created_at', { ascending: false }).limit(500)
-    if (!error && data) setOrders(data as Saved[])
+    const [o, we] = await Promise.all([
+      supabase.from('pondruff_preisauftraege').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('pondruff_wareneingaenge').select('*').order('created_at', { ascending: false }).limit(500),
+    ])
+    if (!o.error && o.data) setOrders(o.data as Saved[])
+    if (!we.error && we.data) setWareneingaenge(we.data as SavedWE[])
   }
   useEffect(() => { load() }, [])
+
+  async function syncToBueroAuftrag(o: Saved) {
+    setBusy(true)
+    try {
+      const r = await fetch('/api/pondruff/sync-buero-auftrag', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: o.id }) })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data?.error || 'Sync fehlgeschlagen')
+      showToast(`→ BüroPilot Auftrag ${data.buero_auftrag_id} erstellt`)
+      load()
+    } catch (e) { showToast((e instanceof Error ? e.message : String(e)) || 'Fehler', false) }
+    finally { setBusy(false) }
+  }
+
+  async function syncToBueroWareneingang(w: SavedWE) {
+    setBusy(true)
+    try {
+      const r = await fetch('/api/pondruff/sync-buero-wareneingang', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: w.id }) })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data?.error || 'Sync fehlgeschlagen')
+      showToast(`→ BüroPilot Dokument ${data.buero_dokument_id} erstellt`)
+      load()
+    } catch (e) { showToast((e instanceof Error ? e.message : String(e)) || 'Fehler', false) }
+    finally { setBusy(false) }
+  }
+
+  async function exportToWiso(o: Saved) {
+    setBusy(true)
+    try {
+      const r = await fetch('/api/pondruff/wiso-export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: o.id }) })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data?.error || 'WISO-Export fehlgeschlagen')
+      showToast('✓ An WISO MeinBüro übergeben')
+      load()
+    } catch (e) { showToast((e instanceof Error ? e.message : String(e)) || 'Fehler', false) }
+    finally { setBusy(false) }
+  }
+
+  async function delWE(id: string) {
+    const sb = createSupabaseClient()
+    await sb.from('pondruff_wareneingaenge').delete().eq('id', id)
+    showToast('Gelöscht'); load()
+  }
 
   const visible = useMemo(() => {
     const q = filter.toLowerCase().trim()
@@ -239,14 +307,72 @@ ${order.rows.map(r => `<tr>
     } finally { setBusy(false) }
   }
 
+  const visibleWE = useMemo(() => {
+    const q = filter.toLowerCase().trim()
+    if (!q) return wareneingaenge
+    return wareneingaenge.filter(w => [w.delivery_id, w.customer, w.note, w.operator].some(x => (x || '').toLowerCase().includes(q)))
+  }, [wareneingaenge, filter])
+
   return (
     <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        {(['auftraege', 'wareneingaenge'] as const).map(s => (
+          <button key={s} onClick={() => { setSection(s); setSelectedId(null) }}
+            style={{
+              padding: '10px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 800, fontSize: 14,
+              border: `1px solid ${section === s ? 'rgba(229,9,9,.6)' : 'rgba(255,255,255,.08)'}`,
+              background: section === s ? 'linear-gradient(180deg,#e50909,#b80000)' : 'rgba(255,255,255,.03)',
+              color: section === s ? '#fff' : '#aeb9c8',
+            }}>
+            {s === 'auftraege' ? `💶 Aufträge (${orders.length})` : `📥 Wareneingänge (${wareneingaenge.length})`}
+          </button>
+        ))}
+      </div>
+
       <div className="pk-card" style={{ marginBottom: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <input className="pk-input" placeholder="🔍 Suche Kunde / Projekt / Rechnung-Nr." value={filter} onChange={e => setFilter(e.target.value)} style={{ flex: 1, minWidth: 220 }} />
-        <button className="pk-btn-ghost" onClick={downloadAllCsv} disabled={!visible.length}>⬇️ TSV-Export</button>
+        {section === 'auftraege' && <button className="pk-btn-ghost" onClick={downloadAllCsv} disabled={!visible.length}>⬇️ TSV-Export</button>}
         <button className="pk-btn-ghost" onClick={load}>🔄 Neu laden</button>
       </div>
 
+      {section === 'wareneingaenge' && (
+        <div className="pk-card">
+          <h3 style={{ margin: '0 0 10px', fontSize: 15, fontWeight: 800 }}>Wareneingänge ({visibleWE.length})</h3>
+          {visibleWE.length === 0 ? (
+            <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine Wareneingänge. Über das Pondruff-Menü → Wareneingang erfassen.</div>
+          ) : (
+            <div className="pk-table-wrap" style={{ overflowX: 'auto' }}>
+              <table className="pk-table" style={{ width: '100%', fontSize: 12 }}>
+                <thead><tr><th>Datum</th><th>Lieferschein</th><th>Kunde</th><th>Status</th><th>Notiz</th><th>BüroPilot</th><th>Aktion</th></tr></thead>
+                <tbody>{visibleWE.map(w => (
+                  <tr key={w.id}>
+                    <td>{new Date(w.created_at).toLocaleDateString('de-DE')}</td>
+                    <td>{w.delivery_id || '—'}</td>
+                    <td>{w.customer || '—'}</td>
+                    <td>{w.status || 'offen'}</td>
+                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.note || ''}</td>
+                    <td>
+                      {w.synced_buero_dokument_id
+                        ? <span style={{ color: '#4ddb7e', fontSize: 11 }}>✓ {w.synced_buero_dokument_id}</span>
+                        : <span style={{ color: '#7f8da3', fontSize: 11 }}>—</span>}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {!w.synced_buero_dokument_id && (
+                          <button className="pk-btn-ghost" disabled={busy} onClick={() => syncToBueroWareneingang(w)} style={{ fontSize: 11 }} title="In BüroPilot übernehmen">→ Petersen KI</button>
+                        )}
+                        <button className="pk-btn-ghost" onClick={() => delWE(w.id)} style={{ fontSize: 11 }}>🗑️</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {section === 'auftraege' && <>
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => { setTab(t.key); setSelectedId(null) }}
@@ -302,6 +428,12 @@ ${order.rows.map(r => `<tr>
                       <button className="pk-btn-ghost" onClick={() => copyWiso(o)} style={{ fontSize: 11 }} title="WISO Copy">📋</button>
                       <button className="pk-btn-ghost" onClick={() => downloadCsv(o)} style={{ fontSize: 11 }} title="TSV">⬇️</button>
                       <button className="pk-btn-ghost" onClick={() => downloadHtmlReport(o)} style={{ fontSize: 11 }} title="HTML Bericht">📄</button>
+                      {o.synced_buero_auftrag_id
+                        ? <span style={{ fontSize: 11, color: '#4ddb7e', alignSelf: 'center' }}>✓ KI</span>
+                        : <button className="pk-btn-ghost" disabled={busy} onClick={() => syncToBueroAuftrag(o)} style={{ fontSize: 11 }} title="In BüroPilot übernehmen">→ Petersen KI</button>}
+                      {o.synced_wiso_at
+                        ? <span style={{ fontSize: 11, color: '#4ddb7e', alignSelf: 'center' }}>✓ WISO</span>
+                        : <button className="pk-btn-ghost" disabled={busy} onClick={() => exportToWiso(o)} style={{ fontSize: 11 }} title="An WISO MeinBüro übergeben">→ WISO API</button>}
                       {delConfirm === o.id ? (
                         <>
                           <button onClick={() => del(o.id)} style={{ background: '#e50909', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}>Ja</button>
@@ -339,6 +471,7 @@ ${order.rows.map(r => `<tr>
           <pre style={{ fontSize: 11, background: 'rgba(0,0,0,.3)', padding: 10, borderRadius: 8, overflowX: 'auto', maxHeight: 240 }}>{wisoOrderTsv(toWiso(selected))}</pre>
         </div>
       )}
+      </>}
 
       {toast && (
         <div style={{
