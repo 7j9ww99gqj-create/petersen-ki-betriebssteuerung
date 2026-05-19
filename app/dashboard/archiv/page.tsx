@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
 import { getBueroDokumente, getDokumentUrl, getSteuerBelege } from '@/lib/db'
 import { normalizeDocumentStoragePath } from '@/lib/documents'
+import EmptyState from '@/components/EmptyState'
 
 type ArchivDokument = {
   id: string
@@ -321,9 +322,11 @@ export default function ArchivPage() {
         )}
 
         {!loading && filtered.length === 0 && (
-          <div style={{ padding: 40, textAlign: 'center', color: '#aeb9c8' }}>
-            Keine Dokumente gefunden.
-          </div>
+          <EmptyState
+            icon="🗂️"
+            title="Keine Dokumente gefunden"
+            description={docs.length === 0 ? 'Lade Dokumente im BüroPilot oder SteuerPilot hoch, um sie hier zu sehen.' : 'Kein Treffer für deine Filterauswahl. Suche anpassen oder Filter zurücksetzen.'}
+          />
         )}
       </div>
 

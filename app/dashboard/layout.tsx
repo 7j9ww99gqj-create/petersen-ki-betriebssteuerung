@@ -13,6 +13,7 @@ import { getFirmaEinstellungen, upsertFirmaEinstellungen, uploadFirmenLogo, type
 import { isPondruffUser } from '@/lib/pondruff'
 import PondruffSheet from '@/components/pondruff/PondruffSheet'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import { WhatsNewModal } from '@/components/ui'
 
 // Bottom-Nav Einträge (Mobile)
 const bottomNavItems = [
@@ -191,6 +192,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div style={{ display: 'flex' }}>
+      <WhatsNewModal />
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
