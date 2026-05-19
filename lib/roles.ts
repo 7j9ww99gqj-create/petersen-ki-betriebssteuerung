@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
+import { isPondruffUser } from '@/lib/pondruff'
 
 export const INHABER_EMAIL = 'info@petersen-ki-pilot.de'
 
@@ -55,6 +56,9 @@ async function readAuthRole(): Promise<AppRole | null> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
 
+    // Hard-Lock: Pondruff-Account ist NIE Inhaber, immer Admin
+    if (isPondruffUser(user.email)) return 'Admin'
+
     const rawRole = user.app_metadata?.role ?? user.user_metadata?.role
     if (typeof rawRole !== 'string' || !APP_ROLES.includes(rawRole as AppRole)) return null
 
@@ -73,6 +77,17 @@ export async function loadRole(): Promise<AppRole> {
     localStorage.setItem('pk_role', authRole)
     return authRole
   }
+
+  // Schutz vor stale localStorage: wenn aktueller User Pondruff ist, IMMER Admin
+  try {
+    if (isSupabaseConfigured()) {
+      const { data: { user } } = await createSupabaseClient().auth.getUser()
+      if (isPondruffUser(user?.email)) {
+        localStorage.setItem('pk_role', 'Admin')
+        return 'Admin'
+      }
+    }
+  } catch {}
 
   return readLocalRole()
 }

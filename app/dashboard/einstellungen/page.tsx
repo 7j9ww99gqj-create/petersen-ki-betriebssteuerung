@@ -3656,14 +3656,19 @@ async function runBulkImport(dataType: ImportDataType, rows: Record<string, stri
   }
   if (dataType === 'kunden') {
     const prepared = rows.map(r => {
-      const name = (r.name && r.name.trim()) || (r.ansprechpartner && r.ansprechpartner.trim()) || ''
+      const fullName = [r.vorname?.trim(), r.nachname?.trim()].filter(Boolean).join(' ').trim()
+      // Name = Firma, sonst Ansprechpartner, sonst Vorname+Nachname
+      const name = (r.name?.trim()) || (r.ansprechpartner?.trim()) || fullName
+      // Ansprechpartner = explizit angegeben, sonst Vorname+Nachname
+      const ansprechpartner = r.ansprechpartner?.trim() || fullName || undefined
       return {
         id: genId('KD'), name,
-        kundennummer: r.kundennummer, ansprechpartner: r.ansprechpartner,
-        email: r.email, telefon: r.telefon, mobil: r.mobil,
-        strasse: r.strasse, plz: r.plz, ort: r.ort, land: r.land,
-        website: r.website, ust_id: r.ust_id,
-        adresse: r.adresse, notizen: r.notizen,
+        kundennummer: r.kundennummer || undefined,
+        ansprechpartner,
+        email: r.email || undefined, telefon: r.telefon || undefined, mobil: r.mobil || undefined,
+        strasse: r.strasse || undefined, plz: r.plz || undefined, ort: r.ort || undefined, land: r.land || undefined,
+        website: r.website || undefined, ust_id: r.ust_id || undefined,
+        adresse: r.adresse || undefined, notizen: r.notizen || undefined,
       }
     }).filter(r => r.name.trim().length > 0)
     if (!prepared.length) return { count: 0, ids: [], table: 'buero_kunden' }

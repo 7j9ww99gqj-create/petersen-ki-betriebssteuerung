@@ -56,7 +56,10 @@ export async function getRouteAccess(req: NextRequest, allowedRoles?: ServerAppR
     }
   }
 
-  const role = normalizeRole(data.user.app_metadata?.role ?? data.user.user_metadata?.role)
+  // Pondruff-Hardlock auch serverseitig — nie Inhaber-Routen erreichbar
+  const rawRole = data.user.app_metadata?.role ?? data.user.user_metadata?.role
+  const isPondEmail = (data.user.email || '').toLowerCase() === 'info@pondruffpolierservice.de'
+  const role = normalizeRole(isPondEmail ? 'Admin' : rawRole)
   if (allowedRoles && !allowedRoles.includes(role)) {
     return {
       isDemo: false as const,
