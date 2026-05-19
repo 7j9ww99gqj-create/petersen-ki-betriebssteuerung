@@ -26,14 +26,31 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Security-Sprint** (HEAD `4ceb16d`): Zod-Validation (5 Routen), Rate-Limiting (10 KI/OCR-Routen), KI-Response-Caching für Tagesbericht.
-- Davor: **Quick-Wins-Sprint** (Commits `4dc83a1`–`e0f4170`): 6 Quick-Win-Aufgaben + jsx-a11y-Vollfix (430→0) + Sentry-Aktivierung mit Free-Tier-Schutz.
-- Vorheriger Sprint (2026-05-19, Commit `d28aa39`): Code-Qualität-Sprint — Vitest + 40 Tests, Service-Worker + Offline-Cache, KI-Streaming-Support, db.ts/lager.tsx Soft-Splits.
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Phase-2-Sprint** (HEAD `0e89a9f`): Audit-Logs, OpenAI-Cost-Tracking, Modal/Toast-Konsolidierung, Test-Coverage +47, API-Versionierung.
+- Davor: **Security-Sprint** (Commits `bb920c0`–`4ceb16d`): Zod, Rate-Limiting, KI-Cache.
+- Davor: **Quick-Wins-Sprint** (Commits `4dc83a1`–`e0f4170`): Sentry, Error-Boundaries, Skeletons, CI, README/ARCHITECTURE, jsx-a11y (430→0).
 - Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main).
 - TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19).
-- Tests: `npm test` — ✅ 40 Tests (3 Files: pondruff-price, demo-helpers, lager-helpers).
+- Tests: `npm test` — ✅ **87 Tests** in 7 Files (40 Bestand + 47 neu in Phase-2).
 - CI: GitHub Actions (tsc + test + build) — ✅ Workflow aktiv auf main.
 - Supabase Storage: ~100 GB Plan — neue Buckets `lager-bilder`, `ocr-originale`, `firma-branding`, `db-backups` (alle privat, user-scoped RLS).
+
+### Phase-2-Sprint (2026-05-19) — Aufgaben 10-14 aus Optimierungs-Plan
+
+| # | Aufgabe | Dateien | Commit |
+|---|---------|---------|--------|
+| 10 | User-Audit-Logs (8 Delete-Funktionen) | `supabase/migrations/20260519910000_user_audit_log.sql`, `lib/user-audit.ts`, `lib/db.ts` | `39a5790` |
+| 11 | OpenAI-Cost-Tracking pro User + Owner-Panel | `supabase/migrations/20260519920000_ai_usage.sql`, `lib/ai-usage.ts`, 5 KI-Routen, `app/api/owner/ai-usage-per-user/route.ts` | `587a770` |
+| 12 | Modal/Toast Foundation + 8 Refactor-Commits | `components/ui/{ConfirmModal,ToastProvider,index}.ts`, `app/layout.tsx` + 9 Dashboards/Components | `ed5dee7` → `8d2dae2` |
+| 13 | Test-Coverage Phase 1 — 47 neue Tests | `tests/{validation,ai-usage,ai-cache,rate-limit}.test.ts` | `21ebce3` |
+| 14 | API-Versionierung /api/v1/ (Rewrite + ADR) | `next.config.js`, `ARCHITECTURE.md` (ADR-Abschnitt) | `0e89a9f` |
+
+**Auswirkung:**
+- **Audit (10):** Lösch/Anonymize-Aktionen werden in `user_audit_log` (RLS, append-only) protokolliert — DSGVO/Forensik-Basis
+- **Cost-Tracking (11):** Pro User + Route + Modell + Tokens + EUR — Owner-Cockpit kann Top-50-User auswerten, Cache-Hits zählen separat
+- **Konsolidierung (12):** −260 Zeilen Boilerplate; einheitlicher Toast-Stack über `ToastProvider`; 8 Dateien auf zentrale Komponenten migriert
+- **Tests (13):** 40 → 87 grüne Tests; deckt Validation, Cost-Berechnung, Cache-Key-Hashing, Rate-Limit-Buckets ab; entdeckter Bug in `hashCacheKey(undefined)` direkt mitgefixt
+- **API-Versionierung (14):** `/api/v1/foo` → `/api/foo` Rewrite ist additiv (keine Breaking-Changes); ADR dokumentiert Migrationsstrategie für künftiges v2
 
 ### Security-Sprint (2026-05-19) — Aufgaben 7-9 aus Optimierungs-Plan
 
