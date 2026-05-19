@@ -27,6 +27,22 @@ export function OwnerCustomerControlPanel({
   const [loading, setLoading] = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
 
+  const audit = async (
+    action: 'customer.unlock' | 'customer.suspend' | 'customer.status_change' | 'invoice.create',
+    target: { userId?: string | null; email?: string | null },
+    details: Record<string, unknown>,
+  ) => {
+    try {
+      await fetch('/api/owner/audit-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, target, details }),
+      })
+    } catch {
+      // Audit-Logging darf UI niemals blockieren
+    }
+  }
+
   useEffect(() => {
     if (!enabled) return
     setLoading(true)
@@ -50,10 +66,33 @@ export function OwnerCustomerControlPanel({
 
   const applyChange = async (id: string, input: { status?: BookingStatus; softwareEnabled?: boolean }) => {
     setSavingId(id)
+    const prev = rows.find(r => r.id === id) ?? null
     try {
       const updated = await updateBillingSubscriptionControls(id, input)
       setRows(current => current.map(row => row.id === id ? updated : row))
       showToast('✅ Kundenstatus aktualisiert')
+
+      // Audit-Logging der Inhaber-Aktion (fire-and-forget)
+      const target = { userId: updated.userId ?? null, email: updated.userEmail ?? null }
+      if (typeof input.softwareEnabled === 'boolean' && prev?.softwareEnabled !== input.softwareEnabled) {
+        await audit(
+          input.softwareEnabled ? 'customer.unlock' : 'customer.suspend',
+          target,
+          {
+            subscriptionId: id,
+            softwareEnabled: input.softwareEnabled,
+            previousSoftwareEnabled: prev?.softwareEnabled ?? null,
+            status: updated.status,
+            previousStatus: prev?.status ?? null,
+          },
+        )
+      } else if (typeof input.status === 'string' && prev?.status !== input.status) {
+        await audit('customer.status_change', target, {
+          subscriptionId: id,
+          status: input.status,
+          previousStatus: prev?.status ?? null,
+        })
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Kundenstatus konnte nicht gespeichert werden', 'error')
     } finally {
@@ -89,6 +128,13 @@ export function OwnerCustomerControlPanel({
         },
       }))
       showToast(`✅ Rechnung ${draft.number} erstellt`)
+      await audit('invoice.create', { userId: row.userId ?? null, email: row.userEmail ?? null }, {
+        subscriptionId: row.id,
+        invoiceId: draft.id,
+        invoiceNumber: draft.number,
+        grossAmount: draft.grossAmount,
+        status: draft.status,
+      })
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Rechnung konnte nicht erstellt werden', 'error')
     } finally {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getRouteAccess } from '@/lib/server-auth'
 import { POND_DEFAULT_FEATURE_FLAGS, POND_FEATURE_KEYS, POND_USER_ID, type PondruffFeatureFlags, type PondruffFeatureKey } from '@/lib/pondruff'
+import { logOwnerAction } from '@/lib/audit-log'
 
 const OWNER_EMAIL = 'info@petersen-ki-pilot.de'
 
@@ -60,6 +61,15 @@ export async function POST(req: NextRequest) {
   }
   const sa = admin()
   if (!sa) return NextResponse.json({ error: 'Service-Role-Key fehlt.' }, { status: 500 })
+
+  // Vorherige Flags fuer Audit-Log auslesen
+  const { data: previousRow } = await sa
+    .from('pondruff_feature_flags')
+    .select('*')
+    .eq('user_id', POND_USER_ID)
+    .maybeSingle()
+  const previousFlags = normalize(previousRow)
+
   const payload: Record<string, unknown> = {
     user_id: POND_USER_ID,
     [key]: body.value,
@@ -72,5 +82,18 @@ export async function POST(req: NextRequest) {
     .select('*')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Audit-Log (fire-and-forget)
+  await logOwnerAction({
+    actor: { userId: access.user?.id, email: access.user?.email },
+    action: 'pondruff_flag.toggle',
+    target: { userId: POND_USER_ID },
+    details: {
+      flag: key,
+      previousValue: previousFlags[key],
+      newValue: body.value,
+    },
+  })
+
   return NextResponse.json({ userId: POND_USER_ID, flags: normalize(data) })
 }
