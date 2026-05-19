@@ -2657,10 +2657,31 @@ export async function getImportProtokolle() {
 export async function insertImportProtokoll(p: {
   id: string; quelle: string; datentyp: string; dateiname: string; status: string
   anzahl_gesamt: number; anzahl_erfolgreich: number; anzahl_fehlerhaft: number; fehler?: object
+  imported_ids?: string[]; ziel_tabelle?: string
 }) {
   const { data, error } = await db().from('import_protokolle').insert(p).select()
   if (error) throw error
   return data
+}
+
+// Lösche ein Import-Protokoll. Wenn rollback=true, werden auch die importierten Datensätze gelöscht.
+export async function deleteImportProtokoll(id: string, rollback: boolean): Promise<{ deleted_records: number }> {
+  let deletedRecords = 0
+  if (rollback) {
+    const { data: proto, error: fetchErr } = await db().from('import_protokolle').select('imported_ids, ziel_tabelle').eq('id', id).maybeSingle()
+    if (fetchErr) throw fetchErr
+    const ids: string[] = Array.isArray(proto?.imported_ids) ? proto!.imported_ids as string[] : []
+    const table: string | null = proto?.ziel_tabelle ?? null
+    const ALLOWED = ['buero_kunden', 'lager_artikel', 'einkauf_lieferanten', 'buero_rechnungen', 'steuer_belege', 'steuer_buchungen', 'steuer_konten']
+    if (table && ids.length && ALLOWED.includes(table)) {
+      const { error: delErr, count } = await db().from(table).delete({ count: 'exact' }).in('id', ids)
+      if (delErr) throw delErr
+      deletedRecords = count ?? 0
+    }
+  }
+  const { error } = await db().from('import_protokolle').delete().eq('id', id)
+  if (error) throw error
+  return { deleted_records: deletedRecords }
 }
 
 // ── BULK INSERT HELPERS ────────────────────────────────────────────────────────

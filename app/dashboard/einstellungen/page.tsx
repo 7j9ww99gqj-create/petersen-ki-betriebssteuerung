@@ -13,7 +13,7 @@ import {
   type ImportDataType, type ImportSource, type ImportParseResult, type ImportValidationResult,
 } from '@/lib/importer'
 import {
-  getImportProtokolle, insertImportProtokoll,
+  getImportProtokolle, insertImportProtokoll, deleteImportProtokoll,
   bulkImportLagerArtikel, bulkImportBueroKunden, bulkImportEinkaufLieferanten,
   bulkImportBueroRechnungen, bulkImportSteuerBelege, bulkImportSteuerBuchungen,
   bulkImportSteuerKonten, bulkImportWerkstattZeitbuchungen, bulkImportWerkstattMaterial,
@@ -3143,6 +3143,7 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
   const [protokolle, setProtokolle] = useState<ImportProtokoll[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [parsing, setParsing] = useState(false)
+  const [delDialog, setDelDialog] = useState<{ id: string; count: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -3202,25 +3203,43 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
     }
 
     try {
-      const importedCount = await runBulkImport(dataType, builtRows)
+      const result = await runBulkImport(dataType, builtRows)
+      const importedCount = result.count
       const proto: ImportProtokoll = {
         id: genId('IMP'),
         quelle: source,
         datentyp: dataType,
         dateiname: file?.name ?? '',
-        status: validationResult.summary.invalid > 0 ? 'teilweise' : 'erfolgreich',
+        status: importedCount === 0 ? 'fehlgeschlagen' : validationResult.summary.invalid > 0 ? 'teilweise' : 'erfolgreich',
         anzahl_gesamt: validationResult.summary.total,
         anzahl_erfolgreich: importedCount,
         anzahl_fehlerhaft: validationResult.summary.invalid,
         erstellt_am: new Date().toISOString(),
       }
-      await insertImportProtokoll({ ...proto, fehler: validationResult.warnings as object })
+      await insertImportProtokoll({
+        ...proto, fehler: validationResult.warnings as object,
+        imported_ids: result.ids, ziel_tabelle: result.table,
+      })
       setProtokolle(prev => [proto, ...prev])
-      showToast(`✅ ${importedCount} Datensätze erfolgreich importiert`)
+      if (importedCount === 0) {
+        showToast('⚠️ Import abgeschlossen, aber keine Datensätze geschrieben. Mapping prüfen.', 'error')
+      } else {
+        showToast(`✅ ${importedCount} Datensätze erfolgreich importiert`)
+      }
       setStep(5)
     } catch (err) {
       showToast('Fehler beim Import: ' + String(err), 'error')
     } finally { setImporting(false) }
+  }
+
+  const handleDeleteProtokoll = async (id: string, rollback: boolean) => {
+    try {
+      const r = await deleteImportProtokoll(id, rollback)
+      setProtokolle(prev => prev.filter(p => p.id !== id))
+      showToast(rollback ? `🗑️ Protokoll und ${r.deleted_records} Datensätze gelöscht` : '🗑️ Protokoll gelöscht')
+    } catch (err) {
+      showToast('Fehler beim Löschen: ' + String(err), 'error')
+    }
   }
 
   const reset = () => {
@@ -3550,9 +3569,9 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
           <div style={{ color: '#4a5568', fontSize: 13 }}>Noch keine Importe durchgeführt.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="pk-table">
+            <table className="pk-table" style={{ minWidth: 900, width: '100%' }}>
               <thead>
-                <tr><th>Datum</th><th>Quelle</th><th>Datentyp</th><th>Datei</th><th>Gesamt</th><th>OK</th><th>Fehler</th><th>Status</th></tr>
+                <tr><th>Datum</th><th>Quelle</th><th>Datentyp</th><th>Datei</th><th>Gesamt</th><th>OK</th><th>Fehler</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
                 {(isDemo ? DEMO_PROTOKOLLE : protokolle).map(p => (
@@ -3560,7 +3579,7 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
                     <td style={{ fontSize: 12 }}>{new Date(p.erstellt_am).toLocaleDateString('de-DE')}</td>
                     <td style={{ fontWeight: 600 }}>{p.quelle}</td>
                     <td style={{ fontSize: 12 }}>{p.datentyp}</td>
-                    <td style={{ fontSize: 11, color: '#aeb9c8', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.dateiname}</td>
+                    <td style={{ fontSize: 11, color: '#aeb9c8', maxWidth: 200, whiteSpace: 'normal', wordBreak: 'break-word' }} title={p.dateiname}>{p.dateiname}</td>
                     <td style={{ fontFamily: 'monospace' }}>{p.anzahl_gesamt}</td>
                     <td style={{ fontFamily: 'monospace', color: '#4ddb7e' }}>{p.anzahl_erfolgreich}</td>
                     <td style={{ fontFamily: 'monospace', color: p.anzahl_fehlerhaft > 0 ? '#ff8080' : '#4a5568' }}>{p.anzahl_fehlerhaft}</td>
@@ -3569,6 +3588,15 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
                         {p.status}
                       </span>
                     </td>
+                    <td>
+                      {!isDemo && (
+                        <button onClick={() => setDelDialog({ id: p.id, count: p.anzahl_erfolgreich })}
+                          style={{ fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(255,80,80,.3)', background: 'rgba(255,80,80,.08)', color: '#ff8080', cursor: 'pointer' }}
+                          title="Eintrag (optional mit Datensätzen) löschen">
+                          🗑️
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -3576,6 +3604,30 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
           </div>
         )}
       </div>
+
+      {delDialog && (
+        <div onClick={() => setDelDialog(null)} style={{ position: 'fixed', inset: 0, zIndex: 1500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} className="pk-card" style={{ maxWidth: 520, width: '100%', padding: 24 }}>
+            <h3 style={{ margin: '0 0 10px', fontSize: 17, fontWeight: 800 }}>Import löschen?</h3>
+            <p style={{ margin: '0 0 18px', color: '#aeb9c8', fontSize: 13, lineHeight: 1.5 }}>
+              Wähle, wie das Protokoll entfernt werden soll. <strong>Achtung:</strong> „Mit Daten&ldquo; entfernt zusätzlich
+              alle <strong>{delDialog.count}</strong> beim Import angelegten Datensätze (z. B. Kunden in der DB).
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button className="pk-btn-ghost" onClick={() => { handleDeleteProtokoll(delDialog.id, false); setDelDialog(null) }} style={{ width: '100%', justifyContent: 'flex-start', padding: '12px 16px' }}>
+                📋 Nur Protokoll-Eintrag entfernen
+              </button>
+              <button onClick={() => { handleDeleteProtokoll(delDialog.id, true); setDelDialog(null) }}
+                style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.12)', color: '#ff8080', cursor: 'pointer', fontWeight: 700, textAlign: 'left' }}>
+                🗑️ Protokoll + alle {delDialog.count} importierten Datensätze löschen
+              </button>
+              <button className="pk-btn-ghost" onClick={() => setDelDialog(null)} style={{ width: '100%' }}>
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -3586,7 +3638,9 @@ const DEMO_PROTOKOLLE: ImportProtokoll[] = [
   { id: 'IMP-003', quelle: 'DATEV CSV', datentyp: 'steuer_belege', dateiname: 'datev_belege_q1.csv', status: 'erfolgreich', anzahl_gesamt: 34, anzahl_erfolgreich: 34, anzahl_fehlerhaft: 0, erstellt_am: '2025-04-01T11:00:00Z' },
 ]
 
-async function runBulkImport(dataType: ImportDataType, rows: Record<string, string>[]): Promise<number> {
+type BulkResult = { count: number; ids: string[]; table?: string }
+
+async function runBulkImport(dataType: ImportDataType, rows: Record<string, string>[]): Promise<BulkResult> {
 
   if (dataType === 'artikel') {
     const prepared = rows.map(r => ({
@@ -3598,41 +3652,33 @@ async function runBulkImport(dataType: ImportDataType, rows: Record<string, stri
       verkaufspreis: normalizeNumber(r.verkaufspreis ?? '') ?? 0,
     }))
     await bulkImportLagerArtikel(prepared)
-    return prepared.length
+    return { count: prepared.length, ids: prepared.map(p => p.id), table: 'lager_artikel' }
   }
   if (dataType === 'kunden') {
     const prepared = rows.map(r => {
-      // Name kann aus mehreren Spalten kommen — Firma > Kundenname > Vorname+Nachname > Ansprechpartner
       const name = (r.name && r.name.trim()) || (r.ansprechpartner && r.ansprechpartner.trim()) || ''
       return {
-        id: genId('KD'),
-        name,
-        kundennummer: r.kundennummer,
-        ansprechpartner: r.ansprechpartner,
-        email: r.email,
-        telefon: r.telefon,
-        mobil: r.mobil,
-        strasse: r.strasse,
-        plz: r.plz,
-        ort: r.ort,
-        land: r.land,
-        website: r.website,
-        ust_id: r.ust_id,
-        adresse: r.adresse,
-        notizen: r.notizen,
+        id: genId('KD'), name,
+        kundennummer: r.kundennummer, ansprechpartner: r.ansprechpartner,
+        email: r.email, telefon: r.telefon, mobil: r.mobil,
+        strasse: r.strasse, plz: r.plz, ort: r.ort, land: r.land,
+        website: r.website, ust_id: r.ust_id,
+        adresse: r.adresse, notizen: r.notizen,
       }
     }).filter(r => r.name.trim().length > 0)
-    if (!prepared.length) return 0
+    if (!prepared.length) return { count: 0, ids: [], table: 'buero_kunden' }
     const result = await bulkImportBueroKunden(prepared)
-    return result.length
+    return { count: result.length, ids: result.map(r => r.id), table: 'buero_kunden' }
   }
   if (dataType === 'lieferanten') {
     const prepared = rows.map(r => ({ id: genId('LFR'), name: r.name ?? '', email: r.email, telefon: r.telefon, ort: r.ort, kategorie: r.kategorie, zahlungsziel: r.zahlungsziel, notiz: r.notiz }))
-    await bulkImportEinkaufLieferanten(prepared); return prepared.length
+    await bulkImportEinkaufLieferanten(prepared)
+    return { count: prepared.length, ids: prepared.map(p => p.id), table: 'einkauf_lieferanten' }
   }
   if (dataType === 'rechnungen') {
     const prepared = rows.map(r => ({ id: genId('RE'), nummer: r.nummer ?? genId('RE'), kunde: r.kunde, datum: normalizeDate(r.datum ?? '') ?? undefined, faellig_am: normalizeDate(r.faellig_am ?? '') ?? undefined, summe: normalizeNumber(r.summe ?? '') ?? 0, status: r.status ?? 'Offen', notiz: r.notiz }))
-    await bulkImportBueroRechnungen(prepared); return prepared.length
+    await bulkImportBueroRechnungen(prepared)
+    return { count: prepared.length, ids: prepared.map(p => p.id), table: 'buero_rechnungen' }
   }
   if (dataType === 'steuer_belege' || dataType === 'belege') {
     const prepared = rows.map(r => ({
@@ -3641,7 +3687,8 @@ async function runBulkImport(dataType: ImportDataType, rows: Record<string, stri
       steuersatz: normalizeNumber(r.steuersatz ?? '') ?? 19, belegnummer: r.belegnummer,
       kategorie: r.kategorie, status: r.status ?? 'offen', notiz: r.notiz,
     }))
-    await bulkImportSteuerBelege(prepared); return prepared.length
+    await bulkImportSteuerBelege(prepared)
+    return { count: prepared.length, ids: prepared.map(p => p.id), table: 'steuer_belege' }
   }
   if (dataType === 'steuer_buchungen') {
     const prepared = rows.map(r => ({
@@ -3650,11 +3697,13 @@ async function runBulkImport(dataType: ImportDataType, rows: Record<string, stri
       soll_konto: r.soll_konto, haben_konto: r.haben_konto, steuerkonto: r.steuerkonto,
       steuersatz: normalizeNumber(r.steuersatz ?? '') ?? undefined, beleg_id: r.beleg_id, status: r.status ?? 'offen',
     }))
-    await bulkImportSteuerBuchungen(prepared); return prepared.length
+    await bulkImportSteuerBuchungen(prepared)
+    return { count: prepared.length, ids: prepared.map(p => p.id), table: 'steuer_buchungen' }
   }
   if (dataType === 'steuer_konten') {
     const prepared = rows.map(r => ({ id: genId('KTO'), kontonummer: r.kontonummer ?? '', name: r.name ?? '', typ: r.typ, steuersatz: normalizeNumber(r.steuersatz ?? '') ?? undefined, aktiv: r.aktiv !== 'false' }))
-    await bulkImportSteuerKonten(prepared); return prepared.length
+    await bulkImportSteuerKonten(prepared)
+    return { count: prepared.length, ids: prepared.map(p => p.id), table: 'steuer_konten' }
   }
   if (dataType === 'werkstatt_zeitbuchungen') {
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -3665,7 +3714,8 @@ async function runBulkImport(dataType: ImportDataType, rows: Record<string, stri
       datum: r.datum || today,
       taetigkeit: r.taetigkeit ?? '',
     }))
-    await bulkImportWerkstattZeitbuchungen(prepared); return prepared.length
+    await bulkImportWerkstattZeitbuchungen(prepared)
+    return { count: prepared.length, ids: [], table: 'werkstatt_zeitbuchungen' }
   }
   if (dataType === 'werkstatt_material') {
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -3677,8 +3727,8 @@ async function runBulkImport(dataType: ImportDataType, rows: Record<string, stri
       datum: r.datum || today,
       mitarbeiter: r.mitarbeiter ?? '',
     }))
-    await bulkImportWerkstattMaterial(prepared); return prepared.length
+    await bulkImportWerkstattMaterial(prepared)
+    return { count: prepared.length, ids: [], table: 'werkstatt_material' }
   }
-  // TODO: implement auftraege, angebote, bewegungen, projekte, steuer_ustva bulk imports
-  return 0
+  return { count: 0, ids: [] }
 }
