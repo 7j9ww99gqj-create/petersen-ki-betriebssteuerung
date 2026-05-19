@@ -180,7 +180,7 @@ OPENAI_API_KEY=...
 # WISO MeinBüro (nötig für "→ WISO"-Buttons)
 WISO_MEINBUERO_API_KEY=c4655a2196bb41dd8b686ef52b268654       ✅ in Vercel gesetzt
 WISO_MEINBUERO_API_SECRET=e1591015479444b58559e7b530055b32    ✅ in Vercel gesetzt
-WISO_MEINBUERO_OWNERSHIP_ID=                                  ⚠️ FEHLT — aus MeinBüro Einstellungen → API kopieren
+WISO_MEINBUERO_OWNERSHIP_ID=343725                            ✅ in Vercel gesetzt
 ```
 
 WISO-Vars in Vercel setzen (Beispiel):
