@@ -21,6 +21,7 @@ import {
   type CloudBackup,
 } from '@/lib/db'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
+import { useGlobalToast } from '@/components/ui/ToastProvider'
 
 type CloudLogEntry = {
   time: string
@@ -386,7 +387,7 @@ export default function CloudPage() {
   const [backupsLoading, setBackupsLoading] = useState(!isDemo)
   const [backupConfirm, setBackupConfirm] = useState(false)
   const [backupRunning, setBackupRunning] = useState(false)
-  const [backupToast, setBackupToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const toast = useGlobalToast()
   const [expandedBackup, setExpandedBackup] = useState<string | null>(null)
 
   const lastBackup = backups[0] ?? null
@@ -451,12 +452,11 @@ export default function CloudPage() {
     try {
       const backup = await createCloudBackup('Manuell')
       setBackups(prev => [backup, ...prev])
-      setBackupToast({ msg: `Backup erstellt — ${backup.total_records} Datensätze gesichert`, ok: true })
+      toast.success(`Backup erstellt — ${backup.total_records} Datensätze gesichert`)
     } catch (err) {
-      setBackupToast({ msg: err instanceof Error ? err.message : 'Backup fehlgeschlagen', ok: false })
+      toast.error(err instanceof Error ? err.message : 'Backup fehlgeschlagen')
     } finally {
       setBackupRunning(false)
-      setTimeout(() => setBackupToast(null), 4000)
     }
   }
 
@@ -761,19 +761,6 @@ export default function CloudPage() {
         </div>
       </div>
 
-      {/* Toast */}
-      {backupToast && (
-        <div style={{
-          position: 'fixed', bottom: 90, right: 24, zIndex: 9999,
-          padding: '14px 20px', borderRadius: 12, maxWidth: 380,
-          background: backupToast.ok ? 'rgba(37,211,102,.12)' : 'rgba(255,80,80,.15)',
-          border: `1px solid ${backupToast.ok ? 'rgba(37,211,102,.35)' : 'rgba(255,80,80,.4)'}`,
-          color: backupToast.ok ? '#4ddb7e' : '#ff8080',
-          fontSize: 14, fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,.4)',
-        }}>
-          {backupToast.msg}
-        </div>
-      )}
     </div>
   )
 }
