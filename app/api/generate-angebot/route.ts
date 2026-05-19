@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import { checkRateLimit } from '@/lib/rate-limit'
 
 // ── KI-Angebotstext generieren ────────────────────────────────────────────────
 
+const Schema = z.object({
+  kunde: z.string().trim().max(200).optional(),
+  titel: z.string().trim().max(300).optional(),
+  betrag: z.string().trim().max(60).optional(),
+  notiz: z.string().trim().max(2000).optional(),
+})
+
 export async function POST(req: NextRequest) {
   try {
-    const { kunde, titel, betrag, notiz } = await req.json()
-
     const access = await getRouteAccess(req, ['Admin', 'Mitarbeiter', 'Büro'])
     if (access.error) return access.error
 
@@ -15,6 +22,10 @@ export async function POST(req: NextRequest) {
       const limited = checkRateLimit(access.user.id, 'ai')
       if (limited) return limited
     }
+
+    const parsed = await parseBody(req, Schema)
+    if (!parsed.ok) return parsed.error
+    const { kunde, titel, betrag, notiz } = parsed.data
 
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {

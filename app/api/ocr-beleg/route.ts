@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import { checkRateLimit } from '@/lib/rate-limit'
+
+const Schema = z.object({
+  text: z.string().min(10).max(20000),
+})
 
 // ── SteuerPilot OCR-Belegtext → strukturierte Felder ─────────────────────────
 // Nimmt rohen Text (z.B. aus OCR oder manuellem Einfügen) und extrahiert
@@ -17,10 +23,9 @@ export async function POST(req: NextRequest) {
       if (limited) return limited
     }
 
-    const { text } = await req.json()
-    if (!text || typeof text !== 'string' || text.trim().length < 10) {
-      return NextResponse.json({ error: 'Kein Text übergeben' }, { status: 400 })
-    }
+    const parsed = await parseBody(req, Schema)
+    if (!parsed.ok) return parsed.error
+    const { text } = parsed.data
 
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
@@ -72,8 +77,8 @@ ${text.slice(0, 3000)}`
       return NextResponse.json({ error: 'Kein strukturiertes Ergebnis', raw: replyText }, { status: 422 })
     }
 
-    const parsed = JSON.parse(jsonMatch[0])
-    return NextResponse.json(parsed)
+    const parsedJson = JSON.parse(jsonMatch[0])
+    return NextResponse.json(parsedJson)
   } catch (err) {
     console.error('ocr-beleg error:', err)
     return NextResponse.json({ error: 'Interner Fehler' }, { status: 500 })
