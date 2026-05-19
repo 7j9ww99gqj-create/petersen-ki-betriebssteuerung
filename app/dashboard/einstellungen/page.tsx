@@ -2679,11 +2679,22 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
     if (!file || !canEdit) return
     setLogoUploading(true)
     try {
+      // SVG-Logos behalten (Vektor), Raster-Bilder vor Upload komprimieren
+      let uploadFile: File = file
+      if (file.type.startsWith('image/') && file.type !== 'image/svg+xml') {
+        try {
+          const { compressImage, fileExtFromMime } = await import('@/lib/image-compress')
+          const result = await compressImage(file, { maxWidth: 800, maxHeight: 800, quality: 0.9 })
+          uploadFile = new File([result.blob], `logo.${fileExtFromMime(result.blob.type)}`, { type: result.blob.type })
+        } catch {
+          // Bei Kompressionsfehler Original verwenden
+        }
+      }
       if (isDemo) {
-        const url = URL.createObjectURL(file)
+        const url = URL.createObjectURL(uploadFile)
         setField('logo_url', url)
       } else {
-        const uploaded = await uploadFirmenLogo(file)
+        const uploaded = await uploadFirmenLogo(uploadFile)
         setField('logo_url', uploaded.url)
       }
       showToast('✅ Logo hochgeladen')
