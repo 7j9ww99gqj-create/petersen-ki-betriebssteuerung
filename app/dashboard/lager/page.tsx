@@ -20,6 +20,7 @@ import {
   insertLagerBestandSnapshot,
 } from '@/lib/db'
 import PilotDocumentArchive from '@/components/PilotDocumentArchive'
+import { mhdStatus, getBestStellplatz as getBestStellplatzPure } from '@/lib/lager-helpers'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
 
@@ -1407,53 +1408,13 @@ export default function LagerPilotPage() {
   }
 
   // ── Lagerbelegung Helpers ────────────────────────────────────────────────────
-
-  function mhdStatus(mhd: string | undefined): 'abgelaufen' | 'kritisch' | 'ok' | 'kein' {
-    if (!mhd) return 'kein'
-    const diff = (new Date(mhd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-    if (diff < 0) return 'abgelaufen'
-    if (diff < 30) return 'kritisch'
-    return 'ok'
-  }
-
-  function getBestStellplatz(a: Artikel | undefined): { stellplatz: Stellplatz; score: number; grund: string[] } | null {
-    if (!a) return null
-    const aktive = stellplaetze.filter(sp => sp.aktiv !== false)
-    if (aktive.length === 0) return null
-
-    const belegteIds = new Set(stellplatzBestand.map(sb => sb.stellplatz_id))
-
-    const scored = aktive.map(sp => {
-      let score = 0
-      const grund: string[] = []
-
-      // Warengruppe = Artikelkategorie
-      if (sp.warengruppe && sp.warengruppe.toLowerCase() === a.kategorie.toLowerCase()) {
-        score += 3; grund.push('gleiche Warengruppe')
-      }
-      // Warenobergruppe-Heuristik (z.B. Rohstoffe → Metall)
-      if (sp.warenobergruppe && a.kategorie.toLowerCase().includes(sp.warenobergruppe.toLowerCase())) {
-        score += 2; grund.push('passende Warenobergruppe')
-      }
-      // Aktueller Lagerplatz-Code passt zum Stellplatz-Code (Prefix)
-      if (a.lagerplatz && sp.code.startsWith(a.lagerplatz.slice(0, 2))) {
-        score += 1; grund.push('bekannter Bereich')
-      }
-      // Freier Stellplatz bevorzugen
-      if (!belegteIds.has(sp.id)) {
-        score += 2; grund.push('freier Stellplatz')
-      }
-      // Typ-Heuristik: Betriebsstoffe → Kühl/Tiefkühl
-      const kuehlKat = ['betriebsstoffe', 'kühlware', 'lebensmittel']
-      if (kuehlKat.some(k => a.kategorie.toLowerCase().includes(k)) && sp.typ && sp.typ.toLowerCase().includes('kühl')) {
-        score += 2; grund.push('passende Temperaturzone')
-      }
-
-      return { stellplatz: sp, score, grund }
-    })
-
-    const best = scored.sort((a, b) => b.score - a.score)[0]
-    return best.score > 0 ? best : { stellplatz: aktive[0], score: 0, grund: ['kein spezifischer Treffer – erster freier Stellplatz'] }
+  // mhdStatus + getBestStellplatz sind nach lib/lager-helpers.ts extrahiert.
+  // Hier nur dünner Closure-Wrapper, damit der Aufrufer-Code unverändert bleibt.
+  function getBestStellplatz(a: Artikel | undefined) {
+    const res = getBestStellplatzPure(a, stellplaetze, stellplatzBestand)
+    if (!res) return null
+    // Type-Cast back to local Stellplatz (LagerHelperStellplatz ist strukturell kompatibel)
+    return { stellplatz: res.stellplatz as Stellplatz, score: res.score, grund: res.grund }
   }
 
   const handleDeleteStellplatzBestand = async (id: string) => {
