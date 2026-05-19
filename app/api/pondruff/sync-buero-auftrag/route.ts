@@ -26,9 +26,26 @@ export async function POST(req: NextRequest) {
   // BueroPilot-Auftrag bauen
   const auftragId = src.order_id || `PON-${Date.now()}`
   const rows = Array.isArray(src.rows) ? src.rows : []
-  const beschreibung = rows.length
-    ? rows.map((r: Record<string, unknown>, i: number) => `${String(i + 1).padStart(2, '0')}. ${String(r['Beschreibung'] || '').split('\n')[0]} (${String(r['Menge'])}x ${String(r['Einzelpreis'])} €)`).join('\n')
-    : (src.project || '')
+
+  // Positionen strukturiert (fuer PDF-Tabelle + Auftrag → Rechnung Workflow)
+  const parseMoney = (s: unknown): number => {
+    if (typeof s === 'number') return s
+    const t = String(s ?? '').replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')
+    const n = Number.parseFloat(t)
+    return Number.isFinite(n) ? n : 0
+  }
+  const positionen = rows.map((r: Record<string, unknown>, i: number) => ({
+    id: `${auftragId}-P${String(i + 1).padStart(2, '0')}`,
+    beschreibung: String(r['Beschreibung'] || '').replace(/\r/g, '').trim(),
+    menge: Number(r['Menge']) || 1,
+    einheit: 'Stk',
+    einzelpreis: parseMoney(r['Einzelpreis']),
+  }))
+
+  // Brieftext bleibt sauber — Positionen kommen in die Tabelle, nicht in den Fliesstext.
+  const beschreibung = src.purchase_order
+    ? `Auftrag zu Ihrer Bestell-Nr. ${String(src.purchase_order)}.`
+    : (src.project ? `Auftrag ${String(src.project)}.` : `Auftrag ${auftragId}.`)
 
   const total = Number(src.total || 0)
   const wert = total > 0 ? total.toFixed(2).replace('.', ',') + ' €' : ''
@@ -58,6 +75,7 @@ export async function POST(req: NextRequest) {
     start: new Date().toISOString().slice(0, 10),
     ab_nummer: src.order_id,
     ab_verschickt_am: src.confirmed_at ? new Date(src.confirmed_at).toISOString().slice(0, 10) : null,
+    positionen,
     updated_at: new Date().toISOString(),
   })
   if (e2) return NextResponse.json({ error: e2.message }, { status: 500 })

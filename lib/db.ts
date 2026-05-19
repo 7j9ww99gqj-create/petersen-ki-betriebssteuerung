@@ -1514,6 +1514,7 @@ export async function getBueroAuftraege() {
 export async function upsertBueroAuftrag(a: {
   id: string; kunde_id?: string; billing_subscription_id?: string; kunde?: string; beschreibung?: string; wert?: string
   start?: string; ende?: string; status?: string; fortschritt?: number; angebot_id?: string; ab_verschickt_am?: string; ab_nummer?: string
+  positionen?: Array<{ id: string; beschreibung: string; menge: number; einheit: string; einzelpreis: number }>
 }) {
   const kundenIndex = await listBueroKundenIndex()
   const kundeRecord = a.kunde_id

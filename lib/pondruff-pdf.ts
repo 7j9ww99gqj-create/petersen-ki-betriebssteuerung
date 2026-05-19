@@ -242,7 +242,7 @@ function drawPondruffContent(doc: DocLike, c: ContentBlock) {
   const closing = c.docType === 'RECHNUNG'
     ? 'Wir bitten um Begleichung des Rechnungsbetrags innerhalb der vereinbarten Zahlungsfrist.\nVielen Dank für das Vertrauen in Pondruff Polier- & Beschichtungsservice.'
     : c.docType === 'AUFTRAGSBESTÄTIGUNG'
-    ? 'Wir bestätigen hiermit den oben genannten Auftrag und beginnen mit der Bearbeitung.\nVielen Dank für Ihren Auftrag.'
+    ? 'Vielen Dank für Ihren Auftrag.'
     : 'Über Ihren Auftrag würden wir uns sehr freuen.\nMit freundlichen Grüßen — Pondruff Polier- & Beschichtungsservice'
   const closingLines = doc.splitTextToSize(closing, rightEdge - margin)
   doc.text(closingLines, margin, y)
@@ -312,7 +312,7 @@ export async function generatePondruffAuftragsbestaetigungPDF(auftrag: PDFAuftra
     docType: 'AUFTRAGSBESTÄTIGUNG',
     docNummer: auftrag.ab_nummer || auftrag.id,
     kundenName,
-    introText: auftrag.beschreibung || 'wir bestätigen hiermit den folgenden Auftrag:',
+    introText: 'wir bestätigen hiermit den oben genannten Auftrag und beginnen mit der Bearbeitung.',
     metaRows: [
       ['AB-Nr.', auftrag.ab_nummer || auftrag.id],
       ['Datum', auftrag.ab_verschickt_am || new Date().toLocaleDateString('de-DE')],
@@ -398,7 +398,7 @@ export async function generatePondruffOrderPDF(o: PondPreisauftrag, returnBase64
       docType: 'AUFTRAGSBESTÄTIGUNG',
       docNummer: o.order_id || '',
       kundenName: o.customer || '—',
-      introText: `wir bestätigen hiermit den folgenden Auftrag${o.purchase_order ? ` zu Ihrer Bestell-Nr. ${o.purchase_order}` : ''}.`,
+      introText: `wir bestätigen hiermit den oben genannten Auftrag${o.purchase_order ? ` zu Ihrer Bestell-Nr. ${o.purchase_order}` : ''} und beginnen mit der Bearbeitung.`,
       metaRows: [
         ['AB-Nr.', o.order_id || ''],
         ['Datum', o.confirmed_at ? new Date(o.confirmed_at).toLocaleDateString('de-DE') : new Date().toLocaleDateString('de-DE')],
