@@ -77,7 +77,7 @@ export default function KiSuchePage() {
         </div>
         <label style={{ display: 'block', marginBottom: 10 }}>
           <div style={lbl}>Such-Foto</div>
-          <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
+          <input type="file" accept="image/*" capture="environment" onChange={e => setFile(e.target.files?.[0] || null)} />
         </label>
         <button className="pk-btn" disabled={busy || !file || !kiEnabled} onClick={run} style={{ width: '100%' }}>
           {busy ? '⏳ KI vergleicht…' : kiEnabled ? '🔍 Bauteil suchen' : '🚫 Funktion deaktiviert'}
