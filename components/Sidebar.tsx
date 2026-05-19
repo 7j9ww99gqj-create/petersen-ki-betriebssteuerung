@@ -82,7 +82,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       <div style={{ padding: '18px 16px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
         <button onClick={() => navigate('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
           <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, overflow: 'hidden', border: '1px solid rgba(22,132,255,.35)', boxShadow: '0 0 16px rgba(22,132,255,.25)' }}>
-            <Image src="/logo.jpg" alt="Petersen KI Logo" width={42} height={42} style={{ objectFit: 'cover', borderRadius: 12 }} priority />
+            <Image src="/logo.png" alt="Petersen KI Logo" width={42} height={42} style={{ objectFit: 'cover', borderRadius: 12 }} priority />
           </div>
           <div style={{ textAlign: 'left' }}>
             <div style={{ fontSize: 14, fontWeight: 900, lineHeight: 1.1, color: '#f8fbff' }}>Petersen <span style={{ color: '#1684ff' }}>KI</span></div>
