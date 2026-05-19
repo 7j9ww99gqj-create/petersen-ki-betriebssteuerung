@@ -4,7 +4,7 @@ import { getRouteAccess } from '@/lib/server-auth'
 import { getServerAiFeatureSettings } from '@/lib/ai-settings'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { getCachedResponse, setCachedResponse, hashCacheKey } from '@/lib/ai-cache'
-import { logAiUsage, extractUsage } from '@/lib/ai-usage'
+import { logAiUsage, extractUsage, checkCostLimit } from '@/lib/ai-usage'
 
 const ChatRequestSchema = z.object({
   messages: z.array(z.object({
@@ -227,6 +227,16 @@ export async function POST(req: NextRequest) {
     if (access.user) {
       const limited = checkRateLimit(access.user.id, 'ai')
       if (limited) return limited
+
+      if (!access.isDemo) {
+        const costCheck = await checkCostLimit(access.user.id)
+        if (!costCheck.allowed) {
+          return NextResponse.json({
+            reply: `Dein monatliches KI-Budget von ${costCheck.limit.toFixed(2)} € wurde erreicht (verbraucht: ${costCheck.spent.toFixed(4)} €). Bitte kontaktiere den Administrator.`,
+            actions: [],
+          }, { status: 429, headers: { 'X-Cost-Limit-Reached': '1' } })
+        }
+      }
     }
 
     const aiSettings = await getServerAiFeatureSettings(access.supabase)

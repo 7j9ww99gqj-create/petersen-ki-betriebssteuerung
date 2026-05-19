@@ -52,6 +52,37 @@ export function logAiUsage(input: AiUsageInput): void {
   })
 }
 
+// Default monatliches Kostenlimit pro User in EUR
+const DEFAULT_MONTHLY_LIMIT_EUR = 5.0
+
+/**
+ * Prüft ob der User sein monatliches KI-Kostenlimit überschritten hat.
+ * Gibt { allowed: true } oder { allowed: false, spent: number, limit: number } zurück.
+ * Best-effort: bei DB-Fehler wird der Request durchgelassen.
+ */
+export async function checkCostLimit(
+  userId: string,
+  limitEur: number = DEFAULT_MONTHLY_LIMIT_EUR,
+): Promise<{ allowed: boolean; spent: number; limit: number }> {
+  const client = serviceClient()
+  if (!client || !userId) return { allowed: true, spent: 0, limit: limitEur }
+  try {
+    const startOfMonth = new Date()
+    startOfMonth.setDate(1)
+    startOfMonth.setHours(0, 0, 0, 0)
+    const { data, error } = await client
+      .from('ai_usage')
+      .select('cost_eur')
+      .eq('user_id', userId)
+      .gte('created_at', startOfMonth.toISOString())
+    if (error) return { allowed: true, spent: 0, limit: limitEur }
+    const spent = (data ?? []).reduce((sum, r) => sum + (r.cost_eur ?? 0), 0)
+    return { allowed: spent < limitEur, spent: Number(spent.toFixed(4)), limit: limitEur }
+  } catch {
+    return { allowed: true, spent: 0, limit: limitEur }
+  }
+}
+
 /**
  * Extrahiert Token-Counts aus einer OpenAI Chat-Completions/Responses-API-Antwort.
  */

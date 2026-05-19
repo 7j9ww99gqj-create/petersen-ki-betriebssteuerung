@@ -4,7 +4,7 @@ import { getRouteAccess } from '@/lib/server-auth'
 import { getServerOpenAiToolSettings } from '@/lib/ai-settings'
 import { parseBody } from '@/lib/validation'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { logAiUsage, extractUsage } from '@/lib/ai-usage'
+import { logAiUsage, extractUsage, checkCostLimit } from '@/lib/ai-usage'
 
 const Schema = z.object({
   umsatzDaten: z.array(z.object({
@@ -24,6 +24,9 @@ export async function POST(req: NextRequest) {
 
   const limited = checkRateLimit(user.id, 'ai')
   if (limited) return limited
+
+  const costCheck = await checkCostLimit(user.id)
+  if (!costCheck.allowed) return NextResponse.json({ error: `KI-Budget erschöpft (${costCheck.spent.toFixed(4)} / ${costCheck.limit} €).` }, { status: 429 })
 
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'Kein OpenAI API-Key konfiguriert.' }, { status: 500 })
