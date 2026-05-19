@@ -3194,7 +3194,8 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
   const handleImport = async () => {
     if (!validationResult || !parseResult) return
     setImporting(true)
-    const builtRows = buildImportRows(validationResult.valid, mapping)
+    // validationResult.valid enthält BEREITS gemappte Zeilen (target-fields) — nicht erneut mappen!
+    const builtRows = validationResult.valid
 
     if (isDemo) {
       await new Promise(r => setTimeout(r, 800))
