@@ -176,9 +176,9 @@ export default function WareneingangPage() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginTop: 10 }}>
-          <label><div style={lbl}>Lieferschein-Bild(er) — mehrere möglich</div><input type="file" accept="image/*" capture="environment" multiple onChange={e => setReceiptFiles(Array.from(e.target.files || []))} /></label>
-          <label><div style={lbl}>Bauteile-Bild</div><input type="file" accept="image/*" capture="environment" onChange={e => setFiles(f => ({ ...f, parts: e.target.files?.[0] }))} /></label>
-          <label><div style={lbl}>Verpackung-Bild</div><input type="file" accept="image/*" capture="environment" onChange={e => setFiles(f => ({ ...f, packaging: e.target.files?.[0] }))} /></label>
+          <label><div style={lbl}>Lieferschein-Bild(er) — mehrere möglich</div><input type="file" accept="image/*" multiple onChange={e => setReceiptFiles(Array.from(e.target.files || []))} /></label>
+          <label><div style={lbl}>Bauteile-Bild</div><input type="file" accept="image/*" onChange={e => setFiles(f => ({ ...f, parts: e.target.files?.[0] }))} /></label>
+          <label><div style={lbl}>Verpackung-Bild</div><input type="file" accept="image/*" onChange={e => setFiles(f => ({ ...f, packaging: e.target.files?.[0] }))} /></label>
         </div>
         {receiptFiles.length > 0 && <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 6 }}>{receiptFiles.length} Lieferschein-Bild(er) ausgewählt</div>}
         {!ocrEnabled && (

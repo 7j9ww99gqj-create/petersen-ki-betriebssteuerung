@@ -181,10 +181,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (item.href === '#menu' || item.href === '/dashboard') return true
     if (item.href === '/dashboard/lager') return allowedPilotIds.includes('lager')
     if (item.href === '/dashboard/buero') return allowedPilotIds.includes('buero')
-    // Pondruff-Account ersetzt Werkstatt durch eigenes Sheet-Item
+    // Pondruff-Account ersetzt Werkstatt durch eigenes Sheet-Item — Steuer + KI bleiben sichtbar
     if (item.href === '/dashboard/werkstatt') return !isPondruff && allowedPilotIds.includes('werkstatt')
-    if (item.href === '/dashboard/steuer') return !isPondruff && allowedPilotIds.includes('steuer')
-    if (item.href === '/dashboard/ki-erkennung') return !isPondruff && allowedPilotIds.length > 0
+    if (item.href === '/dashboard/steuer') return allowedPilotIds.includes('steuer')
+    if (item.href === '/dashboard/ki-erkennung') return allowedPilotIds.length > 0
     return true
   })
 

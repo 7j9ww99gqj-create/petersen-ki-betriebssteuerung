@@ -311,7 +311,7 @@ export default function PreisrechnerPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           <div>
             <div style={lblStyle}>Dokumente hochladen (PNG/JPG)</div>
-            <input type="file" accept="image/*" capture="environment" multiple onChange={e => setFiles(Array.from(e.target.files || []))} />
+            <input type="file" accept="image/*" multiple onChange={e => setFiles(Array.from(e.target.files || []))} />
             {files.length > 0 && <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 6 }}>{files.length} Datei(en) bereit</div>}
             <label style={{ display: 'block', marginTop: 10 }}>
               <div style={lblStyle}>Rabatt % für alle Positionen</div>

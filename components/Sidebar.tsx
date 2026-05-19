@@ -11,6 +11,8 @@ const pondruffNav = [
   { label: 'Wareneingang', icon: '📥', href: '/dashboard/pondruff/wareneingang' },
   { label: 'Preisrechner', icon: '💶', href: '/dashboard/pondruff/preisrechner' },
   { label: 'Büro / WISO',  icon: '🧾', href: '/dashboard/pondruff/buero-wiso' },
+  { label: 'KI-Suche',     icon: '🤖', href: '/dashboard/pondruff/ki-suche' },
+  { label: 'Archiv',       icon: '🗂️', href: '/dashboard/pondruff/archiv' },
 ]
 
 const pilots = [
