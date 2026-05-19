@@ -26,14 +26,51 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Phase-2-Sprint** (HEAD `0e89a9f`): Audit-Logs, OpenAI-Cost-Tracking, Modal/Toast-Konsolidierung, Test-Coverage +47, API-Versionierung.
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Optimierungs-Sprint Phase-3** (HEAD `37e0835`): 13 Verbesserungen live.
+- Davor: **Phase-2-Sprint** (HEAD `0e89a9f`): Audit-Logs, OpenAI-Cost-Tracking, Modal/Toast-Konsolidierung, Test-Coverage +47, API-Versionierung.
 - Davor: **Security-Sprint** (Commits `bb920c0`–`4ceb16d`): Zod, Rate-Limiting, KI-Cache.
-- Davor: **Quick-Wins-Sprint** (Commits `4dc83a1`–`e0f4170`): Sentry, Error-Boundaries, Skeletons, CI, README/ARCHITECTURE, jsx-a11y (430→0).
 - Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main).
 - TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19).
-- Tests: `npm test` — ✅ **87 Tests** in 7 Files (40 Bestand + 47 neu in Phase-2).
+- Tests: `npm test` — ✅ **87 Tests** in 7 Files.
 - CI: GitHub Actions (tsc + test + build) — ✅ Workflow aktiv auf main.
 - Supabase Storage: ~100 GB Plan — neue Buckets `lager-bilder`, `ocr-originale`, `firma-branding`, `db-backups` (alle privat, user-scoped RLS).
+
+### Optimierungs-Sprint Phase-3 (2026-05-19) — 13 Verbesserungen aus CTO-Analyse
+
+| # | Verbesserung | Dateien / Commits | Status |
+|---|---|---|---|
+| 1 | db.ts Domain-Barrel-Split | `lib/db/{lager,buero,werkstatt,marketing,planung,index}.ts` — `eb4ef43` | ✅ |
+| 2 | Aktivitätsprotokoll-UI | `components/ui/ActivityLog.tsx`, Cloud-Pilot — `b9d7cea` | ✅ |
+| 3 | Onboarding-Wizard 5 Schritte | `components/OnboardingWizard.tsx`, layout.tsx — `0d4727b` | ✅ |
+| 4 | ⌘K Schnellaktionen (8 Quick-Actions) | `components/GlobalSearch.tsx` — `73f40ce` | ✅ |
+| 5 | KI-Cost-Limit 5 €/Monat pro User | `lib/ai-usage.ts`, 5 KI-Routen — `c3454bc` | ✅ |
+| 6 | Multi-Tenant | — | ⏳ Nächster Architektur-Sprint (zu groß) |
+| 7 | Idempotency-Keys Middleware + DB | `lib/idempotency.ts`, Migration — `0d4727b` | ✅ |
+| 8 | OCR Async-Pipeline | — | ⏳ Braucht Queue-Infra (Inngest/Trigger.dev) |
+| 9 | PDF via Workers | — | ⚠️ jsPDF ausreichend für aktuelle Scale |
+| 11 | Supabase Realtime (NotificationBell) | `hooks/useRealtime.ts`, NotificationBell — `73f40ce` | ✅ |
+| 12 | pg_trgm Search-Indexes (9 Tabellen) | Migration `20260519950000` — `233047e` | ✅ |
+| 14 | EmptyState breiter eingesetzt | Archiv-Pilot — `28686ca` | ✅ |
+| 15 | Tooltip / HelpTooltip-Komponente | `components/ui/Tooltip.tsx` — `28686ca` | ✅ |
+| 16 | Skeleton-Loader | — | ✅ Bereits done (Quick-Wins-Sprint) |
+| 17 | Bulk-Aktionen Lager-Bestand | `app/dashboard/lager/page.tsx` — `233047e` | ✅ |
+| 18 | „Was ist neu" Changelog-Modal | `components/ui/WhatsNewModal.tsx` — `28686ca` | ✅ |
+| 21 | Owner MRR/Churn Dashboard | `components/billing/OwnerMrrPanel.tsx`, `/api/owner/mrr-stats` — `b9d7cea` | ✅ |
+| 23 | /api/v1 Prefix | — | ✅ Bereits done (Phase-2-Sprint) |
+| 24 | Nightly DB-Backup | — | ✅ Bereits done (Storage-Sprint) |
+
+**Noch offen (nächste Sprints):**
+- 🔴 Multi-Tenant-Architektur (`organizations`-Tabelle, RLS auf `org_id`) — eigenes Sprint-Ticket nötig
+- 🟡 OCR async via Inngest/Trigger.dev — Queue-Infra aufsetzen
+- 🟡 Rate-Limit auf Upstash Redis migrieren (aktuell In-Memory, auf Vercel Serverless wirkungslos)
+- 🟡 AVV mit Supabase/Vercel/OpenAI/Sentry — rechtlich zwingend vor Public Release
+- 🟡 Datenschutzerklärung + Impressum + Cookie-Banner — rechtlich zwingend
+- 🟡 DSFA für KI-Verarbeitung dokumentieren
+- 🟡 Stripe Integration vollständig (Abos + Self-Service + MwSt + Rechnungsversand)
+- 🟡 Test-Coverage auf 30 % (aktuell: 87 Tests, vorw. Hilfsfunktionen)
+- 🟢 MFA/2FA (Supabase Auth TOTP)
+- 🟢 Statuspage + öffentliches Changelog
+- 🟢 Self-Service Datenlöschung + Datenexport (Art. 17/20 DSGVO)
 
 ### Phase-2-Sprint (2026-05-19) — Aufgaben 10-14 aus Optimierungs-Plan
 
