@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { getBueroAngebote, upsertBueroAngebot, deleteBueroAngebot, getBueroDokumente, updateBueroDokument, getNextAngebotNumber, upsertBueroAuftrag, upsertBueroRechnung, getNextInvoiceNumber } from '@/lib/db'
+import { getBueroAngebote, upsertBueroAngebot, deleteBueroAngebot, getBueroDokumente, updateBueroDokument, getNextAngebotNumber, upsertBueroAuftrag, upsertBueroRechnung, getNextInvoiceNumber, getArchivPdfSignedUrl } from '@/lib/db'
 import { generateAngebotPDFAuto as generateAngebotPDF } from '@/lib/pondruff-pdf'
 import { genId } from '@/lib/ids'
 import { PACKAGE_PRICING, EMPLOYEE_TIERS, type PackageId, type EmployeeTierId } from '@/lib/pricingConfig'
@@ -719,9 +719,18 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
                           </button>
                         </>
                       )}
-                      <button onClick={e => { e.stopPropagation(); generateAngebotPDF(a, a.kunde) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
+                      <button onClick={e => { e.stopPropagation(); generateAngebotPDF(a, a.kunde, { archive: true }).then(() => setAngebote(prev => prev.map(x => x.id === a.id ? { ...x, pdf_archived_at: new Date().toISOString() } : x))) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }} title="PDF erstellen + archivieren">
                         📄 PDF
                       </button>
+                      {a.pdf_path && (
+                        <button onClick={async e => {
+                          e.stopPropagation()
+                          const url = await getArchivPdfSignedUrl(a.pdf_path!)
+                          if (url) window.open(url, '_blank', 'noopener')
+                        }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(167,139,250,.3)', background: 'rgba(167,139,250,.08)', color: '#a78bfa', cursor: 'pointer' }} title={`Archiviert am ${a.pdf_archived_at ? new Date(a.pdf_archived_at).toLocaleDateString('de-DE') : '?'}`}>
+                          📎 Archiv
+                        </button>
+                      )}
                       <button onClick={e => { e.stopPropagation(); const k = kunden.find(k => k.id === a.kunde_id || k.name === a.kunde); setAngebotMailTarget({ id: a.id, email: k?.email || '' }) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
                         ✉️ Mail
                       </button>
@@ -772,7 +781,7 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
               <button
                 className="pk-btn-ghost"
                 style={{ fontWeight: 700, marginBottom: 10, width: '100%' }}
-                onClick={() => generateAngebotPDF(angebot, angebot.kunde)}
+                onClick={() => generateAngebotPDF(angebot, angebot.kunde, { archive: true }).then(() => setAngebote(prev => prev.map(x => x.id === angebot.id ? { ...x, pdf_archived_at: new Date().toISOString() } : x)))}
               >
                 📄 PDF erstellen & herunterladen
               </button>

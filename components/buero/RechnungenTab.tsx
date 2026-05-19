@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { getBueroRechnungen, upsertBueroRechnung, deleteBueroRechnung, getBueroDokumente, updateBueroDokument, getNextInvoiceNumber } from '@/lib/db'
+import { getBueroRechnungen, upsertBueroRechnung, deleteBueroRechnung, getBueroDokumente, updateBueroDokument, getNextInvoiceNumber, getArchivPdfSignedUrl } from '@/lib/db'
 import { generateRechnungPDFAuto as generateRechnungPDF } from '@/lib/pondruff-pdf'
 import { genId } from '@/lib/ids'
 import { Toast, Modal, DeleteConfirm, StatusBadgeRechnung, labelStyle } from './shared'
@@ -516,9 +516,18 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
                           </button>
                         </>
                       )}
-                      <button onClick={e => { e.stopPropagation(); generateRechnungPDF(r, r.kunde) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }}>
+                      <button onClick={e => { e.stopPropagation(); generateRechnungPDF(r, r.kunde, { archive: true }).then(() => setRechnungen(prev => prev.map(x => x.id === r.id ? { ...x, pdf_archived_at: new Date().toISOString() } : x))) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(32,200,255,.2)', background: 'rgba(32,200,255,.06)', color: '#20c8ff', cursor: 'pointer' }} title="PDF erstellen + GoBD-konform archivieren">
                         📄 PDF
                       </button>
+                      {r.pdf_path && (
+                        <button onClick={async e => {
+                          e.stopPropagation()
+                          const url = await getArchivPdfSignedUrl(r.pdf_path!)
+                          if (url) window.open(url, '_blank', 'noopener')
+                        }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(167,139,250,.3)', background: 'rgba(167,139,250,.08)', color: '#a78bfa', cursor: 'pointer' }} title={`Archiviert am ${r.pdf_archived_at ? new Date(r.pdf_archived_at).toLocaleDateString('de-DE') : '?'}`}>
+                          📎 Archiv
+                        </button>
+                      )}
                       <button onClick={e => {
                         e.stopPropagation()
                         const k = kunden.find(k => k.id === r.kunde_id || k.name === r.kunde)
@@ -575,7 +584,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
                 style={{ fontWeight: 700, marginBottom: 10, width: '100%' }}
                 onClick={() => {
                   const r = rechnungen.find(r => r.id === mailTarget.id)
-                  if (r) generateRechnungPDF(r, r.kunde)
+                  if (r) generateRechnungPDF(r, r.kunde, { archive: true }).then(() => setRechnungen(prev => prev.map(x => x.id === r.id ? { ...x, pdf_archived_at: new Date().toISOString() } : x)))
                 }}
               >
                 📄 PDF erstellen & herunterladen
