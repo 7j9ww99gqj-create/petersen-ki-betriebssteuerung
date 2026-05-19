@@ -14,6 +14,7 @@ import { isPondruffUser } from '@/lib/pondruff'
 import PondruffSheet from '@/components/pondruff/PondruffSheet'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import OnboardingWizard from '@/components/OnboardingWizard'
+import DemoBanner from '@/components/DemoBanner'
 import { WhatsNewModal } from '@/components/ui'
 
 // Bottom-Nav Einträge (Mobile)
@@ -287,6 +288,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </span>
           </div>
         </div>
+
+        <DemoBanner />
 
         <main className="main-inner">
           <ErrorBoundary>
