@@ -9,8 +9,22 @@
  *   NEXT_PUBLIC_VAPID_PUBLIC_KEY (gleicher Wert, für Client)
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { parseBody } from '@/lib/validation'
+
+const SubscribeSchema = z.object({
+  endpoint: z.string().trim().min(1).max(2000),
+  keys: z.object({
+    p256dh: z.string().trim().min(1).max(500),
+    auth: z.string().trim().min(1).max(500),
+  }),
+})
+
+const UnsubscribeSchema = z.object({
+  endpoint: z.string().trim().max(2000).optional(),
+})
 
 function getSupabase() {
   const cookieStore = cookies()
@@ -32,14 +46,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 })
     }
 
-    const body = await req.json() as {
-      endpoint: string
-      keys: { p256dh: string; auth: string }
-    }
-
-    if (!body.endpoint || !body.keys?.p256dh || !body.keys?.auth) {
-      return NextResponse.json({ error: 'Fehlende Subscription-Daten' }, { status: 400 })
-    }
+    const parsedBody = await parseBody(req, SubscribeSchema)
+    if (!parsedBody.ok) return parsedBody.error
+    const body = parsedBody.data
 
     const { error } = await supabase.from('push_subscriptions').upsert({
       user_id: user.id,
@@ -66,7 +75,9 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 })
     }
 
-    const body = await req.json() as { endpoint?: string }
+    const parsedBody = await parseBody(req, UnsubscribeSchema)
+    if (!parsedBody.ok) return parsedBody.error
+    const body = parsedBody.data
 
     if (body.endpoint) {
       // Nur diese spezifische Subscription entfernen

@@ -5,9 +5,18 @@
  * Wenn userId fehlt → Broadcast an alle
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { sendPushNotification } from '@/lib/push.server'
+import { parseBody } from '@/lib/validation'
+
+const Schema = z.object({
+  userId: z.string().trim().max(100).optional(),
+  title: z.string().trim().min(1).max(300),
+  body: z.string().trim().min(1).max(2000),
+  url: z.string().trim().max(2000).optional(),
+})
 
 function getSupabase() {
   const cookieStore = cookies()
@@ -40,16 +49,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
     }
 
-    const body = await req.json() as {
-      userId?: string
-      title: string
-      body: string
-      url?: string
-    }
-
-    if (!body.title || !body.body) {
-      return NextResponse.json({ error: 'title und body erforderlich' }, { status: 400 })
-    }
+    const parsedBody = await parseBody(req, Schema)
+    if (!parsedBody.ok) return parsedBody.error
+    const body = parsedBody.data
 
     // Subscriptions laden
     let query = supabase.from('push_subscriptions').select('*')
