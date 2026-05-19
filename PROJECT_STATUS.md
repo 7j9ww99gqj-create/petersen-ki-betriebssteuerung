@@ -26,9 +26,27 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, Commit `7ccbf03` (AnalysePilot Mobile-Optimierung).
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, Commit `6ea978a` (OpenAI Piloten-Tools: Steuerprognose, Mahnungsgenerator, E-Mail Assistent, Monatsbericht).
 - Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main, HTTP 307 → OK).
 - TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19).
+
+### OpenAI Piloten-Tools (2026-05-19, Commit 6ea978a)
+- **4 neue OpenAI-gestützte Tools** — alle standardmäßig DEAKTIVIERT
+  - `📊 Steuerprognose` → AnalysePilot KI-Tab · `/api/openai/steuerprognose`
+  - `📨 Mahnungsgenerator` → BüroPilot KI-Tools Tab · `/api/openai/mahnung`
+  - `✉️ E-Mail Assistent` → BüroPilot KI-Tools Tab · `/api/openai/email-assistent`
+  - `📋 Monatsbericht Generator` → AnalysePilot KI-Tab · `/api/openai/monatsbericht`
+- **Supabase Migration** `20260519120000_openai_tools.sql`: 4 neue Spalten in `firma_einstellungen` (default `false`)
+- **`lib/db.ts`**: `OpenAiToolSettings` Typ, `getOpenAiToolSettings()`, `updateOpenAiToolSettings()` — analog zu Marketing-KI-Pattern
+- **`lib/ai-settings.ts`**: `getServerOpenAiToolSettings(userId)` — Server-Side Feature-Flag-Check
+- **`OwnerAiControlPanel.tsx`**: Neue „✨ OpenAI Piloten-Tools" Sektion (grüne Akzentfarbe #10b981, 4 Toggles, 0/4 AKTIV Status)
+- **`components/buero/KiToolsTab.tsx`** (neu): E-Mail Assistent + Mahnungsgenerator im neuen BüroPilot Tab
+- **`types/buero.ts`**: Tab-Union um `'ki-tools'` erweitert
+- **`components/buero/shared.tsx`**: `🤖 KI-Tools` Tab in TabBar ergänzt
+- **`app/dashboard/buero/page.tsx`**: `KiToolsTab` importiert und eingebunden
+- **`app/dashboard/analyse/page.tsx`**: KI-Monatsbericht + KI-Steuerprognose Karten im `ki`-Tab, inkl. State + Handler + Copy-to-Clipboard
+- **Sicherheit**: Alle 4 API-Routen prüfen Auth + Feature-Flag — keine Kosten ohne Aktivierung
+- **Modell**: `gpt-4o-mini` · ca. 0,001–0,005 € / Aufruf
 
 ### AnalysePilot Mobile-Optimierung (2026-05-19, Commit 7ccbf03)
 - **Header**: `page-header-row` + `header-actions` — stacked auf Mobile, Badges + Button wrappen sauber
