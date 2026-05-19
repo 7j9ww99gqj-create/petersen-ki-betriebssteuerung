@@ -11,6 +11,10 @@ const ChatRequestSchema = z.object({
   system: z.string().optional(),
   context: z.string().optional(),
   structuredOutput: z.boolean().optional(),
+  // Wenn true UND structuredOutput false: liefert text/event-stream mit
+  // OpenAI Responses-API SSE-Events. Bestehende strukturierte Aufrufer
+  // (Tagesbericht, SKR-Vorschlag, proaktive Frage) sind nicht betroffen.
+  stream: z.boolean().optional(),
 })
 
 // ── Demo-Kontext (spiegelt die Demo-Daten aus lager/page.tsx wider) ──────────
@@ -122,6 +126,65 @@ ${none([...ueberlastet, ...verteilt])
 === ENDE LAGERDATEN ===`
 }
 
+// Wandelt OpenAI Responses-API SSE-Events in einen simplen Text-Stream um.
+// Pro `response.output_text.delta`-Event wird der Delta-Text als
+// `data: <text>\n\n` ausgegeben. Am Ende `event: done\ndata: \n\n`.
+function transformOpenAiSseToTextSse(upstream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+  const decoder = new TextDecoder()
+  const encoder = new TextEncoder()
+  let buffer = ''
+
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = upstream.getReader()
+      try {
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          let idx: number
+          // SSE-Frames sind durch \n\n getrennt
+          while ((idx = buffer.indexOf('\n\n')) !== -1) {
+            const frame = buffer.slice(0, idx)
+            buffer = buffer.slice(idx + 2)
+            const lines = frame.split('\n')
+            let eventType = 'message'
+            const dataLines: string[] = []
+            for (const line of lines) {
+              if (line.startsWith('event:')) eventType = line.slice(6).trim()
+              else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
+            }
+            if (!dataLines.length) continue
+            const payload = dataLines.join('\n')
+            if (payload === '[DONE]') continue
+            try {
+              const json = JSON.parse(payload) as Record<string, unknown>
+              if (eventType === 'response.output_text.delta' || json.type === 'response.output_text.delta') {
+                const delta = typeof json.delta === 'string' ? json.delta : ''
+                if (delta) controller.enqueue(encoder.encode(`data: ${JSON.stringify(delta)}\n\n`))
+              } else if (eventType === 'response.error' || json.type === 'response.error') {
+                const errMsg = typeof json.error === 'object' && json.error && 'message' in (json.error as Record<string, unknown>)
+                  ? String((json.error as { message: unknown }).message)
+                  : 'OpenAI-Fehler im Stream'
+                controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify(errMsg)}\n\n`))
+              }
+            } catch {
+              // Frame nicht parsebar — ignorieren
+            }
+          }
+        }
+        controller.enqueue(encoder.encode('event: done\ndata: \n\n'))
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify(msg)}\n\n`))
+      } finally {
+        controller.close()
+      }
+    },
+  })
+}
+
 function pickOutputText(data: Record<string, unknown>): string {
   if (typeof data.output_text === 'string') return data.output_text
   const output = Array.isArray(data.output) ? data.output as Array<Record<string, unknown>> : []
@@ -153,7 +216,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { messages, system, context, structuredOutput } = parsed.data
+    const { messages, system, context, structuredOutput, stream } = parsed.data
+    const wantsStream = Boolean(stream) && !structuredOutput
     const access = await getRouteAccess(req, ['Admin', 'Mitarbeiter', 'Lager', 'Werkstatt'])
     if (access.error) return access.error
 
@@ -305,6 +369,7 @@ Regeln:
         instructions: fullSystem,
         input: inputMessages,
         max_output_tokens: 1024,
+        ...(wantsStream ? { stream: true } : {}),
         ...(structuredOutput ? {
           text: {
             format: {
@@ -352,6 +417,24 @@ Regeln:
         } : {}),
       }),
     })
+
+    // Streaming-Pfad: SSE-Events 1:1 vom OpenAI Responses-API durchreichen,
+    // aber nur die delta-Text-Chunks als simples 'data: <text>\n\n' weitergeben,
+    // gefolgt von 'event: done\ndata: \n\n'. Das macht den Client trivial.
+    if (wantsStream) {
+      if (!response.ok || !response.body) {
+        const errText = await response.text().catch(() => '')
+        return NextResponse.json({ reply: errText.slice(0, 500) || 'OpenAI-Fehler', actions: [] }, { status: 502 })
+      }
+      const stream = transformOpenAiSseToTextSse(response.body)
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache, no-transform',
+          Connection: 'keep-alive',
+        },
+      })
+    }
 
     const data = await response.json() as Record<string, unknown>
     if (!response.ok) {

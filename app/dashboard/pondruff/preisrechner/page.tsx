@@ -5,9 +5,10 @@ import { createSupabaseClient } from '@/lib/supabase'
 import {
   PRICE_COATINGS, blankPricePosition, calcPricePosition, priceDefaultFactor,
   normalizePriceCoating, normalizePriceCustomer, buildWisoPriceOrder, wisoOrderTsv,
-  money, compressImageDataUrl, type PricePosition, type PondShape,
+  money, compressImageDataUrl, parseDecimal, type PricePosition, type PondShape,
 } from '@/lib/pondruff'
 import { usePondruffFlags } from '@/components/pondruff/usePondruffFlags'
+import { DecimalInput } from '@/components/pondruff/DecimalInput'
 
 function Pos({ pos, idx, onChange, onDelete, isFirst, globalPO, setGlobalPO }: {
   pos: PricePosition; idx: number;
@@ -30,7 +31,9 @@ function Pos({ pos, idx, onChange, onDelete, isFirst, globalPO, setGlobalPO }: {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 10 }}>
         <label><div style={lblStyle}>Bezeichnung</div><input className="pk-input" value={pos.description} onChange={e => set('description', e.target.value)} /></label>
         <label><div style={lblStyle}>Artikel-Nr.</div><input className="pk-input" value={pos.article_no} onChange={e => set('article_no', e.target.value)} /></label>
-        <label><div style={lblStyle}>Stückzahl</div><input className="pk-input" type="number" min={1} value={pos.quantity} onChange={e => set('quantity', Math.max(1, parseInt(e.target.value) || 1))} /></label>
+        <label><div style={lblStyle}>Stückzahl</div>
+          <DecimalInput value={pos.quantity} min={1} keepZero decimals={0} onChange={n => set('quantity', Math.max(1, Math.round(n) || 1))} />
+        </label>
         <label><div style={lblStyle}>Form</div>
           <select className="pk-input" value={pos.shape} onChange={e => {
             const shape = e.target.value as PondShape
@@ -47,28 +50,42 @@ function Pos({ pos, idx, onChange, onDelete, isFirst, globalPO, setGlobalPO }: {
             {PRICE_COATINGS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
-        <label><div style={lblStyle}>R4-Faktor</div><input className="pk-input" type="number" step="0.1" min={0} value={pos.factor} onChange={e => set('factor', parseFloat(e.target.value) || 0)} /></label>
+        <label><div style={lblStyle}>R4-Faktor</div>
+          <DecimalInput value={pos.factor} min={0} onChange={n => set('factor', n)} />
+        </label>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 10 }}>
         {pos.shape === 'Rund' ? (
           <>
-            <label><div style={lblStyle}>Durchmesser (mm)</div><input className="pk-input" type="number" step="0.1" min={0} value={pos.diameter} onChange={e => set('diameter', parseFloat(e.target.value) || 0)} /></label>
-            <label><div style={lblStyle}>Länge (mm)</div><input className="pk-input" type="number" step="0.1" min={0} value={pos.length} onChange={e => set('length', parseFloat(e.target.value) || 0)} /></label>
+            <label><div style={lblStyle}>Durchmesser (mm)</div>
+              <DecimalInput value={pos.diameter} min={0} onChange={n => set('diameter', n)} />
+            </label>
+            <label><div style={lblStyle}>Länge (mm)</div>
+              <DecimalInput value={pos.length} min={0} onChange={n => set('length', n)} />
+            </label>
             <Metric label="Volumenbasis" value="Rund (Ø² · π/4 · L)" />
           </>
         ) : (
           <>
-            <label><div style={lblStyle}>Länge (mm)</div><input className="pk-input" type="number" step="0.1" min={0} value={pos.length} onChange={e => set('length', parseFloat(e.target.value) || 0)} /></label>
-            <label><div style={lblStyle}>Breite (mm)</div><input className="pk-input" type="number" step="0.1" min={0} value={pos.width} onChange={e => set('width', parseFloat(e.target.value) || 0)} /></label>
-            <label><div style={lblStyle}>Höhe (mm)</div><input className="pk-input" type="number" step="0.1" min={0} value={pos.height} onChange={e => set('height', parseFloat(e.target.value) || 0)} /></label>
+            <label><div style={lblStyle}>Länge (mm)</div>
+              <DecimalInput value={pos.length} min={0} onChange={n => set('length', n)} />
+            </label>
+            <label><div style={lblStyle}>Breite (mm)</div>
+              <DecimalInput value={pos.width} min={0} onChange={n => set('width', n)} />
+            </label>
+            <label><div style={lblStyle}>Höhe (mm)</div>
+              <DecimalInput value={pos.height} min={0} onChange={n => set('height', n)} />
+            </label>
             <Metric label="Volumenbasis" value="Eckig (L · B · H)" />
           </>
         )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 10 }}>
-        <label><div style={lblStyle}>Rabatt %</div><input className="pk-input" type="number" step="1" min={0} max={100} value={pos.discount} onChange={e => set('discount', Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))} /></label>
+        <label><div style={lblStyle}>Rabatt %</div>
+          <DecimalInput value={pos.discount} min={0} max={100} onChange={n => set('discount', n)} />
+        </label>
         <label><div style={lblStyle}>Positionsnummer</div><input className="pk-input" value={pos.position_no} onChange={e => set('position_no', e.target.value)} /></label>
         <label><div style={lblStyle}>Auftrags-Nr.</div><input className="pk-input" value={pos.order_no} onChange={e => set('order_no', e.target.value)} /></label>
         <label><div style={lblStyle}>Kostenstelle</div><input className="pk-input" value={pos.cost_center} onChange={e => set('cost_center', e.target.value)} /></label>
@@ -146,8 +163,17 @@ export default function PreisrechnerPage() {
           const p = raw as Partial<PricePosition>
           const base = blankPricePosition(p.shape === 'Rund' ? 'Rund' : 'Eckig')
           const c = normalizePriceCoating(String(p.coating || 'TiCN'))
-          return { ...base, ...p, coating: c, factor: priceDefaultFactor(c),
-            purchase_order: i === 0 ? String(p.purchase_order || ad?.purchase_order || '') : '', source: 'ki' } as PricePosition
+          return {
+            ...base, ...p,
+            quantity: Math.max(1, Math.round(parseDecimal(p.quantity ?? 1)) || 1),
+            diameter: parseDecimal(p.diameter),
+            length: parseDecimal(p.length),
+            width: parseDecimal(p.width),
+            height: parseDecimal(p.height),
+            discount: parseDecimal(p.discount),
+            coating: c, factor: priceDefaultFactor(c),
+            purchase_order: i === 0 ? String(p.purchase_order || ad?.purchase_order || '') : '', source: 'ki',
+          } as PricePosition
         })
         setPositions(arr)
       }
@@ -196,6 +222,11 @@ export default function PreisrechnerPage() {
         const c = normalizePriceCoating(String(p.coating || 'TiCN'))
         return {
           ...base, ...p,
+          quantity: Math.max(1, Math.round(parseDecimal(p.quantity ?? 1)) || 1),
+          diameter: parseDecimal(p.diameter),
+          length: parseDecimal(p.length),
+          width: parseDecimal(p.width),
+          height: parseDecimal(p.height),
           coating: c,
           factor: priceDefaultFactor(c),
           discount: globalDiscount,
@@ -252,7 +283,7 @@ export default function PreisrechnerPage() {
             {files.length > 0 && <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 6 }}>{files.length} Datei(en) bereit</div>}
             <label style={{ display: 'block', marginTop: 10 }}>
               <div style={lblStyle}>Rabatt % für alle Positionen</div>
-              <input className="pk-input" type="number" min={0} max={100} step={1} value={globalDiscount} onChange={e => setGlobalDiscount(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))} />
+              <DecimalInput value={globalDiscount} min={0} max={100} onChange={setGlobalDiscount} />
             </label>
             <button className="pk-btn" disabled={busy || !ocrEnabled} onClick={runOcr} style={{ marginTop: 10, width: '100%' }}>
               {busy ? '⏳ Läuft…' : ocrEnabled ? '🤖 GPT-4 Positionen auslesen' : '🚫 Funktion deaktiviert'}
@@ -483,7 +514,7 @@ function OcrReviewModal({
                   <input className="pk-input" value={p.article_no} onChange={e => setPos(i, { article_no: e.target.value })} />
                 </label>
                 <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>Menge</div>
-                  <input className="pk-input" type="number" min={1} value={p.quantity} onChange={e => setPos(i, { quantity: Math.max(1, parseInt(e.target.value) || 1) })} />
+                  <DecimalInput value={p.quantity} min={1} keepZero decimals={0} onChange={n => setPos(i, { quantity: Math.max(1, Math.round(n) || 1) })} />
                 </label>
                 <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>Schicht</div>
                   <select className="pk-input" value={p.coating} onChange={e => {
@@ -496,22 +527,22 @@ function OcrReviewModal({
                 {p.shape === 'Rund' ? (
                   <>
                     <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>Ø (mm)</div>
-                      <input className="pk-input" type="number" step="0.1" min={0} value={p.diameter} onChange={e => setPos(i, { diameter: parseFloat(e.target.value) || 0 })} />
+                      <DecimalInput value={p.diameter} min={0} onChange={n => setPos(i, { diameter: n })} />
                     </label>
                     <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>Länge (mm)</div>
-                      <input className="pk-input" type="number" step="0.1" min={0} value={p.length} onChange={e => setPos(i, { length: parseFloat(e.target.value) || 0 })} />
+                      <DecimalInput value={p.length} min={0} onChange={n => setPos(i, { length: n })} />
                     </label>
                   </>
                 ) : (
                   <>
                     <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>L (mm)</div>
-                      <input className="pk-input" type="number" step="0.1" min={0} value={p.length} onChange={e => setPos(i, { length: parseFloat(e.target.value) || 0 })} />
+                      <DecimalInput value={p.length} min={0} onChange={n => setPos(i, { length: n })} />
                     </label>
                     <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>B (mm)</div>
-                      <input className="pk-input" type="number" step="0.1" min={0} value={p.width} onChange={e => setPos(i, { width: parseFloat(e.target.value) || 0 })} />
+                      <DecimalInput value={p.width} min={0} onChange={n => setPos(i, { width: n })} />
                     </label>
                     <label><div style={{ fontSize: 10, color: '#aeb9c8' }}>H (mm)</div>
-                      <input className="pk-input" type="number" step="0.1" min={0} value={p.height} onChange={e => setPos(i, { height: parseFloat(e.target.value) || 0 })} />
+                      <DecimalInput value={p.height} min={0} onChange={n => setPos(i, { height: n })} />
                     </label>
                   </>
                 )}

@@ -84,6 +84,43 @@ export function moneyDe(value: number): string {
   return money(value).toFixed(2).replace('.', ',')
 }
 
+// Akzeptiert deutsche ("4,4") und englische ("4.4") Schreibweise.
+// Strip Tausender-Punkte/Leerzeichen, danach Komma -> Punkt.
+// Gibt 0 zurück bei leer/ungültig.
+export function parseDecimal(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (value == null) return 0
+  let s = String(value).trim()
+  if (!s) return 0
+  s = s.replace(/\s+/g, '').replace(/[€%]/g, '')
+  const hasComma = s.includes(',')
+  const hasDot = s.includes('.')
+  if (hasComma && hasDot) {
+    // "1.234,56" -> "1234.56"   /   "1,234.56" -> "1234.56"
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+      s = s.replace(/\./g, '').replace(',', '.')
+    } else {
+      s = s.replace(/,/g, '')
+    }
+  } else if (hasComma) {
+    s = s.replace(',', '.')
+  }
+  const n = parseFloat(s)
+  return Number.isFinite(n) ? n : 0
+}
+
+// Anzeige-Format: 4.4 -> "4,4"  /  4 -> "4"  /  0 -> ""
+export function formatDecimalDe(n: number, opts?: { keepZero?: boolean; decimals?: number }): string {
+  if (!Number.isFinite(n)) return ''
+  if (!n && !opts?.keepZero) return ''
+  if (typeof opts?.decimals === 'number') {
+    return n.toFixed(opts.decimals).replace('.', ',')
+  }
+  // Knapp halten: keine überflüssigen Nullen
+  const s = String(n)
+  return s.replace('.', ',')
+}
+
 export function normalizePriceCoating(value: string): string {
   if (!value) return 'TiCN'
   const v = String(value).trim().toLowerCase()
@@ -125,20 +162,20 @@ export interface PriceResult {
 
 export function calcPricePosition(pos: PricePosition): PriceResult {
   const coating = normalizePriceCoating(pos.coating)
-  const factor = Number(pos.factor) || priceDefaultFactor(coating)
-  const quantity = Math.max(1, Math.floor(Number(pos.quantity) || 1))
-  const discount = Math.max(0, Math.min(100, Number(pos.discount) || 0))
+  const factor = parseDecimal(pos.factor) || priceDefaultFactor(coating)
+  const quantity = Math.max(1, Math.floor(parseDecimal(pos.quantity) || 1))
+  const discount = Math.max(0, Math.min(100, parseDecimal(pos.discount)))
   const shape = pos.shape === 'Rund' ? 'Rund' : 'Eckig'
 
   let volume = 0
   if (shape === 'Rund') {
-    const d = Number(pos.diameter) || 0
-    const l = Number(pos.length) || 0
+    const d = parseDecimal(pos.diameter)
+    const l = parseDecimal(pos.length)
     volume = (d * d) * PRICE_EXCEL_PI / 4 * l
   } else {
-    const l = Number(pos.length) || 0
-    const w = Number(pos.width) || 0
-    const h = Number(pos.height) || 0
+    const l = parseDecimal(pos.length)
+    const w = parseDecimal(pos.width)
+    const h = parseDecimal(pos.height)
     volume = l * w * h
   }
 
@@ -160,10 +197,14 @@ export function calcPricePosition(pos: PricePosition): PriceResult {
 // --- WISO ---
 
 export function wisoCompactDimensionText(pos: PricePosition): string {
-  if (pos.shape === 'Rund') {
-    return `Ø${Number(pos.diameter) || 0}x${Number(pos.length) || 0}mm`
+  const fmt = (v: unknown) => {
+    const n = parseDecimal(v)
+    return Number.isInteger(n) ? String(n) : String(n).replace('.', ',')
   }
-  return `${Number(pos.length) || 0}x${Number(pos.width) || 0}x${Number(pos.height) || 0}mm`
+  if (pos.shape === 'Rund') {
+    return `Ø${fmt(pos.diameter)}x${fmt(pos.length)}mm`
+  }
+  return `${fmt(pos.length)}x${fmt(pos.width)}x${fmt(pos.height)}mm`
 }
 
 export function wisoShortDescriptionText(pos: PricePosition): string {
@@ -220,7 +261,7 @@ export interface WisoOrder {
 export function buildWisoPriceOrder(customer: string, project: string, positions: PricePosition[], globalPO: string): WisoOrder {
   const rows: WisoOrderRow[] = positions.map((pos, i) => {
     const result = calcPricePosition(pos)
-    const qty = Math.max(1, Math.floor(Number(pos.quantity) || 1))
+    const qty = Math.max(1, Math.floor(parseDecimal(pos.quantity) || 1))
     const singleAfter = money(result.final_total / qty)
     const idx = i + 1
     return {
@@ -231,7 +272,7 @@ export function buildWisoPriceOrder(customer: string, project: string, positions
       Beschreibung: wisoDescriptionForPricePosition(pos, idx === positions.length, globalPO),
       Liefertermin: '',
       Listenpreis: result.unit_price.toFixed(2),
-      'Rabatt (%)': String(Number(pos.discount) || 0),
+      'Rabatt (%)': String(parseDecimal(pos.discount)),
       Einzelpreis: singleAfter.toFixed(2),
       Gesamtpreis: result.final_total.toFixed(2),
     }
