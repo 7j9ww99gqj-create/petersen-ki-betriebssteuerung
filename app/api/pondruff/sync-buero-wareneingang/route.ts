@@ -22,7 +22,8 @@ export async function POST(req: NextRequest) {
   const { data: src, error: e1 } = await sb.from('pondruff_wareneingaenge').select('*').eq('id', body.id).single()
   if (e1 || !src) return NextResponse.json({ error: e1?.message || 'Wareneingang nicht gefunden' }, { status: 404 })
 
-  const dokId = `WE-${Date.now().toString(36).toUpperCase()}`
+  // Idempotent: bestehende Dokument-ID wiederverwenden, statt jedes Mal neu zu erzeugen
+  const dokId: string = (src.synced_buero_dokument_id as string | null) || `WE-${Date.now().toString(36).toUpperCase()}`
   const ai = (src.ai_data as Record<string, unknown> | null) || null
   const beschreibung = [
     src.delivery_id ? `Lieferschein-ID: ${src.delivery_id}` : '',
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     ai?.ocr_note ? `KI: ${ai.ocr_note}` : '',
   ].filter(Boolean).join('\n')
 
-  const { error: e2 } = await sb.from('buero_dokumente').insert({
+  const { error: e2 } = await sb.from('buero_dokumente').upsert({
     id: dokId,
     user_id: access.user.id,
     kategorie: 'Wareneingang',
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     beschreibung,
     dateipfad: src.receipt_url || null,
     status: src.status || 'offen',
-  })
+  }, { onConflict: 'id' })
   if (e2) return NextResponse.json({ error: e2.message }, { status: 500 })
 
   await sb.from('pondruff_wareneingaenge').update({
