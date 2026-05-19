@@ -13,6 +13,7 @@ import { getFirmaEinstellungen, upsertFirmaEinstellungen, uploadFirmenLogo, type
 import { isPondruffUser } from '@/lib/pondruff'
 import PondruffSheet from '@/components/pondruff/PondruffSheet'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import OnboardingWizard from '@/components/OnboardingWizard'
 import { WhatsNewModal } from '@/components/ui'
 
 // Bottom-Nav Einträge (Mobile)
@@ -295,100 +296,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {showCompanyOnboarding && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 80,
-            background: 'rgba(0,0,0,.68)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 18,
-          }}
-        >
-          <div className="pk-card" style={{ width: 'min(760px, 100%)', maxHeight: '92vh', overflow: 'auto', padding: 22 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 16 }}>
-              <div>
-                <div style={{ fontSize: 12, color: '#6cb6ff', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                  Firmendaten-Onboarding
-                </div>
-                <h2 style={{ margin: '4px 0 4px', fontSize: 22, fontWeight: 900 }}>Briefpapier einmal einrichten</h2>
-                <p style={{ margin: 0, color: '#aeb9c8', fontSize: 13 }}>
-                  Diese Daten erscheinen später im Dashboard, in Angeboten, Auftragsbestätigungen, Rechnungen und Exporten.
-                </p>
-              </div>
-              <button className="pk-btn-ghost" onClick={() => setShowCompanyOnboarding(false)} disabled={companySaving}>
-                Später
-              </button>
-            </div>
-
-            {companyError && (
-              <div style={{ marginBottom: 14, padding: 12, borderRadius: 12, background: 'rgba(244,63,94,.12)', border: '1px solid rgba(244,63,94,.28)', color: '#ff8aa0', fontSize: 13 }}>
-                {companyError}
-              </div>
-            )}
-
-            <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontSize: 12, color: '#aeb9c8' }}>Firmenname *</span>
-                <input className="pk-input" value={companyForm.firmenname} onChange={e => setCompanyField('firmenname', e.target.value)} />
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontSize: 12, color: '#aeb9c8' }}>Logo</span>
-                <input className="pk-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={e => setCompanyLogo(e.target.files?.[0] ?? null)} />
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontSize: 12, color: '#aeb9c8' }}>Adresse</span>
-                <input className="pk-input" value={companyForm.adresse || ''} onChange={e => setCompanyField('adresse', e.target.value)} />
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: 10 }}>
-                <label style={{ display: 'grid', gap: 6 }}>
-                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>PLZ</span>
-                  <input className="pk-input" value={companyForm.plz || ''} onChange={e => setCompanyField('plz', e.target.value)} />
-                </label>
-                <label style={{ display: 'grid', gap: 6 }}>
-                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>Ort</span>
-                  <input className="pk-input" value={companyForm.ort || ''} onChange={e => setCompanyField('ort', e.target.value)} />
-                </label>
-              </div>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontSize: 12, color: '#aeb9c8' }}>E-Mail</span>
-                <input className="pk-input" type="email" value={companyForm.email || ''} onChange={e => setCompanyField('email', e.target.value)} />
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontSize: 12, color: '#aeb9c8' }}>Telefon</span>
-                <input className="pk-input" value={companyForm.telefon || ''} onChange={e => setCompanyField('telefon', e.target.value)} />
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontSize: 12, color: '#aeb9c8' }}>Website</span>
-                <input className="pk-input" value={companyForm.website || ''} onChange={e => setCompanyField('website', e.target.value)} />
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontSize: 12, color: '#aeb9c8' }}>Ansprechpartner</span>
-                <input className="pk-input" value={companyForm.ansprechpartner || ''} onChange={e => setCompanyField('ansprechpartner', e.target.value)} />
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontSize: 12, color: '#aeb9c8' }}>USt-IdNr.</span>
-                <input className="pk-input" value={companyForm.ust_id || ''} onChange={e => setCompanyField('ust_id', e.target.value)} />
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontSize: 12, color: '#aeb9c8' }}>IBAN</span>
-                <input className="pk-input" value={companyForm.iban || ''} onChange={e => setCompanyField('iban', e.target.value)} />
-              </label>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
-              <button className="pk-btn-ghost" onClick={() => setShowCompanyOnboarding(false)} disabled={companySaving}>
-                Überspringen
-              </button>
-              <button className="pk-btn" onClick={saveCompanyOnboarding} disabled={companySaving}>
-                {companySaving ? 'Speichern…' : 'Firmendaten speichern'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <OnboardingWizard
+          form={companyForm}
+          onFieldChange={setCompanyField}
+          onLogoChange={setCompanyLogo}
+          onSave={saveCompanyOnboarding}
+          onSkip={() => setShowCompanyOnboarding(false)}
+          saving={companySaving}
+          error={companyError}
+        />
       )}
 
       {/* ── Bottom Navigation (Mobile) ── */}
