@@ -3,6 +3,13 @@ const { withSentryConfig } = require('@sentry/nextjs')
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  async rewrites() {
+    return [
+      // API-Versionierung: /api/v1/foo → /api/foo (Aliase für künftige Breaking-Changes)
+      // Bestehende Routen bleiben unter /api/* erreichbar.
+      { source: '/api/v1/:path*', destination: '/api/:path*' },
+    ]
+  },
 }
 
 module.exports = withSentryConfig(nextConfig, {

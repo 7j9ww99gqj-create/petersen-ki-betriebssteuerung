@@ -172,3 +172,32 @@ supabase/
 | Bilder | WebP-Kompression vor Upload, Signed URLs (1h TTL) |
 | DB-Queries | 23 Indexes auf Haupttabellen (Migration `20260519100000`) |
 | Tab-Loading | Lazy-Loading (nur aktiver Tab lädt Daten) |
+
+---
+
+## ADR: API-Versionierung
+
+**Status:** akzeptiert (2026-05-19)
+
+**Entscheidung:** API-Routen werden ab sofort versioniert über `/api/v1/*`-Aliase erreichbar gemacht.
+
+**Setup:**
+- `next.config.js` enthält Rewrite `/api/v1/:path*` → `/api/:path*`
+- Bestehende Routen unter `/api/*` bleiben unverändert (keine Breaking-Changes)
+- Neue Clients sollten `/api/v1/*` ansprechen
+- Bei künftigen Breaking-Changes: neue Implementierung unter `app/api/v2/`, alte Route bleibt für N Releases
+
+**Vorteile:**
+- Bestehende Integrationen (Frontend, externe Pondruff-Sync) brechen nicht
+- Klare Migrationsstrategie für Breaking-Changes
+- Versionsbewusste Clients können `Accept-Version`-Konvention nutzen
+
+**Wann v2 anlegen:**
+- Response-Format-Änderungen (Felder umbenennen/entfernen)
+- Auth-Modell wechseln
+- Status-Code-Semantik ändern
+
+**Nicht zwingend versionieren:**
+- Neue Felder in Response (additive Änderungen sind backward-kompatibel)
+- Neue Routen (einfach unter `/api/v1/neueRoute` anlegen)
+- Performance-Optimierungen ohne Schnittstellenänderung
