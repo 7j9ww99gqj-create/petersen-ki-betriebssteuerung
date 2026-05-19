@@ -46,7 +46,7 @@ function faktorForIntervall(intervall: string): number {
 
 type SteuerTab =
   | 'dashboard' | 'einnahmen' | 'belege' | 'fixkosten'
-  | 'betriebsausgaben' | 'anschaffungen' | 'ustva' | 'auswertungen' | 'export'
+  | 'betriebsausgaben' | 'anschaffungen' | 'ustva' | 'auswertungen' | 'fibu' | 'export'
 
 // ── Konstanten ─────────────────────────────────────────────────────────────────
 
@@ -68,6 +68,7 @@ const NAV_ITEMS: { id: SteuerTab; icon: string; label: string }[] = [
   { id: 'anschaffungen',    icon: '🖥️', label: 'Anschaffungen' },
   { id: 'ustva',            icon: '📑', label: 'UStVA' },
   { id: 'auswertungen',     icon: '📈', label: 'Auswertungen' },
+  { id: 'fibu',             icon: '🗂️', label: 'Fibu' },
   { id: 'export',           icon: '📤', label: 'Export' },
 ]
 
@@ -521,6 +522,75 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
     ]
     downloadCsv(rows, `DATEV_Export_${new Date().toISOString().slice(0, 10)}.csv`)
     showToast('DATEV CSV exportiert')
+  }
+
+  // ── Fibu-Export (Buchungssätze SKR 04) ───────────────────────────────────────
+  //
+  // Liefert komplette Buchungssätze, die ein Steuerberater 1:1 in die
+  // Finanzbuchhaltung übernehmen kann. Format passt für Lexware, BuchhaltungsButler,
+  // sevDesk-Import etc. Eingangsbelege gegen Bank (1200), Ausgangsrechnungen gegen
+  // Forderungen (1400). Vorsteuer wird automatisch auf das passende Konto gebucht.
+
+  // SKR-04-Konten-Map: Beleg-Kategorie → Aufwandskonto (Soll)
+  const fibuKontoFuerKategorie = (notiz: string, lieferant: string): { konto: string; bezeichnung: string } => {
+    const t = `${notiz} ${lieferant}`.toLowerCase()
+    if (/hosting|domain|software|lizenz|saas|cloud|edv|it/.test(t))     return { konto: '6815', bezeichnung: 'EDV-Kosten' }
+    if (/versicherung/.test(t))                                          return { konto: '6400', bezeichnung: 'Versicherungen' }
+    if (/miete|raum/.test(t))                                            return { konto: '6310', bezeichnung: 'Raumkosten' }
+    if (/telefon|internet|mobilfunk/.test(t))                            return { konto: '6805', bezeichnung: 'Telefon/Porto' }
+    if (/steuerberat|buchführ|buchhalt/.test(t))                         return { konto: '6825', bezeichnung: 'Rechts-/Beratungskosten' }
+    if (/material|werkzeug|teile/.test(t))                               return { konto: '5400', bezeichnung: 'Wareneingang' }
+    if (/kraftstoff|tank|benzin|diesel|kfz|fahrzeug|leasing/.test(t))    return { konto: '6520', bezeichnung: 'Kfz-Kosten' }
+    if (/reise|hotel|bahn|flug/.test(t))                                 return { konto: '6660', bezeichnung: 'Reisekosten' }
+    if (/bewirt|essen|restaurant/.test(t))                               return { konto: '6640', bezeichnung: 'Bewirtungskosten' }
+    if (/marketing|werbung|anzeige|google|meta|facebook/.test(t))        return { konto: '6600', bezeichnung: 'Werbekosten' }
+    if (/büro|papier|drucker|toner/.test(t))                             return { konto: '6815', bezeichnung: 'Bürobedarf' }
+    return { konto: '6850', bezeichnung: 'Sonstige Aufwendungen' }
+  }
+
+  const vorsteuerKontoFuerSatz = (satz: number): string => ({ 0: '', 7: '1571', 19: '1576' } as Record<number, string>)[satz] ?? '1576'
+  const umsatzsteuerKontoFuerSatz = (satz: number): string => ({ 0: '', 7: '3801', 19: '3806' } as Record<number, string>)[satz] ?? '3806'
+
+  const handleFibuExport = () => {
+    const num = (n: number) => n.toFixed(2).replace('.', ',')
+    const rows: string[][] = [[
+      'Beleg-Nr.', 'Datum', 'Buchungstext',
+      'Soll-Konto', 'Haben-Konto', 'Brutto', 'Netto', 'USt-Satz %', 'USt-Betrag',
+      'Vorsteuer-/USt-Konto', 'Status',
+    ]]
+
+    // Eingangsbelege (Aufwand an Bank)
+    for (const b of belege) {
+      const netto = b.betrag - b.steuerbetrag
+      const aufwand = fibuKontoFuerKategorie(b.notiz ?? '', b.lieferant)
+      const vorsteuerKonto = vorsteuerKontoFuerSatz(b.steuersatz)
+      rows.push([
+        b.id, b.datum, `${b.lieferant}${b.notiz ? ' — ' + b.notiz : ''}`.slice(0, 80),
+        aufwand.konto, '1200', // Aufwand an Bank
+        num(b.betrag), num(netto), String(b.steuersatz), num(b.steuerbetrag),
+        vorsteuerKonto, b.status,
+      ])
+    }
+
+    // Ausgangsrechnungen (Forderungen an Erlöse)
+    for (const r of rechnungen) {
+      const brutto = r.summe ?? 0
+      if (brutto <= 0) continue
+      const satz = r.steuer_satz ?? 19
+      const steuer = r.steuerbetrag ?? Math.round((brutto - brutto / (1 + satz / 100)) * 100) / 100
+      const netto = r.netto ?? (brutto - steuer)
+      const ustKonto = umsatzsteuerKontoFuerSatz(satz)
+      rows.push([
+        r.nummer || r.id, r.erstellt || '',
+        `Rechnung ${r.nummer || r.id} ${r.kunde ? '— ' + r.kunde : ''}`.slice(0, 80),
+        '1400', '8400', // Forderungen an Erlöse 19%
+        num(brutto), num(netto), String(satz), num(steuer),
+        ustKonto, r.status ?? '',
+      ])
+    }
+
+    downloadCsv(rows, `Fibu_Buchungssaetze_${new Date().toISOString().slice(0, 10)}.csv`)
+    showToast(`Fibu-Export: ${rows.length - 1} Buchungssätze`)
   }
 
   const handleMonatExport = () => {
@@ -1373,6 +1443,71 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
       )}
 
       {/* ── Export ────────────────────────────────────────────────────────────── */}
+      {tab === 'fibu' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>🗂️ Fibu-Daten exportieren</div>
+
+          <div className="pk-card" style={{ padding: 24 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>📑 Buchungssätze (SKR 04)</div>
+            <div style={{ fontSize: 13, color: '#aeb9c8', marginBottom: 16, lineHeight: 1.5 }}>
+              Vollständige Finanzbuchhaltungs-Datei mit allen Eingangsbelegen <b>und</b> Ausgangsrechnungen
+              als fertige Buchungssätze: Datum, Belegnummer, Soll-/Haben-Konto, Brutto/Netto, Steuersatz
+              und Steuerkonto. Import in Lexware, BuchhaltungsButler, sevDesk oder direkter Versand an den Steuerberater.
+            </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+              <button className="pk-btn" onClick={handleFibuExport} style={{ fontSize: 14 }}>
+                📥 Fibu-CSV herunterladen ({belege.length + rechnungen.length} Buchungen)
+              </button>
+              <div style={{ fontSize: 12, color: '#aeb9c8' }}>
+                {belege.length} Eingangsbelege · {rechnungen.length} Ausgangsrechnungen
+              </div>
+            </div>
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', fontSize: 12, color: '#ffb347' }}>
+              ⚠️ Konten-Vorschlag aus Lieferant/Notiz heuristisch (SKR 04). Vor Buchung bitte mit Ihrem
+              Steuerberater abstimmen.
+            </div>
+          </div>
+
+          <div className="pk-card" style={{ padding: 24 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>🗂️ Verwendete Konten (SKR 04)</div>
+            <table className="pk-table">
+              <thead><tr><th>Konto</th><th>Bezeichnung</th><th>Verwendung</th></tr></thead>
+              <tbody>
+                <tr><td style={{ fontFamily: 'monospace' }}>1200</td><td>Bank</td><td style={{ color: '#aeb9c8' }}>Gegenkonto Eingangsbelege</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>1400</td><td>Forderungen aus L+L</td><td style={{ color: '#aeb9c8' }}>Soll-Konto Ausgangsrechnungen</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>8400</td><td>Erlöse 19% USt</td><td style={{ color: '#aeb9c8' }}>Haben-Konto Ausgangsrechnungen</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>1571 / 1576</td><td>Vorsteuer 7% / 19%</td><td style={{ color: '#aeb9c8' }}>aus Eingangsbelegen</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>3801 / 3806</td><td>Umsatzsteuer 7% / 19%</td><td style={{ color: '#aeb9c8' }}>aus Ausgangsrechnungen</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>5400</td><td>Wareneingang</td><td style={{ color: '#aeb9c8' }}>Material, Werkzeug, Teile</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>6310</td><td>Raumkosten</td><td style={{ color: '#aeb9c8' }}>Miete</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>6400</td><td>Versicherungen</td><td style={{ color: '#aeb9c8' }}>Versicherungs-Belege</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>6520</td><td>Kfz-Kosten</td><td style={{ color: '#aeb9c8' }}>Kraftstoff, Leasing, Wartung</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>6600</td><td>Werbekosten</td><td style={{ color: '#aeb9c8' }}>Marketing, Anzeigen</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>6640</td><td>Bewirtungskosten</td><td style={{ color: '#aeb9c8' }}>Restaurant, Geschäftsessen</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>6660</td><td>Reisekosten</td><td style={{ color: '#aeb9c8' }}>Hotel, Bahn, Flug</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>6805</td><td>Telefon/Porto</td><td style={{ color: '#aeb9c8' }}>Telefon, Internet, Mobilfunk</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>6815</td><td>EDV-/Bürobedarf</td><td style={{ color: '#aeb9c8' }}>Software, SaaS, Hosting, Toner</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>6825</td><td>Rechts-/Beratung</td><td style={{ color: '#aeb9c8' }}>Steuerberater, Buchführung</td></tr>
+                <tr><td style={{ fontFamily: 'monospace' }}>6850</td><td>Sonstige Aufwendungen</td><td style={{ color: '#aeb9c8' }}>Default-Konto</td></tr>
+              </tbody>
+            </table>
+            <div style={{ marginTop: 12, fontSize: 12, color: '#aeb9c8' }}>
+              Konten-Zuordnung erfolgt automatisch anhand Lieferant + Notiz. Default 6850 wenn kein Treffer.
+            </div>
+          </div>
+
+          <div className="pk-card" style={{ padding: 24 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>📋 CSV-Format</div>
+            <div style={{ fontSize: 13, color: '#aeb9c8', marginBottom: 10 }}>
+              Trennzeichen Semikolon, Zeichensatz UTF-8 mit BOM (Excel-tauglich). Spalten:
+            </div>
+            <pre style={{ fontSize: 11, background: 'rgba(0,0,0,.3)', padding: 12, borderRadius: 8, overflowX: 'auto', color: '#aeb9c8' }}>
+{`Beleg-Nr.;Datum;Buchungstext;Soll-Konto;Haben-Konto;Brutto;Netto;USt-Satz %;USt-Betrag;Vorsteuer-/USt-Konto;Status`}
+            </pre>
+          </div>
+        </div>
+      )}
+
       {tab === 'export' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>📤 Exporte & Downloads</div>
