@@ -1545,6 +1545,87 @@ export async function getBueroAuftragById(id: string) {
   return normalizeBueroAuftrag(auftrag.data as BueroAuftragRecord, kundenIndex.byId)
 }
 
+// ── PDF-ARCHIV (GoBD) ─────────────────────────────────────────────────────────
+
+async function sha256Base64(base64: string): Promise<string> {
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+  const hash = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function base64ToBlob(base64: string, mime = 'application/pdf'): Blob {
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+  return new Blob([bytes], { type: mime })
+}
+
+export async function archiveRechnungPdf(opts: {
+  rechnungId: string
+  rechnungNummer?: string
+  pdfBase64: string
+}): Promise<{ path: string; hash: string }> {
+  const supabase = db()
+  const { data: userData, error: userErr } = await supabase.auth.getUser()
+  if (userErr || !userData?.user) throw new Error('Nicht angemeldet')
+  const userId = userData.user.id
+  const year = new Date().getFullYear()
+  const safeName = (opts.rechnungNummer || opts.rechnungId).replace(/[^a-zA-Z0-9_-]/g, '_')
+  const path = `${userId}/${year}/rechnung_${safeName}.pdf`
+
+  const hash = await sha256Base64(opts.pdfBase64)
+  const blob = base64ToBlob(opts.pdfBase64)
+  const { error } = await supabase.storage.from('rechnungen-archiv').upload(path, blob, {
+    upsert: true,
+    contentType: 'application/pdf',
+    cacheControl: '3600',
+  })
+  if (error) throw error
+
+  await supabase.from('buero_rechnungen').update({
+    pdf_path: path,
+    pdf_hash: hash,
+    pdf_archived_at: new Date().toISOString(),
+  }).eq('id', opts.rechnungId)
+
+  return { path, hash }
+}
+
+export async function archiveAngebotPdf(opts: {
+  angebotId: string
+  angebotNummer?: string
+  pdfBase64: string
+}): Promise<{ path: string; hash: string }> {
+  const supabase = db()
+  const { data: userData, error: userErr } = await supabase.auth.getUser()
+  if (userErr || !userData?.user) throw new Error('Nicht angemeldet')
+  const userId = userData.user.id
+  const year = new Date().getFullYear()
+  const safeName = (opts.angebotNummer || opts.angebotId).replace(/[^a-zA-Z0-9_-]/g, '_')
+  const path = `${userId}/${year}/angebot_${safeName}.pdf`
+
+  const hash = await sha256Base64(opts.pdfBase64)
+  const blob = base64ToBlob(opts.pdfBase64)
+  const { error } = await supabase.storage.from('rechnungen-archiv').upload(path, blob, {
+    upsert: true,
+    contentType: 'application/pdf',
+    cacheControl: '3600',
+  })
+  if (error) throw error
+
+  await supabase.from('buero_angebote').update({
+    pdf_path: path,
+    pdf_hash: hash,
+    pdf_archived_at: new Date().toISOString(),
+  }).eq('id', opts.angebotId)
+
+  return { path, hash }
+}
+
+export async function getArchivPdfSignedUrl(path: string, expiresIn = 3600): Promise<string | null> {
+  if (!path) return null
+  const { data } = await db().storage.from('rechnungen-archiv').createSignedUrl(path, expiresIn)
+  return data?.signedUrl ?? null
+}
+
 export async function getBueroRechnungen() {
   const [{ data, error }, kundenIndex] = await Promise.all([
     db().from('buero_rechnungen').select('*').order('id', { ascending: false }),

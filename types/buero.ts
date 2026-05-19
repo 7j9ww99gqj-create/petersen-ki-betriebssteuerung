@@ -52,6 +52,7 @@ export type Angebot = {
   gueltig: string; status: 'Entwurf' | 'Erstellt' | 'Versendet' | 'Akzeptiert' | 'Abgelehnt'
   nummer?: string; verschickt_am?: string
   positionen?: Position[]
+  pdf_path?: string; pdf_hash?: string; pdf_archived_at?: string
 }
 
 export type Auftrag = {
@@ -67,6 +68,7 @@ export type Rechnung = {
   id: string; nummer?: string; kunde_id?: string; kunde: string; betrag: string; faellig: string
   erstellt: string; status: 'Erstellt' | 'Offen' | 'Bezahlt' | 'Überfällig' | 'Mahnung'
   bezahltAm?: string; mahnung_count?: number; positionen?: Position[]
+  pdf_path?: string; pdf_hash?: string; pdf_archived_at?: string
 }
 
 export type Dokument = {
