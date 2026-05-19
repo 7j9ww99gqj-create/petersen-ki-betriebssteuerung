@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
 import { getServerOpenAiToolSettings } from '@/lib/ai-settings'
+import { parseBody } from '@/lib/validation'
+
+const Schema = z.object({
+  anfrage: z.string().trim().min(1).max(4000),
+  empfaenger: z.string().trim().max(200).optional(),
+  kontext: z.string().trim().max(2000).optional(),
+  ton: z.enum(['professionell', 'freundlich', 'formell']).optional(),
+  firmenname: z.string().trim().max(200).optional(),
+})
 
 export async function POST(req: NextRequest) {
   const { isDemo, user, error } = await getRouteAccess(req)
@@ -12,13 +22,9 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'Kein OpenAI API-Key konfiguriert.' }, { status: 500 })
 
-  const body = await req.json() as {
-    anfrage: string
-    empfaenger?: string
-    kontext?: string
-    ton?: 'professionell' | 'freundlich' | 'formell'
-    firmenname?: string
-  }
+  const result = await parseBody(req, Schema)
+  if (!result.ok) return result.error
+  const body = result.data
 
   const prompt = `Du bist ein professioneller E-Mail-Assistent für ein deutsches Unternehmen.
 

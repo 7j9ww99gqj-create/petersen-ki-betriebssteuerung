@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
 import { getServerOpenAiToolSettings } from '@/lib/ai-settings'
+import { parseBody } from '@/lib/validation'
+
+const Schema = z.object({
+  rechnung: z.object({
+    nummer: z.string().trim().max(60).optional(),
+    kunde: z.string().trim().min(1).max(200),
+    betrag: z.string().trim().min(1).max(40),
+    faellig: z.string().trim().min(1).max(40),
+    mahnung_count: z.number().int().min(0).max(10).optional(),
+  }),
+  ton: z.enum(['freundlich', 'bestimmt', 'streng']).optional(),
+  firmenname: z.string().trim().max(200).optional(),
+})
 
 export async function POST(req: NextRequest) {
   const { isDemo, user, error } = await getRouteAccess(req)
@@ -12,11 +26,9 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'Kein OpenAI API-Key konfiguriert.' }, { status: 500 })
 
-  const body = await req.json() as {
-    rechnung: { nummer?: string; kunde: string; betrag: string; faellig: string; mahnung_count?: number }
-    ton?: 'freundlich' | 'bestimmt' | 'streng'
-    firmenname?: string
-  }
+  const result = await parseBody(req, Schema)
+  if (!result.ok) return result.error
+  const body = result.data
 
   const mahnStufe = (body.rechnung.mahnung_count ?? 0) + 1
   const ton = body.ton ?? (mahnStufe === 1 ? 'freundlich' : mahnStufe === 2 ? 'bestimmt' : 'streng')

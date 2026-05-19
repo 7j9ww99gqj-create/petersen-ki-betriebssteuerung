@@ -5,11 +5,11 @@ import { getServerAiFeatureSettings } from '@/lib/ai-settings'
 
 const ChatRequestSchema = z.object({
   messages: z.array(z.object({
-    role: z.string(),
+    role: z.enum(['user', 'assistant', 'system']),
     content: z.unknown(),
-  })),
-  system: z.string().optional(),
-  context: z.string().optional(),
+  })).min(1).max(40),
+  system: z.string().max(8000).optional(),
+  context: z.string().max(16000).optional(),
   structuredOutput: z.boolean().optional(),
   // Wenn true UND structuredOutput false: liefert text/event-stream mit
   // OpenAI Responses-API SSE-Events. Bestehende strukturierte Aufrufer

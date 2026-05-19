@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
 import { getServerOpenAiToolSettings } from '@/lib/ai-settings'
+import { parseBody } from '@/lib/validation'
+
+const Schema = z.object({
+  kpi: z.object({
+    umsatzMonat: z.number().finite(),
+    gewinnMonat: z.number().finite(),
+    artikelGesamt: z.number().int().nonnegative(),
+    artikelNiedrig: z.number().int().nonnegative(),
+    artikelLeer: z.number().int().nonnegative(),
+    aktivKunden: z.number().int().nonnegative(),
+    offeneAngebote: z.number().int().nonnegative(),
+    offeneRechnungen: z.number().int().nonnegative(),
+    offeneRechnungenSumme: z.number().finite(),
+    lagerwert: z.number().finite(),
+  }),
+  umsatzVormonat: z.number().finite().optional(),
+  monat: z.string().trim().max(40).optional(),
+})
 
 export async function POST(req: NextRequest) {
   const { isDemo, user, error } = await getRouteAccess(req)
@@ -12,22 +31,9 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'Kein OpenAI API-Key konfiguriert.' }, { status: 500 })
 
-  const body = await req.json() as {
-    kpi: {
-      umsatzMonat: number
-      gewinnMonat: number
-      artikelGesamt: number
-      artikelNiedrig: number
-      artikelLeer: number
-      aktivKunden: number
-      offeneAngebote: number
-      offeneRechnungen: number
-      offeneRechnungenSumme: number
-      lagerwert: number
-    }
-    umsatzVormonat?: number
-    monat?: string
-  }
+  const result = await parseBody(req, Schema)
+  if (!result.ok) return result.error
+  const body = result.data
 
   const prompt = `Du bist ein Unternehmensberater-Assistent für ein deutsches KMU. Erstelle einen professionellen Monatsbericht.
 

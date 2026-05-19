@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
 import { getServerOpenAiToolSettings } from '@/lib/ai-settings'
+import { parseBody } from '@/lib/validation'
+
+const Schema = z.object({
+  umsatzDaten: z.array(z.object({
+    monat: z.string().trim().max(40),
+    umsatz: z.number().finite(),
+    kosten: z.number().finite(),
+  })).max(60).optional(),
+  steuersatz: z.number().min(0).max(100).optional(),
+})
 
 export async function POST(req: NextRequest) {
   const { isDemo, user, error } = await getRouteAccess(req)
@@ -12,10 +23,9 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'Kein OpenAI API-Key konfiguriert.' }, { status: 500 })
 
-  const body = await req.json() as {
-    umsatzDaten?: Array<{ monat: string; umsatz: number; kosten: number }>
-    steuersatz?: number
-  }
+  const result = await parseBody(req, Schema)
+  if (!result.ok) return result.error
+  const body = result.data
 
   const umsatzText = (body.umsatzDaten ?? [])
     .map(d => `${d.monat}: Umsatz ${d.umsatz}€, Kosten ${d.kosten}€, Gewinn ${d.umsatz - d.kosten}€`)
