@@ -71,12 +71,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(emptyResult('Datei ist zu groß. Maximal erlaubt sind 12 MB.'), { status: 413 })
     }
 
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      return NextResponse.json(FALLBACK_RESULT)
+    const buffer = Buffer.from(await file.arrayBuffer())
+
+    // OCR-Original im Storage-Bucket "ocr-originale" archivieren (GoBD-relevant)
+    // Pfad-Konvention: <user_id>/<YYYY-MM-DD>/<timestamp>-<filename>
+    let originalPath: string | null = null
+    if (access.user && access.supabase) {
+      try {
+        const now = new Date()
+        const dateFolder = now.toISOString().slice(0, 10)
+        const safeName = (file.name || 'dokument').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)
+        const path = `${access.user.id}/${dateFolder}/${now.getTime()}-${safeName}`
+        const { error: upErr } = await access.supabase.storage
+          .from('ocr-originale')
+          .upload(path, buffer, { upsert: false, contentType: file.type, cacheControl: '3600' })
+        if (!upErr) originalPath = path
+      } catch {
+        // Archivierung ist best-effort; OCR-Analyse läuft trotzdem weiter
+      }
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer())
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ ...FALLBACK_RESULT, originalPath })
+    }
+
     const base64 = buffer.toString('base64')
     const isPdf = file.type === 'application/pdf'
 
@@ -189,11 +208,11 @@ export async function POST(req: NextRequest) {
 
     const text = pickOutputText(data)
     if (!text) {
-      return NextResponse.json(emptyResult('OpenAI hat keine auswertbare Antwort geliefert.'), { status: 502 })
+      return NextResponse.json({ ...emptyResult('OpenAI hat keine auswertbare Antwort geliefert.'), originalPath }, { status: 502 })
     }
 
     try {
-      return NextResponse.json(JSON.parse(text))
+      return NextResponse.json({ ...JSON.parse(text), originalPath })
     } catch {
       return NextResponse.json({
         documentType: 'sonstiges',
@@ -201,6 +220,7 @@ export async function POST(req: NextRequest) {
         summary: text.slice(0, 900),
         extracted: {},
         suggestedActions: ['Antwort prüfen und manuell übernehmen.'],
+        originalPath,
       })
     }
   } catch (err) {
