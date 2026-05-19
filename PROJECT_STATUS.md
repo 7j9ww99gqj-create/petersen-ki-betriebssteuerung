@@ -26,7 +26,7 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Quick-Wins-Sprint** (Commit `5db72fb`): 6 Quick-Win-Aufgaben — Sentry, Error Boundaries, Loading-Skeletons, CI-Pipeline, README+ARCHITECTURE, jsx-a11y.
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Quick-Wins-Sprint** (HEAD `e0f4170`): 6 Quick-Win-Aufgaben + jsx-a11y-Vollfix (430→0) + Sentry-Aktivierung mit Free-Tier-Schutz.
 - Vorheriger Sprint (2026-05-19, Commit `d28aa39`): Code-Qualität-Sprint — Vitest + 40 Tests, Service-Worker + Offline-Cache, KI-Streaming-Support, db.ts/lager.tsx Soft-Splits.
 - Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main).
 - TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19).
@@ -45,10 +45,10 @@
 | 5 | README.md + ARCHITECTURE.md | `README.md`, `ARCHITECTURE.md` | `aaf8dbd` | ✅ |
 | 6 | eslint-plugin-jsx-a11y | `.eslintrc.json`, `eslint-plugin-jsx-a11y` | `5db72fb` | ✅ |
 
-**Offene jsx-a11y Folge-Aufgaben (nur Warnings, kein Build-Blocker):**
-- 299× `label-has-associated-control`: `<label><span>...</span><input/></label>` Pattern — valides HTML, Plugin erkennt Nesting nicht. Fix: `htmlFor`+`id` bei jedem Input ergänzen oder `eslint-disable` per File.
-- 62× `click-events-have-key-events` + 61× `no-static-element-interactions`: `<div onClick>` Patterns — Fix: auf `<button>` oder `role="button"` + `onKeyDown` umstellen.
-- 5× `no-img-element`: `<img>` statt `<Image>` — Fix: `next/image` verwenden.
+**Manuelle Folge-Schritte (alle erledigt):**
+- ✅ jsx-a11y Warnings fixen — Commit `796a416`: 430 Warnings → 0 (label `htmlFor`/`id`, `div onClick` → `role="button"` + `onKeyDown`, `<img>` → `<Image>` wo möglich)
+- ✅ Sentry DSN aktiviert — Commits `d593a38` + `e0f4170`: Vercel-Env-Vars gesetzt (Org `content-creators-agency`, Project `javascript-nextjs`), Free-Tier-Schutz (Performance + Replays deaktiviert, nur Errors), 5k-Errors-Limit/Monat
+- ⏳ Optional offen: `SENTRY_AUTH_TOKEN` für Source-Maps-Upload (sonst minifizierte Stack-Traces in Sentry)
 
 ### Code-Qualität-Sprint (2026-05-19) — 10-Aufgaben-Optimierung
 Pragmatischer Soft-Split-Ansatz: kleine sichere Wins zuerst live, große Refactorings als Vorbereitung für Folge-Sessions.
