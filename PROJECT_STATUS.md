@@ -26,10 +26,33 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Pondruff-Workflow-Sprint** (Feature-Flags, OCR-Review-Modal, Kunde-Auto-Match, Sync-Badges, Resync-Button, BüroPilot-Pondruff-Quelle, Workflow-Stepper, Positions-Sync-Fix).
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Code-Qualität-Sprint** (Commit `d28aa39`): 10-Aufgaben-Optimierung — Vitest + 40 Tests, Service-Worker + Offline-Cache, KI-Streaming-Support, db.ts/lager.tsx Soft-Splits, Vision-Fallback raus, OCR-Konsolidierung, zentrale UI-Komponenten, Demo-Wrapper, JSON-Preis-Konfig.
+- Vorheriger Sprint (2026-05-19, Commit `3665a28`): Pondruff-Workflow + Komma-Zahlen-Fix (DecimalInput, parseDecimal, deutsche Dezimal-OCR).
 - Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main, HTTP 307 → OK).
 - TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19).
+- Tests: `npm test` — ✅ 40 Tests (3 Files: pondruff-price, demo-helpers, lager-helpers).
 - Supabase Storage: ~100 GB Plan — neue Buckets `lager-bilder`, `ocr-originale`, `firma-branding`, `db-backups` (alle privat, user-scoped RLS).
+
+### Code-Qualität-Sprint (2026-05-19) — 10-Aufgaben-Optimierung
+Pragmatischer Soft-Split-Ansatz: kleine sichere Wins zuerst live, große Refactorings als Vorbereitung für Folge-Sessions.
+
+| # | Aufgabe | Datei(en) | Commit | Status |
+|---|---------|-----------|--------|--------|
+| 10 | PRICE_TABLE in JSON-Konfig auslagern | `lib/pondruff-price-config.json`, `lib/pondruff.ts` | `0e65aa8` | ✅ |
+| 9  | OCR-Vision-Helper konsolidieren | `lib/pondruff-ocr.ts`, `app/api/pondruff/ocr-*/route.ts` | `6b9a020` | ✅ |
+| 4  | Vision-Fallback in Bauteilsuche entfernen (Kosten-Spar) | `app/api/pondruff/bauteil-suche/route.ts` | `19747d3` | ✅ |
+| 6  | Vitest + 22 Kern-Tests einrichten | `vitest.config.ts`, `tests/pondruff-price.test.ts`, `package.json` | `41444b3` | ✅ |
+| 5  | Zentrale Modal/Toast-Komponenten + useToast-Hook | `components/ui/Modal.tsx`, `components/ui/Toast.tsx`, `components/buero/shared.tsx` | `9425e05` | ✅ |
+| 7  | Service Worker beim App-Start auto-registrieren + Asset-Cache | `public/sw.js v3`, `components/ServiceWorkerRegister.tsx`, `app/layout.tsx` | `a200596` | ✅ |
+| 8  | KI-Streaming-Support in /api/chat (SSE für freie Texte) | `app/api/chat/route.ts` | `3665a28` (parallel-merge) | ✅ |
+| 3  | Demo-Mode-Wrapper (ifLive / skipInDemo / useDemoCheck) + 7 Tests | `lib/demo.ts`, `tests/demo-helpers.test.ts` | `26278c4` | ✅ |
+| 1  | lib/db.ts Soft-Split — Helpers/Types/Normalize in _shared.ts (3412 → 3036 Zeilen) | `lib/db/_shared.ts`, `lib/db.ts` | `3022b2e` | ✅ |
+| 2  | lager-helpers Soft-Split (mhdStatus, getBestStellplatz) + 11 Tests | `lib/lager-helpers.ts`, `tests/lager-helpers.test.ts`, `app/dashboard/lager/page.tsx` | `d28aa39` | ✅ |
+
+**Voll-Refactorings bleiben offen für Folge-Sessions** (zu groß für sicheren Auto-Push):
+- lib/db.ts vollständig nach Domains splitten (lager.ts, buero.ts, einkauf.ts, …) — derzeit 3036 Zeilen
+- lager/page.tsx 12 Tabs in eigene Files extrahieren — derzeit ~3760 Zeilen, tief verschachtelter Page-State
+- Demo-Wrapper auf alle 580 `if (isDemo)`-Altstellen anwenden — graduell, pro neuer Aufgabe
 
 ### Rechnungs-/Angebots-Archiv (2026-05-19) — GoBD-konform
 - **Bucket** `rechnungen-archiv` (privat, user-scoped RLS, KEIN delete-policy für anon/auth → unveränderlich)
