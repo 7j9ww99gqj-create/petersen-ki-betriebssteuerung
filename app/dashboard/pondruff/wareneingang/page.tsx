@@ -83,6 +83,8 @@ export default function WareneingangPage() {
     sessionStorage.setItem('pondruff_prefill', JSON.stringify({
       customer: form.customer,
       delivery_id: form.delivery_id,
+      operator: form.operator,
+      status: form.status,
       positions: aiPositions,
       ai_data: aiData,
     }))

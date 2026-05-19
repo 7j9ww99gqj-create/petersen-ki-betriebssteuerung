@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
 import {
   PRICE_COATINGS, blankPricePosition, calcPricePosition, priceDefaultFactor,
@@ -133,6 +133,7 @@ const lblStyle: React.CSSProperties = { fontSize: 11, color: '#aeb9c8', marginBo
 
 export default function PreisrechnerPage() {
   const sp = useSearchParams()
+  const router = useRouter()
   const [positions, setPositions] = useState<PricePosition[]>([])
   const [customer, setCustomer] = useState('')
   const [project, setProject] = useState('')
@@ -154,17 +155,22 @@ export default function PreisrechnerPage() {
     ocr_note: string
   }
   const [review, setReview] = useState<OcrReview | null>(null)
+  const [prefillInfo, setPrefillInfo] = useState<{ operator?: string; status?: string; deliveryId?: string } | null>(null)
+  const isPrefill = sp.get('prefill') === '1'
 
   useEffect(() => {
     if (sp.get('prefill') !== '1' || typeof window === 'undefined') return
     const raw = sessionStorage.getItem('pondruff_prefill')
     if (!raw) return
     try {
-      const pf = JSON.parse(raw) as { customer?: string; delivery_id?: string; positions?: Record<string, unknown>[]; ai_data?: Record<string, unknown> }
+      const pf = JSON.parse(raw) as { customer?: string; delivery_id?: string; operator?: string; status?: string; positions?: Record<string, unknown>[]; ai_data?: Record<string, unknown> }
       if (pf.customer) setCustomer(normalizePriceCustomer(pf.customer))
       if (pf.delivery_id) setProject(pf.delivery_id)
       const ad = pf.ai_data as Record<string, unknown> | undefined
       if (ad?.purchase_order) setGlobalPO(String(ad.purchase_order))
+      if (pf.operator || pf.status || pf.delivery_id) {
+        setPrefillInfo({ operator: pf.operator, status: pf.status, deliveryId: pf.delivery_id })
+      }
       if (Array.isArray(pf.positions) && pf.positions.length) {
         const arr: PricePosition[] = pf.positions.map((raw, i) => {
           const p = raw as Partial<PricePosition> & { raw_dimension_text?: unknown }
@@ -185,7 +191,8 @@ export default function PreisrechnerPage() {
         })
         setPositions(arr)
       }
-      sessionStorage.removeItem('pondruff_prefill')
+      // Prefill NICHT direkt löschen — bleibt erhalten, wenn User zurück navigiert.
+      // Wird erst nach saveOrder() oder explizitem Verlassen entfernt.
       setToast({ msg: `${pf.positions?.length || 0} Position(en) aus Wareneingang übernommen`, ok: true })
       setTimeout(() => setToast(null), 3500)
     } catch {}
@@ -279,6 +286,9 @@ export default function PreisrechnerPage() {
         status: 'preisauftrag',
       })
       if (error) throw error
+      // Prefill nach erfolgreichem Speichern entfernen
+      if (typeof window !== 'undefined') sessionStorage.removeItem('pondruff_prefill')
+      setPrefillInfo(null)
       showToast('Auftrag in Büro/WISO gespeichert. Dort kannst du nach BüroPilot oder WISO exportieren.')
     } catch (e) {
       showToast((e instanceof Error ? e.message : String(e)) || 'Speichern fehlgeschlagen', false)
@@ -287,6 +297,16 @@ export default function PreisrechnerPage() {
 
   return (
     <div>
+      {isPrefill && prefillInfo && (
+        <div className="pk-card" style={{ marginBottom: 10, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', padding: 12, background: 'rgba(22,132,255,.06)', border: '1px solid rgba(22,132,255,.25)' }}>
+          <button className="pk-btn-ghost" onClick={() => router.push('/dashboard/pondruff/wareneingang')} style={{ fontSize: 12 }}>← Zurück zum Wareneingang</button>
+          <div style={{ fontSize: 12, color: '#aeb9c8', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+            {prefillInfo.deliveryId && <span>📥 Lieferschein: <b style={{ color: '#f8fbff' }}>{prefillInfo.deliveryId}</b></span>}
+            {prefillInfo.operator && <span>🧑 Bediener: <b style={{ color: '#f8fbff' }}>{prefillInfo.operator}</b></span>}
+            {prefillInfo.status && <span>· Status: <b style={{ color: '#f8fbff' }}>{prefillInfo.status}</b></span>}
+          </div>
+        </div>
+      )}
       <div className="pk-card" style={{ marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           <div>
