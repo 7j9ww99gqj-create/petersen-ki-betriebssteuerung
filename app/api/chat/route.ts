@@ -4,6 +4,7 @@ import { getRouteAccess } from '@/lib/server-auth'
 import { getServerAiFeatureSettings } from '@/lib/ai-settings'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { getCachedResponse, setCachedResponse, hashCacheKey } from '@/lib/ai-cache'
+import { logAiUsage, extractUsage } from '@/lib/ai-usage'
 
 const ChatRequestSchema = z.object({
   messages: z.array(z.object({
@@ -374,6 +375,7 @@ Regeln:
         access.supabase, access.user.id, cacheKey,
       )
       if (cached) {
+        logAiUsage({ userId: access.user.id, route: 'chat', model: 'gpt-4o-mini', cached: true })
         return NextResponse.json({ ...cached, cached: true })
       }
     }
@@ -465,6 +467,10 @@ Regeln:
     }
 
     const rawText = pickOutputText(data) || 'Keine Antwort erhalten.'
+    if (access.user) {
+      const usage = extractUsage(data)
+      logAiUsage({ userId: access.user.id, route: 'chat', model: process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini', inputTokens: usage.input, outputTokens: usage.output })
+    }
 
     // Bei structuredOutput: JSON parsen, sonst plain text zurückgeben
     if (structuredOutput) {

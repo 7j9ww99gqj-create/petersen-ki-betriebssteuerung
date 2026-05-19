@@ -4,6 +4,7 @@ import { getRouteAccess } from '@/lib/server-auth'
 import { getServerOpenAiToolSettings } from '@/lib/ai-settings'
 import { parseBody } from '@/lib/validation'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { logAiUsage, extractUsage } from '@/lib/ai-usage'
 
 const Schema = z.object({
   kpi: z.object({
@@ -75,5 +76,7 @@ Maximal 400 Wörter, professionell, auf Deutsch.`
   }
 
   const data = await res.json() as { choices: Array<{ message: { content: string } }> }
+  const usage = extractUsage(data)
+  logAiUsage({ userId: user.id, route: 'openai/monatsbericht', model: 'gpt-4o-mini', inputTokens: usage.input, outputTokens: usage.output })
   return NextResponse.json({ reply: data.choices[0]?.message?.content ?? '' })
 }

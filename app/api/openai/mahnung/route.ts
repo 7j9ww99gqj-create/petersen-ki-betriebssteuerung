@@ -4,6 +4,7 @@ import { getRouteAccess } from '@/lib/server-auth'
 import { getServerOpenAiToolSettings } from '@/lib/ai-settings'
 import { parseBody } from '@/lib/validation'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { logAiUsage, extractUsage } from '@/lib/ai-usage'
 
 const Schema = z.object({
   rechnung: z.object({
@@ -71,5 +72,7 @@ Schreibe einen professionellen Mahnbrief auf Deutsch.
   }
 
   const data = await res.json() as { choices: Array<{ message: { content: string } }> }
+  const usage = extractUsage(data)
+  logAiUsage({ userId: user.id, route: 'openai/mahnung', model: 'gpt-4o-mini', inputTokens: usage.input, outputTokens: usage.output })
   return NextResponse.json({ reply: data.choices[0]?.message?.content ?? '' })
 }
