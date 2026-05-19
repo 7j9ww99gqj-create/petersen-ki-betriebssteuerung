@@ -21,6 +21,8 @@ import {
   getBueroAuftraege,
 } from '@/lib/db'
 import PilotDocumentArchive from '@/components/PilotDocumentArchive'
+import { Modal } from '@/components/ui/Modal'
+import { useGlobalToast } from '@/components/ui/ToastProvider'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
 
@@ -184,35 +186,6 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
   )
 }
 
-// Fixed-position Toast (success = green, error = red)
-function Toast({ msg, isError }: { msg: string; isError?: boolean }) {
-  if (!msg) return null
-  return (
-    <div style={{
-      position: 'fixed', bottom: 90, right: 24, zIndex: 9999,
-      padding: '14px 20px', borderRadius: 12, minWidth: 260, maxWidth: 400,
-      background: isError ? 'rgba(244,63,94,.15)' : 'rgba(37,211,102,.12)',
-      border: `1px solid ${isError ? 'rgba(244,63,94,.4)' : 'rgba(37,211,102,.3)'}`,
-      color: isError ? '#fb7185' : '#4ddb7e',
-      fontSize: 14, fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,.4)',
-    }}>{msg}</div>
-  )
-}
-
-// Modal-Pattern
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose() }}>
-      <div role="presentation" className="pk-card fade-in" style={{ width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', position: 'relative' }} onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
 
 // ── Edit-Modal für Arbeitskarten ──────────────────────────────────────────────
 
@@ -331,8 +304,7 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [filterPrio, setFilterPrio] = useState<string>('Alle')
-  const [toast, setToast] = useState('')
-  const [toastError, setToastError] = useState(false)
+  const toast = useGlobalToast()
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(!isDemo)
   const [retryKey, setRetryKey] = useState(0)
@@ -377,8 +349,7 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
   }, [newKarteParams?.auftragsnr, newKarteParams?.beschreibung])
 
   const showToast = (msg: string, error = false) => {
-    setToast(msg); setToastError(error)
-    setTimeout(() => { setToast(''); setToastError(false) }, 4000)
+    if (error) toast.error(msg); else toast.success(msg)
   }
 
   const filtered = karten.filter(k =>
@@ -478,7 +449,6 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
 
   return (
     <div>
-      <Toast msg={toast} isError={toastError} />
       {errorMsg && (
         <div style={{
           marginBottom: 16, padding: '12px 16px', borderRadius: 12,
@@ -744,8 +714,7 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
 function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeiterNamen: string[] }) {
   const [buchungen, setBuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])
   const [form, setForm] = useState({ mitarbeiter: '', auftragsnr: '', stunden: '', taetigkeit: '' })
-  const [toast, setToast] = useState('')
-  const [toastError, setToastError] = useState(false)
+  const toast = useGlobalToast()
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(!isDemo)
   const [retryKey, setRetryKey] = useState(0)
@@ -761,8 +730,7 @@ function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitar
   }, [isDemo, retryKey])
 
   const showToast = (msg: string, error = false) => {
-    setToast(msg); setToastError(error)
-    setTimeout(() => { setToast(''); setToastError(false) }, 4000)
+    if (error) toast.error(msg); else toast.success(msg)
   }
 
   const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -797,7 +765,6 @@ function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitar
 
   return (
     <div>
-      <Toast msg={toast} isError={toastError} />
       {errorMsg && (
         <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13, display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ flex: 1 }}>⚠️ {errorMsg}</span>
@@ -899,8 +866,7 @@ function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitar
 function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeiterNamen: string[] }) {
   const [material, setMaterial] = useState<Materialverbrauch[]>(isDemo ? demoMaterial : [])
   const [form, setForm] = useState({ artikel: '', menge: '', einheit: 'Stk', auftragsnr: '', mitarbeiter: '' })
-  const [toast, setToast] = useState('')
-  const [toastError, setToastError] = useState(false)
+  const toast = useGlobalToast()
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(!isDemo)
   const [retryKey, setRetryKey] = useState(0)
@@ -924,8 +890,7 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
   }, [isDemo, retryKey])
 
   const showToast = (msg: string, error = false) => {
-    setToast(msg); setToastError(error)
-    setTimeout(() => { setToast(''); setToastError(false) }, 4000)
+    if (error) toast.error(msg); else toast.success(msg)
   }
 
   const handleSave = async () => {
@@ -977,7 +942,6 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
 
   return (
     <div>
-      <Toast msg={toast} isError={toastError} />
       {errorMsg && (
         <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13, display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ flex: 1 }}>⚠️ {errorMsg}</span>
@@ -1108,8 +1072,7 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
 function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeiterNamen: string[] }) {
   const [protokolle, setProtokolle] = useState<Pruefprotokoll[]>(isDemo ? demoPruefung : [])
   const [form, setForm] = useState({ auftragsnr: '', pruefpunkt: '', pruefer: '' })
-  const [toast, setToast] = useState('')
-  const [toastError, setToastError] = useState(false)
+  const toast = useGlobalToast()
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(!isDemo)
   const [retryKey, setRetryKey] = useState(0)
@@ -1125,8 +1088,7 @@ function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeit
   }, [isDemo, retryKey])
 
   const showToast = (msg: string, error = false) => {
-    setToast(msg); setToastError(error)
-    setTimeout(() => { setToast(''); setToastError(false) }, 4000)
+    if (error) toast.error(msg); else toast.success(msg)
   }
 
   const handleErgebnis = async (id: number, ergebnis: 'OK' | 'Fehler' | 'Offen') => {
@@ -1203,7 +1165,6 @@ function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeit
 
   return (
     <div>
-      <Toast msg={toast} isError={toastError} />
       {errorMsg && (
         <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', color: '#ff8080', fontSize: 13, display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ flex: 1 }}>⚠️ {errorMsg}</span>
@@ -1354,12 +1315,10 @@ function MitarbeiterTab({ isDemo, mitarbeiter, setMitarbeiter }: {
   const [form, setForm] = useState({ id: '', name: '', rolle: '', email: '', telefon: '', aktiv: true, notiz: '' })
   const [editId, setEditId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [toast, setToast] = useState('')
-  const [toastError, setToastError] = useState(false)
+  const toast = useGlobalToast()
 
   const showToast = (msg: string, error = false) => {
-    setToast(msg); setToastError(error)
-    setTimeout(() => { setToast(''); setToastError(false) }, 3500)
+    if (error) toast.error(msg); else toast.success(msg)
   }
 
   const reset = () => {
@@ -1412,7 +1371,6 @@ function MitarbeiterTab({ isDemo, mitarbeiter, setMitarbeiter }: {
 
   return (
     <div>
-      <Toast msg={toast} isError={toastError} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
         {[
           { label: 'Mitarbeiter gesamt', value: String(mitarbeiter.length), icon: '👷', color: '#a78bfa' },
@@ -1489,12 +1447,10 @@ function BereicheTab({ isDemo, bereiche, setBereiche }: {
   const [form, setForm] = useState({ name: '', typ: 'Bereich', aktiv: true, notiz: '' })
   const [editId, setEditId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [toast, setToast] = useState('')
-  const [toastError, setToastError] = useState(false)
+  const toast = useGlobalToast()
 
   const showToast = (msg: string, error = false) => {
-    setToast(msg); setToastError(error)
-    setTimeout(() => { setToast(''); setToastError(false) }, 3500)
+    if (error) toast.error(msg); else toast.success(msg)
   }
 
   const reset = () => {
@@ -1539,7 +1495,6 @@ function BereicheTab({ isDemo, bereiche, setBereiche }: {
 
   return (
     <div>
-      <Toast msg={toast} isError={toastError} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
         {[
           { label: 'Gesamt', value: String(bereiche.length), icon: '🏭', color: '#a78bfa' },
@@ -1621,13 +1576,11 @@ function WartungTab({ isDemo, bereiche, mitarbeiterNamen, wartungen, setWartunge
   const [form, setForm] = useState({ maschine: '', intervall: 'monatlich', faellig_am: isoToday(), letzte_wartung: '', verantwortlich: '', status: 'geplant' as WartungStatus, notiz: '' })
   const [editId, setEditId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [toast, setToast] = useState('')
-  const [toastError, setToastError] = useState(false)
+  const toast = useGlobalToast()
   const maschinen = bereiche.filter(b => b.aktiv !== false && ['Maschine', 'Anlage', 'Arbeitsplatz'].includes(b.typ ?? ''))
 
   const showToast = (msg: string, error = false) => {
-    setToast(msg); setToastError(error)
-    setTimeout(() => { setToast(''); setToastError(false) }, 3500)
+    if (error) toast.error(msg); else toast.success(msg)
   }
   const reset = () => {
     setForm({ maschine: '', intervall: 'monatlich', faellig_am: isoToday(), letzte_wartung: '', verantwortlich: '', status: 'geplant', notiz: '' })
@@ -1686,7 +1639,6 @@ function WartungTab({ isDemo, bereiche, mitarbeiterNamen, wartungen, setWartunge
 
   return (
     <div>
-      <Toast msg={toast} isError={toastError} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
         {[
           { label: 'Wartungen', value: wartungen.length, icon: '🧰', color: '#a78bfa' },
@@ -1781,13 +1733,11 @@ function StoerungenTab({ isDemo, bereiche, mitarbeiterNamen, stoerungen, setStoe
 }) {
   const [form, setForm] = useState({ maschine: '', titel: '', beschreibung: '', prioritaet: 'Mittel' as Prioritaet, gemeldet_von: '', notiz: '' })
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [toast, setToast] = useState('')
-  const [toastError, setToastError] = useState(false)
+  const toast = useGlobalToast()
   const maschinen = bereiche.filter(b => b.aktiv !== false && ['Maschine', 'Anlage', 'Arbeitsplatz'].includes(b.typ ?? ''))
 
   const showToast = (msg: string, error = false) => {
-    setToast(msg); setToastError(error)
-    setTimeout(() => { setToast(''); setToastError(false) }, 3500)
+    if (error) toast.error(msg); else toast.success(msg)
   }
   const save = async () => {
     if (!form.maschine || !form.titel.trim()) { showToast('Maschine und Titel sind Pflicht', true); return }
@@ -1829,7 +1779,6 @@ function StoerungenTab({ isDemo, bereiche, mitarbeiterNamen, stoerungen, setStoe
 
   return (
     <div>
-      <Toast msg={toast} isError={toastError} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
         {[
           { label: 'Offene Störungen', value: offen, icon: '🚨', color: offen > 0 ? '#f43f5e' : '#10b981' },
