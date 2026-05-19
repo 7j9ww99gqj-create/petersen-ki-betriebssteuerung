@@ -12,7 +12,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  */
 
 export function hashCacheKey(parts: unknown): string {
-  return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 32)
+  const serialized = JSON.stringify(parts) ?? 'null'
+  return createHash('sha256').update(serialized).digest('hex').slice(0, 32)
 }
 
 export async function getCachedResponse<T>(
