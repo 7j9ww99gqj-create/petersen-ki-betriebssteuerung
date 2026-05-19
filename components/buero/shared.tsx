@@ -51,8 +51,26 @@ export function Toast({ msg, error }: { msg: string; error?: boolean }) {
 // Modal-Komponente (nach PlanungPilot-Pattern)
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div role="dialog" aria-modal="true" aria-label={title} data-no-swipe="true" style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={onClose}>
-      <div className="pk-card fade-in" data-no-swipe="true" style={{ width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', position: 'relative' }} onClick={e => e.stopPropagation()}>
+    <div role="dialog" aria-modal="true" aria-label={title} data-no-swipe="true"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 500,
+        background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)',
+        // flex-start statt center: Modal klebt oben und überschreitet nie den Header,
+        // auch nicht bei kleinen Displays. Der Backdrop scrollt, falls Modal zu lang.
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        padding: '32px 16px',
+        overflowY: 'auto',
+      }}
+      onClick={onClose}
+    >
+      <div className="pk-card fade-in" data-no-swipe="true"
+        style={{
+          width: '100%', maxWidth: 600,
+          maxHeight: 'calc(100vh - 64px)', overflowY: 'auto',
+          position: 'relative', margin: 'auto 0',
+        }}
+        onClick={e => e.stopPropagation()}>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{title}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
@@ -63,13 +81,17 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
   )
 }
 
-// Inline-Löschbestätigung
+// Inline-Löschbestätigung — stoppt Event-Bubbling, damit der umgebende
+// <tr onClick={openEdit}> nicht versehentlich getriggert wird.
 export function DeleteConfirm({ label, onConfirm, onCancel }: { label: string; onConfirm: () => void; onCancel: () => void }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,80,80,.08)', border: '1px solid rgba(255,80,80,.2)' }}>
+    <div
+      onClick={e => e.stopPropagation()}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,80,80,.08)', border: '1px solid rgba(255,80,80,.2)' }}
+    >
       <span style={{ fontSize: 12, color: '#ff8080', fontWeight: 600 }}>{label} löschen?</span>
-      <button onClick={onConfirm} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.15)', color: '#ff8080', cursor: 'pointer', fontWeight: 700 }}>Ja</button>
-      <button onClick={onCancel} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
+      <button onClick={e => { e.stopPropagation(); onConfirm() }} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, border: '1px solid rgba(255,80,80,.4)', background: 'rgba(255,80,80,.15)', color: '#ff8080', cursor: 'pointer', fontWeight: 700 }}>Ja</button>
+      <button onClick={e => { e.stopPropagation(); onCancel() }} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#aeb9c8', cursor: 'pointer' }}>Nein</button>
     </div>
   )
 }
