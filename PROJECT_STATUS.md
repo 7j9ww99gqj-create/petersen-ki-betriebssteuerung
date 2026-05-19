@@ -26,9 +26,35 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, Commit `6ea978a` (OpenAI Piloten-Tools: Steuerprognose, Mahnungsgenerator, E-Mail Assistent, Monatsbericht).
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Storage-Sprint** (Artikel-Bilder, OCR-Archiv, DB-Backup, Logo-Kompression).
 - Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main, HTTP 307 → OK).
 - TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19).
+- Supabase Storage: ~100 GB Plan — neue Buckets `lager-bilder`, `ocr-originale`, `firma-branding`, `db-backups` (alle privat, user-scoped RLS).
+
+### Storage-Sprint (2026-05-19) — Nutzung erweiterten Supabase-Storages
+| # | Aufgabe | Dateien | Status |
+|---|---------|---------|--------|
+| 1 | RLS Storage-Buckets anlegen | `20260519500000_storage_buckets.sql` | ✅ |
+| 2 | Bild-Kompression-Util (WebP, max 1600px) | `lib/image-compress.ts` | ✅ |
+| 3 | Artikel-Bild im Lager (1 Bild pro Artikel) | `lager/page.tsx`, `lib/db.ts`, `20260519510000_lager_artikel_bild.sql` | ✅ |
+| 4 | OCR-Originale aufbewahren (GoBD) | `app/api/document-ai/route.ts` | ✅ |
+| 5 | Firmenlogo-Kompression vor Upload | `einstellungen/page.tsx` | ✅ |
+| 6 | Nightly DB-Backup (vollständiger JSON-Dump, gzipped, 30 Tage Retention) | `app/api/backup/auto/route.ts`, `20260519520000_cloud_backups_storage_path.sql` | ✅ |
+
+**Details:**
+- **Aufgabe 1**: 4 neue private Buckets mit user-scoped RLS-Policies (Pfad-Konvention `<user_id>/...`). `db-backups` ohne anon/auth-Policies — nur Service-Role-Zugriff.
+- **Aufgabe 2**: `lib/image-compress.ts` mit `compressImage()` (WebP, max 1600×1600px, q=0.82) — wird in Artikel-Modal und Logo-Upload genutzt.
+- **Aufgabe 3**: Spalte `bild_path` in `lager_artikel`. Modal mit Upload-Vorschau + Kompressions-Info (Original→Komprimiert KB). Thumbnail-Spalte in Bestand-Tabelle (Lazy-Loading). Signed URLs (1h TTL, CDN-cached). Cleanup: `deleteLagerArtikel()` entfernt das Bild aus Storage.
+- **Aufgabe 4**: `app/api/document-ai/route.ts` archiviert Original (PDF/PNG/JPG) im Bucket `ocr-originale` BEVOR OpenAI analysiert — best-effort, blockiert die Analyse nicht. Pfad: `<user_id>/<date>/<timestamp>-<filename>`. Response enthält `originalPath` zur Verknüpfung.
+- **Aufgabe 5**: Logo wird vor Upload via `compressImage()` auf 800×800px komprimiert (q=0.9). SVG bleibt unverändert (Vektor). PDF-Branding war bereits vollständig (`lib/pdf.ts` mit Logo-Header in 4 Layouts).
+- **Aufgabe 6**: `/api/backup/auto` jetzt mit vollständigem JSON-Dump aller 26 User-Tabellen, gzipped (`zlib.gzipSync`), Upload in `db-backups/<user_id>/<date>.json.gz`. CRON_SECRET-Auth. Retention: Backups älter als 30 Tage werden automatisch gelöscht. `cloud_backups` um `storage_path` + `size_bytes` erweitert.
+
+### OpenAI Piloten-Tools (2026-05-19, Commit 6ea978a)
+- **4 neue OpenAI-gestützte Tools** — alle standardmäßig DEAKTIVIERT
+  - `📊 Steuerprognose` → AnalysePilot KI-Tab · `/api/openai/steuerprognose`
+  - `📨 Mahnungsgenerator` → BüroPilot KI-Tools Tab · `/api/openai/mahnung`
+  - `✉️ E-Mail Assistent` → BüroPilot KI-Tools Tab · `/api/openai/email-assistent`
+  - `📋 Monatsbericht Generator` → AnalysePilot KI-Tab · `/api/openai/monatsbericht`
 
 ### OpenAI Piloten-Tools (2026-05-19, Commit 6ea978a)
 - **4 neue OpenAI-gestützte Tools** — alle standardmäßig DEAKTIVIERT
@@ -40,12 +66,6 @@
 - **`lib/db.ts`**: `OpenAiToolSettings` Typ, `getOpenAiToolSettings()`, `updateOpenAiToolSettings()` — analog zu Marketing-KI-Pattern
 - **`lib/ai-settings.ts`**: `getServerOpenAiToolSettings(userId)` — Server-Side Feature-Flag-Check
 - **`OwnerAiControlPanel.tsx`**: Neue „✨ OpenAI Piloten-Tools" Sektion (grüne Akzentfarbe #10b981, 4 Toggles, 0/4 AKTIV Status)
-- **`components/buero/KiToolsTab.tsx`** (neu): E-Mail Assistent + Mahnungsgenerator im neuen BüroPilot Tab
-- **`types/buero.ts`**: Tab-Union um `'ki-tools'` erweitert
-- **`components/buero/shared.tsx`**: `🤖 KI-Tools` Tab in TabBar ergänzt
-- **`app/dashboard/buero/page.tsx`**: `KiToolsTab` importiert und eingebunden
-- **`app/dashboard/analyse/page.tsx`**: KI-Monatsbericht + KI-Steuerprognose Karten im `ki`-Tab, inkl. State + Handler + Copy-to-Clipboard
-- **Sicherheit**: Alle 4 API-Routen prüfen Auth + Feature-Flag — keine Kosten ohne Aktivierung
 - **Modell**: `gpt-4o-mini` · ca. 0,001–0,005 € / Aufruf
 
 ### AnalysePilot Mobile-Optimierung (2026-05-19, Commit 7ccbf03)
@@ -203,9 +223,9 @@
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-19, Commit `b9185eb`  
-**Letzte Session (7-Task-Sprint):** cron push-alerts Spaltenfehler, Zod-Validierung /api/chat, DB-Indexes (8 Tabellen), SkeletonCard, EmptyState, einkaufspreis-Spalte  
-**Nächster Focus:** Weitere UX-Verbesserungen, Stripe Analytics, AnalysePilot Lagerwert nutzt jetzt einkaufspreis-Spalte  
+**Letzter Stand:** 2026-05-19, **Storage-Sprint abgeschlossen** (6 Aufgaben, 4 neue Buckets, 3 Migrations)  
+**Letzte Session:** Artikel-Bilder mit Kompression+CDN, OCR-Original-Archiv (GoBD), nightly DB-Backup mit Retention, Logo-Kompression  
+**Nächster Focus:** UI-Test der Bild-Uploads im Live-Deploy, evtl. PDF-Anhänge für Rechnungen archivieren  
 **Blocker:** Keine  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
