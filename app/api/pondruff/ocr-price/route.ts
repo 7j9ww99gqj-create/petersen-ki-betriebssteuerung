@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
+import { requirePondruffFeature } from '@/lib/pondruff-server'
 import { POND_USER_EMAIL, PRICE_COATINGS, normalizePriceCoating, normalizePriceCustomer } from '@/lib/pondruff'
 
 // GPT-4 Vision OCR fuer Preisrechner-Positionen (Pondruff-Modul).
@@ -13,6 +14,9 @@ export async function POST(req: NextRequest) {
   if (!access.user || access.user.email?.toLowerCase() !== POND_USER_EMAIL) {
     return NextResponse.json({ error: 'Nicht berechtigt' }, { status: 403 })
   }
+
+  const blocked = await requirePondruffFeature('ocr_preisrechner', access.user.id)
+  if (blocked) return blocked
 
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'OPENAI_API_KEY fehlt' }, { status: 500 })

@@ -896,6 +896,42 @@ export async function updateBillingSubscriptionControls(id: string, input: {
   return normalizeBillingSubscription(data as BillingSubscriptionRow)
 }
 
+// ── Pondruff Feature-Flags ───────────────────────────────────────────────────
+
+import { POND_DEFAULT_FEATURE_FLAGS, type PondruffFeatureFlags, type PondruffFeatureKey } from './pondruff'
+
+type PondruffFeatureFlagsRow = {
+  user_id: string
+  ocr_wareneingang: boolean | null
+  ocr_preisrechner: boolean | null
+  ki_bauteilsuche: boolean | null
+  wiso_sync: boolean | null
+  updated_at: string | null
+}
+
+function normalizeFlags(row: PondruffFeatureFlagsRow | null): PondruffFeatureFlags {
+  if (!row) return { ...POND_DEFAULT_FEATURE_FLAGS }
+  return {
+    ocr_wareneingang: row.ocr_wareneingang ?? true,
+    ocr_preisrechner: row.ocr_preisrechner ?? true,
+    ki_bauteilsuche: row.ki_bauteilsuche ?? true,
+    wiso_sync: row.wiso_sync ?? true,
+  }
+}
+
+// Pondruff-User liest seine eigenen Flags (RLS: select_self)
+export async function getMyPondruffFeatureFlags(): Promise<PondruffFeatureFlags> {
+  const { data, error } = await db()
+    .from('pondruff_feature_flags')
+    .select('*')
+    .maybeSingle()
+  if (error) {
+    // Bei Fehler: Defaults zurueck — UI wird optimistisch alles freischalten.
+    return { ...POND_DEFAULT_FEATURE_FLAGS }
+  }
+  return normalizeFlags(data as PondruffFeatureFlagsRow | null)
+}
+
 export async function listOwnerNotifications(limit = 20) {
   const { data, error } = await db()
     .from('owner_notifications')

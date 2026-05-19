@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
+import { compressImageDataUrl } from '@/lib/pondruff'
+import { usePondruffFlags } from '@/components/pondruff/usePondruffFlags'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type Entry = {
@@ -30,6 +32,8 @@ export default function WareneingangPage() {
   const [receiptFiles, setReceiptFiles] = useState<File[]>([])
   const [files, setFiles] = useState<{ parts?: File; packaging?: File }>({})
   const [ocrBusy, setOcrBusy] = useState(false)
+  const { flags: pondFlags } = usePondruffFlags()
+  const ocrEnabled = pondFlags.ocr_wareneingang
   const [aiData, setAiData] = useState<Record<string, unknown> | null>(null)
   const [aiPositions, setAiPositions] = useState<Record<string, unknown>[]>([])
 
@@ -48,9 +52,7 @@ export default function WareneingangPage() {
     if (!receiptFiles.length) { showToast('Bitte mindestens ein Lieferschein-Bild auswählen', false); return }
     setOcrBusy(true)
     try {
-      const images = await Promise.all(receiptFiles.map(f => new Promise<string>((res, rej) => {
-        const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f)
-      })))
+      const images = await Promise.all(receiptFiles.map(f => compressImageDataUrl(f)))
       // Bei mehreren Bildern: nutzen die Preis-OCR (Multi-File-fähig + Positionen)
       const endpoint = images.length > 1 ? '/api/pondruff/ocr-price' : '/api/pondruff/ocr-lieferschein'
       const body = images.length > 1 ? { images } : { image: images[0] }
@@ -177,10 +179,15 @@ export default function WareneingangPage() {
           <label><div style={lbl}>Verpackung-Bild</div><input type="file" accept="image/*" onChange={e => setFiles(f => ({ ...f, packaging: e.target.files?.[0] }))} /></label>
         </div>
         {receiptFiles.length > 0 && <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 6 }}>{receiptFiles.length} Lieferschein-Bild(er) ausgewählt</div>}
+        {!ocrEnabled && (
+          <div style={{ marginTop: 8, fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 8, padding: 8 }}>
+            ℹ️ Lieferschein-OCR ist aktuell durch den Inhaber deaktiviert. Lieferscheine können weiterhin manuell erfasst werden.
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: aiPositions.length ? '1fr 1fr' : '1fr', gap: 10, marginTop: 10 }}>
-          <button className="pk-btn-ghost" disabled={ocrBusy || !receiptFiles.length} onClick={runOcr} style={{ width: '100%' }}>
-            {ocrBusy ? '⏳ GPT-4 liest…' : `🤖 GPT-4 Lieferschein auslesen${receiptFiles.length > 1 ? ' (mehrere)' : ''}`}
+          <button className="pk-btn-ghost" disabled={ocrBusy || !receiptFiles.length || !ocrEnabled} onClick={runOcr} style={{ width: '100%' }}>
+            {ocrBusy ? '⏳ GPT-4 liest…' : ocrEnabled ? `🤖 GPT-4 Lieferschein auslesen${receiptFiles.length > 1 ? ' (mehrere)' : ''}` : '🚫 Funktion deaktiviert'}
           </button>
           {aiPositions.length > 0 && (
             <button className="pk-btn" onClick={openInPriceCalc} style={{ width: '100%', background: 'linear-gradient(180deg,#e50909,#b80000)', border: '1px solid rgba(229,9,9,.6)' }}>

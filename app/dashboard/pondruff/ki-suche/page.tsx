@@ -1,5 +1,7 @@
 'use client'
 import { useState } from 'react'
+import { compressImageDataUrl } from '@/lib/pondruff'
+import { usePondruffFlags } from '@/components/pondruff/usePondruffFlags'
 
 type Match = {
   index: number
@@ -22,6 +24,8 @@ export default function KiSuchePage() {
   const [note, setNote] = useState('')
   const [queryDesc, setQueryDesc] = useState('')
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const { flags: pondFlags } = usePondruffFlags()
+  const kiEnabled = pondFlags.ki_bauteilsuche
 
   function showToast(msg: string, ok = true) { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500) }
 
@@ -47,9 +51,7 @@ export default function KiSuchePage() {
     if (!file) { showToast('Bitte Foto auswählen', false); return }
     setBusy(true); setMatches([]); setNote('')
     try {
-      const image = await new Promise<string>((res, rej) => {
-        const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(file)
-      })
+      const image = await compressImageDataUrl(file)
       const resp = await fetch('/api/pondruff/bauteil-suche', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image }),
       })
@@ -77,12 +79,17 @@ export default function KiSuchePage() {
           <div style={lbl}>Such-Foto</div>
           <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
         </label>
-        <button className="pk-btn" disabled={busy || !file} onClick={run} style={{ width: '100%' }}>
-          {busy ? '⏳ KI vergleicht…' : '🔍 Bauteil suchen'}
+        <button className="pk-btn" disabled={busy || !file || !kiEnabled} onClick={run} style={{ width: '100%' }}>
+          {busy ? '⏳ KI vergleicht…' : kiEnabled ? '🔍 Bauteil suchen' : '🚫 Funktion deaktiviert'}
         </button>
-        <button className="pk-btn-ghost" disabled={backfillBusy} onClick={runBackfill} style={{ width: '100%', marginTop: 8, fontSize: 12 }}>
+        <button className="pk-btn-ghost" disabled={backfillBusy || !kiEnabled} onClick={runBackfill} style={{ width: '100%', marginTop: 8, fontSize: 12 }}>
           {backfillBusy ? '⏳ Backfill läuft…' : '⚙️ Embeddings für alte Bauteile nachgenerieren'}
         </button>
+        {!kiEnabled && (
+          <div style={{ marginTop: 8, fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 8, padding: 8 }}>
+            ℹ️ KI-Bauteilsuche ist aktuell durch den Inhaber deaktiviert.
+          </div>
+        )}
       </div>
 
       {(note || queryDesc) && <div className="pk-card" style={{ marginBottom: 14, color: '#aeb9c8', fontSize: 13 }}>

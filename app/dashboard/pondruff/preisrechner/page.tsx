@@ -5,8 +5,9 @@ import { createSupabaseClient } from '@/lib/supabase'
 import {
   PRICE_COATINGS, blankPricePosition, calcPricePosition, priceDefaultFactor,
   normalizePriceCoating, normalizePriceCustomer, buildWisoPriceOrder, wisoOrderTsv,
-  money, type PricePosition, type PondShape,
+  money, compressImageDataUrl, type PricePosition, type PondShape,
 } from '@/lib/pondruff'
+import { usePondruffFlags } from '@/components/pondruff/usePondruffFlags'
 
 function Pos({ pos, idx, onChange, onDelete, isFirst, globalPO, setGlobalPO }: {
   pos: PricePosition; idx: number;
@@ -117,6 +118,8 @@ export default function PreisrechnerPage() {
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [files, setFiles] = useState<File[]>([])
   const [ocrNote, setOcrNote] = useState('')
+  const { flags: pondFlags } = usePondruffFlags()
+  const ocrEnabled = pondFlags.ocr_preisrechner
   const [expected, setExpected] = useState({ positions: 0, coatings: 0, polishing: 0, stripping: 0 })
 
   useEffect(() => {
@@ -172,9 +175,7 @@ export default function PreisrechnerPage() {
     if (!files.length) { showToast('Bitte Datei(en) hochladen', false); return }
     setBusy(true)
     try {
-      const images = await Promise.all(files.map(f => new Promise<string>((res, rej) => {
-        const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f)
-      })))
+      const images = await Promise.all(files.map(f => compressImageDataUrl(f)))
       const resp = await fetch('/api/pondruff/ocr-price', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ images }),
       })
@@ -245,9 +246,14 @@ export default function PreisrechnerPage() {
               <div style={lblStyle}>Rabatt % für alle Positionen</div>
               <input className="pk-input" type="number" min={0} max={100} step={1} value={globalDiscount} onChange={e => setGlobalDiscount(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))} />
             </label>
-            <button className="pk-btn" disabled={busy} onClick={runOcr} style={{ marginTop: 10, width: '100%' }}>
-              {busy ? '⏳ Läuft…' : '🤖 GPT-4 Positionen auslesen'}
+            <button className="pk-btn" disabled={busy || !ocrEnabled} onClick={runOcr} style={{ marginTop: 10, width: '100%' }}>
+              {busy ? '⏳ Läuft…' : ocrEnabled ? '🤖 GPT-4 Positionen auslesen' : '🚫 Funktion deaktiviert'}
             </button>
+            {!ocrEnabled && (
+              <div style={{ marginTop: 8, fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 8, padding: 8 }}>
+                ℹ️ Positionen-OCR ist aktuell durch den Inhaber deaktiviert. Positionen können weiterhin manuell angelegt werden.
+              </div>
+            )}
           </div>
 
           <div>

@@ -107,7 +107,30 @@ supabase/migrations/
   20260519410000_pondruff_auftrag_rechnung.sql     Status + Rechnung-Spalten (Spalten bleiben, UI nicht mehr genutzt)
   20260519420000_pondruff_bauteile_sync.sql        Bauteile-Tabelle + Sync-Spalten
   20260519430000_pondruff_embeddings.sql           pgvector + match_pondruff_bauteile RPC
+  20260519440000_pondruff_feature_flags.sql        pondruff_feature_flags Tabelle (Inhaber-Schalter)
+
+lib/pondruff-server.ts                            ← Server-Helper loadPondruffFeatureFlags + requirePondruffFeature
+components/pondruff/usePondruffFlags.ts           ← Client-Hook fuer Pondruff-Pages
+components/billing/OwnerPondruffFeaturesPanel.tsx ← Inhaber-UI (Einstellungen → Kundensteuerung)
+app/api/owner/pondruff-flags/route.ts             ← GET/POST Flags (nur Inhaber-Email)
 ```
+
+### Inhaber-Steuerung der KI-Funktionen
+
+Im Petersen-KI-Inhaberaccount (`info@petersen-ki-pilot.de`) erscheint unter
+**Einstellungen → Kundensteuerung** ein Panel "Pondruff-Funktionen steuern" mit
+vier Schaltern:
+
+| Flag | Schaltet ab |
+|------|-------------|
+| `ocr_wareneingang` | Wareneingang Lieferschein-OCR (`/api/pondruff/ocr-lieferschein`) |
+| `ocr_preisrechner` | Preisrechner Positionen-OCR (`/api/pondruff/ocr-price`) |
+| `ki_bauteilsuche` | KI-Bauteilsuche (`/api/pondruff/bauteil-suche`) |
+| `wiso_sync` | WISO MeinBüro Direkt-Export (Auftrag + Wareneingang) |
+
+Deaktivierte Funktionen liefern serverseitig `403 + disabled:true`. Im Pondruff-UI
+sind die Buttons grau, mit einem orange Hinweis "Funktion durch Inhaber deaktiviert".
+Defaults: alle vier `true` (siehe Migration).
 
 ### Minimale Eingriffe in bestehenden Code (alle gated, alle reversibel)
 
@@ -257,6 +280,8 @@ Petersen-KI existiert (z.B. Rechnungs-Verwaltung), nutz die Sync-Routen statt zu
 | **Rotes Theme** | `app/globals.css` Klasse `.pondruff-theme` + Wrap in `pondruff/layout.tsx` | pk-card / pk-btn / pk-input alle in Rot |
 | **Pondruff-PDF mit Briefpapier** | `lib/pondruff-pdf.ts` | PNG-Briefpapier als Hintergrund + Inhalte in Rot/Schwarz |
 | **BüroPilot PDF-Auto-Switch** | `components/buero/*Tab.tsx` nutzen `generate*PDFAuto` | Bei Pondruff-User automatisch Pondruff-PDF, sonst Standard |
+| **Inhaber-Feature-Flags** | `pondruff_feature_flags` + `OwnerPondruffFeaturesPanel` | 4 OpenAI-Funktionen ein-/ausschaltbar |
+| **Client-Image-Compression** | `compressImageDataUrl` in `lib/pondruff.ts` | Smartphone-Fotos werden auf 2000px/JPEG 85% verkleinert → kein Vercel-Body-Limit |
 
 ### 🟡 Noch denkbar (Vorschläge für nächste Sessions)
 

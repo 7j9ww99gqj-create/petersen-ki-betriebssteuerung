@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
+import { requirePondruffFeature } from '@/lib/pondruff-server'
 import { POND_USER_EMAIL, money } from '@/lib/pondruff'
 
 // WISO MeinBüro REST API Direkt-Export eines Pondruff-Preisauftrags.
@@ -122,6 +123,9 @@ export async function POST(req: NextRequest) {
   if (!access.user || access.user.email?.toLowerCase() !== POND_USER_EMAIL || !access.supabase) {
     return NextResponse.json({ error: 'Nicht berechtigt' }, { status: 403 })
   }
+
+  const blocked = await requirePondruffFeature('wiso_sync', access.user.id)
+  if (blocked) return blocked
 
   const apiKey = process.env.WISO_MEINBUERO_API_KEY
   const apiSecret = process.env.WISO_MEINBUERO_API_SECRET

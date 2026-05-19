@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { wisoOrderTsv, type WisoOrder, type WisoOrderRow } from '@/lib/pondruff'
 import { generatePondruffOrderPDF, type PondPreisauftrag } from '@/lib/pondruff-pdf'
+import { usePondruffFlags } from '@/components/pondruff/usePondruffFlags'
 
 type Saved = {
   id: string
@@ -57,6 +58,8 @@ export default function BueroWisoPage() {
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [delConfirm, setDelConfirm] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const { flags: pondFlags } = usePondruffFlags()
+  const wisoEnabled = pondFlags.wiso_sync
 
   function showToast(msg: string, ok = true) { setToast({ msg, ok }); setTimeout(() => setToast(null), 4500) }
 
@@ -211,7 +214,7 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
                     <td onClick={e => e.stopPropagation()}>
                       {o.synced_wiso_at
                         ? <span style={{ color: '#4ddb7e', fontSize: 11 }}>✓ {new Date(o.synced_wiso_at).toLocaleDateString('de-DE')}</span>
-                        : <button className="pk-btn-ghost" disabled={busy} onClick={() => exportWisoAuftrag(o)} style={{ fontSize: 11 }}>→ WISO</button>}
+                        : <button className="pk-btn-ghost" disabled={busy || !wisoEnabled} title={wisoEnabled ? undefined : 'WISO-Sync ist durch den Inhaber deaktiviert'} onClick={() => exportWisoAuftrag(o)} style={{ fontSize: 11 }}>{wisoEnabled ? '→ WISO' : '🚫 WISO'}</button>}
                     </td>
                     <td onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 4 }}>
@@ -264,7 +267,7 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
                       <td>
                         {wisoSynced
                           ? <span style={{ color: '#4ddb7e', fontSize: 11 }}>✓ WISO</span>
-                          : <button className="pk-btn-ghost" disabled={busy} onClick={() => exportWisoWE(w)} style={{ fontSize: 11 }}>→ WISO</button>}
+                          : <button className="pk-btn-ghost" disabled={busy || !wisoEnabled} title={wisoEnabled ? undefined : 'WISO-Sync ist durch den Inhaber deaktiviert'} onClick={() => exportWisoWE(w)} style={{ fontSize: 11 }}>{wisoEnabled ? '→ WISO' : '🚫 WISO'}</button>}
                       </td>
                       <td>
                         <button className="pk-btn-ghost" onClick={() => delWE(w.id)} style={{ fontSize: 11 }}>🗑️</button>

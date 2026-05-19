@@ -2,9 +2,32 @@
 // Port der Preislogik aus dem Streamlit-Tool (app.py).
 
 export const POND_USER_EMAIL = 'info@pondruffpolierservice.de'
+export const POND_USER_ID = '7eb541ca-ca2e-4890-9c20-51ee20a00b43'
 
 export function isPondruffUser(email: string | null | undefined): boolean {
   return (email || '').toLowerCase() === POND_USER_EMAIL
+}
+
+export type PondruffFeatureKey = 'ocr_wareneingang' | 'ocr_preisrechner' | 'ki_bauteilsuche' | 'wiso_sync'
+
+export const POND_FEATURE_KEYS: PondruffFeatureKey[] = [
+  'ocr_wareneingang', 'ocr_preisrechner', 'ki_bauteilsuche', 'wiso_sync',
+]
+
+export const POND_FEATURE_LABELS: Record<PondruffFeatureKey, string> = {
+  ocr_wareneingang: 'Wareneingang Lieferschein-OCR',
+  ocr_preisrechner: 'Preisrechner Positionen-OCR',
+  ki_bauteilsuche: 'KI-Bauteilsuche (Foto-Vergleich)',
+  wiso_sync: 'WISO MeinBüro Direkt-Export',
+}
+
+export type PondruffFeatureFlags = Record<PondruffFeatureKey, boolean>
+
+export const POND_DEFAULT_FEATURE_FLAGS: PondruffFeatureFlags = {
+  ocr_wareneingang: true,
+  ocr_preisrechner: true,
+  ki_bauteilsuche: true,
+  wiso_sync: true,
 }
 
 export const PRICE_BASE_COATING_MULTIPLIER = 1.2
@@ -300,4 +323,41 @@ export function wisoClipboardPlainTsv(order: WisoOrder): string {
       }).join('\t'),
     )
     .join('\r\n')
+}
+
+// Client-side: Bild auf maxSide skalieren + als JPEG mit quality re-encodieren.
+// Smartphone-Fotos (4-6 MB) werden so auf ~300-800 KB reduziert → Vercel 4.5 MB
+// Body-Limit wird auch bei mehreren Bildern eingehalten.
+export async function compressImageDataUrl(file: File, maxSide = 2000, quality = 0.85): Promise<string> {
+  if (typeof window === 'undefined') throw new Error('compressImageDataUrl: nur im Browser')
+  const dataUrl = await new Promise<string>((res, rej) => {
+    const r = new FileReader()
+    r.onload = () => res(r.result as string)
+    r.onerror = () => rej(new Error('FileReader-Fehler'))
+    r.readAsDataURL(file)
+  })
+  if (!dataUrl.startsWith('data:image/')) return dataUrl
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image()
+    i.onload = () => res(i)
+    i.onerror = () => rej(new Error('Bild konnte nicht geladen werden'))
+    i.src = dataUrl
+  })
+  const w = img.naturalWidth || img.width
+  const h = img.naturalHeight || img.height
+  if (!w || !h) return dataUrl
+  const scale = Math.min(1, maxSide / Math.max(w, h))
+  const tw = Math.max(1, Math.round(w * scale))
+  const th = Math.max(1, Math.round(h * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = tw
+  canvas.height = th
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return dataUrl
+  ctx.drawImage(img, 0, 0, tw, th)
+  try {
+    return canvas.toDataURL('image/jpeg', quality)
+  } catch {
+    return dataUrl
+  }
 }
