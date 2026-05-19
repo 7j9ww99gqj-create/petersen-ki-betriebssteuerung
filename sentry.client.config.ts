@@ -5,7 +5,10 @@ const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
-    tracesSampleRate: 0.1,
+    // Free-Tier-Schutz: Performance-Monitoring aus → nur Errors tracken (5k/Monat-Limit)
+    tracesSampleRate: 0,
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 0,
     debug: false,
     beforeSend(event, hint) {
       // Demo-User-Errors nicht tracken
