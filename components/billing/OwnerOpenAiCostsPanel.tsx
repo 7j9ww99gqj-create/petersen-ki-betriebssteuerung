@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 type UsageData = {
   totalCostEur: number
@@ -10,6 +10,8 @@ type UsageData = {
   dailyData: { date: string; costEur: number; requests: number }[]
   month: string
   fetchedDays: number
+  cached_at?: string
+  from_cache?: boolean
 }
 
 type Props = {
@@ -112,21 +114,28 @@ export function OwnerOpenAiCostsPanel({ enabled }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
 
+  const loadUsage = useCallback(async (forceRefresh = false) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/owner/openai-usage${forceRefresh ? '?refresh=1' : ''}`, { cache: 'no-store' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string }
+        throw new Error(body.error ?? 'Fehler beim Laden der OpenAI-Nutzung.')
+      }
+      const json = await res.json() as UsageData
+      setData(json)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fehler')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (!enabled) return
-    setLoading(true)
-    fetch('/api/owner/openai-usage')
-      .then(async res => {
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({})) as { error?: string }
-          throw new Error(body.error ?? 'Fehler beim Laden der OpenAI-Nutzung.')
-        }
-        return res.json() as Promise<UsageData>
-      })
-      .then(setData)
-      .catch(err => setError(err instanceof Error ? err.message : 'Fehler'))
-      .finally(() => setLoading(false))
-  }, [enabled])
+    void loadUsage(false)
+  }, [enabled, loadUsage])
 
   if (!enabled) return null
 
@@ -154,20 +163,47 @@ export function OwnerOpenAiCostsPanel({ enabled }: Props) {
             Live-Auswertung Ihrer KI-API-Ausgaben — {monthLabel}
           </div>
         </div>
-        <a
-          href="https://platform.openai.com/usage"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="pk-btn-ghost"
-          style={{ fontSize: 12, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-        >
-          OpenAI Dashboard ↗
-        </a>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => void loadUsage(true)}
+            disabled={loading}
+            className="pk-btn-ghost"
+            style={{ fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            {loading ? '⏳ Lädt…' : '🔄 Neu laden'}
+          </button>
+          <a
+            href="https://platform.openai.com/usage"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pk-btn-ghost"
+            style={{ fontSize: 12, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            OpenAI Dashboard ↗
+          </a>
+        </div>
       </div>
 
+      {/* Cache-Hinweis */}
+      {data?.cached_at && (
+        <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 10 }}>
+          {data.from_cache ? '📦 Aus Cache · ' : '🟢 Frisch · '}
+          Stand {new Date(data.cached_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+        </div>
+      )}
+
       {/* Cost KPIs */}
-      {loading && (
-        <div style={{ color: '#aeb9c8', fontSize: 13, padding: '12px 0' }}>Lade Nutzungsdaten von OpenAI…</div>
+      {loading && !data && (
+        <div style={{ color: '#aeb9c8', fontSize: 13, padding: '12px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            display: 'inline-block', width: 14, height: 14, borderRadius: '50%',
+            border: '2px solid rgba(22,132,255,.25)', borderTopColor: '#1684ff',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          Lade Nutzungsdaten von OpenAI…
+          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+        </div>
       )}
       {error && (
         <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.22)', color: '#fca5a5', fontSize: 13 }}>

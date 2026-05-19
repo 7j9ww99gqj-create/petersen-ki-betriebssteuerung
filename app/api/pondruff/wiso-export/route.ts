@@ -89,6 +89,15 @@ export async function POST(req: NextRequest) {
   const { data: src, error: e1 } = await sb.from('pondruff_preisauftraege').select('*').eq('id', body.id).single()
   if (e1 || !src) return NextResponse.json({ error: e1?.message || 'Auftrag nicht gefunden' }, { status: 404 })
 
+  // Doppel-Klick-Schutz: wenn bereits in WISO exportiert, vorhandene Response zurückgeben (kein zweiter Insert)
+  if (src.synced_wiso_at) {
+    return NextResponse.json({
+      ok: true, already_synced: true,
+      synced_at: src.synced_wiso_at,
+      response: src.synced_wiso_response,
+    })
+  }
+
   try {
     const token = await getWisoToken(apiKey!, apiSecret!, ownershipId!)
     const { id: customerId, candidates } = await findCustomerId(String(src.customer || ''), token, ownershipId!)

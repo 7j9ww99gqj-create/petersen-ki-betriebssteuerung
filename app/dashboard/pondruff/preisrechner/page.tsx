@@ -223,7 +223,10 @@ export default function PreisrechnerPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ images }),
       })
       const data = await resp.json()
-      if (!resp.ok) throw new Error(data?.error || 'OCR fehlgeschlagen')
+      if (!resp.ok) {
+        const msg = [data?.error, data?.detail].filter(Boolean).join(' — ')
+        throw new Error(msg || 'OCR fehlgeschlagen')
+      }
       const arr: PricePosition[] = (data.positions || []).map((raw: Record<string, unknown>, i: number) => {
         const p = raw as Partial<PricePosition>
         const base = blankPricePosition(p.shape === 'Rund' ? 'Rund' : 'Eckig')

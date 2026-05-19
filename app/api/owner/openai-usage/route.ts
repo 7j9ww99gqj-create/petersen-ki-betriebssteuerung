@@ -5,6 +5,21 @@ export const runtime = 'nodejs'
 
 const OWNER_EMAIL = 'info@petersen-ki-pilot.de'
 const USD_TO_EUR = 0.92
+const CACHE_TTL_MS = 60 * 60 * 1000 // 1h
+
+type UsageResponse = {
+  totalCostEur: number
+  totalInputTokens: number
+  totalOutputTokens: number
+  totalRequests: number
+  dailyData: { date: string; inputTokens: number; outputTokens: number; requests: number; costEur: number }[]
+  month: string
+  fetchedDays: number
+}
+
+type CacheEntry = { fetchedAt: number; data: UsageResponse }
+// In-Memory-Cache (pro Server-Instance, ueberlebt keinen Cold-Start)
+const usageCache = new Map<string, CacheEntry>()
 
 // Pricing per 1M tokens (USD, gpt-4o-mini is default model)
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
@@ -69,6 +84,26 @@ export async function GET(req: NextRequest) {
   const year = now.getFullYear()
   const month = now.getMonth()
   const days = now.getDate()
+  const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
+
+  const url = new URL(req.url)
+  const forceRefresh = url.searchParams.get('refresh') === '1'
+
+  // Cache-Hit pruefen (TTL 1h). Wir cachen auch nur fuer den aktuellen Monat anhand
+  // der `fetchedDays` — wenn ein neuer Tag angebrochen ist, ist der Eintrag stale.
+  if (!forceRefresh) {
+    const cached = usageCache.get(monthKey)
+    if (cached
+      && (Date.now() - cached.fetchedAt) < CACHE_TTL_MS
+      && cached.data.fetchedDays === days
+    ) {
+      return NextResponse.json({
+        ...cached.data,
+        cached_at: new Date(cached.fetchedAt).toISOString(),
+        from_cache: true,
+      })
+    }
+  }
 
   const dates: string[] = []
   for (let d = 1; d <= days; d++) {
@@ -84,13 +119,22 @@ export async function GET(req: NextRequest) {
   const totalRequests = results.reduce((s, r) => s + r.requests, 0)
   const totalCostEur = results.reduce((s, r) => s + r.costEur, 0)
 
-  return NextResponse.json({
+  const responseData: UsageResponse = {
     totalCostEur,
     totalInputTokens,
     totalOutputTokens,
     totalRequests,
     dailyData,
-    month: `${year}-${String(month + 1).padStart(2, '0')}`,
+    month: monthKey,
     fetchedDays: days,
+  }
+
+  const fetchedAt = Date.now()
+  usageCache.set(monthKey, { fetchedAt, data: responseData })
+
+  return NextResponse.json({
+    ...responseData,
+    cached_at: new Date(fetchedAt).toISOString(),
+    from_cache: false,
   })
 }

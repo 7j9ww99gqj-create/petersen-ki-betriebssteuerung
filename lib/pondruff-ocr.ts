@@ -38,7 +38,14 @@ export async function runVisionOcr(opts: OcrVisionOptions): Promise<OcrVisionRes
     })
     if (!r.ok) {
       const err = await r.text()
-      return { ok: false, response: NextResponse.json({ error: 'OpenAI-Fehler', detail: err.slice(0, 500) }, { status: 502 }) }
+      // Versuche, ein klares OpenAI error.message rauszufiltern
+      let parsedMsg = ''
+      try {
+        const j = JSON.parse(err) as { error?: { message?: string; type?: string } }
+        parsedMsg = j?.error?.message ? `${j.error.type || 'error'}: ${j.error.message}` : ''
+      } catch { /* ignore */ }
+      const detail = `HTTP ${r.status} — ${parsedMsg || err.slice(0, 500)}`
+      return { ok: false, response: NextResponse.json({ error: 'OpenAI-Fehler', detail, status: r.status }, { status: 502 }) }
     }
     const data = await r.json()
     const text = data.choices?.[0]?.message?.content || '{}'

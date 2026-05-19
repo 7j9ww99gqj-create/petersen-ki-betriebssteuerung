@@ -67,6 +67,17 @@ export async function POST(req: NextRequest) {
   if (e1 || !src) return NextResponse.json({ error: e1?.message || 'Wareneingang nicht gefunden' }, { status: 404 })
   if (!src.customer) return NextResponse.json({ error: 'Kein Kunde im Wareneingang gespeichert — WISO benötigt einen Kunden.' }, { status: 400 })
 
+  // Doppel-Klick-Schutz: bereits in WISO synchronisiert → vorhandene Response zurückgeben
+  const existingAi = (src.ai_data as Record<string, unknown> | null) || null
+  const existingWiso = existingAi && typeof existingAi.wiso === 'object' ? existingAi.wiso as Record<string, unknown> : null
+  if (existingWiso?.synced_at) {
+    return NextResponse.json({
+      ok: true, already_synced: true,
+      synced_at: existingWiso.synced_at,
+      response: existingWiso.response,
+    })
+  }
+
   try {
     const token = await getWisoToken(apiKey!, apiSecret!, ownershipId!)
     const customerId = await findOrCreateCustomer(String(src.customer), token, ownershipId!)
