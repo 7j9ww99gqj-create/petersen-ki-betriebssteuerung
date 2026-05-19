@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
 import { trackVisit } from '@/lib/recent'
 import { useSwipeTabs } from '@/hooks/useSwipeTabs'
-import { getBueroKunden, getBueroAngebote, getBueroAuftraege, getBueroRechnungen } from '@/lib/db'
+import { getBueroKunden, getBueroAngebote, getBueroAuftraege, getBueroRechnungen, getEinkaufLieferanten } from '@/lib/db'
 import { useRole } from '@/lib/roles'
 import { TabBar } from '@/components/buero/shared'
 import type { Kunde, Angebot, Auftrag, Rechnung, Tab } from '@/types/buero'
@@ -46,6 +46,9 @@ export default function BueroPilotPage() {
   const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
   const [auftraege, setAuftraege] = useState<Auftrag[]>(isDemo ? demoAuftraege : [])
   const [sharedRechnungen, setSharedRechnungen] = useState<Rechnung[]>(isDemo ? demoRechnungen : [])
+  const [lieferantenCount, setLieferantenCount] = useState(isDemo ? demoLieferanten.length : 0)
+  const [zeiterfassungCount] = useState(isDemo ? demoBueroZeiterfassung.length : 0)
+  const [artikelCount] = useState(isDemo ? demoBueroArtikel.length : 0)
   const [sharedMailTarget, setSharedMailTarget] = useState<{ id: string; email: string; typ: 'rechnung' } | null>(null)
   const [loading, setLoading] = useState(!isDemo)
   const [errorMsg, setErrorMsg] = useState('')
@@ -56,11 +59,12 @@ export default function BueroPilotPage() {
     trackVisit({ href: '/dashboard/buero', label: 'BüroPilot', icon: '🧾' })
     setLoading(true)
     setErrorMsg('')
-    // Beim Start nur Kunden + Rechnungen laden (Basis-Daten)
-    Promise.all([getBueroKunden(), getBueroRechnungen()])
-      .then(([k, r]) => {
+    // Beim Start Kunden + Rechnungen + Lieferantenanzahl laden
+    Promise.all([getBueroKunden(), getBueroRechnungen(), getEinkaufLieferanten()])
+      .then(([k, r, l]) => {
         setKunden(k as Kunde[])
         setSharedRechnungen(r as Rechnung[])
+        setLieferantenCount((l as unknown[]).length)
       })
       .catch((err) => setErrorMsg(err instanceof Error ? err.message : 'Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
@@ -183,9 +187,9 @@ export default function BueroPilotPage() {
         {[
           { label: 'Umsatz MTD', value: fmtEuro(umsatzMTD), icon: '📅', color: '#20c8ff', tab: 'rechnungen' as Tab },
           { label: 'Umsatz YTD', value: fmtEuro(umsatzYTD), icon: '📆', color: '#25d366', tab: 'rechnungen' as Tab },
-          { label: 'Zeiterfassung', value: '⏱', icon: '🕐', color: '#a78bfa', tab: 'zeiterfassung' as Tab },
-          { label: 'Lieferanten', value: '🏭', icon: '🏭', color: '#20c8ff', tab: 'lieferanten' as Tab },
-          { label: 'Artikel', value: '📦', icon: '📦', color: '#f59e0b', tab: 'artikel' as Tab },
+          { label: 'Zeiterfassung', value: String(zeiterfassungCount), icon: '🕐', color: '#a78bfa', tab: 'zeiterfassung' as Tab },
+          { label: 'Lieferanten', value: String(lieferantenCount), icon: '🏭', color: '#20c8ff', tab: 'lieferanten' as Tab },
+          { label: 'Artikel', value: String(artikelCount), icon: '📦', color: '#f59e0b', tab: 'artikel' as Tab },
         ].map(s => (
           <button key={s.label} className="pk-card" onClick={() => setTab(s.tab)}
             style={{ textAlign: 'center', padding: '12px 10px', cursor: 'pointer', color: 'inherit' }}>
