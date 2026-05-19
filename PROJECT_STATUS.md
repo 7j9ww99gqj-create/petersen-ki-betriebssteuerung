@@ -26,13 +26,27 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Quick-Wins-Sprint** (HEAD `e0f4170`): 6 Quick-Win-Aufgaben + jsx-a11y-Vollfix (430→0) + Sentry-Aktivierung mit Free-Tier-Schutz.
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Security-Sprint** (HEAD `4ceb16d`): Zod-Validation (5 Routen), Rate-Limiting (10 KI/OCR-Routen), KI-Response-Caching für Tagesbericht.
+- Davor: **Quick-Wins-Sprint** (Commits `4dc83a1`–`e0f4170`): 6 Quick-Win-Aufgaben + jsx-a11y-Vollfix (430→0) + Sentry-Aktivierung mit Free-Tier-Schutz.
 - Vorheriger Sprint (2026-05-19, Commit `d28aa39`): Code-Qualität-Sprint — Vitest + 40 Tests, Service-Worker + Offline-Cache, KI-Streaming-Support, db.ts/lager.tsx Soft-Splits.
 - Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main).
 - TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19).
 - Tests: `npm test` — ✅ 40 Tests (3 Files: pondruff-price, demo-helpers, lager-helpers).
 - CI: GitHub Actions (tsc + test + build) — ✅ Workflow aktiv auf main.
 - Supabase Storage: ~100 GB Plan — neue Buckets `lager-bilder`, `ocr-originale`, `firma-branding`, `db-backups` (alle privat, user-scoped RLS).
+
+### Security-Sprint (2026-05-19) — Aufgaben 7-9 aus Optimierungs-Plan
+
+| # | Aufgabe | Dateien | Commit |
+|---|---------|---------|--------|
+| 7 | Zod-Validation auf 5 KI-Routen | `lib/validation.ts`, `app/api/openai/{mahnung,email-assistent,monatsbericht,steuerprognose}/route.ts`, `app/api/chat/route.ts` | `bb920c0` |
+| 8 | Rate-Limiting auf 10 KI/OCR-Routen | `lib/rate-limit.ts`, alle KI/OCR-Routen (ai: 20/min, ocr: 10/min) | `c4d647d` |
+| 9 | KI-Response-Caching für Tagesbericht | `supabase/migrations/20260519900000_ki_response_cache.sql`, `lib/ai-cache.ts`, `app/api/chat/route.ts` | `4ceb16d` |
+
+**Schutz-Wirkung:**
+- **Zod (7):** Server-seitige Input-Validierung mit Längen-Limits → kein Crash + keine 8MB-Prompts mehr möglich
+- **Rate-Limit (8):** In-Memory-Limiter pro User → kostet selbst nichts, blockt Abuse-Szenarien (ai-Bucket: 20 Req/Min, ocr-Bucket: 10 Req/Min)
+- **Cache (9):** Tagesbericht wird in `ki_response_cache` (user-scoped RLS, 1h TTL) zwischengespeichert → identische Anfragen sparen Token-Kosten
 
 ### Quick-Wins-Sprint (2026-05-19) — 6 Aufgaben aus Optimierungs-Plan
 
