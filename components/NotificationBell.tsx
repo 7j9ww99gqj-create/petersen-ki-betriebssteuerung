@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
 import { getAppWarnings, type Warning } from '@/lib/warnings'
+import { useRealtimeMulti } from '@/hooks/useRealtime'
 
 type Tab = 'alle' | 'error' | 'warn'
 
@@ -79,12 +80,18 @@ export default function NotificationBell() {
     window.localStorage.setItem(READ_STORAGE_KEY, JSON.stringify(Array.from(readIds)))
   }, [readIds])
 
-  // Initial load + auto-refresh alle 60 Sekunden
+  // Initial load + auto-refresh alle 60 Sekunden (Fallback)
   useEffect(() => {
     void load()
     const interval = setInterval(() => { void load() }, 60_000)
     return () => clearInterval(interval)
   }, [load])
+
+  // Realtime: sofort neu laden wenn sich Lager/Büro/Werkstatt ändert
+  useRealtimeMulti(
+    ['lager_artikel', 'buero_rechnungen', 'werkstatt_karten'],
+    useCallback(() => { void load() }, [load]),
+  )
 
   // Außenklick schließt Panel
   useEffect(() => {

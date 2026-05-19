@@ -167,6 +167,18 @@ export default function GlobalSearch() {
     router.push(href)
   }
 
+  // Quick-Actions — immer verfügbar, keine Suche nötig
+  const quickActions = [
+    { label: 'Neuer Artikel', icon: '📦', color: '#1684ff', href: '/dashboard/lager?tab=bestand&action=new' },
+    { label: 'Neuer Kunde', icon: '🏢', color: '#20c8ff', href: '/dashboard/buero?tab=kunden&action=new' },
+    { label: 'Neue Rechnung', icon: '💶', color: '#f59e0b', href: '/dashboard/buero?tab=rechnungen&action=new' },
+    { label: 'Neue Werkstatt-Karte', icon: '🛠️', color: '#a78bfa', href: '/dashboard/werkstatt?action=new' },
+    { label: 'KI-Chat öffnen', icon: '🧠', color: '#7c3aed', href: '/dashboard/ki-erkennung?tab=chat' },
+    { label: 'Wareneingang buchen', icon: '📥', color: '#10b981', href: '/dashboard/lager?tab=eingang' },
+    { label: 'Analyse anzeigen', icon: '📊', color: '#10b981', href: '/dashboard/analyse' },
+    { label: 'Einstellungen', icon: '⚙️', color: '#aeb9c8', href: '/dashboard/einstellungen' },
+  ]
+
   return (
     <>
       {/* Search Button */}
@@ -238,10 +250,37 @@ export default function GlobalSearch() {
             {/* Results */}
             <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
               {query.trim().length < 2 && (
-                <div style={{ padding: '28px 20px', textAlign: 'center', color: '#4a5568' }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-                  <div style={{ fontSize: 14 }}>Mindestens 2 Zeichen eingeben…</div>
-                  <div style={{ fontSize: 12, marginTop: 6 }}>Durchsucht: Artikel, Kunden, Rechnungen, Arbeitskarten</div>
+                <div>
+                  <div style={{ padding: '10px 20px 4px', fontSize: 11, color: '#1684ff', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                    Schnellaktionen
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                    {quickActions.map(a => (
+                      <button
+                        key={a.href}
+                        onClick={() => navigate(a.href)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '11px 20px', border: 'none', cursor: 'pointer',
+                          background: 'transparent', textAlign: 'left',
+                          borderBottom: '1px solid rgba(255,255,255,.04)',
+                          transition: 'background .1s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,.05)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <div style={{
+                          width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                          background: a.color + '18', border: `1px solid ${a.color}25`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+                        }}>{a.icon}</div>
+                        <span style={{ fontSize: 13, color: '#d0dae8', fontWeight: 600 }}>{a.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ padding: '8px 20px', borderTop: '1px solid rgba(255,255,255,.06)', fontSize: 12, color: '#4a5568' }}>
+                    Mindestens 2 Zeichen für globale Suche · Artikel, Kunden, Rechnungen, Arbeitskarten
+                  </div>
                 </div>
               )}
 
