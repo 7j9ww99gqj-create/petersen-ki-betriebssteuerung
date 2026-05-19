@@ -119,22 +119,22 @@ function KPICard({ icon, label, value, delta, color, sub, onClick }: {
   icon: string; label: string; value: string; delta?: string; color: string; sub?: string; onClick?: () => void
 }) {
   return (
-    <div className="pk-card" style={{ display: 'flex', gap: 14, alignItems: 'center', cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
+    <div className="pk-card" style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: onClick ? 'pointer' : 'default', padding: '12px 14px' }} onClick={onClick}>
       <div style={{
-        width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+        width: 42, height: 42, borderRadius: 12, flexShrink: 0,
         background: color + '18', border: `1px solid ${color}30`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
       }}>{icon}</div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 2 }}>{label}</div>
-        <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-.03em' }}>{value}</div>
-        {sub && <div style={{ fontSize: 11, color: '#4a5568', marginTop: 1 }}>{sub}</div>}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+        <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-.03em' }}>{value}</div>
+        {sub && <div style={{ fontSize: 11, color: '#4a5568', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>}
       </div>
       {delta && (
         <div style={{
-          fontSize: 13, fontWeight: 700, color: delta.startsWith('+') ? '#4ddb7e' : '#fb7185',
+          fontSize: 12, fontWeight: 700, flexShrink: 0, color: delta.startsWith('+') ? '#4ddb7e' : '#fb7185',
           background: (delta.startsWith('+') ? 'rgba(37,211,102,' : 'rgba(244,63,94,') + '.1)',
-          padding: '4px 10px', borderRadius: 999,
+          padding: '3px 8px', borderRadius: 999,
         }}>{delta}</div>
       )}
     </div>
@@ -478,22 +478,24 @@ export default function AnalysePilotPage() {
   return (
     <div className="fade-in">
       {/* Header */}
-      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{
-          width: 52, height: 52, borderRadius: 14,
-          background: 'rgba(16,185,129,.15)', border: '1px solid rgba(16,185,129,.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0,
-        }}>📊</div>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>AnalysePilot</h1>
-          <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Echtzeit-Dashboards · KPIs · Diagramme · Prognosen</p>
+      <div className="page-header-row" style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: 14,
+            background: 'rgba(16,185,129,.15)', border: '1px solid rgba(16,185,129,.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0,
+          }}>📊</div>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: '-.04em' }}>AnalysePilot</h1>
+            <p style={{ margin: 0, color: '#aeb9c8', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Echtzeit-Dashboards · KPIs · Diagramme</p>
+          </div>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {isDemo && <span className="badge badge-orange">Demo</span>}
           {loading && <span className="badge badge-blue">⏳ Lädt…</span>}
           {!loading && !isDemo && !loadError && <span className="badge badge-green">● Live</span>}
-          {loadError && <span className="badge badge-red">⚠️ Ladefehler</span>}
-          <button className="pk-btn-ghost" style={{ fontSize: 13 }} onClick={() => {
+          {loadError && <span className="badge badge-red">⚠️ Fehler</span>}
+          <button className="pk-btn-ghost" style={{ fontSize: 12, padding: '6px 12px', whiteSpace: 'nowrap' }} onClick={() => {
             const kpis = [
               { label: 'Umsatz (Monat)', value: fmtK(kpi.umsatzMonat) },
               { label: 'Gewinn (Monat)', value: fmtK(kpi.gewinnMonat) },
@@ -506,7 +508,7 @@ export default function AnalysePilotPage() {
               { label: 'Artikel leer', value: String(kpi.artikelLeer) },
             ]
             void generateAnalysePDF({ kpis, zeitraum })
-          }}>📄 Bericht exportieren</button>
+          }}>📄 Bericht</button>
         </div>
       </div>
 
@@ -527,19 +529,20 @@ export default function AnalysePilotPage() {
       )}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+      <div className="pk-tab-bar" style={{ marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
         {([
-          { id: 'uebersicht', label: '⊞ Übersicht' },
-          { id: 'umsatz', label: '💶 Umsatz & Gewinn' },
-          { id: 'bestand', label: '📦 Bestandsentwicklung' },
-          { id: 'ki', label: '🧠 KI-Nutzung' },
-          { id: 'archiv', label: '🗂️ Archiv' },
-          { id: 'zahlungsmoral', label: '💳 Zahlungsmoral' },
+          { id: 'uebersicht', label: '⊞ Übersicht', short: '⊞' },
+          { id: 'umsatz', label: '💶 Umsatz', short: '💶' },
+          { id: 'bestand', label: '📦 Bestand', short: '📦' },
+          { id: 'ki', label: '🧠 KI', short: '🧠' },
+          { id: 'archiv', label: '🗂️ Archiv', short: '🗂️' },
+          { id: 'zahlungsmoral', label: '💳 Zahlung', short: '💳' },
         ] as const).map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: '10px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+            padding: '10px 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
             background: 'transparent', borderBottom: tab === t.id ? '2px solid #10b981' : '2px solid transparent',
             color: tab === t.id ? '#34d399' : '#aeb9c8', marginBottom: -1, transition: 'color .15s',
+            whiteSpace: 'nowrap', flexShrink: 0,
           }}>{t.label}</button>
         ))}
       </div>
@@ -548,7 +551,7 @@ export default function AnalysePilotPage() {
       {tab === 'uebersicht' && (
         <div>
           {/* KPI Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: 12, marginBottom: 20 }}>
             {loading && <SkeletonCard count={6} />}
             {!loading && <>
               <KPICard icon="💶" label="Umsatz (lfd. Monat)" value={fmtK(kpi.umsatzMonat)} color="#10b981" onClick={() => setTab('umsatz')} />
@@ -570,15 +573,15 @@ export default function AnalysePilotPage() {
 
           {/* Sparkline Umsatz */}
           <div className="pk-card" style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>💶 Umsatz & Kosten – letzte 8 Monate</h3>
-              <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>💶 Umsatz & Kosten – 8 Monate</h3>
+              <div style={{ display: 'flex', gap: 10, fontSize: 11, flexWrap: 'wrap' }}>
                 <span style={{ color: '#10b981' }}>▬ Umsatz</span>
                 <span style={{ color: '#f43f5e' }}>▬ Kosten</span>
                 <span style={{ color: '#1684ff' }}>▬ Gewinn</span>
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={umsatzData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="umsatzGrad" x1="0" y1="0" x2="0" y2="1">
@@ -623,17 +626,17 @@ export default function AnalysePilotPage() {
       {/* ── UMSATZ ── */}
       {tab === 'umsatz' && (
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>💶 Umsatz, Kosten & Gewinn</h2>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>💶 Umsatz, Kosten & Gewinn</h2>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               {(['7T', '30T', '3M', '6M', '1J'] as const).map(z => (
                 <button key={z} onClick={() => setZeitraum(z)} style={{
-                  padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)',
+                  padding: '5px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.1)',
                   background: zeitraum === z ? 'rgba(16,185,129,.15)' : 'transparent',
-                  color: zeitraum === z ? '#34d399' : '#aeb9c8', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  color: zeitraum === z ? '#34d399' : '#aeb9c8', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 36,
                 }}>{z}</button>
               ))}
-              <button onClick={() => exportUmsatzCsv(umsatzData)} style={{ padding: '6px 14px', borderRadius: 999, border: '1px solid rgba(16,185,129,.35)', background: 'rgba(16,185,129,.1)', color: '#34d399', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📥 CSV exportieren</button>
+              <button onClick={() => exportUmsatzCsv(umsatzData)} style={{ padding: '5px 12px', borderRadius: 999, border: '1px solid rgba(16,185,129,.35)', background: 'rgba(16,185,129,.1)', color: '#34d399', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 36, whiteSpace: 'nowrap' }}>📥 CSV</button>
             </div>
           </div>
 
@@ -689,10 +692,10 @@ export default function AnalysePilotPage() {
             </div>
           )}
           <div className="pk-card" style={{ marginBottom: 16 }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800 }}>
               {bestandData.length >= 2 ? '📦 Bestandstrend – historische Snapshots' : '📦 Bestandsübersicht – aktuell'}
             </h3>
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={240}>
               <AreaChart data={bestandData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="bestandGrad" x1="0" y1="0" x2="0" y2="1">
@@ -718,7 +721,7 @@ export default function AnalysePilotPage() {
             </ResponsiveContainer>
           </div>
 
-          <div className="pk-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="pk-card pk-table-wrap" style={{ padding: 0, overflow: 'hidden' }}>
             <table className="pk-table">
               <thead>
                 <tr>
@@ -767,7 +770,7 @@ export default function AnalysePilotPage() {
                   : `Noch keine KI-Erkennungen in den letzten 7 Tagen. Sobald Dokumente per KI analysiert werden, erscheinen hier echte Werte.`}
               </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
               {[
                 { label: 'Erkennungen diese Woche', value: String(totalErkennungen), icon: '🧠', color: '#a78bfa' },
                 { label: 'Genauigkeit', value: genauigkeit !== '–' ? `${genauigkeit}%` : '–', icon: '🎯', color: '#10b981' },
@@ -783,9 +786,9 @@ export default function AnalysePilotPage() {
             </div>
 
             <div className="pk-card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 800 }}>🧠 KI-Erkennungen pro Tag (letzte 7 Tage)</h3>
+              <h3 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 800 }}>🧠 KI-Erkennungen pro Tag (7 Tage)</h3>
               {hasKiData ? (
-                <ResponsiveContainer width="100%" height={260}>
+                <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={kiData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barGap={2}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" vertical={false} />
                     <XAxis dataKey="tag" tick={axisStyle} axisLine={false} tickLine={false} />
@@ -803,7 +806,7 @@ export default function AnalysePilotPage() {
               )}
             </div>
 
-            <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+            <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
               <div className="pk-card">
                 <h3 style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 800 }}>🥧 Pilot-Nutzungsverteilung</h3>
                 <div style={{ fontSize: 12, color: '#8ba0b8', padding: '24px 0', textAlign: 'center' }}>
@@ -868,30 +871,30 @@ export default function AnalysePilotPage() {
             { name: 'Weber & Co', anzahl: 3, bezahlt: 3, mahnung: 0, avgVerzoegerungTage: 0, mahnquote: 0 },
             { name: 'Bauer KG', anzahl: 6, bezahlt: 5, mahnung: 1, avgVerzoegerungTage: 24, mahnquote: 17 },
           ] : zahlungsmoralData).map((k, i) => (
-            <div key={k.name} className="pk-card" style={{ marginBottom: 10, padding: '14px 18px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                <div>
-                  <span style={{ fontWeight: 800, fontSize: 14 }}>#{i + 1} {k.name}</span>
-                  <span style={{ color: '#aeb9c8', fontSize: 12, marginLeft: 10 }}>{k.anzahl} Rechnungen · {k.bezahlt} bezahlt</span>
+            <div key={k.name} className="pk-card" style={{ marginBottom: 10, padding: '12px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: 14 }}>#{i + 1} {k.name}</div>
+                  <div style={{ color: '#aeb9c8', fontSize: 12, marginTop: 2 }}>{k.anzahl} Rechnungen · {k.bezahlt} bezahlt</div>
                 </div>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexShrink: 0 }}>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: k.avgVerzoegerungTage > 14 ? '#f43f5e' : k.avgVerzoegerungTage > 7 ? '#f59e0b' : '#10b981' }}>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: k.avgVerzoegerungTage > 14 ? '#f43f5e' : k.avgVerzoegerungTage > 7 ? '#f59e0b' : '#10b981' }}>
                       {k.avgVerzoegerungTage === 0 ? '—' : `+${k.avgVerzoegerungTage}d`}
                     </div>
-                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>Ø Verzug</div>
+                    <div style={{ fontSize: 10, color: '#aeb9c8' }}>Ø Verzug</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: k.mahnquote > 30 ? '#f43f5e' : k.mahnquote > 10 ? '#f59e0b' : '#10b981' }}>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: k.mahnquote > 30 ? '#f43f5e' : k.mahnquote > 10 ? '#f59e0b' : '#10b981' }}>
                       {k.mahnquote}%
                     </div>
-                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>Mahnquote</div>
+                    <div style={{ fontSize: 10, color: '#aeb9c8' }}>Mahnquote</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: k.mahnung > 0 ? '#f59e0b' : '#10b981' }}>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: k.mahnung > 0 ? '#f59e0b' : '#10b981' }}>
                       {k.mahnung}
                     </div>
-                    <div style={{ fontSize: 11, color: '#aeb9c8' }}>Mahnungen</div>
+                    <div style={{ fontSize: 10, color: '#aeb9c8' }}>Mahnungen</div>
                   </div>
                 </div>
               </div>
