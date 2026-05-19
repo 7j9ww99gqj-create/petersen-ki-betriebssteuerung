@@ -39,17 +39,12 @@ export default function LoginPage() {
     e.preventDefault()
     if (!email || !password) { setError('Bitte E-Mail und Passwort eingeben.'); return }
 
-    // Demo credentials → cookie, no Supabase needed
-    if (email.toLowerCase() === DEMO_EMAIL && password === DEMO_PASSWORD) {
-      setDemoCookie()
-      router.push('/dashboard')
-      return
-    }
-
     if (!isSupabaseConfigured()) {
       setError('Supabase nicht konfiguriert. Bitte NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel setzen.')
       return
     }
+
+    const isDemo = email.toLowerCase() === DEMO_EMAIL && password === DEMO_PASSWORD
 
     setLoading(true)
     setError('')
@@ -57,6 +52,10 @@ export default function LoginPage() {
       const supabase = createSupabaseClient()
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
       if (authError) { setError(authError.message); return }
+
+      // Demo-User: zusätzlich pk_demo-Cookie für UI-Banner (RLS schützt Daten serverseitig)
+      if (isDemo) setDemoCookie()
+
       const { data: { user } } = await supabase.auth.getUser()
       const profile = getAccessProfile(user ?? {})
       if (!profile.canAccessDashboard) {
