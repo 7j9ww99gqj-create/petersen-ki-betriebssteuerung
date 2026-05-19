@@ -12,6 +12,7 @@ import { ROLE_LABELS, loadRole, type AppRole } from '@/lib/roles'
 import { getFirmaEinstellungen, upsertFirmaEinstellungen, uploadFirmenLogo, type FirmaEinstellungen } from '@/lib/db'
 import { isPondruffUser } from '@/lib/pondruff'
 import PondruffSheet from '@/components/pondruff/PondruffSheet'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 // Bottom-Nav Einträge (Mobile)
 const bottomNavItems = [
@@ -283,7 +284,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <main className="main-inner">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </main>
       </div>
 
