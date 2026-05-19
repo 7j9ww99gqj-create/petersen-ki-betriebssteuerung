@@ -16,12 +16,13 @@ export function useSwipeTabs(tabs: string[], currentTab: string, setTab: (t: str
       if (document.querySelector('[role="dialog"], [data-modal-open="true"], [data-no-swipe-root="true"]')) return true
       // Touch innerhalb eines Modals / Form-Felds / interaktiven Elements
       if (el.closest('[role="dialog"], [data-no-swipe], input, textarea, select, button, a, label')) return true
-      // Horizontal scrollbares Element → eigener Scroll wins
+      // Innere scrollbare Container blocken (Modal-Inhalte, scroll-wraps).
+      // body/html ausnehmen — sonst löst Swipe nie auf der normalen Seite aus.
       let cur: Element | null = el
-      while (cur) {
+      while (cur && cur !== document.body && cur !== document.documentElement) {
         const cs = window.getComputedStyle(cur)
-        const overflowX = cs.overflowX
-        if ((overflowX === 'auto' || overflowX === 'scroll') && cur.scrollWidth > cur.clientWidth) return true
+        if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && cur.scrollWidth > cur.clientWidth) return true
+        if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && cur.scrollHeight > cur.clientHeight) return true
         cur = cur.parentElement
       }
       return false
