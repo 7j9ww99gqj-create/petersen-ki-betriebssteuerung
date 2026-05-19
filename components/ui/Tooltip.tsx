@@ -66,6 +66,7 @@ export function HelpTooltip({ content, placement = 'top' }: { content: string; p
           color: '#aeb9c8', fontSize: 10, fontWeight: 700, cursor: 'help',
           flexShrink: 0,
         }}
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}
         role="img"
         aria-label={`Hilfe: ${content}`}

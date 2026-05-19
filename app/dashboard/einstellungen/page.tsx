@@ -28,6 +28,7 @@ import { OwnerCustomerControlPanel } from '@/components/billing/OwnerCustomerCon
 import { OwnerPondruffFeaturesPanel } from '@/components/billing/OwnerPondruffFeaturesPanel'
 import { OwnerOpenAiCostsPanel } from '@/components/billing/OwnerOpenAiCostsPanel'
 import { OwnerAuditLogPanel } from '@/components/billing/OwnerAuditLogPanel'
+import { OwnerMrrPanel } from '@/components/billing/OwnerMrrPanel'
 import type { PilotId } from '@/lib/pricingConfig'
 import { isPushSupported, subscribeToPush, unsubscribeFromPush, getCurrentPushSubscription } from '@/lib/push'
 
@@ -767,6 +768,7 @@ export default function EinstellungenPage() {
 
           {section === 'kundensteuerung' && (
             <div style={{ display: 'grid', gap: 16 }}>
+              <OwnerMrrPanel enabled={isInhaberAccount} />
               <OwnerAiControlPanel enabled={isInhaberAccount} showToast={showToast} />
               <OwnerOpenAiCostsPanel enabled={isInhaberAccount} />
               <OwnerCustomerControlPanel enabled={isInhaberAccount} showToast={showToast} />

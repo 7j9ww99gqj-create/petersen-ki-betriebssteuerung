@@ -22,6 +22,7 @@ import {
 } from '@/lib/db'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { useGlobalToast } from '@/components/ui/ToastProvider'
+import ActivityLog from '@/components/ui/ActivityLog'
 
 type CloudLogEntry = {
   time: string
@@ -704,7 +705,7 @@ export default function CloudPage() {
       {/* Aktivitätsprotokoll + Geräte */}
       <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
         <div className="pk-card">
-          <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800 }}>📋 Aktivitätsprotokoll</h3>
+          <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800 }}>📋 Sync-Protokoll</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {snapshot.syncLog.map((log, index) => (
               <div
@@ -722,6 +723,11 @@ export default function CloudPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="pk-card">
+          <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800 }}>🗑️ Lösch-Protokoll</h3>
+          <ActivityLog maxItems={30} compact />
         </div>
 
         <div className="pk-card">
