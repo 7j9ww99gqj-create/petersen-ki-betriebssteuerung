@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
 import { requirePondruffFeature } from '@/lib/pondruff-server'
+import { checkRateLimit } from '@/lib/rate-limit'
 import { POND_USER_EMAIL, PRICE_COATINGS, normalizePriceCoating, normalizePriceCustomer } from '@/lib/pondruff'
 import { runVisionOcr } from '@/lib/pondruff-ocr'
 
@@ -15,6 +16,9 @@ export async function POST(req: NextRequest) {
 
   const blocked = await requirePondruffFeature('ocr_preisrechner', access.user.id)
   if (blocked) return blocked
+
+  const limited = checkRateLimit(access.user.id, 'ocr')
+  if (limited) return limited
 
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'OPENAI_API_KEY fehlt' }, { status: 500 })

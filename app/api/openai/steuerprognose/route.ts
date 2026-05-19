@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
 import { getServerOpenAiToolSettings } from '@/lib/ai-settings'
 import { parseBody } from '@/lib/validation'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 const Schema = z.object({
   umsatzDaten: z.array(z.object({
@@ -19,6 +20,9 @@ export async function POST(req: NextRequest) {
 
   const settings = await getServerOpenAiToolSettings(user.id)
   if (!settings.steuerprognoseEnabled) return NextResponse.json({ disabled: true }, { status: 403 })
+
+  const limited = checkRateLimit(user.id, 'ai')
+  if (limited) return limited
 
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'Kein OpenAI API-Key konfiguriert.' }, { status: 500 })

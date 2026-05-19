@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
 import { requirePondruffFeature } from '@/lib/pondruff-server'
+import { checkRateLimit } from '@/lib/rate-limit'
 import { POND_USER_EMAIL } from '@/lib/pondruff'
 
 // Bauteil-KI-Suche v3: Reine Embedding-Suche.
@@ -23,6 +24,8 @@ export async function POST(req: NextRequest) {
   }
   const blocked = await requirePondruffFeature('ki_bauteilsuche', access.user.id)
   if (blocked) return blocked
+  const limited = checkRateLimit(access.user.id, 'ai')
+  if (limited) return limited
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'OPENAI_API_KEY fehlt' }, { status: 500 })
 

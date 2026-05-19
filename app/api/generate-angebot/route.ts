@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 // ── KI-Angebotstext generieren ────────────────────────────────────────────────
 
@@ -9,6 +10,11 @@ export async function POST(req: NextRequest) {
 
     const access = await getRouteAccess(req, ['Admin', 'Mitarbeiter', 'Büro'])
     if (access.error) return access.error
+
+    if (access.user) {
+      const limited = checkRateLimit(access.user.id, 'ai')
+      if (limited) return limited
+    }
 
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {

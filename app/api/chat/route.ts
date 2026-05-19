@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
 import { getServerAiFeatureSettings } from '@/lib/ai-settings'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 const ChatRequestSchema = z.object({
   messages: z.array(z.object({
@@ -220,6 +221,11 @@ export async function POST(req: NextRequest) {
     const wantsStream = Boolean(stream) && !structuredOutput
     const access = await getRouteAccess(req, ['Admin', 'Mitarbeiter', 'Lager', 'Werkstatt'])
     if (access.error) return access.error
+
+    if (access.user) {
+      const limited = checkRateLimit(access.user.id, 'ai')
+      if (limited) return limited
+    }
 
     const aiSettings = await getServerAiFeatureSettings(access.supabase)
     if (!aiSettings.enabled || !aiSettings.chatEnabled) {

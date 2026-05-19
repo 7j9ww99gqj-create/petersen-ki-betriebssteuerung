@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
 import { getServerAiFeatureSettings } from '@/lib/ai-settings'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 
@@ -46,6 +47,11 @@ export async function POST(req: NextRequest) {
   try {
     const access = await getRouteAccess(req, ['Admin', 'Mitarbeiter', 'Büro', 'Werkstatt', 'Lager'])
     if (access.error) return access.error
+
+    if (access.user) {
+      const limited = checkRateLimit(access.user.id, 'ocr')
+      if (limited) return limited
+    }
 
     const aiSettings = await getServerAiFeatureSettings(access.supabase)
     if (!aiSettings.enabled || !aiSettings.documentEnabled) {

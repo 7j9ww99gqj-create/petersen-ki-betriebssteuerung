@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 // ── SteuerPilot OCR-Belegtext → strukturierte Felder ─────────────────────────
 // Nimmt rohen Text (z.B. aus OCR oder manuellem Einfügen) und extrahiert
@@ -10,6 +11,11 @@ export async function POST(req: NextRequest) {
   try {
     const access = await getRouteAccess(req, ['Admin', 'Mitarbeiter', 'Büro'])
     if (access.error) return access.error
+
+    if (access.user) {
+      const limited = checkRateLimit(access.user.id, 'ocr')
+      if (limited) return limited
+    }
 
     const { text } = await req.json()
     if (!text || typeof text !== 'string' || text.trim().length < 10) {
