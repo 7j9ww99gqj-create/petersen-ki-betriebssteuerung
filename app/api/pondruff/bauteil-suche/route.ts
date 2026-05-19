@@ -3,17 +3,17 @@ import { getRouteAccess } from '@/lib/server-auth'
 import { requirePondruffFeature } from '@/lib/pondruff-server'
 import { POND_USER_EMAIL } from '@/lib/pondruff'
 
-// Bauteil-KI-Suche v2: Embedding-basiert.
+// Bauteil-KI-Suche v3: Reine Embedding-Suche.
 // 1) Such-Foto + Hinweis → GPT-4o-mini Vision → Kurzbeschreibung
 // 2) Beschreibung → text-embedding-3-small → 1536-dim Vector
 // 3) Supabase RPC match_pondruff_bauteile (pgvector Kosinus) → Top-N
-// 4) Fallback wenn keine Embeddings vorhanden: alte Live-GPT-Vision-Variante (max. 12 Bilder)
+// 4) Wenn noch keine Embeddings existieren: klarer Hinweis, dass Backfill nötig ist
+//    (kein teurer Live-Vision-Vergleich mehr — der hat ~$0.01-0.05 pro Anfrage gekostet)
 
 export const maxDuration = 60
 
 const MAX_RESULTS = 10
 const SIM_THRESHOLD = 0.35
-const VISION_FALLBACK_MAX = 12
 
 export async function POST(req: NextRequest) {
   const access = await getRouteAccess(req)
@@ -90,14 +90,27 @@ export async function POST(req: NextRequest) {
   type Hit = { id: string; customer: string | null; delivery_id: string | null; article_no: string | null; description: string | null; image_url: string; wareneingang_id: string | null; created_at: string; similarity: number }
   const hits = (rpc as Hit[]) || []
 
-  // Wenn Embeddings noch fehlen (Backfill nicht gelaufen): Fallback auf Live-Vision-Vergleich
+  // Keine Treffer? Pruefen, ob ueberhaupt schon Embeddings existieren.
   if (!hits.length) {
-    const { data: anyEmb } = await sb.from('pondruff_bauteile')
+    const { count: withEmbeddings } = await sb.from('pondruff_bauteile')
       .select('id', { count: 'exact', head: true }).not('embedding', 'is', null)
-    const hasAny = (anyEmb as unknown as { count?: number })?.count ?? 0
-    if (!hasAny) {
-      return await visionFallback(sb, apiKey, image)
+    const { count: withoutEmbeddings } = await sb.from('pondruff_bauteile')
+      .select('id', { count: 'exact', head: true }).is('embedding', null)
+
+    if ((withEmbeddings ?? 0) === 0 && (withoutEmbeddings ?? 0) > 0) {
+      return NextResponse.json({
+        matches: [],
+        query_description: queryDescription,
+        note: `Der Bauteil-Index ist noch nicht aufgebaut: ${withoutEmbeddings} Bauteil(e) ohne Embedding. Bitte den Inhaber: Backfill über /api/pondruff/embed-backfill ausführen.`,
+        needs_backfill: true,
+        pending: withoutEmbeddings ?? 0,
+      })
     }
+    return NextResponse.json({
+      matches: [],
+      query_description: queryDescription,
+      note: 'Keine ähnlichen Bauteile gefunden. Versuche ein klareres Foto oder zusätzliche Hinweise.',
+    })
   }
 
   // Signed URLs anhaengen
@@ -115,41 +128,4 @@ export async function POST(req: NextRequest) {
   }))
 
   return NextResponse.json({ matches: enriched, query_description: queryDescription })
-}
-
-// Fallback: alte Live-GPT-Vision-Vergleichs-Logik (nur wenn noch keine Embeddings da sind)
-async function visionFallback(sb: NonNullable<Awaited<ReturnType<typeof getRouteAccess>>['supabase']>, apiKey: string, image: string) {
-  const { data: bauteile } = await sb.from('pondruff_bauteile').select('*').order('created_at', { ascending: false }).limit(VISION_FALLBACK_MAX)
-  if (!bauteile?.length) return NextResponse.json({ matches: [], note: 'Keine gespeicherten Bauteile zum Vergleich.' })
-  const compared: { id: string; customer: string | null; delivery_id: string | null; description: string | null; signed: string }[] = []
-  for (const b of bauteile) {
-    if (!b.image_url) continue
-    const { data: signed } = await sb.storage.from('pondruff').createSignedUrl(b.image_url, 300)
-    if (signed?.signedUrl) compared.push({ id: b.id, customer: b.customer, delivery_id: b.delivery_id, description: b.description, signed: signed.signedUrl })
-  }
-  if (!compared.length) return NextResponse.json({ matches: [], note: 'Keine Bilder zum Vergleich.' })
-  type Part = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
-  const content: Part[] = [
-    { type: 'text', text: `Vergleiche das Such-Bild mit ${compared.length} Vergleichs-Bildern. Antworte als JSON {"matches":[{"index":0,"score":0,"reason":""}]}. score 0–100, sortiert DESC, nur ab 30.` },
-    { type: 'text', text: 'SUCH-BILD:' },
-    { type: 'image_url', image_url: { url: image } },
-  ]
-  compared.forEach((c, i) => {
-    content.push({ type: 'text', text: `VERGLEICH ${i}: ${c.description || ''} (Kunde: ${c.customer || '-'})` })
-    content.push({ type: 'image_url', image_url: { url: c.signed } })
-  })
-  const r = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content }], response_format: { type: 'json_object' }, max_tokens: 1024 }),
-  })
-  if (!r.ok) return NextResponse.json({ matches: [], note: 'Fallback fehlgeschlagen' })
-  const data = await r.json()
-  const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}')
-  const arr = Array.isArray(parsed.matches) ? parsed.matches : []
-  const enriched = arr.map((m: { index: number; score: number; reason: string }) => {
-    const c = compared[m.index]
-    return c ? { ...m, bauteil: { id: c.id, customer: c.customer, delivery_id: c.delivery_id, description: c.description, signed: c.signed } } : null
-  }).filter(Boolean)
-  return NextResponse.json({ matches: enriched, fallback: true, note: 'Live-Vergleich (Embedding-Backfill empfohlen).' })
 }
