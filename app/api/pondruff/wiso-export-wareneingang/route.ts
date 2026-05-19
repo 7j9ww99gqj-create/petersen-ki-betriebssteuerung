@@ -1,0 +1,137 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getRouteAccess } from '@/lib/server-auth'
+import { POND_USER_EMAIL } from '@/lib/pondruff'
+
+// Wareneingang als WISO-Vorgang anlegen (ohne Positionen, nur Notiz).
+// WISO MeinBüro hat keinen nativen Wareneingang-Typ → wir legen einen leeren Auftrag
+// (oder Vorgang) beim entsprechenden Kunden mit der Wareneingang-Notiz an.
+
+export const maxDuration = 60
+
+const API_BASE = 'https://api.meinbuero.de/openapi'
+const LEGACY_BASE = 'https://api.meinbuero.de'
+
+async function wisoReq(method: string, path: string, opts: {
+  token?: string; basic?: string; payload?: unknown; formPayload?: Record<string, string>; base?: string; ownershipId?: string
+} = {}): Promise<{ ok: true; data: unknown } | { ok: false; status: number; message: string }> {
+  const base = opts.base || API_BASE
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  let body: BodyInit | undefined
+  if (opts.formPayload) { body = new URLSearchParams(opts.formPayload).toString(); headers['Content-Type'] = 'application/x-www-form-urlencoded' }
+  else if (opts.payload !== undefined) { body = JSON.stringify(opts.payload); headers['Content-Type'] = 'application/json' }
+  if (opts.token) headers['Authorization'] = `Bearer ${opts.token}`
+  if (opts.basic) headers['Authorization'] = `Basic ${opts.basic}`
+  if (opts.ownershipId) headers['x-authorization-ownershipid'] = opts.ownershipId
+  const r = await fetch(`${base}${path}`, { method, headers, body })
+  const text = await r.text()
+  if (!r.ok) {
+    let msg = text
+    try { const j = JSON.parse(text); msg = j.message || JSON.stringify(j) } catch {}
+    return { ok: false, status: r.status, message: msg.slice(0, 500) }
+  }
+  try { return { ok: true, data: text ? JSON.parse(text) : {} } } catch { return { ok: true, data: {} } }
+}
+
+async function getToken(apiKey: string, apiSecret: string, ownershipId: string): Promise<string> {
+  const basic = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')
+  const r1 = await wisoReq('POST', '/auth/token', { basic, payload: { ownershipId }, ownershipId })
+  if (r1.ok) { const t = String((r1.data as Record<string, unknown>).token || (r1.data as Record<string, unknown>).access_token || ''); if (t) return t }
+  const r2 = await wisoReq('POST', '/auth/token', { basic, formPayload: { grant_type: 'ownership', ownershipId }, base: LEGACY_BASE, ownershipId })
+  if (r2.ok) { const t = String((r2.data as Record<string, unknown>).token || (r2.data as Record<string, unknown>).access_token || ''); if (t) return t }
+  throw new Error(`WISO Token fehlgeschlagen: ${(r1 as { message?: string }).message || ''} | ${(r2 as { message?: string }).message || ''}`)
+}
+
+function compactMatch(v: string): string { return v.toLowerCase().replace(/[^a-z0-9]+/g, '') }
+
+async function findOrCreateCustomer(name: string, token: string, ownershipId: string): Promise<string> {
+  const q = new URLSearchParams({ limit: '20', offset: '0', orderBy: 'name', search: name }).toString()
+  const r = await wisoReq('GET', `/customer?${q}`, { token, ownershipId })
+  if (r.ok) {
+    const root = r.data as { data?: unknown }
+    let list: Record<string, unknown>[] = []
+    if (Array.isArray(root.data)) list = root.data as Record<string, unknown>[]
+    else if (root.data && typeof root.data === 'object') { const n = (root.data as { data?: unknown }).data; if (Array.isArray(n)) list = n as Record<string, unknown>[] }
+    const needle = compactMatch(name)
+    for (const c of list) {
+      const nm = String(c.name || c.companyName || c.lastName || '').trim()
+      if (compactMatch(nm).includes(needle) || needle.includes(compactMatch(nm))) {
+        if (c.id) return String(c.id)
+      }
+    }
+    if (list.length === 1 && list[0].id) return String(list[0].id)
+  }
+  // Kunde anlegen (minimal)
+  const create = await wisoReq('POST', '/customer/', { token, ownershipId, payload: { companyName: name, isCustomer: true } })
+  if (!create.ok) throw new Error(`Kunde konnte nicht angelegt werden: ${create.message}`)
+  const d = create.data as Record<string, unknown>
+  const newId = String(d.id || (d.data as Record<string, unknown> | undefined)?.id || '')
+  if (!newId) throw new Error('WISO Kunde angelegt aber keine ID erhalten')
+  return newId
+}
+
+export async function POST(req: NextRequest) {
+  const access = await getRouteAccess(req)
+  if (access.error) return access.error
+  if (!access.user || access.user.email?.toLowerCase() !== POND_USER_EMAIL || !access.supabase) {
+    return NextResponse.json({ error: 'Nicht berechtigt' }, { status: 403 })
+  }
+
+  const apiKey = process.env.WISO_MEINBUERO_API_KEY
+  const apiSecret = process.env.WISO_MEINBUERO_API_SECRET
+  const ownershipId = process.env.WISO_MEINBUERO_OWNERSHIP_ID
+  const missing = [
+    !apiKey && 'WISO_MEINBUERO_API_KEY',
+    !apiSecret && 'WISO_MEINBUERO_API_SECRET',
+    !ownershipId && 'WISO_MEINBUERO_OWNERSHIP_ID',
+  ].filter(Boolean)
+  if (missing.length) return NextResponse.json({ error: `WISO Env-Vars fehlen: ${missing.join(', ')}` }, { status: 400 })
+
+  let body: { id?: string }
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'Ungueltige Anfrage' }, { status: 400 }) }
+  if (!body.id) return NextResponse.json({ error: 'id fehlt' }, { status: 400 })
+
+  const sb = access.supabase
+  const { data: src, error: e1 } = await sb.from('pondruff_wareneingaenge').select('*').eq('id', body.id).single()
+  if (e1 || !src) return NextResponse.json({ error: e1?.message || 'Wareneingang nicht gefunden' }, { status: 404 })
+  if (!src.customer) return NextResponse.json({ error: 'Kein Kunde im Wareneingang gespeichert — WISO benötigt einen Kunden.' }, { status: 400 })
+
+  try {
+    const token = await getToken(apiKey!, apiSecret!, ownershipId!)
+    const customerId = await findOrCreateCustomer(String(src.customer), token, ownershipId!)
+    const ai = (src.ai_data as Record<string, unknown> | null) || null
+    const description = [
+      `Wareneingang ${src.delivery_id || '(ohne Lieferschein-Nr.)'}`,
+      src.operator ? `Bediener: ${src.operator}` : '',
+      src.status ? `Status: ${src.status}` : '',
+      src.note || '',
+      ai?.ocr_note ? `KI: ${ai.ocr_note}` : '',
+    ].filter(Boolean).join('\n')
+
+    const payload = {
+      customerId: /^\d+$/.test(customerId) ? parseInt(customerId, 10) : customerId,
+      positions: [{
+        amount: 1,
+        title: `Wareneingang ${src.delivery_id || ''}`.slice(0, 80),
+        description,
+        showDescription: true,
+        unit: 'Stk.',
+        priceNet: 0,
+        priceGross: 0,
+        vatPercent: 19,
+        discountPercent: 0,
+        metaData: { type: 'custom' },
+      }],
+    }
+    const resp = await wisoReq('POST', '/order/', { token, payload, ownershipId: ownershipId! })
+    if (!resp.ok) return NextResponse.json({ error: `WISO POST fehlgeschlagen: ${resp.message}` }, { status: 502 })
+
+    await sb.from('pondruff_wareneingaenge').update({
+      synced_buero_at: src.synced_buero_at, // unchanged
+      ai_data: { ...(ai || {}), wiso: { synced_at: new Date().toISOString(), response: resp.data } },
+    }).eq('id', body.id)
+
+    return NextResponse.json({ ok: true, customer_id: customerId, response: resp.data })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+  }
+}

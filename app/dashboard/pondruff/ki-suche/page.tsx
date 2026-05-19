@@ -17,11 +17,31 @@ type Match = {
 export default function KiSuchePage() {
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
+  const [backfillBusy, setBackfillBusy] = useState(false)
   const [matches, setMatches] = useState<Match[]>([])
   const [note, setNote] = useState('')
+  const [queryDesc, setQueryDesc] = useState('')
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
 
   function showToast(msg: string, ok = true) { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500) }
+
+  async function runBackfill() {
+    setBackfillBusy(true)
+    try {
+      let total = 0
+      // Bis zu 5 Runden à 10 Bauteile
+      for (let i = 0; i < 5; i++) {
+        const r = await fetch('/api/pondruff/embed-backfill', { method: 'POST' })
+        const d = await r.json()
+        if (!r.ok) throw new Error(d?.error || 'Backfill-Fehler')
+        total += d.processed || 0
+        if (!d.remaining) break
+      }
+      showToast(`Backfill fertig: ${total} Bauteile`)
+    } catch (e) {
+      showToast((e instanceof Error ? e.message : String(e)) || 'Backfill-Fehler', false)
+    } finally { setBackfillBusy(false) }
+  }
 
   async function run() {
     if (!file) { showToast('Bitte Foto auswählen', false); return }
@@ -36,7 +56,8 @@ export default function KiSuchePage() {
       const data = await resp.json()
       if (!resp.ok) throw new Error(data?.error || 'Fehler')
       setMatches(data.matches || [])
-      setNote(data.note || '')
+      setNote(data.note || (data.fallback ? 'Live-Vergleich (Embeddings noch nicht generiert)' : ''))
+      setQueryDesc(data.query_description || '')
       showToast(`${(data.matches || []).length} Treffer`)
     } catch (e) {
       showToast((e instanceof Error ? e.message : String(e)) || 'KI-Fehler', false)
@@ -56,12 +77,18 @@ export default function KiSuchePage() {
           <div style={lbl}>Such-Foto</div>
           <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
         </label>
-        <button className="pk-btn" disabled={busy || !file} onClick={run} style={{ width: '100%', background: 'linear-gradient(180deg,#e50909,#b80000)', border: '1px solid rgba(229,9,9,.6)' }}>
+        <button className="pk-btn" disabled={busy || !file} onClick={run} style={{ width: '100%' }}>
           {busy ? '⏳ KI vergleicht…' : '🔍 Bauteil suchen'}
+        </button>
+        <button className="pk-btn-ghost" disabled={backfillBusy} onClick={runBackfill} style={{ width: '100%', marginTop: 8, fontSize: 12 }}>
+          {backfillBusy ? '⏳ Backfill läuft…' : '⚙️ Embeddings für alte Bauteile nachgenerieren'}
         </button>
       </div>
 
-      {note && <div className="pk-card" style={{ marginBottom: 14, color: '#aeb9c8', fontSize: 13 }}>ℹ️ {note}</div>}
+      {(note || queryDesc) && <div className="pk-card" style={{ marginBottom: 14, color: '#aeb9c8', fontSize: 13 }}>
+        {queryDesc && <div style={{ marginBottom: note ? 6 : 0 }}><b>KI-Beschreibung:</b> {queryDesc}</div>}
+        {note && <div>ℹ️ {note}</div>}
+      </div>}
 
       {matches.length > 0 && (
         <div className="pk-card">

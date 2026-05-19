@@ -115,9 +115,9 @@ export default function WareneingangPage() {
         user_id: user.id, ...form, receipt_url, parts_url, packaging_url, ai_data: { ...aiData, positions: aiPositions },
       }).select().single()
       if (error) throw error
-      // Bauteil-Asset speichern (für KI-Suche)
+      // Bauteil-Asset speichern (für KI-Suche) + Embedding generieren
       if (parts_url && ins) {
-        await supabase.from('pondruff_bauteile').insert({
+        const { data: bt } = await supabase.from('pondruff_bauteile').insert({
           user_id: user.id,
           customer: form.customer || null,
           delivery_id: form.delivery_id || null,
@@ -126,7 +126,14 @@ export default function WareneingangPage() {
           image_url: parts_url,
           wareneingang_id: ins.id,
           note: form.note || null,
-        })
+        }).select().single()
+        if (bt?.id) {
+          // Embedding im Hintergrund — Fehler nicht aufhalten lassen
+          fetch('/api/pondruff/embed-bauteil', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: bt.id }),
+          }).catch(() => {})
+        }
       }
       setForm({ delivery_id: '', customer: '', operator: '', status: 'offen', note: '' })
       setReceiptFiles([])

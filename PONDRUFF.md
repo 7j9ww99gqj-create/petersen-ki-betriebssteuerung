@@ -44,39 +44,26 @@ Eigene Sektion "Pondruff Polier-Service" in Rot mit allen 5 Punkten.
 
 ---
 
-## Workflow
+## Workflow (vereinfacht)
 
 ```
-                    ┌───────────────────────────────────────┐
-   Wareneingang ────│  Pondruff-Modul                       │
-   (Bilder + OCR)   │                                       │
-                    │  ┌──────────────┐                     │
-                    │  │ Preisrechner │  ◄── "→ Preiskalk." │
-                    │  └──────┬───────┘                     │
-                    │         │                             │
-                    │         ▼                             │
-                    │  ┌─────────────────────────────────┐  │
-                    │  │  Büro / WISO                    │  │
-                    │  │  ├─ Aufträge (Preis → AB →     │  │
-                    │  │  │   Rechnung)                  │  │
-                    │  │  └─ Wareneingänge               │  │
-                    │  └──────────┬──────────┬───────────┘  │
-                    │             │          │              │
-                    └─────────────┼──────────┼──────────────┘
-                                  │          │
-                       ┌──────────▼──┐    ┌──▼──────────┐
-                       │ Petersen KI │    │ WISO MeinB. │
-                       │ BüroPilot   │    │ REST-API    │
-                       │ (Aufträge / │    │ (Direkt-    │
-                       │  Dokumente) │    │  Import)    │
-                       └─────────────┘    └─────────────┘
+Pondruff-Modul
+  Wareneingang        Preisrechner
+       │                   │
+       └────┬──────────────┘
+            │
+            ▼
+       Büro / WISO  (nur Übergabe — keine eigene Verwaltung)
+            │
+   ┌────────┴────────┐
+   ▼                 ▼
+→ BüroPilot     → WISO MeinBüro
+(Aufträge dort)   (Aufträge dort)
 ```
 
-**Wichtig:** Im Büro/WISO-Bereich gibt es **keine** Aktionen außer Übergabe.
-Rechnung schreiben passiert wahlweise:
-- **in Petersen KI BüroPilot** (nach Sync → kann dort wie jede andere Rechnung verwaltet werden)
-- **oder in WISO MeinBüro** (direkt via API)
-- **oder beides**
+**Pondruff = Erfassung + KI-Vorbereitung.**
+**Verwaltung (Rechnung, Mahnung, Buchhaltung) passiert wahlweise im BüroPilot oder in WISO.**
+Im Büro/WISO-Bereich gibt es nur 2 Buttons pro Zeile: `→ BüroPilot` und `→ WISO`.
 
 ---
 
@@ -107,15 +94,19 @@ app/dashboard/pondruff/                          ← komplettes Pondruff-UI
 app/api/pondruff/                                ← komplettes Pondruff-API
   ocr-price/route.ts                               GPT-4 Vision OCR mehrere Preis-Positionen
   ocr-lieferschein/route.ts                        GPT-4 Vision OCR Wareneingang (Single-Image)
-  bauteil-suche/route.ts                           GPT-4 Vision Bauteil-Vergleich
+  bauteil-suche/route.ts                           Embedding-Suche + Live-Vision-Fallback
+  embed-bauteil/route.ts                           Embedding für ein einzelnes Bauteil generieren
+  embed-backfill/route.ts                          Batch-Backfill (10 Bauteile pro Aufruf)
   sync-buero-auftrag/route.ts                      Pondruff-Auftrag → BüroPilot buero_auftraege
   sync-buero-wareneingang/route.ts                 Pondruff-Wareneingang → BüroPilot buero_dokumente
-  wiso-export/route.ts                             WISO MeinBüro REST-API Direkt-Import
+  wiso-export/route.ts                             WISO MeinBüro Direkt-Import Auftrag
+  wiso-export-wareneingang/route.ts                WISO MeinBüro Direkt-Import Wareneingang
 
 supabase/migrations/
   20260519400000_pondruff_module.sql               Basis-Tabellen, RLS, Storage-Bucket
-  20260519410000_pondruff_auftrag_rechnung.sql     Status + Rechnung-Spalten
+  20260519410000_pondruff_auftrag_rechnung.sql     Status + Rechnung-Spalten (Spalten bleiben, UI nicht mehr genutzt)
   20260519420000_pondruff_bauteile_sync.sql        Bauteile-Tabelle + Sync-Spalten
+  20260519430000_pondruff_embeddings.sql           pgvector + match_pondruff_bauteile RPC
 ```
 
 ### Minimale Eingriffe in bestehenden Code (alle gated, alle reversibel)
@@ -186,10 +177,10 @@ Bucket `pondruff`. Pfad-Konvention: `{user_id}/{kategorie}/{timestamp}.{ext}` mi
 # OpenAI — bereits vorhanden, wird für alle OCR + KI-Suche genutzt
 OPENAI_API_KEY=...
 
-# WISO MeinBüro (optional — nur nötig für Direkt-API-Import)
-WISO_MEINBUERO_API_KEY=
-WISO_MEINBUERO_API_SECRET=
-WISO_MEINBUERO_OWNERSHIP_ID=
+# WISO MeinBüro (nötig für "→ WISO"-Buttons)
+WISO_MEINBUERO_API_KEY=c4655a2196bb41dd8b686ef52b268654       ✅ in Vercel gesetzt
+WISO_MEINBUERO_API_SECRET=e1591015479444b58559e7b530055b32    ✅ in Vercel gesetzt
+WISO_MEINBUERO_OWNERSHIP_ID=                                  ⚠️ FEHLT — aus MeinBüro Einstellungen → API kopieren
 ```
 
 WISO-Vars in Vercel setzen (Beispiel):

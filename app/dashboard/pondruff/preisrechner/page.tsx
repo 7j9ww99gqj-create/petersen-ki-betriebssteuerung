@@ -204,14 +204,14 @@ export default function PreisrechnerPage() {
     } finally { setBusy(false) }
   }
 
-  async function saveOrder(status: 'preisauftrag' | 'auftragsbestaetigung' = 'preisauftrag') {
+  async function saveOrder() {
     if (!positions.length) { showToast('Keine Positionen', false); return }
     setBusy(true)
     try {
       const supabase = createSupabaseClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Nicht eingeloggt')
-      const payload: Record<string, unknown> = {
+      const { error } = await supabase.from('pondruff_preisauftraege').insert({
         user_id: user.id,
         order_id: wiso.id,
         customer: wiso.customer,
@@ -220,12 +220,10 @@ export default function PreisrechnerPage() {
         total: wiso.total,
         positions,
         rows: wiso.rows,
-        status,
-      }
-      if (status === 'auftragsbestaetigung') payload.confirmed_at = new Date().toISOString()
-      const { error } = await supabase.from('pondruff_preisauftraege').insert(payload)
+        status: 'preisauftrag',
+      })
       if (error) throw error
-      showToast(status === 'auftragsbestaetigung' ? 'Auftragsbestätigung erstellt. Siehe Büro/WISO.' : 'WISO-Auftrag gespeichert. Siehe Büro/WISO.')
+      showToast('Auftrag in Büro/WISO gespeichert. Dort kannst du nach BüroPilot oder WISO exportieren.')
     } catch (e) {
       showToast((e instanceof Error ? e.message : String(e)) || 'Speichern fehlgeschlagen', false)
     } finally { setBusy(false) }
@@ -320,16 +318,11 @@ export default function PreisrechnerPage() {
 
             <pre style={{ fontSize: 11, background: 'rgba(0,0,0,.3)', padding: 10, borderRadius: 8, overflowX: 'auto', maxHeight: 200 }}>{wisoOrderTsv(wiso)}</pre>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-              <button className="pk-btn-ghost" disabled={busy || !positions.length} onClick={() => saveOrder('preisauftrag')}>
-                {busy ? '⏳…' : '💾 Als Preisauftrag speichern'}
-              </button>
-              <button className="pk-btn" disabled={busy || !positions.length} onClick={() => saveOrder('auftragsbestaetigung')}>
-                {busy ? '⏳…' : '📋 Auftragsbestätigung erstellen'}
-              </button>
-            </div>
+            <button className="pk-btn" disabled={busy || !positions.length} onClick={saveOrder} style={{ width: '100%', marginTop: 10 }}>
+              {busy ? '⏳ Speichere…' : '💾 Auftrag speichern (Büro/WISO)'}
+            </button>
             <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 6 }}>
-              Preisauftrag = nur Kalkulation/WISO-Übergabe. Auftragsbestätigung = verbindlich, kann später in Rechnung gewandelt werden.
+              Der Auftrag wird in <b>Büro/WISO</b> abgelegt — von dort kannst du ihn nach <b>BüroPilot</b> oder <b>WISO MeinBüro</b> exportieren.
             </div>
           </div>
         </>
