@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import { requirePondruffFeature } from '@/lib/pondruff-server'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { POND_USER_EMAIL, PRICE_COATINGS, normalizePriceCoating, normalizePriceCustomer } from '@/lib/pondruff'
 import { runVisionOcr } from '@/lib/pondruff-ocr'
+
+const Schema = z.object({
+  image: z.string().max(10_000_000).optional(),
+})
 
 export const maxDuration = 60
 
@@ -23,8 +29,9 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'OPENAI_API_KEY fehlt' }, { status: 500 })
 
-  let body: { image?: string }
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Ungueltige Anfrage' }, { status: 400 }) }
+  const parsedBody = await parseBody(req, Schema)
+  if (!parsedBody.ok) return parsedBody.error
+  const body = parsedBody.data
   const image = body.image
   if (!image || !image.startsWith('data:')) return NextResponse.json({ error: 'Kein Bild' }, { status: 400 })
 

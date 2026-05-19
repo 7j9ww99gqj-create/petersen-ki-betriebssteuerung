@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import { requirePondruffFeature } from '@/lib/pondruff-server'
 import { POND_USER_EMAIL, money } from '@/lib/pondruff'
 import { getWisoToken, wisoRequest } from '@/lib/wiso'
+
+const Schema = z.object({
+  id: z.string().trim().min(1).max(100),
+})
 
 // WISO MeinBüro REST API Direkt-Export eines Pondruff-Preisauftrags.
 // Erwartet ENV: WISO_MEINBUERO_API_KEY, WISO_MEINBUERO_API_SECRET, WISO_MEINBUERO_OWNERSHIP_ID.
@@ -81,9 +87,9 @@ export async function POST(req: NextRequest) {
   ].filter(Boolean)
   if (missing.length) return NextResponse.json({ error: `WISO Env-Vars fehlen: ${missing.join(', ')}` }, { status: 400 })
 
-  let body: { id?: string }
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Ungueltige Anfrage' }, { status: 400 }) }
-  if (!body.id) return NextResponse.json({ error: 'id fehlt' }, { status: 400 })
+  const parsedBody = await parseBody(req, Schema)
+  if (!parsedBody.ok) return parsedBody.error
+  const body = parsedBody.data
 
   const sb = access.supabase
   const { data: src, error: e1 } = await sb.from('pondruff_preisauftraege').select('*').eq('id', body.id).single()

@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import { requirePondruffFeature } from '@/lib/pondruff-server'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { POND_USER_EMAIL } from '@/lib/pondruff'
+
+const Schema = z.object({
+  image: z.string().max(10_000_000).optional(),
+  note: z.string().trim().max(2000).optional(),
+})
 
 // Bauteil-KI-Suche v3: Reine Embedding-Suche.
 // 1) Such-Foto + Hinweis → GPT-4o-mini Vision → Kurzbeschreibung
@@ -29,8 +36,9 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'OPENAI_API_KEY fehlt' }, { status: 500 })
 
-  let body: { image?: string; note?: string }
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Ungueltige Anfrage' }, { status: 400 }) }
+  const parsedBody = await parseBody(req, Schema)
+  if (!parsedBody.ok) return parsedBody.error
+  const body = parsedBody.data
   const image = body.image
   const note = (body.note || '').trim()
   if (!image?.startsWith('data:')) return NextResponse.json({ error: 'Kein Bild' }, { status: 400 })

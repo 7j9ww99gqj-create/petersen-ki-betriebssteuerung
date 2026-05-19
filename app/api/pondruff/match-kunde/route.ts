@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import { POND_USER_EMAIL } from '@/lib/pondruff'
+
+const Schema = z.object({
+  name: z.string().trim().max(200).optional(),
+})
 
 // Fuzzy-Match: Pondruff-OCR-Customer gegen buero_kunden des Pondruff-Users.
 // Liefert Top-3 Kandidaten mit Score 0..100.
@@ -41,8 +47,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Nicht berechtigt' }, { status: 403 })
   }
 
-  let body: { name?: string }
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Ungueltige Anfrage' }, { status: 400 }) }
+  const parsedBody = await parseBody(req, Schema)
+  if (!parsedBody.ok) return parsedBody.error
+  const body = parsedBody.data
   const name = (body.name || '').trim()
   if (!name) return NextResponse.json({ matches: [] })
 

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import { POND_USER_EMAIL } from '@/lib/pondruff'
+
+const Schema = z.object({
+  id: z.string().trim().min(1).max(100),
+})
 
 // Pondruff Preisauftrag → BüroPilot Auftrag.
 // Erstellt einen buero_auftraege-Eintrag aus einem pondruff_preisauftraege-Record
@@ -15,9 +21,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Nicht berechtigt' }, { status: 403 })
   }
 
-  let body: { id?: string }
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Ungueltige Anfrage' }, { status: 400 }) }
-  if (!body.id) return NextResponse.json({ error: 'id fehlt' }, { status: 400 })
+  const parsedBody = await parseBody(req, Schema)
+  if (!parsedBody.ok) return parsedBody.error
+  const body = parsedBody.data
 
   const sb = access.supabase
   const { data: src, error: e1 } = await sb.from('pondruff_preisauftraege').select('*').eq('id', body.id).single()

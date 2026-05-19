@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import { POND_USER_EMAIL } from '@/lib/pondruff'
 import { INHABER_EMAIL } from '@/lib/roles'
 import defaultConfig from '@/lib/pondruff-price-config.json'
+
+const Schema = z.object({
+  config: z.unknown(),
+})
 
 // Pondruff Preistabellen-Admin-Endpunkt.
 // GET → aktuelle Config aus DB; Fallback auf JSON-Defaults wenn leer.
@@ -43,8 +49,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Nicht berechtigt' }, { status: 403 })
   }
 
-  let body: { config?: unknown }
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Ungueltige Anfrage' }, { status: 400 }) }
+  const parsedBody = await parseBody(req, Schema)
+  if (!parsedBody.ok) return parsedBody.error
+  const body = parsedBody.data
   if (!body.config || typeof body.config !== 'object') {
     return NextResponse.json({ error: 'config fehlt oder ungültig' }, { status: 400 })
   }
