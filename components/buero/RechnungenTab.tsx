@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import { getBueroRechnungen, upsertBueroRechnung, deleteBueroRechnung, getBueroDokumente, updateBueroDokument, getNextInvoiceNumber } from '@/lib/db'
-import { generateRechnungPDF } from '@/lib/pdf'
+import { generateRechnungPDFAuto as generateRechnungPDF } from '@/lib/pondruff-pdf'
 import { genId } from '@/lib/ids'
 import { Toast, Modal, DeleteConfirm, StatusBadgeRechnung, labelStyle } from './shared'
 import type { Rechnung, Kunde, Dokument, Position } from '@/types/buero'

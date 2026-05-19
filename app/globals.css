@@ -187,6 +187,50 @@ a { text-decoration: none; color: inherit; }
 
 select.pk-input { appearance: none; }
 
+/* ── Pondruff-Theme (rotes Design für Pondruff-Account) ──────────────────── */
+
+.pondruff-theme {
+  --pond-red: #e50909;
+  --pond-red-2: #b80000;
+  --pond-red-soft: rgba(229,9,9,.12);
+  --pond-red-line: rgba(229,9,9,.30);
+}
+.pondruff-theme .pk-card {
+  border-color: rgba(229,9,9,.18);
+  background: linear-gradient(180deg, rgba(20,8,8,.94), rgba(8,4,4,.96));
+}
+.pondruff-theme .pk-card:hover {
+  border-color: rgba(229,9,9,.34);
+}
+.pondruff-theme .pk-btn {
+  background: linear-gradient(135deg, #e50909, #b80000);
+  border-color: rgba(229,9,9,.5);
+  box-shadow: 0 4px 16px rgba(229,9,9,.30);
+}
+.pondruff-theme .pk-btn:hover {
+  box-shadow: 0 8px 24px rgba(229,9,9,.45);
+}
+.pondruff-theme .pk-btn-ghost {
+  background: rgba(229,9,9,.05);
+  border-color: rgba(229,9,9,.25);
+  color: #f5d4d4;
+}
+.pondruff-theme .pk-btn-ghost:hover {
+  background: rgba(229,9,9,.12);
+  border-color: rgba(229,9,9,.45);
+}
+.pondruff-theme .pk-input:focus {
+  border-color: var(--pond-red);
+  box-shadow: 0 0 0 3px rgba(229,9,9,.18);
+}
+.pondruff-theme .pk-table th {
+  background: rgba(229,9,9,.10);
+  color: #ffb3b3;
+  border-bottom-color: rgba(229,9,9,.25);
+}
+.pondruff-theme a { color: #ff8080; }
+.pondruff-theme h1, .pondruff-theme h2, .pondruff-theme h3 { color: #fff; }
+
 /* ── Table ───────────────────────────────────────────────────────────────── */
 
 .pk-table { width: 100%; border-collapse: collapse; }

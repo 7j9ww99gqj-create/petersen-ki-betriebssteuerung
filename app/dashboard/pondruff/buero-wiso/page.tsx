@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { wisoClipboardPlainTsv, wisoClipboardTsv, wisoOrderTsv, type WisoOrder, type WisoOrderRow } from '@/lib/pondruff'
+import { generatePondruffOrderPDF, type PondPreisauftrag } from '@/lib/pondruff-pdf'
 
 type Status = 'preisauftrag' | 'auftragsbestaetigung' | 'rechnung'
 
@@ -428,6 +429,7 @@ ${order.rows.map(r => `<tr>
                       <button className="pk-btn-ghost" onClick={() => copyWiso(o)} style={{ fontSize: 11 }} title="WISO Copy">📋</button>
                       <button className="pk-btn-ghost" onClick={() => downloadCsv(o)} style={{ fontSize: 11 }} title="TSV">⬇️</button>
                       <button className="pk-btn-ghost" onClick={() => downloadHtmlReport(o)} style={{ fontSize: 11 }} title="HTML Bericht">📄</button>
+                      <button className="pk-btn-ghost" onClick={() => generatePondruffOrderPDF(o as unknown as PondPreisauftrag)} style={{ fontSize: 11, color: '#e50909' }} title="PDF (mit Briefpapier)">PDF</button>
                       {o.synced_buero_auftrag_id
                         ? <span style={{ fontSize: 11, color: '#4ddb7e', alignSelf: 'center' }}>✓ KI</span>
                         : <button className="pk-btn-ghost" disabled={busy} onClick={() => syncToBueroAuftrag(o)} style={{ fontSize: 11 }} title="In BüroPilot übernehmen">→ Petersen KI</button>}

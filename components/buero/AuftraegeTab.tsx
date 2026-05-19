@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import { getBueroDokumente, upsertBueroAuftrag, deleteBueroAuftrag, updateBueroDokument, upsertBueroRechnung, getNextInvoiceNumber } from '@/lib/db'
-import { generateAuftragsbestaetigungPDF } from '@/lib/pdf'
+import { generateAuftragsbestaetigungPDFAuto as generateAuftragsbestaetigungPDF } from '@/lib/pondruff-pdf'
 import { genId } from '@/lib/ids'
 import { PACKAGE_PRICING, EMPLOYEE_TIERS, type PackageId, type EmployeeTierId } from '@/lib/pricingConfig'
 import { Toast, Modal, DeleteConfirm, StatusBadgeAuftrag, ProgressBar, labelStyle } from './shared'

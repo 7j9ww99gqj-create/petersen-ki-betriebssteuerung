@@ -84,11 +84,13 @@ Rechnung schreiben passiert wahlweise:
 
 ```
 lib/pondruff.ts                                  ← Konstanten, Preislogik, isPondruffUser()
+lib/pondruff-pdf.ts                              ← PDF-Generator (Briefpapier + Rot/Schwarz)
 
 public/pondruff/
   banner.png                                       Banner-Logo (Dashboard groß)
   icon.png                                         Rundes Logo (Bottom-Nav klein)
   rund.png                                         Alternative
+  briefpapier.png                                  DIN-A4 Briefpapier (PDF-Hintergrund)
 
 components/pondruff/
   PondruffSheet.tsx                                Slide-Up Menü, rot
@@ -123,8 +125,13 @@ supabase/migrations/
 | `app/dashboard/page.tsx`       | `{isPondruff && …}` Banner + Kacheln |
 | `components/Sidebar.tsx`       | `{isPondruff && …}` Sidebar-Sektion |
 | `app/dashboard/layout.tsx`     | `{isPondruff && …}` Bottom-Nav-Button + PondruffSheet |
+| `app/globals.css`              | `.pondruff-theme` CSS-Klasse (greift nur in Pondruff-Layout) |
+| `components/buero/RechnungenTab.tsx` | `generateRechnungPDFAuto` statt `generateRechnungPDF` (Auto-Switch je User) |
+| `components/buero/AuftraegeTab.tsx`  | dito für `generateAuftragsbestaetigungPDFAuto` |
+| `components/buero/AngeboteTab.tsx`   | dito für `generateAngebotPDFAuto` |
 
-Diese 3 Stellen sind die **einzige** Berührung mit der bestehenden Codebase.
+Diese 7 Stellen sind die **einzige** Berührung mit der bestehenden Codebase.
+Die 3 PDF-Imports sind reine Drop-In-Wrapper — andere Nutzer bekommen 1:1 dieselbe PDF wie vorher.
 
 ---
 
@@ -256,6 +263,9 @@ Petersen-KI existiert (z.B. Rechnungs-Verwaltung), nutz die Sync-Routen statt zu
 | HTML-Bericht | `buero-wiso/page.tsx` | Pro Auftrag/Rechnung druckbar |
 | WISO Copy/Paste | `buero-wiso/page.tsx` | Clipboard im exakten WISO-Format |
 | TSV-Export | `buero-wiso/page.tsx` | Pro Auftrag + Sammel-Export |
+| **Rotes Theme** | `app/globals.css` Klasse `.pondruff-theme` + Wrap in `pondruff/layout.tsx` | pk-card / pk-btn / pk-input alle in Rot |
+| **Pondruff-PDF mit Briefpapier** | `lib/pondruff-pdf.ts` | PNG-Briefpapier als Hintergrund + Inhalte in Rot/Schwarz |
+| **BüroPilot PDF-Auto-Switch** | `components/buero/*Tab.tsx` nutzen `generate*PDFAuto` | Bei Pondruff-User automatisch Pondruff-PDF, sonst Standard |
 
 ### 🟡 Noch denkbar (Vorschläge für nächste Sessions)
 

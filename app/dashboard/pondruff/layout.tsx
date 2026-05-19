@@ -9,6 +9,8 @@ const TABS = [
   { href: '/dashboard/pondruff/wareneingang', icon: '📥', label: 'Wareneingang' },
   { href: '/dashboard/pondruff/preisrechner', icon: '💶', label: 'Preisrechner' },
   { href: '/dashboard/pondruff/buero-wiso', icon: '🧾', label: 'Büro / WISO' },
+  { href: '/dashboard/pondruff/ki-suche', icon: '🤖', label: 'KI-Suche' },
+  { href: '/dashboard/pondruff/archiv', icon: '🗂️', label: 'Archiv' },
 ]
 
 export default function PondruffLayout({ children }: { children: React.ReactNode }) {
@@ -28,10 +30,10 @@ export default function PondruffLayout({ children }: { children: React.ReactNode
   if (!ok) return null
 
   return (
-    <div>
+    <div className="pondruff-theme">
       <div style={{ marginBottom: 18 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/pondruff/banner.png" alt="Pondruff WE" style={{ width: '100%', maxWidth: 900, height: 'auto', display: 'block', borderRadius: 16 }} />
+        <img src="/pondruff/banner.png" alt="Pondruff WE" style={{ width: '100%', maxWidth: 900, height: 'auto', display: 'block', borderRadius: 16, boxShadow: '0 8px 32px rgba(229,9,9,.22)' }} />
       </div>
       <div className="pk-tab-bar" style={{ display: 'flex', gap: 8, marginBottom: 18, overflowX: 'auto' }}>
         {TABS.map(t => (
