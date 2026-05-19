@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Optimierungs-Sprint Phase-3** (HEAD `37e0835`): 13 Verbesserungen live.
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Compliance-Sprint** (Aufgaben 15-18): DSGVO-Export UI-Button, CONTRIBUTING+PR-Template, Backup-Restore-Drill.
+- Davor: **Optimierungs-Sprint Phase-3** (HEAD `c0bbb45`): 13 Verbesserungen live (paralleler Agent).
 - Davor: **Phase-2-Sprint** (HEAD `0e89a9f`): Audit-Logs, OpenAI-Cost-Tracking, Modal/Toast-Konsolidierung, Test-Coverage +47, API-Versionierung.
 - Davor: **Security-Sprint** (Commits `bb920c0`–`4ceb16d`): Zod, Rate-Limiting, KI-Cache.
 - Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main).
@@ -34,6 +35,16 @@
 - Tests: `npm test` — ✅ **87 Tests** in 7 Files.
 - CI: GitHub Actions (tsc + test + build) — ✅ Workflow aktiv auf main.
 - Supabase Storage: ~100 GB Plan — neue Buckets `lager-bilder`, `ocr-originale`, `firma-branding`, `db-backups` (alle privat, user-scoped RLS).
+
+### Compliance-Sprint (2026-05-19) — Aufgaben 15, 16, 18 aus Optimierungs-Plan
+
+| # | Aufgabe | Dateien |
+|---|---------|---------|
+| 15 | DSGVO Datenexport (Art. 15) | API: `app/api/user/data-export/route.ts` (vom parallelen Agent, `b9d7cea`) — alle 32 User-Tabellen als JSON-Download mit `Content-Disposition: attachment`<br>UI: `components/einstellungen/DataExportButton.tsx` (Self-Service-Button mit Loading/Error-State, kann in `einstellungen/page.tsx` eingebunden werden) |
+| 16 | Vercel Preview-Branches Workflow | `CONTRIBUTING.md` (Feature-Branch-Strategie, Direct-Push vs PR, Commit-Konvention)<br>`.github/PULL_REQUEST_TEMPLATE.md` (Checkliste, Test-Hinweise) |
+| 18 | Backup-Restore-Drill | `docs/RESTORE.md` (3 Szenarien: Einzeltabelle / User-Recovery / Catastrophe-Recovery, 6-Monats-Drill-Plan, JSONB-Restore-Approach) |
+
+**Aufgabe 17 (Zod auf restliche ~30 Routen)** bleibt offen — wird im nächsten Sprint mechanisch durchgezogen, sobald alle parallelen Routen-Edits stabil sind.
 
 ### Optimierungs-Sprint Phase-3 (2026-05-19) — 13 Verbesserungen aus CTO-Analyse
 
