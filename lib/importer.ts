@@ -472,20 +472,47 @@ export function validateImportRows(
 
 // ── Auto-Map columns from source hints ───────────────────────────────────────
 
+function normalizeHeader(s: string): string {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')
+}
+
 export function autoMapColumns(headers: string[], source: ImportSource, dataType: ImportDataType): Record<string, string> {
   const hints = SOURCE_HINTS[source] ?? {}
-  const targetKeys = new Set(TARGET_FIELDS[dataType].map(f => f.key))
+  const fields = TARGET_FIELDS[dataType]
+  const targetKeys = new Set(fields.map(f => f.key))
+
+  // Normalisierte Lookup-Tabelle: Hint-Label + Target-Label + Target-Key alle case-insensitive ohne Sonderzeichen
+  const normMap: Record<string, string> = {}
+  for (const [k, v] of Object.entries(hints)) {
+    if (targetKeys.has(v)) normMap[normalizeHeader(k)] = v
+  }
+  for (const f of fields) {
+    normMap[normalizeHeader(f.key)] = f.key
+    if (f.label) normMap[normalizeHeader(f.label)] = f.key
+  }
+  // Generische Hints zusätzlich (damit ALLE Quellen die deutschen Standardheader treffen)
+  for (const [k, v] of Object.entries(DATEV_HINTS)) {
+    const norm = normalizeHeader(k)
+    if (targetKeys.has(v) && !normMap[norm]) normMap[norm] = v
+  }
+
   const mapping: Record<string, string> = {}
   for (const h of headers) {
-    const hintMatch = hints[h] ?? hints[h.trim()] ?? null
-    if (hintMatch && targetKeys.has(hintMatch)) {
-      mapping[h] = hintMatch
-    } else {
-      // Try case-insensitive direct match to target key
-      const lower = h.toLowerCase().replace(/[^a-z0-9]/g, '')
-      const directMatch = TARGET_FIELDS[dataType].find(f => f.key.toLowerCase().replace(/[^a-z0-9]/g, '') === lower)
-      mapping[h] = directMatch?.key ?? '__skip__'
+    const norm = normalizeHeader(h)
+    if (!norm) { mapping[h] = '__skip__'; continue }
+    // 1) Direkt-Match
+    if (normMap[norm]) { mapping[h] = normMap[norm]; continue }
+    // 2) Fuzzy: Header enthält bekannten Begriff, oder bekannter Begriff enthält Header
+    let fuzzy: string | null = null
+    let fuzzyScore = 0
+    for (const [k, v] of Object.entries(normMap)) {
+      if (k.length < 3) continue
+      if (norm.includes(k) || k.includes(norm)) {
+        const score = Math.min(k.length, norm.length)
+        if (score > fuzzyScore) { fuzzy = v; fuzzyScore = score }
+      }
     }
+    mapping[h] = fuzzy ?? '__skip__'
   }
   return mapping
 }

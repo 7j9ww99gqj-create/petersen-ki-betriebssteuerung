@@ -3229,8 +3229,12 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
 
   const STEP_LABELS = ['System', 'Datentyp', 'Upload', 'Mapping', 'Vorschau']
 
+  // Schnelle Prüfung: Pflichtfeld 'name' (bzw. erstes required-Feld) im Mapping vorhanden?
+  const requiredField = TARGET_FIELDS[dataType].find(f => f.required)
+  const requiredMapped = requiredField ? Object.values(mapping).includes(requiredField.key) : true
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1200, marginInline: 'auto', width: '100%' }}>
       {/* Header */}
       <div className="pk-card" style={{ padding: '20px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
@@ -3378,27 +3382,34 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
           </p>
 
           <div style={{ overflowX: 'auto', marginBottom: 16 }}>
-            <table className="pk-table">
+            <table className="pk-table" style={{ minWidth: 900, width: '100%' }}>
               <thead>
                 <tr>
-                  <th>Spalte in deiner Datei</th>
-                  <th>Beispielwert</th>
-                  <th>Zielfeld in Petersen KI</th>
+                  <th style={{ minWidth: 180 }}>Spalte in deiner Datei</th>
+                  <th>Beispielwerte (Zeile 1–3)</th>
+                  <th style={{ minWidth: 240 }}>Zielfeld in Petersen KI</th>
                 </tr>
               </thead>
               <tbody>
                 {parseResult.headers.map(header => {
-                  const example = parseResult.rows[0]?.[header] ?? ''
+                  const examples = [0, 1, 2]
+                    .map(i => parseResult.rows[i]?.[header])
+                    .filter(v => v !== undefined && v !== '')
+                  const isMapped = mapping[header] && mapping[header] !== '__skip__'
                   return (
-                    <tr key={header}>
-                      <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{header}</td>
-                      <td style={{ color: '#aeb9c8', fontSize: 12, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{example}</td>
-                      <td>
+                    <tr key={header} style={{ background: isMapped ? 'rgba(37,211,102,.04)' : undefined }}>
+                      <td style={{ fontWeight: 700, verticalAlign: 'top', padding: '8px 10px' }}>{header}</td>
+                      <td style={{ color: '#aeb9c8', fontSize: 12, padding: '8px 10px', verticalAlign: 'top' }}>
+                        {examples.length === 0
+                          ? <span style={{ color: '#4a5568', fontStyle: 'italic' }}>(leer)</span>
+                          : examples.map((v, i) => <div key={i} style={{ whiteSpace: 'normal', wordBreak: 'break-word', marginBottom: 2 }}>{v}</div>)}
+                      </td>
+                      <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
                         <select
                           className="pk-input"
                           value={mapping[header] ?? '__skip__'}
                           onChange={e => setMapping(prev => ({ ...prev, [header]: e.target.value }))}
-                          style={{ fontSize: 12, padding: '4px 8px' }}
+                          style={{ fontSize: 13, padding: '8px 12px', width: '100%' }}
                         >
                           <option value="__skip__">– ignorieren –</option>
                           {TARGET_FIELDS[dataType].map(f => (
@@ -3415,8 +3426,13 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
             </table>
           </div>
 
+          {!requiredMapped && requiredField && (
+            <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(255,80,80,.08)', border: '1px solid rgba(255,80,80,.30)', fontSize: 13, color: '#ff8080', marginBottom: 12, fontWeight: 600 }}>
+              ⚠️ Pflichtfeld <strong>{requiredField.label}</strong> ist noch keiner Spalte zugeordnet — der Import wird sonst leer bleiben!
+            </div>
+          )}
           <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(22,132,255,.06)', border: '1px solid rgba(22,132,255,.12)', fontSize: 12, color: '#aeb9c8', marginBottom: 16 }}>
-            * Pflichtfelder müssen zugeordnet sein für einen erfolgreichen Import.
+            * Pflichtfelder müssen zugeordnet sein. Spalten mit grünem Hintergrund werden importiert.
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="pk-btn-ghost" onClick={() => setStep(3)}>← Zurück</button>
@@ -3471,11 +3487,11 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
           <div className="pk-card" style={{ padding: 20 }}>
             <div style={{ fontWeight: 700, marginBottom: 12 }}>Vorschau (erste 10 Zeilen, gültige Felder)</div>
             <div style={{ overflowX: 'auto' }}>
-              <table className="pk-table">
+              <table className="pk-table" style={{ minWidth: 800, width: '100%' }}>
                 <thead>
                   <tr>
                     {Object.values(mapping).filter(v => v && v !== '__skip__').map(field => (
-                      <th key={field}>{field}</th>
+                      <th key={field} style={{ padding: '8px 10px', textAlign: 'left' }}>{field}</th>
                     ))}
                   </tr>
                 </thead>
@@ -3483,8 +3499,8 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
                   {buildImportRows(parseResult.rows.slice(0, 10), mapping).map((row, i) => (
                     <tr key={i}>
                       {Object.values(mapping).filter(v => v && v !== '__skip__').map(field => (
-                        <td key={field} style={{ fontSize: 12, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {row[field] ?? ''}
+                        <td key={field} style={{ fontSize: 12, padding: '8px 10px', maxWidth: 240, whiteSpace: 'normal', wordBreak: 'break-word', verticalAlign: 'top' }} title={row[field] ?? ''}>
+                          {row[field] || <span style={{ color: '#4a5568' }}>—</span>}
                         </td>
                       ))}
                     </tr>
