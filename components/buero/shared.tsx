@@ -13,6 +13,7 @@ export function TabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) 
     { id: 'einkauf', label: '🏭 Einkauf / Lieferanten' },
     { id: 'alerts', label: '⚠️ Alerts' },
     { id: 'pipeline', label: '🔀 Pipeline' },
+    { id: 'ki-tools', label: '🤖 KI-Tools' },
   ]
   return (
     <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,.08)', paddingBottom: 0, overflowX: 'auto' }}>

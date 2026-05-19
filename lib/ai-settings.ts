@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from './supabase-admin'
-import type { AiFeatureSettings, MarketingKiSettings } from './db'
+import type { AiFeatureSettings, MarketingKiSettings, OpenAiToolSettings } from './db'
 
 const DEFAULT_AI_FEATURE_SETTINGS: AiFeatureSettings = {
   enabled: true,
@@ -62,5 +62,34 @@ export async function getServerMarketingKiSettings(userId: string): Promise<Mark
     }
   } catch {
     return DEFAULT_MARKETING_KI
+  }
+}
+
+const DEFAULT_OPENAI_TOOLS: OpenAiToolSettings = {
+  steuerprognoseEnabled: false,
+  mahnungsgeneratorEnabled: false,
+  emailAssistentEnabled: false,
+  monatsberichtEnabled: false,
+}
+
+export async function getServerOpenAiToolSettings(userId: string): Promise<OpenAiToolSettings> {
+  try {
+    if (!isSupabaseAdminConfigured()) return DEFAULT_OPENAI_TOOLS
+    const admin = createSupabaseAdminClient()
+    const { data } = await admin
+      .from('firma_einstellungen')
+      .select('openai_steuerprognose_enabled, openai_mahnungsgenerator_enabled, openai_email_assistent_enabled, openai_monatsbericht_enabled')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (!data) return DEFAULT_OPENAI_TOOLS
+    const row = data as Record<string, unknown>
+    return {
+      steuerprognoseEnabled: Boolean(row.openai_steuerprognose_enabled),
+      mahnungsgeneratorEnabled: Boolean(row.openai_mahnungsgenerator_enabled),
+      emailAssistentEnabled: Boolean(row.openai_email_assistent_enabled),
+      monatsberichtEnabled: Boolean(row.openai_monatsbericht_enabled),
+    }
+  } catch {
+    return DEFAULT_OPENAI_TOOLS
   }
 }

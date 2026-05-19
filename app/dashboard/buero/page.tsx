@@ -18,6 +18,7 @@ import DokumenteTab from '@/components/buero/DokumenteTab'
 import EinkaufTab from '@/components/buero/EinkaufTab'
 import AlertsTab from '@/components/buero/AlertsTab'
 import PipelineKanbanTab from '@/components/buero/PipelineKanbanTab'
+import KiToolsTab from '@/components/buero/KiToolsTab'
 
 // ── Haupt-Seite ─────────────────────────────────────────────────────────────
 
@@ -36,7 +37,7 @@ export default function BueroPilotPage() {
     params.set('tab', newTab)
     router.replace(`?${params.toString()}`, { scroll: false })
   }
-  const BUERO_TABS: Tab[] = ['kunden', 'angebote', 'auftraege', 'rechnungen', 'eingangsrechnungen', 'dokumente', 'einkauf']
+  const BUERO_TABS: Tab[] = ['kunden', 'angebote', 'auftraege', 'rechnungen', 'eingangsrechnungen', 'dokumente', 'einkauf', 'ki-tools']
   useSwipeTabs(BUERO_TABS, tab, (t) => setTab(t as Tab))
   const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
   const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
@@ -206,6 +207,7 @@ export default function BueroPilotPage() {
       {tab === 'einkauf' && <EinkaufTab isDemo={isDemo} />}
       {tab === 'alerts' && <AlertsTab kunden={kunden} rechnungen={sharedRechnungen} auftraege={auftraege} />}
       {tab === 'pipeline' && <PipelineKanbanTab angebote={angebote} auftraege={auftraege} rechnungen={sharedRechnungen} setTab={setTab} />}
+      {tab === 'ki-tools' && <KiToolsTab isDemo={isDemo} rechnungen={sharedRechnungen} />}
     </div>
   )
 }

@@ -166,6 +166,16 @@ export default function AnalysePilotPage() {
   const [isDemo, setIsDemo] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [zahlungsmoralData, setZahlungsmoralData] = useState<ZahlungsmoralKunde[]>([])
+  // Monatsbericht State
+  const [monatsberichtResult, setMonatsberichtResult] = useState('')
+  const [monatsberichtLoading, setMonatsberichtLoading] = useState(false)
+  const [monatsberichtError, setMonatsberichtError] = useState('')
+  const [monatsberichtCopied, setMonatsberichtCopied] = useState(false)
+  // Steuerprognose State
+  const [steuerprognoseResult, setSteuerprognoseResult] = useState('')
+  const [steuerprognoseLoading, setSteuerprognoseLoading] = useState(false)
+  const [steuerprognoseError, setSteuerprognoseError] = useState('')
+  const [steuerprognoseCopied, setSteuerprognoseCopied] = useState(false)
 
   useEffect(() => {
     const demo = hasDemoCookie()
@@ -474,6 +484,60 @@ export default function AnalysePilotPage() {
   }
 
   const fmtK = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1).replace('.0', '')}k €` : `${n.toLocaleString('de-DE')} €`
+
+  async function handleMonatsbericht() {
+    setMonatsberichtLoading(true)
+    setMonatsberichtError('')
+    setMonatsberichtResult('')
+    try {
+      const res = await fetch('/api/openai/monatsbericht', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kpi,
+          monat: new Date().toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }),
+        }),
+      })
+      const data = await res.json() as { reply?: string; disabled?: boolean; error?: string }
+      if (data.disabled) { setMonatsberichtError('Monatsbericht ist deaktiviert. Unter Einstellungen → Kundensteuerung aktivieren.'); return }
+      if (data.error) { setMonatsberichtError(data.error); return }
+      setMonatsberichtResult(data.reply ?? '')
+    } catch {
+      setMonatsberichtError('Fehler beim Generieren.')
+    } finally {
+      setMonatsberichtLoading(false)
+    }
+  }
+
+  async function handleSteuerprognose() {
+    setSteuerprognoseLoading(true)
+    setSteuerprognoseError('')
+    setSteuerprognoseResult('')
+    try {
+      const res = await fetch('/api/openai/steuerprognose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          umsatzDaten: umsatzData.map(d => ({ monat: d.monat, umsatz: d.umsatz, kosten: d.kosten })),
+          steuersatz: 19,
+        }),
+      })
+      const data = await res.json() as { reply?: string; disabled?: boolean; error?: string }
+      if (data.disabled) { setSteuerprognoseError('Steuerprognose ist deaktiviert. Unter Einstellungen → Kundensteuerung aktivieren.'); return }
+      if (data.error) { setSteuerprognoseError(data.error); return }
+      setSteuerprognoseResult(data.reply ?? '')
+    } catch {
+      setSteuerprognoseError('Fehler beim Generieren.')
+    } finally {
+      setSteuerprognoseLoading(false)
+    }
+  }
+
+  function copyAnalyseText(text: string, setCopied: (v: boolean) => void) {
+    void navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   return (
     <div className="fade-in">
@@ -831,6 +895,53 @@ export default function AnalysePilotPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Monatsbericht */}
+            <div className="pk-card" style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>📋 KI-Monatsbericht</h3>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>Strukturierter Bericht aus aktuellen KPIs</div>
+                </div>
+                <button className="pk-btn" onClick={() => void handleMonatsbericht()} disabled={monatsberichtLoading || isDemo} style={{ fontSize: 12 }}>
+                  {monatsberichtLoading ? '⏳ Generiere…' : '✨ Bericht erstellen'}
+                </button>
+              </div>
+              {isDemo && <div style={{ fontSize: 12, color: '#aeb9c8', fontStyle: 'italic' }}>Im Demo-Modus nicht verfügbar.</div>}
+              {monatsberichtError && <div style={{ color: '#ff8080', fontSize: 13, padding: '10px 14px', background: 'rgba(255,80,80,.08)', borderRadius: 8, border: '1px solid rgba(255,80,80,.2)' }}>{monatsberichtError}</div>}
+              {monatsberichtResult && (
+                <div>
+                  <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: 14, fontSize: 13, color: '#dbe4ef', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{monatsberichtResult}</div>
+                  <button className="pk-btn-ghost" onClick={() => copyAnalyseText(monatsberichtResult, setMonatsberichtCopied)} style={{ marginTop: 8, fontSize: 12 }}>
+                    {monatsberichtCopied ? '✓ Kopiert!' : '📋 Kopieren'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Steuerprognose */}
+            <div className="pk-card" style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>📊 KI-Steuerprognose</h3>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>Steuerliche Hochrechnung aus Umsatzdaten</div>
+                </div>
+                <button className="pk-btn" onClick={() => void handleSteuerprognose()} disabled={steuerprognoseLoading || isDemo || umsatzData.length === 0} style={{ fontSize: 12, background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                  {steuerprognoseLoading ? '⏳ Generiere…' : '📊 Prognose erstellen'}
+                </button>
+              </div>
+              {isDemo && <div style={{ fontSize: 12, color: '#aeb9c8', fontStyle: 'italic' }}>Im Demo-Modus nicht verfügbar.</div>}
+              {!isDemo && umsatzData.length === 0 && <div style={{ fontSize: 12, color: '#aeb9c8' }}>Keine Umsatzdaten vorhanden. Bitte erst Rechnungen anlegen.</div>}
+              {steuerprognoseError && <div style={{ color: '#ff8080', fontSize: 13, padding: '10px 14px', background: 'rgba(255,80,80,.08)', borderRadius: 8, border: '1px solid rgba(255,80,80,.2)' }}>{steuerprognoseError}</div>}
+              {steuerprognoseResult && (
+                <div>
+                  <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: 14, fontSize: 13, color: '#dbe4ef', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{steuerprognoseResult}</div>
+                  <button className="pk-btn-ghost" onClick={() => copyAnalyseText(steuerprognoseResult, setSteuerprognoseCopied)} style={{ marginTop: 8, fontSize: 12 }}>
+                    {steuerprognoseCopied ? '✓ Kopiert!' : '📋 Kopieren'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )

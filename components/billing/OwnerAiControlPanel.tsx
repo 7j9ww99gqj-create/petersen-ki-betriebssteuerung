@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   getAiFeatureSettings, updateAiFeatureSettings, type AiFeatureSettings,
   getMarketingKiSettings, updateMarketingKiSettings, type MarketingKiSettings,
+  getOpenAiToolSettings, updateOpenAiToolSettings, type OpenAiToolSettings,
 } from '@/lib/db'
 
 type OwnerAiControlPanelProps = {
@@ -35,6 +36,9 @@ export function OwnerAiControlPanel({
   const [marketingSettings, setMarketingSettings] = useState<MarketingKiSettings>(DEFAULT_MARKETING)
   const [marketingLoading, setMarketingLoading] = useState(true)
   const [savingMarketingKey, setSavingMarketingKey] = useState<keyof MarketingKiSettings | null>(null)
+  const [openAiTools, setOpenAiTools] = useState<OpenAiToolSettings>({ steuerprognoseEnabled: false, mahnungsgeneratorEnabled: false, emailAssistentEnabled: false, monatsberichtEnabled: false })
+  const [openAiLoading, setOpenAiLoading] = useState(true)
+  const [savingOpenAiKey, setSavingOpenAiKey] = useState<keyof OpenAiToolSettings | null>(null)
 
   useEffect(() => {
     if (!enabled) {
@@ -51,6 +55,11 @@ export function OwnerAiControlPanel({
       .then(setMarketingSettings)
       .catch(() => {})
       .finally(() => setMarketingLoading(false))
+
+    getOpenAiToolSettings()
+      .then(setOpenAiTools)
+      .catch(() => {})
+      .finally(() => setOpenAiLoading(false))
   }, [enabled, showToast])
 
   async function handleToggle(key: keyof AiFeatureSettings) {
@@ -93,6 +102,23 @@ export function OwnerAiControlPanel({
       showToast?.(error instanceof Error ? error.message : 'Marketing-KI konnte nicht gespeichert werden.', 'error')
     } finally {
       setSavingMarketingKey(null)
+    }
+  }
+
+  async function handleOpenAiToggle(key: keyof OpenAiToolSettings) {
+    if (!enabled || savingOpenAiKey) return
+    const next = { ...openAiTools, [key]: !openAiTools[key] }
+    setOpenAiTools(next)
+    setSavingOpenAiKey(key)
+    try {
+      const saved = await updateOpenAiToolSettings(next)
+      setOpenAiTools(saved)
+      showToast?.('OpenAI-Tool gespeichert.', 'success')
+    } catch (error) {
+      setOpenAiTools(openAiTools)
+      showToast?.(error instanceof Error ? error.message : 'OpenAI-Tool konnte nicht gespeichert werden.', 'error')
+    } finally {
+      setSavingOpenAiKey(null)
     }
   }
 
@@ -260,6 +286,66 @@ export function OwnerAiControlPanel({
 
         <div style={{ fontSize: 12, color: '#7f8da3', paddingTop: 10 }}>
           {savingMarketingKey ? 'Wird gespeichert…' : 'Jedes Modul ist unabhängig. Kosten nur bei aktivem Modul + API-Aufruf (~0,01–0,02 € / Run).'}
+        </div>
+      </div>
+
+      {/* OpenAI Piloten-Tools */}
+      <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid rgba(16,185,129,.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
+          <div>
+            <h4 style={{ margin: 0, fontSize: compact ? 14 : 15, fontWeight: 900, color: '#34d399' }}>✨ OpenAI Piloten-Tools</h4>
+            <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>
+              Alle Tools sind standardmäßig deaktiviert. Aktivieren wenn bereit — Kosten nur bei Nutzung.
+            </div>
+          </div>
+          <div style={{
+            padding: '5px 9px', borderRadius: 999, fontSize: 11, fontWeight: 800,
+            background: Object.values(openAiTools).some(Boolean) ? 'rgba(16,185,129,.16)' : 'rgba(100,116,139,.14)',
+            color: Object.values(openAiTools).some(Boolean) ? '#34d399' : '#94a3b8',
+            border: '1px solid rgba(16,185,129,.2)',
+          }}>
+            {openAiLoading ? 'Lädt…' : `${Object.values(openAiTools).filter(Boolean).length}/4 AKTIV`}
+          </div>
+        </div>
+
+        {([
+          { key: 'steuerprognoseEnabled' as const, label: '📊 Steuerprognose', desc: 'KI berechnet Steuerprognose aus Umsatzdaten → AnalysePilot · /api/openai/steuerprognose' },
+          { key: 'mahnungsgeneratorEnabled' as const, label: '📨 Mahnungsgenerator', desc: 'KI erstellt Mahnschreiben für überfällige Rechnungen → BüroPilot · /api/openai/mahnung' },
+          { key: 'emailAssistentEnabled' as const, label: '✉️ E-Mail Assistent', desc: 'KI formuliert professionelle Antwort-E-Mails → BüroPilot KI-Tools · /api/openai/email-assistent' },
+          { key: 'monatsberichtEnabled' as const, label: '📋 Monatsbericht Generator', desc: 'KI erstellt strukturierten Monatsbericht aus KPIs → AnalysePilot · /api/openai/monatsbericht' },
+        ] as const).map(({ key, label, desc }) => {
+          const checked = openAiTools[key]
+          const disabled = !enabled || openAiLoading || Boolean(savingOpenAiKey)
+          return (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: compact ? '10px 0' : '12px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: compact ? 13 : 14, color: '#f8fbff' }}>{label}</div>
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 3 }}>{desc}</div>
+              </div>
+              <button
+                onClick={() => void handleOpenAiToggle(key)}
+                disabled={disabled}
+                style={{
+                  width: 48, height: 26, borderRadius: 999, border: 'none',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  position: 'relative', flexShrink: 0,
+                  opacity: disabled ? 0.6 : 1,
+                  background: checked ? 'linear-gradient(135deg, #10b981, #20c8ff)' : 'rgba(255,255,255,.12)',
+                  transition: 'background .2s, opacity .2s',
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: 3, left: checked ? 24 : 3,
+                  width: 20, height: 20, borderRadius: '50%', background: '#fff',
+                  transition: 'left .2s', boxShadow: '0 1px 5px rgba(0,0,0,.35)',
+                }} />
+              </button>
+            </div>
+          )
+        })}
+
+        <div style={{ fontSize: 12, color: '#7f8da3', paddingTop: 10 }}>
+          {savingOpenAiKey ? 'Wird gespeichert…' : 'Kosten ca. 0,001–0,005 € pro Aufruf (gpt-4o-mini).'}
         </div>
       </div>
     </div>

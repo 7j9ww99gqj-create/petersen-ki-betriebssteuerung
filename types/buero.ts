@@ -67,7 +67,7 @@ export type Eingangsrechnung = {
 export type DocumentRelationField = 'eingangsrechnung_id' | 'rechnung_id' | 'angebot_id' | 'auftrag_id'
 export const documentRelationFields: DocumentRelationField[] = ['eingangsrechnung_id', 'rechnung_id', 'angebot_id', 'auftrag_id']
 
-export type Tab = 'kunden' | 'angebote' | 'auftraege' | 'rechnungen' | 'eingangsrechnungen' | 'dokumente' | 'einkauf' | 'alerts' | 'pipeline'
+export type Tab = 'kunden' | 'angebote' | 'auftraege' | 'rechnungen' | 'eingangsrechnungen' | 'dokumente' | 'einkauf' | 'alerts' | 'pipeline' | 'ki-tools'
 
 // Einkauf/Lieferanten-Typen
 export type Lieferant = {

@@ -541,6 +541,10 @@ export type FirmaEinstellungen = {
   marketing_content_daily_enabled?: boolean
   marketing_autopilot_enabled?: boolean
   marketing_sales_assistant_enabled?: boolean
+  openai_steuerprognose_enabled?: boolean
+  openai_mahnungsgenerator_enabled?: boolean
+  openai_email_assistent_enabled?: boolean
+  openai_monatsbericht_enabled?: boolean
   created_at?: string
   updated_at?: string
 }
@@ -673,6 +677,56 @@ export async function updateMarketingKiSettings(next: Partial<MarketingKiSetting
     marketing_sales_assistant_enabled: merged.salesAssistantEnabled,
   })
 
+  return merged
+}
+
+export type OpenAiToolSettings = {
+  steuerprognoseEnabled: boolean
+  mahnungsgeneratorEnabled: boolean
+  emailAssistentEnabled: boolean
+  monatsberichtEnabled: boolean
+}
+
+const DEFAULT_OPENAI_TOOLS: OpenAiToolSettings = {
+  steuerprognoseEnabled: false,
+  mahnungsgeneratorEnabled: false,
+  emailAssistentEnabled: false,
+  monatsberichtEnabled: false,
+}
+
+export async function getOpenAiToolSettings(): Promise<OpenAiToolSettings> {
+  try {
+    const firma = await getFirmaEinstellungen()
+    if (!firma) return DEFAULT_OPENAI_TOOLS
+    const row = firma as Record<string, unknown>
+    return {
+      steuerprognoseEnabled: Boolean(row.openai_steuerprognose_enabled),
+      mahnungsgeneratorEnabled: Boolean(row.openai_mahnungsgenerator_enabled),
+      emailAssistentEnabled: Boolean(row.openai_email_assistent_enabled),
+      monatsberichtEnabled: Boolean(row.openai_monatsbericht_enabled),
+    }
+  } catch {
+    return DEFAULT_OPENAI_TOOLS
+  }
+}
+
+export async function updateOpenAiToolSettings(next: Partial<OpenAiToolSettings>): Promise<OpenAiToolSettings> {
+  const current = await getFirmaEinstellungen()
+  if (!current) throw new Error('Keine Firmeneinstellungen gefunden.')
+  const row = current as Record<string, unknown>
+  const merged: OpenAiToolSettings = {
+    steuerprognoseEnabled: next.steuerprognoseEnabled ?? Boolean(row.openai_steuerprognose_enabled),
+    mahnungsgeneratorEnabled: next.mahnungsgeneratorEnabled ?? Boolean(row.openai_mahnungsgenerator_enabled),
+    emailAssistentEnabled: next.emailAssistentEnabled ?? Boolean(row.openai_email_assistent_enabled),
+    monatsberichtEnabled: next.monatsberichtEnabled ?? Boolean(row.openai_monatsbericht_enabled),
+  }
+  await upsertFirmaEinstellungen({
+    ...current,
+    openai_steuerprognose_enabled: merged.steuerprognoseEnabled,
+    openai_mahnungsgenerator_enabled: merged.mahnungsgeneratorEnabled,
+    openai_email_assistent_enabled: merged.emailAssistentEnabled,
+    openai_monatsbericht_enabled: merged.monatsberichtEnabled,
+  })
   return merged
 }
 
