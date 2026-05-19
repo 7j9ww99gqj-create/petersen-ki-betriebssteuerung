@@ -12,6 +12,7 @@ import {
 } from '@/lib/db'
 import PilotDocumentArchive from '@/components/PilotDocumentArchive'
 import EmptyState from '@/components/EmptyState'
+import { useGlobalToast } from '@/components/ui/ToastProvider'
 
 // ── Typen ─────────────────────────────────────────────────────────────────────
 
@@ -138,24 +139,6 @@ function todayDE() {
   return new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-// Fixed-position toast (bottom-right, like LagerPilot)
-function Toast({ msg, type = 'success' }: { msg: string; type?: 'success' | 'error' }) {
-  if (!msg) return null
-  const isErr = type === 'error'
-  return (
-    <div style={{
-      position: 'fixed', bottom: 90, right: 24, zIndex: 9999,
-      padding: '14px 20px', borderRadius: 12, maxWidth: 360,
-      background: isErr ? 'rgba(255,80,80,.15)' : 'rgba(37,211,102,.12)',
-      border: `1px solid ${isErr ? 'rgba(255,80,80,.4)' : 'rgba(37,211,102,.35)'}`,
-      color: isErr ? '#ff8080' : '#4ddb7e',
-      fontSize: 14, fontWeight: 600,
-      boxShadow: '0 8px 32px rgba(0,0,0,.4)',
-      animation: 'fade-in-scale .2s ease',
-    }}>{msg}</div>
-  )
-}
-
 function ProgressBar({ value, color }: { value: number; color: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -244,8 +227,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
   const [editProjekt, setEditProjekt] = useState<Projekt | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState('Alle')
-  const [toast, setToast] = useState('')
-  const [toastType, setToastType] = useState<'success' | 'error'>('success')
+  const toast = useGlobalToast()
   const [loading, setLoading] = useState(!isDemo)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [createForm, setCreateForm] = useState<ProjektFormState>(emptyProjektForm)
@@ -267,10 +249,8 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
   }, [isDemo])
 
   const showToast = useCallback((msg: string, error = false) => {
-    setToastType(error ? 'error' : 'success')
-    setToast(msg)
-    setTimeout(() => setToast(''), 4000)
-  }, [])
+    if (error) toast.error(msg); else toast.success(msg)
+  }, [toast])
 
   const filtered = projekte.filter(p => filterStatus === 'Alle' || p.status === filterStatus)
   const counts: Record<string, number> = { Alle: projekte.length }
@@ -381,7 +361,6 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
 
   return (
     <div>
-      <Toast msg={toast} type={toastType} />
 
       {/* Filter + Neu */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -574,8 +553,7 @@ function KalenderTab({ isDemo }: { isDemo: boolean }) {
   const [termine, setTermine] = useState<Termin[]>(isDemo ? demoTermine : [])
   const [showForm, setShowForm] = useState(false)
   const [editTermin, setEditTermin] = useState<Termin | null>(null)
-  const [toast, setToast] = useState('')
-  const [toastType, setToastType] = useState<'success' | 'error'>('success')
+  const toast = useGlobalToast()
   const [loading, setLoading] = useState(!isDemo)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [form, setForm] = useState<TerminFormState>(emptyTerminForm)
@@ -590,9 +568,7 @@ function KalenderTab({ isDemo }: { isDemo: boolean }) {
   }, [isDemo])
 
   const showToast = (msg: string, error = false) => {
-    setToastType(error ? 'error' : 'success')
-    setToast(msg)
-    setTimeout(() => setToast(''), 4000)
+    if (error) toast.error(msg); else toast.success(msg)
   }
 
   const sortFn = (a: Termin, b: Termin) => {
@@ -648,7 +624,6 @@ function KalenderTab({ isDemo }: { isDemo: boolean }) {
 
   return (
     <div>
-      <Toast msg={toast} type={toastType} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', gap: 14, fontSize: 12, flexWrap: 'wrap' }}>
           {(['Meeting', 'Deadline', 'Lieferung', 'Wartung'] as const).map(t => (
@@ -763,8 +738,7 @@ const emptyRessourceForm: RessourceFormState = { name: '', typ: 'Person', kapazi
 function RessourcenTab({ isDemo }: { isDemo: boolean }) {
   const [ressourcen, setRessourcen] = useState<Ressource[]>(isDemo ? demoRessourcen : [])
   const [loading, setLoading] = useState(!isDemo)
-  const [toast, setToast] = useState('')
-  const [toastType, setToastType] = useState<'success' | 'error'>('success')
+  const toast = useGlobalToast()
   const [showForm, setShowForm] = useState(false)
   const [editRessource, setEditRessource] = useState<Ressource | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -780,9 +754,7 @@ function RessourcenTab({ isDemo }: { isDemo: boolean }) {
   }, [isDemo])
 
   const showToast = (msg: string, error = false) => {
-    setToastType(error ? 'error' : 'success')
-    setToast(msg)
-    setTimeout(() => setToast(''), 4000)
+    if (error) toast.error(msg); else toast.success(msg)
   }
 
   const personen = ressourcen.filter(r => r.typ === 'Person')
@@ -872,7 +844,6 @@ function RessourcenTab({ isDemo }: { isDemo: boolean }) {
 
   return (
     <div>
-      <Toast msg={toast} type={toastType} />
       {/* KPI-Karten */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
@@ -983,8 +954,7 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
   const [showForm, setShowForm] = useState(false)
   const [editAufgabe, setEditAufgabe] = useState<Aufgabe | null>(null)
   const [filterStatus, setFilterStatus] = useState('Alle')
-  const [toast, setToast] = useState('')
-  const [toastType, setToastType] = useState<'success' | 'error'>('success')
+  const toast = useGlobalToast()
   const [loading, setLoading] = useState(!isDemo)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [form, setForm] = useState<AufgabeFormState>(emptyAufgabeForm)
@@ -1005,9 +975,7 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
   }, [isDemo])
 
   const showToast = (msg: string, error = false) => {
-    setToastType(error ? 'error' : 'success')
-    setToast(msg)
-    setTimeout(() => setToast(''), 4000)
+    if (error) toast.error(msg); else toast.success(msg)
   }
 
   const filtered = aufgaben.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
@@ -1101,7 +1069,6 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
 
   return (
     <div>
-      <Toast msg={toast} type={toastType} />
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(['Alle', 'Offen', 'In Arbeit', 'Blockiert', 'Erledigt'] as const).map(s => (
