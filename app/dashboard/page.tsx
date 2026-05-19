@@ -10,6 +10,13 @@ import { loadRole, type AppRole } from '@/lib/roles'
 import { OwnerAiControlPanel } from '@/components/billing/OwnerAiControlPanel'
 import SkeletonCard from '@/components/SkeletonCard'
 import type { PilotId } from '@/lib/pricingConfig'
+import { isPondruffUser } from '@/lib/pondruff'
+
+const pondruffTiles = [
+  { href: '/dashboard/pondruff/wareneingang', icon: '📥', label: 'Wareneingang', desc: 'Lieferschein, Bauteile & Verpackung erfassen' },
+  { href: '/dashboard/pondruff/preisrechner', icon: '💶', label: 'Preisrechner', desc: 'Positionen kalkulieren, WISO-Auftrag erzeugen' },
+  { href: '/dashboard/pondruff/buero-wiso',   icon: '🧾', label: 'Büro / WISO', desc: 'Copy/Paste & CSV für WISO MeinBüro' },
+]
 
 const pilots = [
   { id: 'lager', label: 'LagerPilot', icon: '📦', desc: 'Wareneingang, Bestände, Lagerplätze, Inventur', href: '/dashboard/lager', color: '#1684ff', status: 'AKTIV' },
@@ -199,6 +206,7 @@ export default function DashboardPage() {
   const [firma, setFirma] = useState<FirmaEinstellungen | null>(null)
   const [role, setRole] = useState<AppRole>('Admin')
   const [allowedPilotIds, setAllowedPilotIds] = useState<string[]>(pilots.map(pilot => pilot.id))
+  const [isPondruff, setIsPondruff] = useState(false)
   const [ownerSnapshot, setOwnerSnapshot] = useState<OwnerDashboardSnapshot | null>(null)
   const [ownerPendingRegistrations, setOwnerPendingRegistrations] = useState(0)
   const [pendingRegistrations, setPendingRegistrations] = useState<PendingRegistration[]>([])
@@ -234,6 +242,7 @@ export default function DashboardPage() {
         .then(({ data: { user } }) => {
           if (user) {
             setAllowedPilotIds(getAccessProfile(user).allowedPilotIds)
+            setIsPondruff(isPondruffUser(user.email))
           }
         })
         .catch(() => {})
@@ -431,6 +440,34 @@ export default function DashboardPage() {
           fontSize: 13,
         }}>
           Dieser Bereich ist für Ihren Account noch nicht freigeschaltet. Die Zuteilung erfolgt im Inhaber-Dashboard.
+        </div>
+      )}
+
+      {isPondruff && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>Pondruff Polier-Service</h2>
+              <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 4 }}>Wareneingang · Preisrechner · Büro/WISO</div>
+            </div>
+          </div>
+          <div className="mobile-1col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+            {pondruffTiles.map(t => (
+              <button key={t.href} onClick={() => router.push(t.href)}
+                style={{
+                  all: 'unset', cursor: 'pointer', padding: 18, borderRadius: 16,
+                  background: 'linear-gradient(180deg, rgba(229,9,9,.08), rgba(8,12,19,.94))',
+                  border: '1px solid rgba(229,9,9,.32)', transition: 'transform .15s, box-shadow .2s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 8px 24px rgba(229,9,9,.18)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none' }}
+              >
+                <div style={{ fontSize: 28, marginBottom: 8 }}>{t.icon}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4, color: '#ff8080' }}>{t.label}</div>
+                <div style={{ fontSize: 13, color: '#aeb9c8' }}>{t.desc}</div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

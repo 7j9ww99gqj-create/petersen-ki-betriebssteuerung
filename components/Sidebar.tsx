@@ -5,6 +5,13 @@ import Image from 'next/image'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { hasDemoCookie, performLogout } from '@/lib/auth'
 import { getAccessProfile } from '@/lib/access'
+import { isPondruffUser } from '@/lib/pondruff'
+
+const pondruffNav = [
+  { label: 'Wareneingang', icon: '📥', href: '/dashboard/pondruff/wareneingang' },
+  { label: 'Preisrechner', icon: '💶', href: '/dashboard/pondruff/preisrechner' },
+  { label: 'Büro / WISO',  icon: '🧾', href: '/dashboard/pondruff/buero-wiso' },
+]
 
 const pilots = [
   { id: 'lager',     label: 'LagerPilot',     icon: '📦', href: '/dashboard/lager' },
@@ -34,6 +41,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const [isDemo, setIsDemo] = useState(false)
   const [allowedPilotIds, setAllowedPilotIds] = useState<string[]>(pilots.map(pilot => pilot.id))
+  const [isPondruff, setIsPondruff] = useState(false)
 
   useEffect(() => {
     if (hasDemoCookie()) { setIsDemo(true); setAllowedPilotIds(pilots.map(pilot => pilot.id)); return }
@@ -41,6 +49,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     try {
       createSupabaseClient().auth.getUser().then(({ data: { user } }) => {
         setIsDemo((user?.email ?? '').toLowerCase() === 'demo@petersen-ki.de')
+        setIsPondruff(isPondruffUser(user?.email))
         if (user) {
           const profile = getAccessProfile(user)
           setAllowedPilotIds(profile.allowedPilotIds)
@@ -107,6 +116,21 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           </button>
         ))}
       </div>
+
+      {/* Pondruff (nur fuer info@pondruffpolierservice.de) */}
+      {isPondruff && (
+        <div style={{ padding: '4px 10px' }}>
+          <div style={{ fontSize: 10, color: '#e50909', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: 700, padding: '4px 8px', marginBottom: 4 }}>Pondruff Polier-Service</div>
+          {pondruffNav.map(item => (
+            <button key={item.href} onClick={() => navigate(item.href)}
+              style={{ ...navBtnStyle(isActive(item.href)), color: isActive(item.href) ? '#ff6b6b' : '#f5d4d4', borderLeft: isActive(item.href) ? '2px solid #e50909' : '2px solid transparent', background: isActive(item.href) ? 'rgba(229,9,9,.15)' : 'transparent' }}
+              onMouseEnter={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(229,9,9,.08)' }}
+              onMouseLeave={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
+              <span style={{ fontSize: 15 }}>{item.icon}</span>{item.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Pilots */}
       <div style={{ padding: '4px 10px', flex: 1 }}>
