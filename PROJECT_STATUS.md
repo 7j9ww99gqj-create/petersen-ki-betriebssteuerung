@@ -26,9 +26,20 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, Commit `2a6c4de` (nach 10-Aufgaben-Sprint).
+- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, Commit `7ccbf03` (AnalysePilot Mobile-Optimierung).
 - Live-Deploy: https://app.petersen-ki-pilot.de (Vercel, Auto-Deploy bei Push auf main, HTTP 307 → OK).
-- TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19 nach Sprint).
+- TypeScript: `npx tsc --noEmit` — ✅ 0 Fehler (Stand 2026-05-19).
+
+### AnalysePilot Mobile-Optimierung (2026-05-19, Commit 7ccbf03)
+- **Header**: `page-header-row` + `header-actions` — stacked auf Mobile, Badges + Button wrappen sauber
+- **Tab-Bar**: `pk-tab-bar` (overflow-x scroll, scrollbar-frei), kompaktere Labels, `whiteSpace: nowrap`
+- **KPI-Grid**: `minmax(155px, 1fr)` → 2 Spalten ab ~340px Viewport
+- **KPI-Cards**: kleinere Icons (42px), kompakteres Padding, `text-overflow: ellipsis` für Labels
+- **Charts**: reduzierte Höhen — 200/220/240px statt 220/260/280px (weniger Scrollbedarf)
+- **Umsatz-Tab**: flexWrap für Zeitraum-Buttons, CSV-Button kompakter mit `whiteSpace: nowrap`
+- **Bestand-Tab**: `pk-table-wrap` für horizontales Scrollen der Tabelle
+- **KI-Tab**: KPI-Mini-Karten 120px min, `mobile-1col` für unteres Grid
+- **Zahlungsmoral**: Kundenkarten stacked mit `flexWrap`, Stats-Zeile kompakter
 
 ### 10-Aufgaben-Sprint (2026-05-19) — Alle Aufgaben abgeschlossen
 | # | Aufgabe | Commit | Status |
