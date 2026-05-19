@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { hasDemoCookie } from '@/lib/auth'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
+import { Modal } from '@/components/ui/Modal'
+import { useGlobalToast } from '@/components/ui/ToastProvider'
 
 export type PilotType = 'lager' | 'werkstatt' | 'analyse' | 'planung'
 
@@ -68,7 +70,7 @@ export default function PilotDocumentArchive({ pilotType }: Props) {
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState('Alle')
   const [uploading, setUploading] = useState(false)
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const toast = useGlobalToast()
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -84,8 +86,7 @@ export default function PilotDocumentArchive({ pilotType }: Props) {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
 
   const showToast = (msg: string, ok = true) => {
-    setToast({ msg, ok })
-    setTimeout(() => setToast(null), 3500)
+    if (ok) toast.success(msg); else toast.error(msg)
   }
 
   const loadDocs = useCallback(async () => {
@@ -376,31 +377,7 @@ export default function PilotDocumentArchive({ pilotType }: Props) {
 
       {/* Upload Modal */}
       {showUploadModal && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 500,
-            background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-          }}
-          role="presentation"
-          onClick={() => setShowUploadModal(false)}
-          onKeyDown={e => { if (e.key === 'Escape') setShowUploadModal(false) }}
-        >
-          <div
-            className="pk-card fade-in"
-            style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }}
-            role="presentation"
-            onClick={e => e.stopPropagation()}
-            onKeyDown={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Dokument hochladen</h3>
-              <button
-                onClick={() => setShowUploadModal(false)}
-                style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}
-              >✕</button>
-            </div>
-
+        <Modal title="Dokument hochladen" onClose={() => setShowUploadModal(false)} maxWidth={560}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Datei-Upload Bereich */}
               <div
@@ -521,20 +498,7 @@ export default function PilotDocumentArchive({ pilotType }: Props) {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'fixed', bottom: 90, right: 24, zIndex: 9999,
-          padding: '14px 20px', borderRadius: 12, maxWidth: 380,
-          background: toast.ok ? 'rgba(37,211,102,.12)' : 'rgba(255,80,80,.15)',
-          border: `1px solid ${toast.ok ? 'rgba(37,211,102,.35)' : 'rgba(255,80,80,.4)'}`,
-          color: toast.ok ? '#4ddb7e' : '#ff8080',
-          fontSize: 14, fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,.4)',
-        }}>{toast.msg}</div>
+        </Modal>
       )}
     </div>
   )
