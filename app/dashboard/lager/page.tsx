@@ -11,6 +11,7 @@ import { genId } from '@/lib/ids'
 import {
   getLagerArtikel, getLagerBewegungen,
   upsertLagerArtikel, insertLagerBewegung, deleteLagerArtikel,
+  uploadLagerArtikelBild, deleteLagerArtikelBild, getLagerBildSignedUrls,
   getLagerStellplaetze, getLagerStellplatzBestand, getLagerUmlagerungen,
   upsertLagerStellplatz, deleteLagerStellplatz,
   upsertLagerStellplatzBestand, deleteLagerStellplatzBestand, umlagerArtikel,
@@ -26,6 +27,7 @@ type Artikel = {
   id: string; name: string; kategorie: string; bestand: number
   einheit: string; lagerplatz: string; status: string; mindestbestand?: number
   lieferant_id?: string | null; einkaufspreis?: number
+  bild_path?: string | null
 }
 type Bewegung = {
   id: number | string; typ: string; artikel: string; menge: number
@@ -209,11 +211,16 @@ function pickStatusLabel(status: PickStatus) {
 
 // ── Modal-Komponente ─────────────────────────────────────────────────────────
 
-type ArtikelForm = { id: string; name: string; kategorie: string; einheit: string; mindestbestand: string; lieferant_id: string; einkaufspreis: string }
+type ArtikelForm = {
+  id: string; name: string; kategorie: string; einheit: string; mindestbestand: string
+  lieferant_id: string; einkaufspreis: string
+  bildBlob?: Blob | null; bildExt?: string | null; bildEntfernen?: boolean
+}
 const emptyForm: ArtikelForm = { id: '', name: '', kategorie: 'Rohstoffe', einheit: 'Stk', mindestbestand: '0', lieferant_id: '', einkaufspreis: '0' }
 
-function ArtikelModal({ artikel, onSave, onClose, lieferanten }: {
+function ArtikelModal({ artikel, bildUrl, onSave, onClose, lieferanten }: {
   artikel?: Artikel | null
+  bildUrl?: string | null
   onSave: (form: ArtikelForm) => void
   onClose: () => void
   lieferanten?: { id: string; name: string }[]
@@ -227,9 +234,43 @@ function ArtikelModal({ artikel, onSave, onClose, lieferanten }: {
     lieferant_id: artikel.lieferant_id ?? '',
     einkaufspreis: String(artikel.einkaufspreis ?? 0),
   } : emptyForm)
+  const [preview, setPreview] = useState<string | null>(bildUrl ?? null)
+  const [bildBusy, setBildBusy] = useState(false)
+  const [bildInfo, setBildInfo] = useState<string | null>(null)
 
   const set = (k: keyof ArtikelForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(p => ({ ...p, [k]: e.target.value }))
+
+  async function handleBildPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setBildBusy(true)
+    setBildInfo(null)
+    try {
+      const { compressImage, fileExtFromMime } = await import('@/lib/image-compress')
+      const result = await compressImage(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.82 })
+      const ext = fileExtFromMime(result.blob.type)
+      setForm(p => ({ ...p, bildBlob: result.blob, bildExt: ext, bildEntfernen: false }))
+      if (preview && preview.startsWith('blob:')) URL.revokeObjectURL(preview)
+      setPreview(URL.createObjectURL(result.blob))
+      const kbOrig = Math.round(result.originalSize / 1024)
+      const kbComp = Math.round(result.compressedSize / 1024)
+      setBildInfo(`${result.width}×${result.height}px · ${kbOrig} → ${kbComp} KB`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Bild konnte nicht verarbeitet werden'
+      setBildInfo(`Fehler: ${msg}`)
+    } finally {
+      setBildBusy(false)
+    }
+  }
+
+  function handleBildEntfernen() {
+    if (preview && preview.startsWith('blob:')) URL.revokeObjectURL(preview)
+    setPreview(null)
+    setBildInfo(null)
+    setForm(p => ({ ...p, bildBlob: null, bildExt: null, bildEntfernen: true }))
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -282,6 +323,29 @@ function ArtikelModal({ artikel, onSave, onClose, lieferanten }: {
               </select>
             </div>
           )}
+          <div>
+            <label style={{ display: 'block', fontSize: 13, color: '#aeb9c8', marginBottom: 6, fontWeight: 600 }}>Artikelbild (optional, 1 Bild)</label>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <div style={{ width: 80, height: 80, borderRadius: 10, background: '#0b1420', border: '1px dashed #2a3a52', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                {preview
+                  ? <img src={preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <span style={{ fontSize: 24, color: '#4a5568' }}>📦</span>}
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label className="pk-btn-ghost" style={{ display: 'inline-block', cursor: 'pointer', textAlign: 'center', fontSize: 13, padding: '8px 12px' }}>
+                  {bildBusy ? '⏳ Komprimiere…' : (preview ? 'Bild ersetzen' : '📷 Bild wählen')}
+                  <input type="file" accept="image/*" onChange={handleBildPick} disabled={bildBusy} style={{ display: 'none' }} />
+                </label>
+                {preview && (
+                  <button type="button" onClick={handleBildEntfernen} style={{ background: 'none', border: 'none', color: '#ff8080', fontSize: 12, cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+                    Bild entfernen
+                  </button>
+                )}
+                {bildInfo && <div style={{ fontSize: 11, color: '#7f8ea3' }}>{bildInfo}</div>}
+                {!bildInfo && !preview && <div style={{ fontSize: 11, color: '#7f8ea3' }}>JPG/PNG/WebP, wird vor Upload komprimiert</div>}
+              </div>
+            </div>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
           <button className="pk-btn" onClick={() => { if (form.id.trim() && form.name.trim()) onSave(form) }} style={{ flex: 1, fontWeight: 700 }}>
@@ -851,6 +915,9 @@ export default function LagerPilotPage() {
   // Warnbanner-Liste ausklappen
   const [warnListOpen, setWarnListOpen] = useState(false)
 
+  // Signed URLs für Artikel-Bilder (path → signed URL, 1h gültig)
+  const [bildUrls, setBildUrls] = useState<Record<string, string>>({})
+
   // Bestellvorschlag-State
   const [bestellMengen, setBestellMengen] = useState<Record<string, string>>({})
   const [bestelltIds, setBestelltIds] = useState<Set<string>>(new Set())
@@ -901,7 +968,16 @@ export default function LagerPilotPage() {
     getAiFeatureSettings().then(setAiSettings).catch(() => {})
     setLoading(true); setLoadError('')
     Promise.all([getLagerArtikel(), getLagerBewegungen()])
-      .then(([a, b]) => { setArtikel(a as Artikel[]); setBewegungen(b as Bewegung[]) })
+      .then(([a, b]) => {
+        const arts = a as Artikel[]
+        setArtikel(arts)
+        setBewegungen(b as Bewegung[])
+        // Signed URLs für vorhandene Artikel-Bilder im Batch laden
+        const paths = arts.map(x => x.bild_path).filter(Boolean) as string[]
+        if (paths.length > 0) {
+          getLagerBildSignedUrls(paths).then(setBildUrls).catch(() => {})
+        }
+      })
       .catch(() => setLoadError('Lagerdaten konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
     getEinkaufLieferanten().then(l => setLieferantenListe((l as { id: string; name: string }[]) ?? [])).catch(() => {})
@@ -1105,11 +1181,37 @@ export default function LagerPilotPage() {
     const lagerplatz = existing?.lagerplatz ?? ''
     const status = calcStatus(bestand, mindestbestand)
     const einkaufspreis = parseFloat(form.einkaufspreis.replace(',', '.')) || 0
-    const a: Artikel = { id, name: form.name.trim(), kategorie: form.kategorie, bestand, einheit: form.einheit, lagerplatz, status, mindestbestand, lieferant_id: form.lieferant_id || null, einkaufspreis }
+    let bild_path: string | null | undefined = existing?.bild_path ?? null
 
     setSaving(true)
+
+    // Bild-Upload (nur Live-Modus) — vor dem Artikel-Upsert, damit bild_path gesetzt werden kann
+    if (!isDemo && form.bildBlob && form.bildExt) {
+      try {
+        bild_path = await uploadLagerArtikelBild({
+          artikelId: id,
+          blob: form.bildBlob,
+          ext: form.bildExt,
+          oldPath: existing?.bild_path ?? null,
+        })
+      } catch {
+        showToast('Bild-Upload fehlgeschlagen', false); setSaving(false); return
+      }
+    } else if (!isDemo && form.bildEntfernen && existing?.bild_path) {
+      try { await deleteLagerArtikelBild(existing.bild_path) } catch {}
+      bild_path = null
+    }
+
+    const a: Artikel = { id, name: form.name.trim(), kategorie: form.kategorie, bestand, einheit: form.einheit, lagerplatz, status, mindestbestand, lieferant_id: form.lieferant_id || null, einkaufspreis, bild_path }
+
     if (!isDemo) {
       try { await upsertLagerArtikel(a) } catch { showToast('Fehler beim Speichern', false); setSaving(false); return }
+      // Signed URL für die neue/geänderte Bilddatei nachladen
+      if (bild_path) {
+        const map: Record<string, string> = await getLagerBildSignedUrls([bild_path]).catch(() => ({}))
+        const url = map[bild_path]
+        if (url) setBildUrls(prev => ({ ...prev, [bild_path as string]: url }))
+      }
     }
     setArtikel(prev => isEdit ? prev.map(x => x.id === id ? a : x) : [...prev, a])
     setModal(null)
@@ -1720,6 +1822,7 @@ export default function LagerPilotPage() {
       {modal !== null && (
         <ArtikelModal
           artikel={modal === 'new' ? null : modal}
+          bildUrl={modal !== 'new' && modal?.bild_path ? bildUrls[modal.bild_path] ?? null : null}
           onSave={handleSaveArtikel}
           onClose={() => setModal(null)}
           lieferanten={lieferantenListe}
@@ -2025,6 +2128,7 @@ export default function LagerPilotPage() {
               <table className="pk-table">
                 <thead>
                   <tr>
+                    <th style={{ width: 48 }}></th>
                     <th
                       onClick={() => handleSort('id')}
                       style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
@@ -2057,11 +2161,18 @@ export default function LagerPilotPage() {
                 </thead>
                 <tbody>
                   {sorted.length === 0 ? (
-                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>
+                    <tr><td colSpan={9} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>
                       {artikel.length === 0 ? '📦 Noch keine Artikel. Lege deinen ersten Artikel an.' : 'Keine Artikel gefunden.'}
                     </td></tr>
                   ) : sorted.map(a => (
                     <tr key={a.id} style={{ cursor: 'pointer' }} onClick={() => setModal(a)}>
+                      <td style={{ padding: '6px 8px' }}>
+                        {a.bild_path && bildUrls[a.bild_path] ? (
+                          <img src={bildUrls[a.bild_path]} alt="" loading="lazy" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', display: 'block' }} />
+                        ) : (
+                          <div style={{ width: 36, height: 36, borderRadius: 6, background: '#0b1420', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: '#4a5568' }}>📦</div>
+                        )}
+                      </td>
                       <td style={{ color: '#aeb9c8', fontFamily: 'monospace', fontSize: 12 }}>{a.id}</td>
                       <td style={{ fontWeight: 600 }}>{a.name}</td>
                       <td><span className="badge badge-gray">{a.kategorie}</span></td>
