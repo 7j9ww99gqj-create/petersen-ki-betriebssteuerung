@@ -11,6 +11,7 @@ const TABS = [
   { href: '/dashboard/pondruff/buero-wiso', icon: '🧾', label: 'Büro / WISO' },
   { href: '/dashboard/pondruff/ki-suche', icon: '🤖', label: 'KI-Suche' },
   { href: '/dashboard/pondruff/archiv', icon: '🗂️', label: 'Archiv' },
+  { href: '/dashboard/pondruff/admin', icon: '⚙️', label: 'Preis-Admin' },
 ]
 
 export default function PondruffLayout({ children }: { children: React.ReactNode }) {
