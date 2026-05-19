@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import { listOwnerAuditLog, logOwnerAction, type OwnerAuditAction } from '@/lib/audit-log'
+
+const Schema = z.object({
+  action: z.string().trim().max(80).optional(),
+  target: z.object({
+    userId: z.string().trim().max(100).nullable().optional(),
+    email: z.string().trim().max(320).nullable().optional(),
+  }).optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
+})
 
 export const runtime = 'nodejs'
 
@@ -38,14 +49,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Nur fuer den Inhaber-Account verfuegbar.' }, { status: 403 })
   }
 
-  let body: {
-    action?: string
-    target?: { userId?: string | null; email?: string | null }
-    details?: Record<string, unknown>
-  }
-  try { body = await req.json() } catch {
-    return NextResponse.json({ error: 'Ungueltige Anfrage.' }, { status: 400 })
-  }
+  const parsedBody = await parseBody(req, Schema)
+  if (!parsedBody.ok) return parsedBody.error
+  const body = parsedBody.data
 
   const action = body.action as OwnerAuditAction | undefined
   if (!action || !ALLOWED_ACTIONS.includes(action)) {

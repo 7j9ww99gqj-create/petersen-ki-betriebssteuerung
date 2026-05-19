@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@supabase/supabase-js'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import { POND_DEFAULT_FEATURE_FLAGS, POND_FEATURE_KEYS, POND_USER_ID, type PondruffFeatureFlags, type PondruffFeatureKey } from '@/lib/pondruff'
 import { logOwnerAction } from '@/lib/audit-log'
+
+const Schema = z.object({
+  key: z.string().trim().max(80).optional(),
+  value: z.boolean().optional(),
+})
 
 const OWNER_EMAIL = 'info@petersen-ki-pilot.de'
 
@@ -50,8 +57,9 @@ export async function POST(req: NextRequest) {
   if (access.user?.email?.toLowerCase() !== OWNER_EMAIL) {
     return NextResponse.json({ error: 'Nur fuer den Inhaber-Account verfuegbar.' }, { status: 403 })
   }
-  let body: { key?: string; value?: boolean }
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Ungueltige Anfrage.' }, { status: 400 }) }
+  const parsedBody = await parseBody(req, Schema)
+  if (!parsedBody.ok) return parsedBody.error
+  const body = parsedBody.data
   const key = body.key as PondruffFeatureKey | undefined
   if (!key || !POND_FEATURE_KEYS.includes(key)) {
     return NextResponse.json({ error: 'Unbekannter Flag.' }, { status: 400 })
