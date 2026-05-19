@@ -57,7 +57,7 @@ export default function GlobalSearch() {
         supabase.from('lager_artikel').select('id,name,kategorie,lagerplatz,bestand,einheit,status').or(`name.ilike.${lower},kategorie.ilike.${lower},lagerplatz.ilike.${lower}`).limit(MAX),
         supabase.from('buero_kunden').select('id,name,email,status').or(`name.ilike.${lower},email.ilike.${lower}`).limit(MAX),
         supabase.from('buero_rechnungen').select('id,nummer,kunde,betrag,status').or(`nummer.ilike.${lower},kunde.ilike.${lower}`).limit(MAX),
-        supabase.from('werkstatt_karten').select('id,auftragsnr,titel,beschreibung,status').or(`titel.ilike.${lower},beschreibung.ilike.${lower},auftragsnr.ilike.${lower}`).limit(MAX),
+        supabase.from('werkstatt_karten').select('id,auftragsnr,beschreibung,status').or(`beschreibung.ilike.${lower},auftragsnr.ilike.${lower}`).limit(MAX),
       ])
 
       const found: SearchResult[] = []
@@ -104,7 +104,7 @@ export default function GlobalSearch() {
         for (const w of kartenRes.value.data) {
           const icon = w.status === 'Fertig' ? '✅' : '⚙️'
           found.push({
-            id: `w-${w.id}`, titel: w.auftragsnr ? `${w.auftragsnr} – ${w.titel || ''}` : (w.titel || w.id),
+            id: `w-${w.id}`, titel: w.auftragsnr ? `${w.auftragsnr}` : w.id,
             sub: `${w.beschreibung ? w.beschreibung.slice(0, 60) : ''} · ${w.status || ''}`,
             kategorie: '🔧 Werkstatt',
             href: '/dashboard/werkstatt',

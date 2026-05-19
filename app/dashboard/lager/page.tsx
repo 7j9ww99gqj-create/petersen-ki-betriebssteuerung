@@ -915,6 +915,8 @@ export default function LagerPilotPage() {
 
   // Inline-Delete-Bestätigung
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set())
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
 
   // Warnbanner-Liste ausklappen
   const [warnListOpen, setWarnListOpen] = useState(false)
@@ -2087,12 +2089,82 @@ export default function LagerPilotPage() {
           {artikel.length === 0 && (
             <EmptyState icon="📦" title="Noch keine Artikel vorhanden" description="Lege deinen ersten Artikel an, um Bestände, Bewegungen und Lagerplätze zu verwalten." actionLabel="+ Artikel anlegen" onAction={() => setModal('new')} />
           )}
+          {bulkSelected.size > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', marginBottom: 10,
+              background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.25)', borderRadius: 10,
+              flexWrap: 'wrap',
+            }}>
+              <span style={{ fontWeight: 700, color: '#6cb6ff', fontSize: 13 }}>
+                {bulkSelected.size} Artikel ausgewählt
+              </span>
+              <button
+                className="pk-btn-ghost"
+                onClick={() => {
+                  const selectedIds = Array.from(bulkSelected)
+                  const csvRows = sorted.filter(a => selectedIds.includes(a.id))
+                    .map(a => `${a.id};${a.name};${a.kategorie};${a.bestand};${a.einheit};${a.lagerplatz};${a.status}`)
+                  const blob = new Blob([`Art.-Nr.;Bezeichnung;Kategorie;Bestand;Einheit;Lagerplatz;Status\n${csvRows.join('\n')}`], { type: 'text/csv' })
+                  const url = URL.createObjectURL(blob)
+                  const link = document.createElement('a'); link.href = url; link.download = 'auswahl.csv'; link.click()
+                  URL.revokeObjectURL(url)
+                }}
+                style={{ fontSize: 12, padding: '4px 10px', minHeight: 28 }}
+              >
+                📥 CSV-Export ({bulkSelected.size})
+              </button>
+              {!bulkDeleteConfirm ? (
+                <button
+                  onClick={() => setBulkDeleteConfirm(true)}
+                  style={{ background: 'rgba(244,63,94,.12)', border: '1px solid rgba(244,63,94,.35)', borderRadius: 8, padding: '4px 12px', cursor: 'pointer', color: '#f43f5e', fontSize: 12, fontWeight: 700 }}
+                >
+                  🗑 Alle löschen
+                </button>
+              ) : (
+                <>
+                  <span style={{ fontSize: 12, color: '#f43f5e', fontWeight: 700 }}>Wirklich {bulkSelected.size} Artikel löschen?</span>
+                  <button
+                    onClick={async () => {
+                      if (isDemo) { showToast('Im Demo-Modus nicht verfügbar', false); setBulkDeleteConfirm(false); return }
+                      const ids = Array.from(bulkSelected)
+                      const count = ids.length
+                      for (const id of ids) {
+                        try { await deleteLagerArtikel(id) } catch { /* continue */ }
+                      }
+                      setBulkSelected(new Set()); setBulkDeleteConfirm(false)
+                      setRetryKey(k => k + 1)
+                      showToast(`${count} Artikel gelöscht`, true)
+                    }}
+                    style={{ background: 'rgba(244,63,94,.18)', border: '1px solid rgba(244,63,94,.5)', borderRadius: 8, padding: '4px 12px', cursor: 'pointer', color: '#f43f5e', fontSize: 12, fontWeight: 700 }}
+                  >
+                    Ja, löschen
+                  </button>
+                  <button onClick={() => setBulkDeleteConfirm(false)} className="pk-btn-ghost" style={{ fontSize: 12, padding: '4px 10px', minHeight: 28 }}>Abbrechen</button>
+                </>
+              )}
+              <button onClick={() => setBulkSelected(new Set())} className="pk-btn-ghost" style={{ fontSize: 12, padding: '4px 10px', minHeight: 28, marginLeft: 'auto' }}>
+                Auswahl aufheben
+              </button>
+            </div>
+          )}
+
           <div className="pk-card" style={{ padding: 0, overflowX: 'auto', display: artikel.length === 0 ? 'none' : undefined }}>
             <div className="pk-table-wrap">
               <table className="pk-table">
                 <thead>
                   <tr>
-                    <th style={{ width: 48 }}></th>
+                    <th style={{ width: 36, textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={sorted.length > 0 && sorted.every(a => bulkSelected.has(a.id))}
+                        onChange={e => {
+                          if (e.target.checked) setBulkSelected(new Set(sorted.map(a => a.id)))
+                          else setBulkSelected(new Set())
+                        }}
+                        style={{ cursor: 'pointer', width: 14, height: 14 }}
+                        aria-label="Alle auswählen"
+                      />
+                    </th>
                     <th
                       onClick={() => handleSort('id')}
                       style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
@@ -2129,7 +2201,25 @@ export default function LagerPilotPage() {
                       {artikel.length === 0 ? '📦 Noch keine Artikel. Lege deinen ersten Artikel an.' : 'Keine Artikel gefunden.'}
                     </td></tr>
                   ) : sorted.map(a => (
-                    <tr key={a.id} style={{ cursor: 'pointer' }} onClick={() => setModal(a)}>
+                    <tr
+                      key={a.id}
+                      style={{ cursor: 'pointer', background: bulkSelected.has(a.id) ? 'rgba(22,132,255,.06)' : undefined }}
+                      onClick={() => setModal(a)}
+                    >
+                      <td style={{ padding: '6px 8px', textAlign: 'center', width: 36 }} onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={bulkSelected.has(a.id)}
+                          onChange={e => {
+                            const next = new Set(bulkSelected)
+                            if (e.target.checked) next.add(a.id)
+                            else next.delete(a.id)
+                            setBulkSelected(next)
+                          }}
+                          style={{ cursor: 'pointer', width: 14, height: 14 }}
+                          aria-label={`${a.name} auswählen`}
+                        />
+                      </td>
                       <td style={{ padding: '6px 8px' }}>
                         {a.bild_path && bildUrls[a.bild_path] ? (
                           // eslint-disable-next-line @next/next/no-img-element
