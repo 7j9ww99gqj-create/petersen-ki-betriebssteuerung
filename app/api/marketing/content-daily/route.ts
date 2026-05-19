@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import { getServerMarketingKiSettings } from '@/lib/ai-settings'
+
+const Schema = z.object({
+  kampagnen: z.array(z.object({
+    name: z.string().max(200),
+    typ: z.string().max(60),
+    status: z.string().max(40),
+  })).max(500).optional(),
+  leads: z.array(z.object({
+    name: z.string().max(200),
+    status: z.string().max(40),
+    wert: z.string().max(60),
+  })).max(500).optional(),
+  seoKeywords: z.array(z.object({ keyword: z.string().max(200) })).max(500).optional(),
+  newsletter: z.array(z.object({
+    betreff: z.string().max(300),
+    status: z.string().max(40),
+  })).max(500).optional(),
+})
 
 function pickOutputText(data: Record<string, unknown>): string {
   if (typeof data.output_text === 'string') return data.output_text
@@ -30,12 +50,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Kein OpenAI API-Key konfiguriert.' }, { status: 500 })
   }
 
-  const body = await req.json() as {
-    kampagnen?: Array<{ name: string; typ: string; status: string }>
-    leads?: Array<{ name: string; status: string; wert: string }>
-    seoKeywords?: Array<{ keyword: string }>
-    newsletter?: Array<{ betreff: string; status: string }>
-  }
+  const parsedBody = await parseBody(req, Schema)
+  if (!parsedBody.ok) return parsedBody.error
+  const body = parsedBody.data
 
   const aktiveKampagnen = (body.kampagnen ?? [])
     .filter(k => k.status === 'Aktiv')

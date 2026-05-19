@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { parseBody } from '@/lib/validation'
 import { getServerMarketingKiSettings } from '@/lib/ai-settings'
+
+const Schema = z.object({
+  leads: z.array(z.object({
+    name: z.string().max(200),
+    firma: z.string().max(200),
+    status: z.string().max(40),
+    wert: z.string().max(60),
+    quelle: z.string().max(100),
+    betreuer: z.string().max(120),
+  })).max(500).optional(),
+})
 
 function pickOutputText(data: Record<string, unknown>): string {
   if (typeof data.output_text === 'string') return data.output_text
@@ -30,9 +43,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Kein OpenAI API-Key konfiguriert.' }, { status: 500 })
   }
 
-  const body = await req.json() as {
-    leads?: Array<{ name: string; firma: string; status: string; wert: string; quelle: string; betreuer: string }>
-  }
+  const parsedBody = await parseBody(req, Schema)
+  if (!parsedBody.ok) return parsedBody.error
+  const body = parsedBody.data
 
   const leads = (body.leads ?? [])
     .filter(l => !['Gewonnen', 'Verloren'].includes(l.status))
