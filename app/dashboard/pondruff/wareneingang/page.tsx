@@ -111,8 +111,17 @@ export default function WareneingangPage() {
 
   const [savedWe, setSavedWe] = useState<ArbeitskarteData | null>(null)
   const [entries, setEntries] = useState<WEEntry[]>([])
+  const [weDelConfirm, setWeDelConfirm] = useState<string | null>(null)
 
   const canSave = !!lieferbedingungen && !!eingelagert_von
+
+  async function deleteEntry(id: string) {
+    const sb = createSupabaseClient()
+    await sb.from('pondruff_wareneingaenge').delete().eq('id', id)
+    setWeDelConfirm(null)
+    loadEntries()
+    toast.success('Wareneingang gelöscht')
+  }
 
   async function loadEntries() {
     const sb = createSupabaseClient()
@@ -339,9 +348,23 @@ export default function WareneingangPage() {
                       <td>{e.lieferbedingungen || '—'}</td>
                       <td>{e.eingelagert_von || '—'}</td>
                       <td>
-                        <button className="pk-btn-ghost" style={{ fontSize: 10 }}
-                          onClick={() => generateArbeitskartePDF(e as unknown as ArbeitskarteData)}
-                          title="Arbeitskarte drucken">🖨️</button>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button className="pk-btn-ghost" style={{ fontSize: 10 }}
+                            onClick={() => generateArbeitskartePDF(e as unknown as ArbeitskarteData)}
+                            title="Arbeitskarte drucken">🖨️</button>
+                          {weDelConfirm === e.id ? (
+                            <>
+                              <button onClick={() => deleteEntry(e.id)}
+                                style={{ background: '#e50909', color: '#fff', border: 'none', borderRadius: 6, padding: '2px 7px', fontSize: 10, cursor: 'pointer' }}>Ja</button>
+                              <button onClick={() => setWeDelConfirm(null)}
+                                style={{ background: 'transparent', color: '#aeb9c8', border: '1px solid rgba(255,255,255,.2)', borderRadius: 6, padding: '2px 7px', fontSize: 10, cursor: 'pointer' }}>X</button>
+                            </>
+                          ) : (
+                            <button className="pk-btn-ghost" style={{ fontSize: 10, color: '#ff8080' }}
+                              onClick={() => setWeDelConfirm(e.id)}
+                              title="Wareneingang löschen">🗑️</button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -405,3 +405,107 @@ export async function deleteQmTeamMitglied(id: string): Promise<void> {
   const { error } = await db().from('qm_team_mitglieder').delete().eq('id', id)
   if (error) throw error
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Statistik-Queries (Phase 2A)
+// ─────────────────────────────────────────────────────────────────────
+
+export type QmStatistikZeitraum = 'woche' | 'monat' | 'quartal' | 'gesamt'
+
+function zeitraumStart(z: QmStatistikZeitraum): string | null {
+  const now = new Date()
+  if (z === 'woche')   { const d = new Date(now); d.setDate(d.getDate() - 7);   return d.toISOString() }
+  if (z === 'monat')   { const d = new Date(now); d.setMonth(d.getMonth() - 1); return d.toISOString() }
+  if (z === 'quartal') { const d = new Date(now); d.setMonth(d.getMonth() - 3); return d.toISOString() }
+  return null
+}
+
+export type QmStatusVerteilung = { gesamtstatus: string; anzahl: number }[]
+
+export async function getQmStatusVerteilung(zeitraum: QmStatistikZeitraum): Promise<QmStatusVerteilung> {
+  let q = db().from('qm_pruefberichte').select('gesamtstatus')
+  const since = zeitraumStart(zeitraum)
+  if (since) q = q.gte('pruef_datum', since.slice(0, 10))
+  const { data, error } = await q
+  if (error) throw error
+  const counts: Record<string, number> = {}
+  for (const row of (data ?? [])) {
+    const s = row.gesamtstatus ?? 'offen'
+    counts[s] = (counts[s] ?? 0) + 1
+  }
+  return Object.entries(counts).map(([gesamtstatus, anzahl]) => ({ gesamtstatus, anzahl }))
+}
+
+export type QmFehlerquoteTrend = { woche: string; fehler: number; gesamt: number }[]
+
+export async function getQmFehlerquoteTrend(): Promise<QmFehlerquoteTrend> {
+  const since = new Date()
+  since.setDate(since.getDate() - 56) // 8 Wochen
+  const { data, error } = await db()
+    .from('qm_pruefberichte')
+    .select('pruef_datum, gesamtstatus')
+    .gte('pruef_datum', since.toISOString().slice(0, 10))
+    .order('pruef_datum', { ascending: true })
+  if (error) throw error
+
+  const weekMap = new Map<string, { fehler: number; gesamt: number }>()
+  for (const row of (data ?? [])) {
+    const d = new Date(row.pruef_datum ?? '')
+    const day = d.getDay()
+    const mon = new Date(d); mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+    const wk = mon.toISOString().slice(0, 10)
+    if (!weekMap.has(wk)) weekMap.set(wk, { fehler: 0, gesamt: 0 })
+    const entry = weekMap.get(wk)!
+    entry.gesamt++
+    if (row.gesamtstatus === 'nachbesserung' || row.gesamtstatus === 'ausschuss') entry.fehler++
+  }
+  return Array.from(weekMap.entries()).map(([woche, v]) => ({ woche, ...v }))
+}
+
+export type QmHaeufigsteAbweichung = { messstelle: string; anzahl: number }[]
+
+export async function getQmHaeufigsteAbweichungen(zeitraum: QmStatistikZeitraum): Promise<QmHaeufigsteAbweichung> {
+  const since = zeitraumStart(zeitraum)
+  let berichtQ = db().from('qm_pruefberichte').select('id')
+  if (since) berichtQ = berichtQ.gte('pruef_datum', since.slice(0, 10))
+  const { data: berichte, error: be } = await berichtQ
+  if (be) throw be
+  if (!berichte?.length) return []
+
+  const berichtIds = berichte.map(b => b.id)
+  const { data, error } = await db()
+    .from('qm_messwerte')
+    .select('messstelle')
+    .in('pruefbericht_id', berichtIds)
+    .eq('status', 'rot')
+  if (error) throw error
+
+  const counts: Record<string, number> = {}
+  for (const row of (data ?? [])) {
+    const m = row.messstelle ?? 'Unbekannt'
+    counts[m] = (counts[m] ?? 0) + 1
+  }
+  return Object.entries(counts)
+    .map(([messstelle, anzahl]) => ({ messstelle, anzahl }))
+    .sort((a, b) => b.anzahl - a.anzahl)
+    .slice(0, 5)
+}
+
+export type QmPrueferPerformance = { pruefer_name: string; gesamt: number; bestanden: number }[]
+
+export async function getQmPrueferPerformance(zeitraum: QmStatistikZeitraum): Promise<QmPrueferPerformance> {
+  let q = db().from('qm_pruefberichte').select('pruefer_name, gesamtstatus')
+  const since = zeitraumStart(zeitraum)
+  if (since) q = q.gte('pruef_datum', since.slice(0, 10))
+  const { data, error } = await q
+  if (error) throw error
+
+  const stats: Record<string, { gesamt: number; bestanden: number }> = {}
+  for (const row of (data ?? [])) {
+    const p = row.pruefer_name ?? 'Unbekannt'
+    if (!stats[p]) stats[p] = { gesamt: 0, bestanden: 0 }
+    stats[p].gesamt++
+    if (row.gesamtstatus === 'bestanden') stats[p].bestanden++
+  }
+  return Object.entries(stats).map(([pruefer_name, v]) => ({ pruefer_name, ...v }))
+}

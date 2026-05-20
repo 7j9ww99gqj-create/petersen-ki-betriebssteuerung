@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
+import { generateArbeitskartePDF, type ArbeitskarteData } from '@/lib/pondruff-pdf'
 
 type Kind = 'wareneingang' | 'preisauftrag' | 'auftragsbestaetigung' | 'rechnung' | 'bauteil'
 
@@ -16,6 +17,8 @@ type Item = {
   image?: string
   syncedBuero?: boolean
   syncedWiso?: boolean
+  rawWE?: ArbeitskarteData
+  archivedAt?: string
 }
 
 const KIND_META: Record<Kind, { icon: string; label: string; color: string }> = {
@@ -37,18 +40,34 @@ export default function ArchivPage() {
   async function load() {
     const sb = createSupabaseClient()
     const [we, pa, bt] = await Promise.all([
-      sb.from('pondruff_wareneingaenge').select('*').order('created_at', { ascending: false }).limit(200),
+      sb.from('pondruff_wareneingaenge').select('*').not('archived_at', 'is', null).order('archived_at', { ascending: false }).limit(200),
       sb.from('pondruff_preisauftraege').select('*').order('created_at', { ascending: false }).limit(200),
       sb.from('pondruff_bauteile').select('*').order('created_at', { ascending: false }).limit(200),
     ])
     const arr: Item[] = []
     ;(we.data || []).forEach(r => arr.push({
-      id: r.id, kind: 'wareneingang', created_at: r.created_at,
-      title: r.delivery_id || `Wareneingang ${new Date(r.created_at).toLocaleDateString('de-DE')}`,
+      id: r.id, kind: 'wareneingang',
+      created_at: r.archived_at || r.created_at,
+      title: r.purchase_order || r.delivery_id || `Wareneingang ${new Date(r.created_at).toLocaleDateString('de-DE')}`,
       customer: r.customer,
-      meta: [r.operator, r.status].filter(Boolean).join(' · '),
-      href: '/dashboard/pondruff/wareneingang',
+      meta: [
+        r.eingelagert_von || r.operator,
+        r.lieferbedingungen,
+        Array.isArray(r.positionen) ? `${r.positionen.length} Pos.` : null,
+      ].filter(Boolean).join(' · '),
+      href: '',
       syncedBuero: !!r.synced_buero_dokument_id,
+      archivedAt: r.archived_at,
+      rawWE: {
+        id: r.id,
+        customer: r.customer,
+        purchase_order: r.purchase_order,
+        delivery_id: r.delivery_id,
+        lieferbedingungen: r.lieferbedingungen,
+        eingelagert_am: r.eingelagert_am,
+        eingelagert_von: r.eingelagert_von,
+        positionen: r.positionen,
+      } as ArbeitskarteData,
     }))
     ;(pa.data || []).forEach(r => {
       const k: Kind = r.status === 'rechnung' ? 'rechnung' : r.status === 'auftragsbestaetigung' ? 'auftragsbestaetigung' : 'preisauftrag'
@@ -111,18 +130,34 @@ export default function ArchivPage() {
           <div style={{ display: 'grid', gap: 8 }}>
             {visible.map(it => {
               const km = KIND_META[it.kind]
+              const isWE = it.kind === 'wareneingang'
               return (
-                <button key={`${it.kind}-${it.id}`} onClick={() => router.push(it.href)}
+                <div key={`${it.kind}-${it.id}`}
+                  onClick={() => !isWE && it.href && router.push(it.href)}
                   style={{
-                    all: 'unset', cursor: 'pointer',
                     display: 'flex', gap: 12, padding: 12, borderRadius: 10,
                     background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.06)',
+                    cursor: isWE ? 'default' : 'pointer',
                   }}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: km.color + '20', border: `1px solid ${km.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{km.icon}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                       <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.title}</div>
-                      <div style={{ fontSize: 11, color: '#aeb9c8' }}>{new Date(it.created_at).toLocaleDateString('de-DE')}</div>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                        {isWE && it.rawWE && (
+                          <button
+                            onClick={e => { e.stopPropagation(); generateArbeitskartePDF(it.rawWE!) }}
+                            style={{ background: 'rgba(229,9,9,.15)', border: '1px solid rgba(229,9,9,.4)', borderRadius: 6, padding: '3px 8px', fontSize: 11, color: '#ff8080', cursor: 'pointer' }}
+                            title="Arbeitskarte A5 herunterladen">
+                            🖨️ Arbeitskarte
+                          </button>
+                        )}
+                        <div style={{ fontSize: 11, color: '#aeb9c8' }}>
+                          {it.archivedAt
+                            ? `Archiviert ${new Date(it.archivedAt).toLocaleDateString('de-DE')}`
+                            : new Date(it.created_at).toLocaleDateString('de-DE')}
+                        </div>
+                      </div>
                     </div>
                     <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>
                       {it.customer || '—'} {it.meta ? '· ' + it.meta : ''} · <span style={{ color: km.color }}>{km.label}</span>
@@ -142,7 +177,7 @@ export default function ArchivPage() {
                       </div>
                     )}
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>

@@ -9,11 +9,25 @@ import {
   getQmTeamMitglieder,
   deleteQmTeamMitglied,
   upsertQmTeamMitglied,
+  getQmStatusVerteilung,
+  getQmFehlerquoteTrend,
+  getQmHaeufigsteAbweichungen,
+  getQmPrueferPerformance,
   type QmGesamtstatus,
   type QmPruefbericht,
   type QmTeamMitglied,
   type QmTeamRolle,
+  type QmStatistikZeitraum,
+  type QmStatusVerteilung,
+  type QmFehlerquoteTrend,
+  type QmHaeufigsteAbweichung,
+  type QmPrueferPerformance,
 } from '@/lib/db/qm'
+import {
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar,
+} from 'recharts'
 
 const QM_COLOR = '#14b8a6'
 
@@ -141,6 +155,14 @@ export default function QMPage() {
   // PDF generation state
   const [pdfLoading, setPdfLoading] = useState<string | null>(null)
 
+  // Statistik state
+  const [statsZeitraum, setStatsZeitraum] = useState<QmStatistikZeitraum>('monat')
+  const [statsLoading, setStatsLoading] = useState(false)
+  const [statsVerteilung, setStatsVerteilung] = useState<QmStatusVerteilung>([])
+  const [statsTrend, setStatsTrend] = useState<QmFehlerquoteTrend>([])
+  const [statsAbweichungen, setStatsAbweichungen] = useState<QmHaeufigsteAbweichung>([])
+  const [statsPruefer, setStatsPruefer] = useState<QmPrueferPerformance>([])
+
   // Team state
   const [team, setTeam] = useState<QmTeamMitglied[]>([])
   const [teamLoading, setTeamLoading] = useState(false)
@@ -181,6 +203,29 @@ export default function QMPage() {
   }, [isDemo])
 
   useEffect(() => { if (tab === 'team') void loadTeam() }, [tab, loadTeam])
+
+  const loadStats = useCallback(async (zeitraum: QmStatistikZeitraum) => {
+    if (isDemo) return
+    setStatsLoading(true)
+    try {
+      const [verteilung, trend, abweichungen, pruefer] = await Promise.all([
+        getQmStatusVerteilung(zeitraum),
+        getQmFehlerquoteTrend(),
+        getQmHaeufigsteAbweichungen(zeitraum),
+        getQmPrueferPerformance(zeitraum),
+      ])
+      setStatsVerteilung(verteilung)
+      setStatsTrend(trend)
+      setStatsAbweichungen(abweichungen)
+      setStatsPruefer(pruefer)
+    } catch { /* ignore */ } finally {
+      setStatsLoading(false)
+    }
+  }, [isDemo])
+
+  useEffect(() => {
+    if (tab === 'statistiken') void loadStats(statsZeitraum)
+  }, [tab, statsZeitraum, loadStats])
 
   async function handlePdf(b: QmPruefbericht) {
     if (isDemo) { showToast('Demo-Modus: PDF-Export deaktiviert', false); return }
@@ -491,34 +536,63 @@ export default function QMPage() {
 
       {/* ─── Statistiken Tab ─── */}
       {tab === 'statistiken' && (() => {
-        const gesamt = berichte.length
-        const bestandenGes = berichte.filter(b => b.gesamtstatus === 'bestanden').length
-        const nachGes = berichte.filter(b => b.gesamtstatus === 'nachbesserung').length
-        const ausschussGes = berichte.filter(b => b.gesamtstatus === 'ausschuss').length
-        const bestandenPct = gesamt > 0 ? Math.round(bestandenGes / gesamt * 100) : 0
-        const nachPct = gesamt > 0 ? Math.round(nachGes / gesamt * 100) : 0
-        const ausschussPct = gesamt > 0 ? Math.round(ausschussGes / gesamt * 100) : 0
+        // Demo-Fallback
+        const DEMO_VERTEILUNG = [{ gesamtstatus: 'bestanden', anzahl: 8 }, { gesamtstatus: 'nachbesserung', anzahl: 2 }, { gesamtstatus: 'ausschuss', anzahl: 1 }]
+        const DEMO_TREND = [
+          { woche: '2026-03-30', fehler: 1, gesamt: 5 }, { woche: '2026-04-06', fehler: 0, gesamt: 4 },
+          { woche: '2026-04-13', fehler: 2, gesamt: 6 }, { woche: '2026-04-20', fehler: 1, gesamt: 3 },
+          { woche: '2026-04-27', fehler: 0, gesamt: 5 }, { woche: '2026-05-04', fehler: 1, gesamt: 4 },
+          { woche: '2026-05-11', fehler: 2, gesamt: 7 }, { woche: '2026-05-18', fehler: 1, gesamt: 5 },
+        ]
+        const DEMO_ABWEICHUNGEN = [{ messstelle: 'Länge', anzahl: 4 }, { messstelle: 'Ø Bohrung', anzahl: 3 }, { messstelle: 'Breite', anzahl: 2 }]
+        const DEMO_PRUEFER = [
+          { pruefer_name: 'Kevin', gesamt: 8, bestanden: 7 },
+          { pruefer_name: 'Maria', gesamt: 6, bestanden: 5 },
+        ]
 
-        // Prüfer performance
-        const prueферStats: Record<string, { berichte: number; fehler: number }> = {}
-        for (const b of berichte) {
-          const p = b.pruefer_name ?? 'Unbekannt'
-          if (!prueферStats[p]) prueферStats[p] = { berichte: 0, fehler: 0 }
-          prueферStats[p].berichte++
-          if (b.gesamtstatus === 'nachbesserung' || b.gesamtstatus === 'ausschuss') prueферStats[p].fehler++
-        }
-        const prueферList = Object.entries(prueферStats)
-          .map(([name, s]) => ({ name, berichte: s.berichte, fehlerquote: s.berichte > 0 ? (s.fehler / s.berichte * 100).toFixed(1) + '%' : '0%' }))
-          .sort((a, b) => b.berichte - a.berichte)
+        const verteilung = isDemo ? DEMO_VERTEILUNG : statsVerteilung
+        const trend = isDemo ? DEMO_TREND : statsTrend
+        const abweichungen = isDemo ? DEMO_ABWEICHUNGEN : statsAbweichungen
+        const pruefer = isDemo ? DEMO_PRUEFER : statsPruefer
+
+        const COLORS: Record<string, string> = { bestanden: '#10b981', nachbesserung: '#f59e0b', ausschuss: '#ef4444', offen: '#aeb9c8' }
+        const totalVerteilung = verteilung.reduce((s, v) => s + v.anzahl, 0)
+
+        const zeitraeume: { id: QmStatistikZeitraum; label: string }[] = [
+          { id: 'woche', label: 'Woche' },
+          { id: 'monat', label: 'Monat' },
+          { id: 'quartal', label: 'Quartal' },
+          { id: 'gesamt', label: 'Gesamt' },
+        ]
 
         return (
           <div>
+            {/* Zeitraum-Filter */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: '#aeb9c8' }}>Zeitraum:</span>
+              {zeitraeume.map(z => (
+                <button key={z.id}
+                  onClick={() => setStatsZeitraum(z.id)}
+                  style={{
+                    padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13,
+                    background: statsZeitraum === z.id ? `${QM_COLOR}20` : 'transparent',
+                    color: statsZeitraum === z.id ? QM_COLOR : '#aeb9c8',
+                    fontWeight: statsZeitraum === z.id ? 700 : 500,
+                    outline: statsZeitraum === z.id ? `1.5px solid ${QM_COLOR}50` : 'none',
+                  }}>
+                  {z.label}
+                </button>
+              ))}
+              {statsLoading && <span style={{ fontSize: 12, color: '#aeb9c8' }}>⏳ Lade…</span>}
+            </div>
+
+            {/* KPI-Karten */}
             <div className="stats-grid" style={{ marginBottom: 20 }}>
               {[
-                { label: 'Prüfberichte gesamt', value: String(gesamt), icon: '📋', color: QM_COLOR },
-                { label: 'Bestanden gesamt', value: String(bestandenGes), icon: '✅', color: '#10b981' },
-                { label: 'Nachbesserung', value: String(nachGes), icon: '⚠️', color: '#f59e0b' },
-                { label: 'Ausschuss', value: String(ausschussGes), icon: '❌', color: '#ef4444' },
+                { label: 'Berichte gesamt', value: totalVerteilung, icon: '📋', color: QM_COLOR },
+                { label: 'Bestanden', value: verteilung.find(v => v.gesamtstatus === 'bestanden')?.anzahl ?? 0, icon: '✅', color: '#10b981' },
+                { label: 'Nachbesserung', value: verteilung.find(v => v.gesamtstatus === 'nachbesserung')?.anzahl ?? 0, icon: '⚠️', color: '#f59e0b' },
+                { label: 'Ausschuss', value: verteilung.find(v => v.gesamtstatus === 'ausschuss')?.anzahl ?? 0, icon: '❌', color: '#ef4444' },
               ].map(k => (
                 <div key={k.label} className="pk-card" style={{ textAlign: 'center', padding: '18px 12px' }}>
                   <div style={{ fontSize: 22, marginBottom: 6 }}>{k.icon}</div>
@@ -528,45 +602,92 @@ export default function QMPage() {
               ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+              {/* Status-Verteilung PieChart */}
               <div className="pk-card">
                 <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 16 }}>📊 Status-Verteilung</div>
-                {[
-                  { label: 'Bestanden', pct: bestandenPct, color: '#10b981' },
-                  { label: 'Nachbesserung', pct: nachPct, color: '#f59e0b' },
-                  { label: 'Ausschuss', pct: ausschussPct, color: '#ef4444' },
-                ].map(s => (
-                  <div key={s.label} style={{ marginBottom: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                      <span>{s.label}</span>
-                      <span style={{ color: s.color, fontWeight: 700 }}>{s.pct}%</span>
-                    </div>
-                    <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,.08)' }}>
-                      <div style={{ height: 6, borderRadius: 3, background: s.color, width: `${s.pct}%`, transition: 'width .6s ease' }} />
-                    </div>
-                  </div>
-                ))}
+                {verteilung.length === 0 ? (
+                  <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine Daten.</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie data={verteilung} dataKey="anzahl" nameKey="gesamtstatus" cx="50%" cy="50%" outerRadius={80} label={(p: { name?: string; percent?: number }) => `${p.name ?? ''} ${((p.percent ?? 0) * 100).toFixed(0)}%`} labelLine={false}>
+                        {verteilung.map((entry, i) => (
+                          <Cell key={i} fill={COLORS[entry.gesamtstatus] ?? '#aeb9c8'} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v) => [`${v}`, 'Anzahl']} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
               </div>
 
+              {/* Fehlerquote-Trend LineChart */}
+              <div className="pk-card">
+                <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 16 }}>📉 Fehlerquote (8 Wochen)</div>
+                {trend.length === 0 ? (
+                  <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine Daten.</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={trend.map(t => ({ ...t, quote: t.gesamt > 0 ? parseFloat((t.fehler / t.gesamt * 100).toFixed(1)) : 0, woche: t.woche.slice(5) }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
+                      <XAxis dataKey="woche" tick={{ fill: '#aeb9c8', fontSize: 10 }} />
+                      <YAxis tick={{ fill: '#aeb9c8', fontSize: 10 }} unit="%" />
+                      <Tooltip formatter={(v) => [`${v}%`, 'Fehlerquote']} />
+                      <Line type="monotone" dataKey="quote" stroke="#ef4444" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              {/* Häufigste Abweichungen BarChart */}
+              <div className="pk-card">
+                <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 16 }}>🔴 Häufigste Abweichungen</div>
+                {abweichungen.length === 0 ? (
+                  <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine roten Messwerte.</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={abweichungen} layout="vertical" margin={{ left: 10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
+                      <XAxis type="number" tick={{ fill: '#aeb9c8', fontSize: 10 }} />
+                      <YAxis type="category" dataKey="messstelle" tick={{ fill: '#aeb9c8', fontSize: 11 }} width={90} />
+                      <Tooltip formatter={(v) => [`${v}×`, 'Abweichungen']} />
+                      <Bar dataKey="anzahl" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              {/* Prüfer-Performance Tabelle */}
               <div className="pk-card">
                 <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 16 }}>🏆 Prüfer-Performance</div>
-                {prueферList.length === 0 ? (
-                  <div style={{ color: '#aeb9c8', fontSize: 13 }}>Noch keine Berichte.</div>
-                ) : prueферList.map(p => (
-                  <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 999, background: `${QM_COLOR}20`, border: `1px solid ${QM_COLOR}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: QM_COLOR }}>
-                      {p.name[0]}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>{p.name}</div>
-                      <div style={{ fontSize: 11, color: '#aeb9c8' }}>{p.berichte} Berichte</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: parseFloat(p.fehlerquote) < 5 ? '#10b981' : '#f59e0b' }}>{p.fehlerquote}</div>
-                      <div style={{ fontSize: 11, color: '#aeb9c8' }}>Fehlerquote</div>
-                    </div>
-                  </div>
-                ))}
+                {pruefer.length === 0 ? (
+                  <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine Daten.</div>
+                ) : (
+                  <table className="pk-table" style={{ width: '100%' }}>
+                    <thead>
+                      <tr>
+                        <th>Prüfer</th>
+                        <th style={{ textAlign: 'right' }}>Berichte</th>
+                        <th style={{ textAlign: 'right' }}>Bestanden</th>
+                        <th style={{ textAlign: 'right' }}>Quote</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pruefer.map(p => {
+                        const pct = p.gesamt > 0 ? Math.round(p.bestanden / p.gesamt * 100) : 0
+                        return (
+                          <tr key={p.pruefer_name}>
+                            <td style={{ fontWeight: 700 }}>{p.pruefer_name}</td>
+                            <td style={{ textAlign: 'right' }}>{p.gesamt}</td>
+                            <td style={{ textAlign: 'right' }}>{p.bestanden}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: pct >= 90 ? '#10b981' : pct >= 70 ? '#f59e0b' : '#ef4444' }}>{pct}%</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           </div>

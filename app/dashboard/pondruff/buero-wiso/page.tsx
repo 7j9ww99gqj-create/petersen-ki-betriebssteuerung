@@ -1,7 +1,12 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
-import { wisoOrderTsv, type WisoOrder, type WisoOrderRow } from '@/lib/pondruff'
+import {
+  wisoOrderTsv, type WisoOrder, type WisoOrderRow,
+  calcPricePosition, buildWisoPriceOrder, parseDecimal,
+  priceDefaultFactor, normalizePriceCoating, getPriceConfig, money,
+  type PricePosition,
+} from '@/lib/pondruff'
 import { generatePondruffOrderPDF, generateArbeitskartePDF, type PondPreisauftrag, type ArbeitskarteData } from '@/lib/pondruff-pdf'
 import { usePondruffFlags } from '@/components/pondruff/usePondruffFlags'
 import { useGlobalToast } from '@/components/ui/ToastProvider'
@@ -86,6 +91,9 @@ export default function BueroWisoPage() {
   const [delConfirm, setDelConfirm] = useState<string | null>(null)
   const [resyncConfirm, setResyncConfirm] = useState<string | null>(null)
   const [selectedWeId, setSelectedWeId] = useState<string | null>(null)
+  const [weDelConfirm, setWeDelConfirm] = useState<string | null>(null)
+  const [weArchiveConfirm, setWeArchiveConfirm] = useState<string | null>(null)
+  const [weConvertConfirm, setWeConvertConfirm] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [wisoDebug, setWisoDebug] = useState<Record<string, unknown> | null>(null)
   const [wisoDebugBusy, setWisoDebugBusy] = useState(false)
@@ -112,7 +120,7 @@ export default function BueroWisoPage() {
     const sb = createSupabaseClient()
     const [o, we] = await Promise.all([
       sb.from('pondruff_preisauftraege').select('*').order('created_at', { ascending: false }).limit(500),
-      sb.from('pondruff_wareneingaenge').select('*').order('created_at', { ascending: false }).limit(500),
+      sb.from('pondruff_wareneingaenge').select('*').is('archived_at', null).order('created_at', { ascending: false }).limit(500),
     ])
     if (!o.error && o.data) setOrders(o.data as Saved[])
     if (!we.error && we.data) setWareneingaenge(we.data as SavedWE[])
@@ -189,8 +197,107 @@ export default function BueroWisoPage() {
 
   async function delWE(id: string) {
     const sb = createSupabaseClient()
-    await sb.from('pondruff_wareneingaenge').delete().eq('id', id)
-    showToast('Gelöscht'); load()
+    const { error } = await sb.from('pondruff_wareneingaenge').delete().eq('id', id)
+    if (error) { showToast('Löschen fehlgeschlagen', false); return }
+    showToast('Gelöscht'); load(); setWeDelConfirm(null)
+  }
+
+  async function archiveWE(id: string) {
+    const sb = createSupabaseClient()
+    const { error } = await sb.from('pondruff_wareneingaenge')
+      .update({ archived_at: new Date().toISOString() }).eq('id', id)
+    if (error) { showToast('Archivieren fehlgeschlagen', false); return }
+    showToast('✓ Archiviert — im Pondruff-Archiv gespeichert')
+    load(); setWeArchiveConfirm(null)
+  }
+
+  async function weToAuftrag(w: SavedWE) {
+    setBusy(true)
+    try {
+      const sb = createSupabaseClient()
+      const { data: { user } } = await sb.auth.getUser()
+      if (!user) throw new Error('Nicht eingeloggt')
+      const cfg = await getPriceConfig(user.id)
+
+      const pricePositions: PricePosition[] = (w.positionen || []).map((p, idx) => {
+        const isRund = p.form === 'Rund'
+        const rawCoating = p.beschichtung && p.beschichtung !== 'Keine' ? p.beschichtung : 'TiCN'
+        const coating = normalizePriceCoating(rawCoating)
+        const services = [
+          p.polieren === 'Ja' && `Polieren${p.polieren_wo ? ` (${p.polieren_wo})` : ''}`,
+          p.entschichtung === 'Ja' && 'Entschichtung',
+          p.microstrahlen === 'Ja' && 'Microstrahlen',
+          p.laeppstrahlen === 'Ja' && 'Läppstrahlen',
+          p.polierstrahlen === 'Ja' && 'Polierstrahlen',
+        ].filter(Boolean).join(', ')
+        return {
+          description: [p.artikelbezeichnung || 'Beschichtung', services].filter(Boolean).join(' · '),
+          article_no: '', position_no: String(p.position_nr || idx + 1),
+          order_no: '', cost_center: '',
+          purchase_order: w.purchase_order || w.delivery_id || '',
+          quantity: Math.max(1, parseDecimal(p.menge) || 1),
+          shape: (isRund ? 'Rund' : 'Eckig') as 'Rund' | 'Eckig',
+          coating,
+          factor: cfg.coating_factors[coating] ?? priceDefaultFactor(coating),
+          diameter: isRund ? parseDecimal(p.durchmesser) : 0,
+          length: isRund ? parseDecimal(p.durchmesser_laenge) : parseDecimal(p.laenge),
+          width: isRund ? 0 : parseDecimal(p.breite),
+          height: isRund ? 0 : parseDecimal(p.hoehe),
+          discount: 0, note: '', source: 'wareneingang',
+          raw_dimension_text: p.raw_dimension_text,
+        }
+      })
+
+      const globalPO = w.purchase_order || w.delivery_id || ''
+      // Build rows with user's price config
+      const rows: WisoOrderRow[] = pricePositions.map((pos, i) => {
+        const result = calcPricePosition(pos, cfg)
+        const qty = Math.max(1, Math.floor(parseDecimal(pos.quantity) || 1))
+        const singleAfter = money(result.final_total / qty)
+        return {
+          'Pos.': String(i + 1).padStart(2, '0'),
+          Menge: qty,
+          'Artikel-Nr.': pos.article_no || '',
+          Einheit: '',
+          Beschreibung: pos.description,
+          Liefertermin: '',
+          Listenpreis: result.unit_price.toFixed(2),
+          'Rabatt (%)': '0',
+          Einzelpreis: singleAfter.toFixed(2),
+          Gesamtpreis: result.final_total.toFixed(2),
+        }
+      })
+      const total = money(rows.reduce((s, r) => s + parseFloat(r.Gesamtpreis), 0))
+      const now = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const orderId = `AB-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
+
+      const { data: ins, error } = await sb.from('pondruff_preisauftraege').insert({
+        user_id: user.id,
+        order_id: orderId,
+        customer: w.customer || null,
+        project: w.purchase_order || w.delivery_id || null,
+        purchase_order: w.purchase_order || w.delivery_id || null,
+        total,
+        positions: pricePositions,
+        rows,
+        status: 'auftragsbestaetigung',
+        confirmed_at: now.toISOString(),
+      }).select().single()
+      if (error) throw error
+
+      // Link WE → Auftrag
+      await sb.from('pondruff_wareneingaenge').update({
+        ai_data: { ...(w.ai_data || {}), converted_to_auftrag_id: ins.id, converted_at: now.toISOString() },
+      }).eq('id', w.id)
+
+      showToast(`✓ Auftragsbestätigung ${orderId} erstellt — ${total.toFixed(2)} € Netto`)
+      setWeConvertConfirm(null)
+      load()
+      setSection('auftraege')
+    } catch (e) {
+      showToast((e instanceof Error ? e.message : String(e)) || 'Fehler', false)
+    } finally { setBusy(false) }
   }
 
   function downloadHtmlReport(o: Saved) {
@@ -350,12 +457,14 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
               <table className="pk-table" style={{ width: '100%', fontSize: 12 }}>
                 <thead><tr>
                   <th>Datum</th><th>Bestell-Nr.</th><th>Kunde</th><th>Pos.</th>
-                  <th>Lieferbedingungen</th><th>Eingelagert von</th>
-                  <th>BüroPilot</th><th>WISO</th><th>Aktion</th>
+                  <th>Lieferbedingungen</th><th>Eingelagert von</th><th>Aktion</th>
                 </tr></thead>
                 <tbody>{visibleWE.map(w => {
-                  const wisoSynced = !!(w.ai_data as { wiso?: { synced_at?: string } } | null)?.wiso?.synced_at
                   const posCount = Array.isArray(w.positionen) ? w.positionen.length : 0
+                  const converted = !!(w.ai_data as { converted_to_auftrag_id?: string } | null)?.converted_to_auftrag_id
+                  const btnStyle = { background: 'transparent', border: '1px solid rgba(255,255,255,.15)', borderRadius: 6, padding: '3px 7px', fontSize: 11, cursor: 'pointer', color: '#aeb9c8' }
+                  const confirmYes = { background: '#e50909', color: '#fff', border: 'none', borderRadius: 6, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }
+                  const confirmNo = { background: 'transparent', color: '#aeb9c8', border: '1px solid rgba(255,255,255,.2)', borderRadius: 6, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }
                   return (
                     <>
                       <tr key={w.id}
@@ -368,27 +477,43 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
                         <td>{w.lieferbedingungen || '—'}</td>
                         <td>{w.eingelagert_von || w.operator || '—'}</td>
                         <td onClick={e => e.stopPropagation()}>
-                          {w.synced_buero_dokument_id
-                            ? <span style={{ color: '#4ddb7e', fontSize: 11 }}>✓ {w.synced_buero_dokument_id}</span>
-                            : <button className="pk-btn-ghost" disabled={busy} onClick={() => syncBueroWE(w)} style={{ fontSize: 11 }}>→ BüroPilot</button>}
-                        </td>
-                        <td onClick={e => e.stopPropagation()}>
-                          {wisoSynced
-                            ? <span style={{ color: '#4ddb7e', fontSize: 11 }}>✓ WISO</span>
-                            : <button className="pk-btn-ghost" disabled={busy || !wisoEnabled} title={wisoEnabled ? undefined : 'WISO-Sync ist durch den Inhaber deaktiviert'} onClick={() => exportWisoWE(w)} style={{ fontSize: 11 }}>{wisoEnabled ? '→ WISO' : '🚫 WISO'}</button>}
-                        </td>
-                        <td onClick={e => e.stopPropagation()}>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <button className="pk-btn-ghost"
-                              onClick={() => generateArbeitskartePDF(w as unknown as ArbeitskarteData)}
-                              style={{ fontSize: 11 }} title="Arbeitskarte A5 drucken">🖨️</button>
-                            <button className="pk-btn-ghost" onClick={() => delWE(w.id)} style={{ fontSize: 11 }}>🗑️</button>
-                          </div>
+                          {weConvertConfirm === w.id ? (
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <span style={{ fontSize: 10, color: '#fbbf24' }}>→ AB erstellen?</span>
+                              <button onClick={() => weToAuftrag(w)} disabled={busy} style={{ ...confirmYes, background: '#16a34a' }}>Ja</button>
+                              <button onClick={() => setWeConvertConfirm(null)} style={confirmNo}>X</button>
+                            </div>
+                          ) : weArchiveConfirm === w.id ? (
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <span style={{ fontSize: 10, color: '#fbbf24' }}>Archivieren?</span>
+                              <button onClick={() => archiveWE(w.id)} style={{ ...confirmYes, background: '#f59e0b' }}>Ja</button>
+                              <button onClick={() => setWeArchiveConfirm(null)} style={confirmNo}>X</button>
+                            </div>
+                          ) : weDelConfirm === w.id ? (
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <span style={{ fontSize: 10, color: '#fbbf24' }}>Löschen?</span>
+                              <button onClick={() => delWE(w.id)} style={confirmYes}>Ja</button>
+                              <button onClick={() => setWeDelConfirm(null)} style={confirmNo}>X</button>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button style={{ ...btnStyle, color: converted ? '#4ddb7e' : '#f59e0b', borderColor: converted ? 'rgba(77,219,126,.3)' : 'rgba(245,158,11,.3)' }}
+                                onClick={() => setWeConvertConfirm(w.id)}
+                                title={converted ? 'Bereits in Auftrag umgewandelt — erneut konvertieren?' : '→ Auftragsbestätigung erstellen (Preis aus Maßen berechnen)'}>
+                                {converted ? '✓ AB' : '💶 AB'}
+                              </button>
+                              <button style={btnStyle} onClick={() => generateArbeitskartePDF(w as unknown as ArbeitskarteData)} title="Arbeitskarte A5 drucken">🖨️</button>
+                              <button style={{ ...btnStyle, color: '#f59e0b', borderColor: 'rgba(245,158,11,.3)' }}
+                                onClick={() => setWeArchiveConfirm(w.id)} title="Archivieren (aus aktiver Liste entfernen)">📦</button>
+                              <button style={{ ...btnStyle, color: '#ff8080', borderColor: 'rgba(255,80,80,.3)' }}
+                                onClick={() => setWeDelConfirm(w.id)}>🗑️</button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                       {selectedWeId === w.id && (
                         <tr key={`${w.id}-detail`}>
-                          <td colSpan={9} style={{ padding: 0 }}>
+                          <td colSpan={7} style={{ padding: 0 }}>
                             <div style={{ padding: '12px 16px', background: 'rgba(22,132,255,.04)', borderTop: '1px solid rgba(22,132,255,.12)' }}>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 12, fontSize: 12 }}>
                                 <div><span style={{ color: '#aeb9c8' }}>Kunde:</span> <b>{w.customer || '—'}</b></div>
