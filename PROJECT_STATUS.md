@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **BUGFIX-SPRINT-2** (P1-1 bis P1-8): 8 wichtige P1-Bugs behoben. HEAD `55821e3`.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **API-Konsolidierung**: Anthropic vollständig entfernt, alles über OpenAI (`gpt-4o-mini`). HEAD `fbbd1b1`.
+- Davor: **BUGFIX-SPRINT-2** (P1-1 bis P1-8): 8 wichtige P1-Bugs behoben. HEAD `55821e3`.
 - Davor: `2026-05-20`, `main`, **BUGFIX-SPRINT-1** (P0-1 bis P0-10): Alle 10 Release-Blocker behoben. HEAD `2b0fa7f`.
 - Davor: `2026-05-20`, Branch `sprint-20-phase-d`, **Demo-Mode-Code-Migration (Sprint 20D)**: 10 Piloten-Seiten von isDemo-Daten-Routing-Branches befreit (~150 Branches), Demo-User nutzt jetzt RLS-DB-Pfad. Tests 87/87, Build grün.
 - Davor: `2026-05-19`, `main`, **Demo-Mode-Foundation-Sprint** (Aufgabe 20A+B+C+E): Demo-User als echter Supabase-Account, Seed-SQL, Reset-CRON, Login-Flow, UI-Banner.
@@ -445,6 +446,14 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+
+- **Zuletzt erledigt (2026-05-20 — API-Konsolidierung, HEAD `fbbd1b1`):**
+  - Anthropic/Claude API vollständig entfernt — App läuft jetzt ausschließlich über OpenAI
+  - `app/api/ocr-beleg/route.ts`: Anthropic claude-haiku → OpenAI `gpt-4o-mini` Vision (Bild-Upload + Text-Modus, ~0,001–0,002€/Scan)
+  - `app/api/generate-angebot/route.ts`: Anthropic claude-haiku → OpenAI `gpt-4o-mini`
+  - Vercel: `OPENAI_CHAT_MODEL` + `OPENAI_DOCUMENT_MODEL` als Env-Vars eingetragen
+  - PDF-Generierung (Rechnung, Angebot, Auftrag) läuft über **jsPDF im Browser** — keine KI, keine Tokenkosten
+  - KI-Kostenlimit: 5€/Monat pro User (via `lib/ai-usage.ts`)
 
 - **Zuletzt erledigt (2026-05-20 — BUGFIX-SPRINT-2, HEAD `55821e3`, 8 P1-Bugs):**
   - P1-1: Cloud Cron-Auth — fehlendes `CRON_SECRET` → 500 statt Endpoint offen (`app/api/backup/auto/route.ts`)
