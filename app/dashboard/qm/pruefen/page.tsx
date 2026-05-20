@@ -8,6 +8,7 @@ import { generateQmPruefberichtPDF } from '@/lib/qm-pdf'
 import {
   ampelStatus,
   getQmZeichnungen,
+  getQmTeamMitglieder,
   insertQmFoto,
   nextQmPruefberichtNummer,
   uploadQmFoto,
@@ -16,6 +17,7 @@ import {
   type QmFotoTyp,
   type QmGesamtstatus,
   type QmMesswertStatus,
+  type QmTeamMitglied,
   type QmZeichnung,
 } from '@/lib/db/qm'
 
@@ -178,6 +180,8 @@ export default function PruefeWizardPage() {
   const [initialen, setInitialen] = useState('')
   const [bemerkungen, setBemerkungen] = useState('')
   const [gesperrt, setGesperrt] = useState(false)
+  const [teamMitglieder, setTeamMitglieder] = useState<QmTeamMitglied[]>([])
+  const [prueferFreitext, setPrueferFreitext] = useState(false)
 
   // ── Save + PDF state
   const [saving, setSaving] = useState(false)
@@ -210,6 +214,11 @@ export default function PruefeWizardPage() {
   }, [isDemo])
 
   useEffect(() => { void loadZeichnungen() }, [loadZeichnungen])
+
+  useEffect(() => {
+    if (isDemo) return
+    getQmTeamMitglieder().then(rows => setTeamMitglieder(rows.filter(m => m.aktiv))).catch(() => {})
+  }, [isDemo])
 
   // Pre-select zeichnung from URL query param
   useEffect(() => {
@@ -748,7 +757,28 @@ export default function PruefeWizardPage() {
             <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 14 }}>✍️ Abzeichnung</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
               <Field label="Prüfer-Name *">
-                <input className="pk-input" value={pruefer} onChange={e => setPruefer(e.target.value)} placeholder="Vollständiger Name" />
+                {teamMitglieder.length > 0 && !prueferFreitext ? (
+                  <>
+                    <select className="pk-input"
+                      value={pruefer}
+                      onChange={e => {
+                        if (e.target.value === '__freitext__') { setPrueferFreitext(true); setPruefer('') }
+                        else setPruefer(e.target.value)
+                      }}>
+                      <option value="">— Prüfer wählen —</option>
+                      {teamMitglieder.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                      <option value="__freitext__">Anderer Name…</option>
+                    </select>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input className="pk-input" style={{ flex: 1 }} value={pruefer} onChange={e => setPruefer(e.target.value)} placeholder="Vollständiger Name" />
+                    {teamMitglieder.length > 0 && (
+                      <button type="button" className="pk-btn-ghost" style={{ fontSize: 11, padding: '6px 10px' }}
+                        onClick={() => { setPrueferFreitext(false); setPruefer('') }}>↩</button>
+                    )}
+                  </div>
+                )}
               </Field>
               <Field label="Initialen (max. 4 Zeichen) *">
                 <input className="pk-input" value={initialen} onChange={e => setInitialen(e.target.value.slice(0, 4).toUpperCase())} placeholder="KP" maxLength={4} style={{ textTransform: 'uppercase' }} />

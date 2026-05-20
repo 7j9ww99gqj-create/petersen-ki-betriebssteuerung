@@ -355,3 +355,53 @@ export async function deleteQmFotoDatei(path: string): Promise<void> {
   const { error } = await db().storage.from('qm-fotos').remove([path])
   if (error) throw error
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Team-Mitglieder (Phase 2A)
+// ─────────────────────────────────────────────────────────────────────
+
+export type QmTeamRolle = 'admin' | 'pruefer' | 'viewer'
+
+export type QmTeamMitglied = {
+  id: string
+  user_id: string
+  name: string
+  email: string | null
+  rolle: QmTeamRolle
+  aktiv: boolean
+  erstellt_am: string
+}
+
+export async function getQmTeamMitglieder(): Promise<QmTeamMitglied[]> {
+  const { data, error } = await db()
+    .from('qm_team_mitglieder')
+    .select('*')
+    .order('erstellt_am', { ascending: true })
+  if (error) throw error
+  return (data ?? []) as QmTeamMitglied[]
+}
+
+export type UpsertQmTeamMitgliedInput = {
+  id?: string
+  name: string
+  email?: string | null
+  rolle?: QmTeamRolle
+  aktiv?: boolean
+}
+
+export async function upsertQmTeamMitglied(m: UpsertQmTeamMitgliedInput): Promise<QmTeamMitglied> {
+  const userId = await getCurrentUserId()
+  const payload = { ...m, user_id: userId }
+  const { data, error } = await db()
+    .from('qm_team_mitglieder')
+    .upsert(payload, { onConflict: 'id' })
+    .select('*')
+    .single()
+  if (error) throw error
+  return data as QmTeamMitglied
+}
+
+export async function deleteQmTeamMitglied(id: string): Promise<void> {
+  const { error } = await db().from('qm_team_mitglieder').delete().eq('id', id)
+  if (error) throw error
+}

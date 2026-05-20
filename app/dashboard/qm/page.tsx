@@ -6,8 +6,13 @@ import { hasDemoCookie } from '@/lib/auth'
 import { generateQmPruefberichtPDF } from '@/lib/qm-pdf'
 import {
   getQmPruefberichte,
+  getQmTeamMitglieder,
+  deleteQmTeamMitglied,
+  upsertQmTeamMitglied,
   type QmGesamtstatus,
   type QmPruefbericht,
+  type QmTeamMitglied,
+  type QmTeamRolle,
 } from '@/lib/db/qm'
 
 const QM_COLOR = '#14b8a6'
@@ -112,7 +117,7 @@ function computeKpis(berichte: QmPruefbericht[]): KpiData {
   return { woche, bestanden, nachbesserung, ausschuss, fehlerquote }
 }
 
-type Tab = 'dashboard' | 'zeichnungen' | 'archiv' | 'statistiken'
+type Tab = 'dashboard' | 'zeichnungen' | 'archiv' | 'statistiken' | 'team'
 
 // ─────────────────────────────────────────────────────────────────────
 // Component
@@ -135,6 +140,14 @@ export default function QMPage() {
 
   // PDF generation state
   const [pdfLoading, setPdfLoading] = useState<string | null>(null)
+
+  // Team state
+  const [team, setTeam] = useState<QmTeamMitglied[]>([])
+  const [teamLoading, setTeamLoading] = useState(false)
+  const [deleteConfirmTeam, setDeleteConfirmTeam] = useState<string | null>(null)
+  const [showTeamModal, setShowTeamModal] = useState(false)
+  const [teamForm, setTeamForm] = useState<{ name: string; email: string; rolle: QmTeamRolle }>({ name: '', email: '', rolle: 'pruefer' })
+  const [teamSaving, setTeamSaving] = useState(false)
 
   function showToast(msg: string, ok = true) {
     setToast({ msg, ok })
@@ -160,6 +173,14 @@ export default function QMPage() {
   }, [isDemo])
 
   useEffect(() => { void loadBerichte() }, [loadBerichte])
+
+  const loadTeam = useCallback(async () => {
+    if (isDemo) return
+    setTeamLoading(true)
+    try { setTeam(await getQmTeamMitglieder()) } catch { /* ignore */ } finally { setTeamLoading(false) }
+  }, [isDemo])
+
+  useEffect(() => { if (tab === 'team') void loadTeam() }, [tab, loadTeam])
 
   async function handlePdf(b: QmPruefbericht) {
     if (isDemo) { showToast('Demo-Modus: PDF-Export deaktiviert', false); return }
@@ -197,6 +218,7 @@ export default function QMPage() {
     { id: 'zeichnungen', label: 'Zeichnungen', icon: '🖼️' },
     { id: 'archiv',      label: 'Archiv',      icon: '📁' },
     { id: 'statistiken', label: 'Statistiken', icon: '📈' },
+    { id: 'team',        label: 'Team',        icon: '👥' },
   ]
 
   return (
@@ -547,6 +569,155 @@ export default function QMPage() {
                 ))}
               </div>
             </div>
+          </div>
+        )
+      })()}
+
+      {/* ─── Team Tab ─── */}
+      {tab === 'team' && (() => {
+        function rolleBadge(rolle: QmTeamRolle) {
+          if (rolle === 'admin')   return { label: 'Admin',  bg: 'rgba(22,132,255,.15)',  color: '#1684ff' }
+          if (rolle === 'pruefer') return { label: 'Prüfer', bg: 'rgba(20,184,166,.15)',  color: '#14b8a6' }
+          return                         { label: 'Viewer', bg: 'rgba(174,185,200,.1)',   color: '#aeb9c8' }
+        }
+
+        async function handleAddMitglied() {
+          if (!teamForm.name.trim()) return
+          setTeamSaving(true)
+          try {
+            await upsertQmTeamMitglied({ name: teamForm.name.trim(), email: teamForm.email.trim() || null, rolle: teamForm.rolle, aktiv: true })
+            setShowTeamModal(false)
+            setTeamForm({ name: '', email: '', rolle: 'pruefer' })
+            await loadTeam()
+            showToast('Mitglied hinzugefügt')
+          } catch (e) {
+            showToast(e instanceof Error ? e.message : 'Fehler', false)
+          } finally {
+            setTeamSaving(false)
+          }
+        }
+
+        async function handleDeleteMitglied(id: string) {
+          try {
+            await deleteQmTeamMitglied(id)
+            setDeleteConfirmTeam(null)
+            await loadTeam()
+            showToast('Mitglied gelöscht')
+          } catch (e) {
+            showToast(e instanceof Error ? e.message : 'Fehler', false)
+          }
+        }
+
+        return (
+          <div>
+            {isDemo && (
+              <div className="pk-card" style={{ marginBottom: 14, border: '1px solid rgba(255,165,0,.3)', color: '#ffb347', fontSize: 13 }}>
+                ● Demo-Modus: Team-Verwaltung nicht verfügbar.
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <span style={{ fontWeight: 800, fontSize: 15 }}>👥 Team-Mitglieder</span>
+              {!isDemo && (
+                <button className="pk-btn" style={{ marginLeft: 'auto', background: QM_COLOR, border: 'none', fontSize: 13, padding: '8px 16px' }}
+                  onClick={() => setShowTeamModal(true)}>
+                  + Mitglied hinzufügen
+                </button>
+              )}
+            </div>
+
+            <div className="pk-card">
+              {teamLoading ? (
+                <div style={{ padding: '20px 0', color: '#aeb9c8', textAlign: 'center' }}>Lade…</div>
+              ) : team.length === 0 ? (
+                <div style={{ padding: '20px 0', color: '#aeb9c8', textAlign: 'center' }}>
+                  {isDemo ? 'Keine Demo-Daten.' : 'Noch keine Mitglieder. Klicke "+ Mitglied hinzufügen".'}
+                </div>
+              ) : (
+                <div className="pk-table-wrap">
+                  <table className="pk-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>E-Mail</th>
+                        <th>Rolle</th>
+                        <th>Status</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {team.map(m => {
+                        const rb = rolleBadge(m.rolle)
+                        return (
+                          <tr key={m.id}>
+                            <td style={{ fontWeight: 700 }}>{m.name}</td>
+                            <td style={{ color: '#aeb9c8', fontSize: 13 }}>{m.email ?? '—'}</td>
+                            <td>
+                              <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: rb.bg, color: rb.color }}>
+                                {rb.label}
+                              </span>
+                            </td>
+                            <td>
+                              <span style={{ fontSize: 12, color: m.aktiv ? '#10b981' : '#aeb9c8' }}>
+                                {m.aktiv ? '● Aktiv' : '○ Inaktiv'}
+                              </span>
+                            </td>
+                            <td>
+                              {deleteConfirmTeam === m.id ? (
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button className="pk-btn-ghost" style={{ fontSize: 11, padding: '4px 8px', color: '#ef4444' }}
+                                    onClick={() => void handleDeleteMitglied(m.id)}>Ja, löschen</button>
+                                  <button className="pk-btn-ghost" style={{ fontSize: 11, padding: '4px 8px' }}
+                                    onClick={() => setDeleteConfirmTeam(null)}>Abbrechen</button>
+                                </div>
+                              ) : (
+                                <button className="pk-btn-ghost" style={{ fontSize: 11, padding: '4px 8px' }}
+                                  onClick={() => setDeleteConfirmTeam(m.id)}>🗑️</button>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Add Modal */}
+            {showTeamModal && (
+              <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+                onClick={() => setShowTeamModal(false)}>
+                <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Mitglied hinzufügen</h3>
+                    <button onClick={() => setShowTeamModal(false)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Name *</div>
+                      <input className="pk-input" value={teamForm.name} onChange={e => setTeamForm(f => ({ ...f, name: e.target.value }))} placeholder="Max Mustermann" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>E-Mail</div>
+                      <input className="pk-input" type="email" value={teamForm.email} onChange={e => setTeamForm(f => ({ ...f, email: e.target.value }))} placeholder="max@firma.de" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Rolle</div>
+                      <select className="pk-input" value={teamForm.rolle} onChange={e => setTeamForm(f => ({ ...f, rolle: e.target.value as QmTeamRolle }))}>
+                        <option value="admin">Admin</option>
+                        <option value="pruefer">Prüfer</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                    </div>
+                    <button className="pk-btn" disabled={teamSaving || !teamForm.name.trim()}
+                      onClick={() => void handleAddMitglied()}
+                      style={{ background: QM_COLOR, border: 'none', marginTop: 8 }}>
+                      {teamSaving ? '⏳ Speichere…' : '💾 Speichern'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )
       })()}
