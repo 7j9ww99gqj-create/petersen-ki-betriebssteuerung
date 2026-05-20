@@ -2989,58 +2989,11 @@ export async function getCloudBackups(): Promise<CloudBackup[]> {
   return (data ?? []) as CloudBackup[]
 }
 
-export async function createCloudBackup(label = 'Manuell'): Promise<CloudBackup> {
-  const sb = db()
-  const [
-    lager, buero_kunden, buero_angebote, buero_auftraege, buero_rechnungen,
-    buero_eingangsrechnungen, buero_dokumente, werkstatt, planung_projekte,
-    planung_aufgaben, steuer_belege, marketing_kampagnen, marketing_leads,
-    marketing_newsletter, einkauf_lieferanten, einkauf_bestellungen,
-  ] = await Promise.all([
-    sb.from('lager_artikel').select('id', { count: 'exact', head: true }),
-    sb.from('buero_kunden').select('id', { count: 'exact', head: true }),
-    sb.from('buero_angebote').select('id', { count: 'exact', head: true }),
-    sb.from('buero_auftraege').select('id', { count: 'exact', head: true }),
-    sb.from('buero_rechnungen').select('id', { count: 'exact', head: true }),
-    sb.from('buero_eingangsrechnungen').select('id', { count: 'exact', head: true }),
-    sb.from('buero_dokumente').select('id', { count: 'exact', head: true }),
-    sb.from('werkstatt_karten').select('id', { count: 'exact', head: true }),
-    sb.from('planung_projekte').select('id', { count: 'exact', head: true }),
-    sb.from('planung_aufgaben').select('id', { count: 'exact', head: true }),
-    sb.from('steuer_belege').select('id', { count: 'exact', head: true }),
-    sb.from('marketing_kampagnen').select('id', { count: 'exact', head: true }),
-    sb.from('marketing_leads').select('id', { count: 'exact', head: true }),
-    sb.from('marketing_newsletter').select('id', { count: 'exact', head: true }),
-    sb.from('einkauf_lieferanten').select('id', { count: 'exact', head: true }),
-    sb.from('einkauf_bestellungen').select('id', { count: 'exact', head: true }),
-  ])
-
-  const modules: Record<string, number> = {
-    'LagerPilot': lager.count ?? 0,
-    'BüroPilot Kunden': buero_kunden.count ?? 0,
-    'BüroPilot Angebote': buero_angebote.count ?? 0,
-    'BüroPilot Aufträge': buero_auftraege.count ?? 0,
-    'BüroPilot Rechnungen': buero_rechnungen.count ?? 0,
-    'BüroPilot Eingangsrechnungen': buero_eingangsrechnungen.count ?? 0,
-    'Archiv Dokumente': buero_dokumente.count ?? 0,
-    'WerkstattPilot': werkstatt.count ?? 0,
-    'PlanungPilot Projekte': planung_projekte.count ?? 0,
-    'PlanungPilot Aufgaben': planung_aufgaben.count ?? 0,
-    'SteuerPilot Belege': steuer_belege.count ?? 0,
-    'MarketingPilot Kampagnen': marketing_kampagnen.count ?? 0,
-    'MarketingPilot Leads': marketing_leads.count ?? 0,
-    'MarketingPilot Newsletter': marketing_newsletter.count ?? 0,
-    'Einkauf Lieferanten': einkauf_lieferanten.count ?? 0,
-    'Einkauf Bestellungen': einkauf_bestellungen.count ?? 0,
+export async function createCloudBackup(_label = 'Manuell'): Promise<CloudBackup> {
+  const res = await fetch('/api/backup/manual', { method: 'POST' })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(body.error ?? `Backup fehlgeschlagen (${res.status})`)
   }
-
-  const total_records = Object.values(modules).reduce((a, b) => a + b, 0)
-
-  const { data, error } = await sb
-    .from('cloud_backups')
-    .insert({ label, modules, total_records, status: 'ok' })
-    .select()
-    .single()
-  if (error) throw error
-  return data as CloudBackup
+  return res.json() as Promise<CloudBackup>
 }
