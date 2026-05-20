@@ -180,7 +180,7 @@ export default function AnalysePilotPage() {
   useEffect(() => {
     const demo = hasDemoCookie()
     setIsDemo(demo)
-    if (demo || !isSupabaseConfigured()) {
+    if (!isSupabaseConfigured()) {
       setKpi(DEMO_KPI)
       setUmsatzData(DEMO_UMSATZ)
       setBestandData(DEMO_BESTAND)
@@ -976,12 +976,7 @@ export default function AnalysePilotPage() {
               Noch keine bezahlten Rechnungen mit Fälligkeitsdatum vorhanden.
             </div>
           )}
-          {(isDemo ? [
-            { name: 'Müller GmbH', anzahl: 8, bezahlt: 7, mahnung: 1, avgVerzoegerungTage: 12, mahnquote: 13 },
-            { name: 'Schmidt AG', anzahl: 5, bezahlt: 4, mahnung: 2, avgVerzoegerungTage: 8, mahnquote: 40 },
-            { name: 'Weber & Co', anzahl: 3, bezahlt: 3, mahnung: 0, avgVerzoegerungTage: 0, mahnquote: 0 },
-            { name: 'Bauer KG', anzahl: 6, bezahlt: 5, mahnung: 1, avgVerzoegerungTage: 24, mahnquote: 17 },
-          ] : zahlungsmoralData).map((k, i) => (
+          {zahlungsmoralData.map((k, i) => (
             <div key={k.name} className="pk-card" style={{ marginBottom: 10, padding: '12px 16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
                 <div style={{ minWidth: 0 }}>
