@@ -31,6 +31,7 @@ export const POND_DEFAULT_FEATURE_FLAGS: PondruffFeatureFlags = {
 }
 
 import priceConfig from './pondruff-price-config.json'
+import { createSupabaseClient } from './supabase'
 
 export const PRICE_BASE_COATING_MULTIPLIER = priceConfig.base_coating_multiplier
 export const PRICE_EXCEL_PI = priceConfig.excel_pi
@@ -39,6 +40,41 @@ export const PRICE_COATING_FACTORS: Record<string, number> = priceConfig.coating
 export const PRICE_COATINGS = Object.keys(PRICE_COATING_FACTORS)
 
 export const PRICE_TABLE: [number, number][] = priceConfig.price_table as [number, number][]
+
+export type PondruffPriceConfig = {
+  base_coating_multiplier: number
+  excel_pi: number
+  coating_factors: Record<string, number>
+  price_table: [number, number][]
+}
+
+export async function getPriceConfig(userId: string): Promise<PondruffPriceConfig> {
+  try {
+    const sb = createSupabaseClient()
+    const { data } = await sb
+      .from('pondruff_price_config')
+      .select('config')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (data?.config && typeof data.config === 'object') {
+      const cfg = data.config as Record<string, unknown>
+      if (
+        typeof cfg.base_coating_multiplier === 'number' &&
+        typeof cfg.excel_pi === 'number' &&
+        cfg.coating_factors && typeof cfg.coating_factors === 'object' &&
+        Array.isArray(cfg.price_table)
+      ) {
+        return cfg as unknown as PondruffPriceConfig
+      }
+    }
+  } catch {}
+  return {
+    base_coating_multiplier: priceConfig.base_coating_multiplier,
+    excel_pi: priceConfig.excel_pi,
+    coating_factors: priceConfig.coating_factors as Record<string, number>,
+    price_table: priceConfig.price_table as [number, number][],
+  }
+}
 
 export type PondShape = 'Eckig' | 'Rund'
 
@@ -164,9 +200,14 @@ export interface PriceResult {
   discount_amount: number
 }
 
-export function calcPricePosition(pos: PricePosition): PriceResult {
+export function calcPricePosition(pos: PricePosition, cfg?: Partial<PondruffPriceConfig>): PriceResult {
+  const coatingFactors = cfg?.coating_factors ?? PRICE_COATING_FACTORS
+  const priceTable = cfg?.price_table ?? PRICE_TABLE
+  const excelPi = cfg?.excel_pi ?? PRICE_EXCEL_PI
+  const baseMultiplier = cfg?.base_coating_multiplier ?? PRICE_BASE_COATING_MULTIPLIER
+
   const coating = normalizePriceCoating(pos.coating)
-  const factor = parseDecimal(pos.factor) || priceDefaultFactor(coating)
+  const factor = parseDecimal(pos.factor) || (coatingFactors[coating] ?? 1.0)
   const quantity = Math.max(1, Math.floor(parseDecimal(pos.quantity) || 1))
   const discount = Math.max(0, Math.min(100, parseDecimal(pos.discount)))
   const shape = pos.shape === 'Rund' ? 'Rund' : 'Eckig'
@@ -175,7 +216,7 @@ export function calcPricePosition(pos: PricePosition): PriceResult {
   if (shape === 'Rund') {
     const d = parseDecimal(pos.diameter)
     const l = parseDecimal(pos.length)
-    volume = (d * d) * PRICE_EXCEL_PI / 4 * l
+    volume = (d * d) * excelPi / 4 * l
   } else {
     const l = parseDecimal(pos.length)
     const w = parseDecimal(pos.width)
@@ -183,9 +224,15 @@ export function calcPricePosition(pos: PricePosition): PriceResult {
     volume = l * w * h
   }
 
-  const multiplier = coating === 'TiN' ? 1.0 : PRICE_BASE_COATING_MULTIPLIER
+  let rate = priceTable[0]?.[1] ?? 0
+  for (const [threshold, candidate] of priceTable) {
+    if (volume >= threshold) rate = candidate
+    else break
+  }
+
+  const multiplier = coating === 'TiN' ? 1.0 : baseMultiplier
   const unit_price = volume > 0 && factor > 0
-    ? priceLookupRate(volume) * volume / 1000 * multiplier * factor
+    ? rate * volume / 1000 * multiplier * factor
     : 0
   const normal_total = money(unit_price * quantity)
   const final_total = money(normal_total * (1 - discount / 100))

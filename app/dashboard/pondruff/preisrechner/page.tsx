@@ -6,18 +6,20 @@ import { createSupabaseClient } from '@/lib/supabase'
 import {
   PRICE_COATINGS, blankPricePosition, calcPricePosition, priceDefaultFactor,
   normalizePriceCoating, normalizePriceCustomer, buildWisoPriceOrder, wisoOrderTsv,
-  money, compressImageDataUrl, parseDecimal, type PricePosition, type PondShape,
+  money, compressImageDataUrl, parseDecimal, getPriceConfig,
+  type PricePosition, type PondShape, type PondruffPriceConfig,
 } from '@/lib/pondruff'
 import { usePondruffFlags } from '@/components/pondruff/usePondruffFlags'
 import { DecimalInput } from '@/components/pondruff/DecimalInput'
 import { useGlobalToast } from '@/components/ui/ToastProvider'
 
-function Pos({ pos, idx, onChange, onDelete, isFirst, globalPO, setGlobalPO }: {
+function Pos({ pos, idx, onChange, onDelete, isFirst, globalPO, setGlobalPO, priceConfig: cfg }: {
   pos: PricePosition; idx: number;
   onChange: (p: PricePosition) => void; onDelete: () => void;
   isFirst: boolean; globalPO: string; setGlobalPO: (s: string) => void;
+  priceConfig?: Partial<PondruffPriceConfig>
 }) {
-  const r = calcPricePosition(pos)
+  const r = calcPricePosition(pos, cfg)
   const set = <K extends keyof PricePosition>(k: K, v: PricePosition[K]) => onChange({ ...pos, [k]: v })
 
   return (
@@ -142,6 +144,7 @@ export default function PreisrechnerPage() {
   const [globalPO, setGlobalPO] = useState('')
   const [globalDiscount, setGlobalDiscount] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [dbPriceConfig, setDbPriceConfig] = useState<PondruffPriceConfig | undefined>(undefined)
   const toast = useGlobalToast()
   const [files, setFiles] = useState<File[]>([])
   const [ocrNote, setOcrNote] = useState('')
@@ -159,6 +162,14 @@ export default function PreisrechnerPage() {
   const [review, setReview] = useState<OcrReview | null>(null)
   const [prefillInfo, setPrefillInfo] = useState<{ operator?: string; status?: string; deliveryId?: string } | null>(null)
   const isPrefill = sp.get('prefill') === '1'
+
+  useEffect(() => {
+    createSupabaseClient().auth.getUser().then(({ data }) => {
+      if (data.user?.id) {
+        getPriceConfig(data.user.id).then(cfg => setDbPriceConfig(cfg)).catch(() => {})
+      }
+    })
+  }, [])
 
   useEffect(() => {
     if (sp.get('prefill') !== '1' || typeof window === 'undefined') return
@@ -202,7 +213,7 @@ export default function PreisrechnerPage() {
   const totals = useMemo(() => {
     let n = 0, f = 0
     positions.forEach(p => {
-      const r = calcPricePosition(p)
+      const r = calcPricePosition(p, dbPriceConfig)
       n += r.normal_total; f += r.final_total
     })
     const net = money(f)
@@ -354,7 +365,7 @@ export default function PreisrechnerPage() {
         <Pos key={i} pos={p} idx={i}
           onChange={np => setPositions(prev => prev.map((x, j) => j === i ? np : x))}
           onDelete={() => setPositions(prev => prev.filter((_, j) => j !== i))}
-          isFirst={i === 0} globalPO={globalPO} setGlobalPO={setGlobalPO} />
+          isFirst={i === 0} globalPO={globalPO} setGlobalPO={setGlobalPO} priceConfig={dbPriceConfig} />
       ))}
 
       {positions.length > 0 && (
