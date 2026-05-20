@@ -7,6 +7,7 @@ import { genId } from '@/lib/ids'
 import { isDemoUser, hasDemoCookie, performLogout } from '@/lib/auth'
 import { type AccessMode, type AccessStatus } from '@/lib/access'
 import { type AppRole, APP_ROLES, INHABER_EMAIL, ROLE_LABELS, ROLE_PILOTS, PERMISSIONS, normalizeRole, useRole } from '@/lib/roles'
+import DesignV2Toggle from '@/components/einstellungen/DesignV2Toggle'
 import {
   parseCsvFile, validateImportRows, autoMapColumns, buildImportRows,
   normalizeNumber, normalizeDate,
@@ -1139,6 +1140,9 @@ export default function EinstellungenPage() {
                   <button className="pk-btn" onClick={handleNotifSave} style={{ fontWeight: 700 }}>Einstellungen speichern</button>
                 </div>
               </div>
+
+              {/* ── Neues Design (Beta) — M6 ────────────────────────────────────── */}
+              <DesignV2Toggle />
 
               {/* ── Push-Benachrichtigungen (PWA) ─────────────────────────────────── */}
               <div className="pk-card">
