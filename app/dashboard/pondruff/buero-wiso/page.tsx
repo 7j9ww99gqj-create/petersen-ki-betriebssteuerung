@@ -243,15 +243,13 @@ export default function BueroWisoPage() {
           p.laeppstrahlen === 'Ja' && 'Läppstrahlen',
           p.polierstrahlen === 'Ja' && 'Polierstrahlen',
         ].filter(Boolean) as string[]
+        const otherSuffix = otherServices.length ? ` + ${otherServices.join(', ')}` : ''
 
-        // ── Beschichtungs-Preis berechnen (mit Rabatt) ───────────────
-        let beschListenUnit = 0
-        let beschEinzelUnit = 0
-        let beschGesamt = 0
+        // ── Beschichtungs-Zeile (Rabatt 10% direkt sichtbar) ─────────
         if (hasCoating) {
           const coating = normalizePriceCoating(p.beschichtung || 'TiCN')
           const pricePos: PricePosition = {
-            description: `${artName} ${masse} ${p.beschichtung} beschichtet`,
+            description: `${artName} ${masse} ${p.beschichtung} beschichtet${otherSuffix}`,
             article_no: articleNo,
             position_no: posNr,
             order_no: '', cost_center: '',
@@ -264,57 +262,60 @@ export default function BueroWisoPage() {
             length: isRund ? parseDecimal(p.durchmesser_laenge) : parseDecimal(p.laenge),
             width: isRund ? 0 : parseDecimal(p.breite),
             height: isRund ? 0 : parseDecimal(p.hoehe),
-            discount: rabatt, // nur auf Beschichtung
+            discount: rabatt,
             note: '', source: 'wareneingang',
             raw_dimension_text: p.raw_dimension_text,
           }
           const result = calcPricePosition(pricePos, cfg)
-          beschListenUnit = result.unit_price
-          beschEinzelUnit = result.final_total / qty
-          beschGesamt = result.final_total
+          const einzelpreis = money(result.final_total / qty)
+          rows.push({
+            'Pos.': posNr,
+            Menge: qty,
+            'Artikel-Nr.': articleNo,
+            Einheit: '',
+            Beschreibung: `${artName} ${masse} ${p.beschichtung} beschichtet${otherSuffix}`,
+            Liefertermin: '',
+            Listenpreis: result.unit_price.toFixed(2),
+            'Rabatt (%)': String(rabatt),
+            Einzelpreis: einzelpreis.toFixed(2),
+            Gesamtpreis: result.final_total.toFixed(2),
+          })
         }
 
-        // ── Polier-Preis (kein Rabatt) ───────────────────────────────
-        const polierUnit = hasPolieren ? parseDecimal(p.polier_kosten) : 0
-        const polierGesamt = money(polierUnit * qty)
-
-        // ── Multi-Line Beschreibung (1 Position, mehrere Service-Zeilen) ──
-        const descLines: string[] = []
-        if (hasCoating) {
-          descLines.push(`${artName} ${masse} ${p.beschichtung} beschichtet`)
-        }
+        // ── Polier-Zeile (kein Rabatt, eigene Pos.-Nr. = selbe wie Beschicht.) ──
         if (hasPolieren) {
+          const polierEinzel = parseDecimal(p.polier_kosten) || 0
+          const polierGesamt = money(polierEinzel * qty)
           const wo = p.polieren_wo ? ` (${p.polieren_wo})` : ''
-          descLines.push(`${artName} ${masse} poliert${wo}`)
+          rows.push({
+            'Pos.': posNr, // selbe Pos.-Nr. wie Beschichtung
+            Menge: qty,
+            'Artikel-Nr.': articleNo,
+            Einheit: '',
+            Beschreibung: `${artName} ${masse} poliert${wo}`,
+            Liefertermin: '',
+            Listenpreis: polierEinzel.toFixed(2),
+            'Rabatt (%)': '0',
+            Einzelpreis: polierEinzel.toFixed(2),
+            Gesamtpreis: polierGesamt.toFixed(2),
+          })
         }
+
+        // ── Fallback: weder Beschichtung noch Polieren → trotzdem 1 Zeile ──
         if (!hasCoating && !hasPolieren) {
-          descLines.push(`${artName} ${masse}`)
+          rows.push({
+            'Pos.': posNr,
+            Menge: qty,
+            'Artikel-Nr.': articleNo,
+            Einheit: '',
+            Beschreibung: `${artName} ${masse}${otherSuffix}`,
+            Liefertermin: '',
+            Listenpreis: '0.00',
+            'Rabatt (%)': '0',
+            Einzelpreis: '0.00',
+            Gesamtpreis: '0.00',
+          })
         }
-        if (otherServices.length) {
-          descLines.push(`+ ${otherServices.join(', ')}`)
-        }
-        const description = descLines.join('\n')
-
-        // ── Kombinierte Preise ───────────────────────────────────────
-        const totalListenUnit = money(beschListenUnit + polierUnit)
-        const totalEinzelUnit = money(beschEinzelUnit + polierUnit)
-        const totalGesamt = money(beschGesamt + polierGesamt)
-        const effectiveRabatt = totalListenUnit > 0
-          ? Math.round(((totalListenUnit - totalEinzelUnit) / totalListenUnit) * 100 * 10) / 10
-          : 0
-
-        rows.push({
-          'Pos.': posNr,
-          Menge: qty,
-          'Artikel-Nr.': articleNo,
-          Einheit: '',
-          Beschreibung: description,
-          Liefertermin: '',
-          Listenpreis: totalListenUnit.toFixed(2),
-          'Rabatt (%)': effectiveRabatt > 0 ? String(effectiveRabatt) : '0',
-          Einzelpreis: totalEinzelUnit.toFixed(2),
-          Gesamtpreis: totalGesamt.toFixed(2),
-        })
       })
 
       const total = money(rows.reduce((s, r) => s + parseFloat(r.Gesamtpreis), 0))

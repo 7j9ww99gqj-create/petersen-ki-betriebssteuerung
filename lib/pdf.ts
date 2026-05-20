@@ -6,6 +6,10 @@ export type PDFPosition = {
   menge: number
   einheit: string
   einzelpreis: number
+  /** Listenpreis pro Einheit vor Rabatt (für Rabattanzeige). Falls nicht gesetzt = einzelpreis. */
+  listenpreis?: number
+  /** Rabatt in % auf diese Position (für Rabattanzeige). */
+  rabatt_pct?: number
 }
 
 export type PDFRechnung = {

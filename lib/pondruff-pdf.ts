@@ -305,6 +305,43 @@ function drawPondruffContent(doc: DocLike, c: ContentBlock) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...POND_DARK)
+
+  // Rabatt-Zusammenfassung: Welcher % wurde nominal vergeben + welcher Betrag
+  // wurde gewährt? Wir gruppieren alle Positionen mit identischem rabatt_pct > 0
+  // und zeigen pro Gruppe eine Zeile.
+  type RabattSum = { pct: number; bruttoVorRabatt: number; rabattBetrag: number }
+  const rabattMap = new Map<number, RabattSum>()
+  for (const p of c.positionen) {
+    const pct = p.rabatt_pct ?? 0
+    if (pct <= 0) continue
+    const listen = (p.listenpreis ?? p.einzelpreis) * p.menge
+    const rabattBetrag = listen - (p.einzelpreis * p.menge)
+    if (rabattBetrag <= 0) continue
+    const cur = rabattMap.get(pct) ?? { pct, bruttoVorRabatt: 0, rabattBetrag: 0 }
+    cur.bruttoVorRabatt += listen
+    cur.rabattBetrag += rabattBetrag
+    rabattMap.set(pct, cur)
+  }
+  const rabattGruppen = Array.from(rabattMap.values()).sort((a, b) => b.pct - a.pct)
+  for (const g of rabattGruppen) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...POND_GREY)
+    doc.text(`Rabatt ${de(g.pct)}% auf Beschichtungen`, sumX, y)
+    doc.setTextColor(...POND_RED)
+    doc.text('-' + de(g.rabattBetrag) + ' €', sumValX, y, { align: 'right' })
+    y += 5
+  }
+  if (rabattGruppen.length > 0) {
+    // Trennstrich zwischen Rabatt und Netto
+    doc.setDrawColor(...POND_GREY)
+    doc.setLineWidth(0.2)
+    doc.line(sumX - 4, y - 2, sumValX, y - 2)
+  }
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(...POND_DARK)
   doc.text(`Netto`, sumX, y)
   doc.text(de(c.nettoVal) + ' €', sumValX, y, { align: 'right' })
   y += 5
@@ -461,12 +498,16 @@ export async function generatePondruffOrderPDF(o: PondPreisauftrag, returnBase64
   const positionen: PDFPosition[] = (o.rows || []).map(r => {
     const artNr = r['Artikel-Nr.']
     const desc = artNr ? `Art.-Nr.: ${artNr}\n${r.Beschreibung}` : r.Beschreibung
+    const listenpreis = parseMoney(r.Listenpreis)
+    const rabattPct = parseFloat(String(r['Rabatt (%)'] || '0').replace(',', '.')) || 0
     return {
       id: r['Pos.'],
       beschreibung: desc,
       menge: Number(r.Menge) || 1,
       einheit: 'Stk.',
       einzelpreis: parseMoney(r.Einzelpreis),
+      listenpreis,
+      rabatt_pct: rabattPct,
     }
   })
   const netto = parseMoney(String(o.total || ''))
