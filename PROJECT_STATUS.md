@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **BUGFIX-SPRINT-1** (P0-1 bis P0-10): Alle 10 Release-Blocker behoben. HEAD `2b0fa7f`.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **BUGFIX-SPRINT-2** (P1-1 bis P1-8): 8 wichtige P1-Bugs behoben. HEAD `55821e3`.
+- Davor: `2026-05-20`, `main`, **BUGFIX-SPRINT-1** (P0-1 bis P0-10): Alle 10 Release-Blocker behoben. HEAD `2b0fa7f`.
 - Davor: `2026-05-20`, Branch `sprint-20-phase-d`, **Demo-Mode-Code-Migration (Sprint 20D)**: 10 Piloten-Seiten von isDemo-Daten-Routing-Branches befreit (~150 Branches), Demo-User nutzt jetzt RLS-DB-Pfad. Tests 87/87, Build grün.
 - Davor: `2026-05-19`, `main`, **Demo-Mode-Foundation-Sprint** (Aufgabe 20A+B+C+E): Demo-User als echter Supabase-Account, Seed-SQL, Reset-CRON, Login-Flow, UI-Banner.
 - Davor: **Compliance-Sprint** (Aufgaben 15-18): DSGVO-Export UI-Button, CONTRIBUTING+PR-Template, Backup-Restore-Drill.
@@ -444,6 +445,16 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+
+- **Zuletzt erledigt (2026-05-20 — BUGFIX-SPRINT-2, HEAD `55821e3`, 8 P1-Bugs):**
+  - P1-1: Cloud Cron-Auth — fehlendes `CRON_SECRET` → 500 statt Endpoint offen (`app/api/backup/auto/route.ts`)
+  - P1-2: PlanungPilot — `showToast` vor `useEffect` in 3 Tabs (ReferenceError-Risiko behoben, `planung/page.tsx`)
+  - P1-3: WerkstattPilot — Supabase-Trigger `trg_werkstatt_zeitbuchung_stunden`: Zeitbuchungen summieren in `werkstatt_karten.stunden`
+  - P1-4: WerkstattPilot — `syncWerkstattMaterialToLager` nutzt jetzt `insertLagerBewegung()` statt direktem Insert (Audit-Konsistenz + konsistentes Datumsformat)
+  - P1-5: AnalysePilot — ISO-8601 KW-Berechnung, Zebra-Striping via `rowIndex % 2`, PDF-Dateiname an `zeitraum`-Filter (`analyse/page.tsx`, `lib/pdf.ts`)
+  - P1-6: SteuerPilot — `uploadSteuerBeleg` → `ocr-originale`-Bucket; FK `steuer_buchungen.beleg_id → steuer_belege(id)` mit `ON DELETE SET NULL`
+  - P1-7: BüroPilot — `isSubmitting`-Guard auf `handleNeu` in `RechnungenTab` (verhindert Doppelklick-Duplikate)
+  - P1-8: Archiv — Datum-Sort parst DE-Format `TT.MM.JJJJ` korrekt; `deleteSteuerBeleg` nutzt `db()` statt `createSupabaseClient()` für DB-Queries
 
 - **Zuletzt erledigt (2026-05-20 — BUGFIX-SPRINT-1, HEAD `2b0fa7f`, alle 10 P0-Release-Blocker):**
   - P0-1: KI-Assistent Chat + Tagesbrief an echte `/api/chat` angeschlossen (Commits `89d37bf`)
