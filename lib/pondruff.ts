@@ -31,7 +31,6 @@ export const POND_DEFAULT_FEATURE_FLAGS: PondruffFeatureFlags = {
 }
 
 import priceConfig from './pondruff-price-config.json'
-import { createSupabaseClient } from './supabase'
 
 export const PRICE_BASE_COATING_MULTIPLIER = priceConfig.base_coating_multiplier
 export const PRICE_EXCEL_PI = priceConfig.excel_pi
@@ -48,26 +47,11 @@ export type PondruffPriceConfig = {
   price_table: [number, number][]
 }
 
-export async function getPriceConfig(userId: string): Promise<PondruffPriceConfig> {
-  try {
-    const sb = createSupabaseClient()
-    const { data } = await sb
-      .from('pondruff_price_config')
-      .select('config')
-      .eq('user_id', userId)
-      .maybeSingle()
-    if (data?.config && typeof data.config === 'object') {
-      const cfg = data.config as Record<string, unknown>
-      if (
-        typeof cfg.base_coating_multiplier === 'number' &&
-        typeof cfg.excel_pi === 'number' &&
-        cfg.coating_factors && typeof cfg.coating_factors === 'object' &&
-        Array.isArray(cfg.price_table)
-      ) {
-        return cfg as unknown as PondruffPriceConfig
-      }
-    }
-  } catch {}
+// Single source of truth: pondruff-price-config.json (entspricht Pondruff Excel-Tabelle).
+// KEINE DB-Überschreibung mehr — die Werte sind fix im Code und werden nirgends editiert.
+// Behält async-Signatur für Backwards-Compat mit aufrufenden Komponenten.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function getPriceConfig(_userId: string): Promise<PondruffPriceConfig> {
   return {
     base_coating_multiplier: priceConfig.base_coating_multiplier,
     excel_pi: priceConfig.excel_pi,
