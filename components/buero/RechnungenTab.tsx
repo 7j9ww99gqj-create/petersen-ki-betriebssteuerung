@@ -244,6 +244,9 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
         const { positionen: _pos1, ...newReDb } = newRe
         await upsertBueroRechnung(newReDb)
         await syncDokumentVerknuepfung(newRe, form.dokumentId)
+        generateRechnungPDF(newRe, newRe.kunde, { archive: true })
+          .then(() => setRechnungen(prev => prev.map(x => x.id === newRe.id ? { ...x, pdf_archived_at: new Date().toISOString() } : x)))
+          .catch(() => {})
       } catch { showToast('Fehler beim Speichern', true); return }
     }
     setRechnungen(prev => [newRe, ...prev])

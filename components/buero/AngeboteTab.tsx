@@ -171,6 +171,9 @@ function AngeboteTab({ isDemo, kunden, auftraege, setAuftraege, initialFilterSta
       try {
         await upsertBueroAngebot(newAng)
         await syncDokumentVerknuepfung(newAng, form.dokumentId)
+        generateAngebotPDF(newAng, newAng.kunde, { archive: true })
+          .then(() => setAngebote(prev => prev.map(x => x.id === newAng.id ? { ...x, pdf_archived_at: new Date().toISOString() } : x)))
+          .catch(() => {})
       } catch { showToast('Fehler beim Speichern', true); return }
     }
     setAngebote(prev => [newAng, ...prev])
