@@ -94,7 +94,16 @@ export default function ArchivPage() {
           confidence: (doc as { confidence?: number }).confidence,
           summary: (doc as { summary?: string }).summary,
         }))
-        setDocs([...mappedBuero, ...mappedSteuer].sort((a, b) => String(b.datum ?? '').localeCompare(String(a.datum ?? ''))))
+        const parseDatum = (d: string | undefined): number => {
+          if (!d) return 0
+          // DE-Format TT.MM.JJJJ → ISO umwandeln für korrekten Vergleich
+          if (/^\d{2}\.\d{2}\.\d{4}$/.test(d)) {
+            const [dd, mm, yyyy] = d.split('.')
+            return new Date(`${yyyy}-${mm}-${dd}`).getTime()
+          }
+          return new Date(d).getTime()
+        }
+        setDocs([...mappedBuero, ...mappedSteuer].sort((a, b) => parseDatum(b.datum) - parseDatum(a.datum)))
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Archiv konnte nicht geladen werden.'))
       .finally(() => setLoading(false))

@@ -48,8 +48,11 @@ function getAdminSupabase() {
 export async function GET(req: NextRequest) {
   // Cron-Auth: Vercel sendet "Authorization: Bearer $CRON_SECRET" automatisch
   const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'CRON_SECRET nicht konfiguriert' }, { status: 500 })
+  }
   const authHeader = req.headers.get('authorization')
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

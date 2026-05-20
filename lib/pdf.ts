@@ -1789,8 +1789,11 @@ export async function generateAnalysePDF(opts: {
   doc.text('Wert', margin + colW + 2, y)
   y += 6
 
+  let rowIndex = 0
   for (const kpi of opts.kpis) {
-    doc.setFillColor(y % 12 === 0 ? 14 : 11, y % 12 === 0 ? 22 : 18, y % 12 === 0 ? 36 : 28)
+    const zebra = rowIndex % 2 === 0
+    doc.setFillColor(zebra ? 14 : 11, zebra ? 22 : 18, zebra ? 36 : 28)
+    rowIndex++
     doc.rect(margin, y - 4, pageW - margin * 2, 8, 'F')
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
@@ -1800,7 +1803,7 @@ export async function generateAnalysePDF(opts: {
     doc.setTextColor(32, 200, 255)
     doc.text(kpi.value, margin + colW + 2, y)
     y += 8
-    if (y > 270) { doc.addPage(); doc.setFillColor(5, 7, 11); doc.rect(0, 0, 210, 297, 'F'); y = 20 }
+    if (y > 270) { doc.addPage(); doc.setFillColor(5, 7, 11); doc.rect(0, 0, 210, 297, 'F'); y = 20; rowIndex = 0 }
   }
 
   // ── Seite 3: Top 5 Artikel ───────────────────────────────────────────────
@@ -1849,7 +1852,8 @@ export async function generateAnalysePDF(opts: {
     doc.text(`Seite ${i} / ${totalPages}`, pageW - margin - 20, 290)
   }
 
-  doc.save(`analyse-bericht-${monthStr}.pdf`)
+  const fileZeitraum = opts.zeitraum ? opts.zeitraum.toLowerCase() : monthStr
+  doc.save(`analyse-bericht-${fileZeitraum}.pdf`)
 }
 
 // ── LagerPilot PDF-Bericht ─────────────────────────────────────────────────

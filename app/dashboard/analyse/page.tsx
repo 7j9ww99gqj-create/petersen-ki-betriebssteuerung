@@ -395,7 +395,9 @@ export default function AnalysePilotPage() {
         const gesamtArtikel = artikelRows.length
         const niedrig = artikelRows.filter(a => a.status === 'niedrig').length
         const leer = artikelRows.filter(a => a.status === 'leer').length
-        const kw = Math.ceil((now.getDate() + new Date(now.getFullYear(), now.getMonth(), 1).getDay()) / 7)
+        const isoD = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
+        isoD.setUTCDate(isoD.getUTCDate() + 4 - (isoD.getUTCDay() || 7))
+        const kw = Math.ceil(((isoD.getTime() - new Date(Date.UTC(isoD.getUTCFullYear(), 0, 1)).getTime()) / 86400000 + 1) / 7)
         setBestandData([{
           woche: `KW${String(kw).padStart(2, '0')} (aktuell)`,
           artikel: gesamtArtikel,

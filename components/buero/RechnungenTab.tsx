@@ -68,6 +68,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
   const mailTarget = sharedMailTarget !== undefined ? sharedMailTarget : mailTargetLocal
   const setMailTarget = (setSharedMailTarget ?? setMailTargetLocal) as React.Dispatch<React.SetStateAction<{ id: string; email: string; typ: 'rechnung' } | null>>
   const [mailSending, setMailSending] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (isDemo) return
@@ -217,8 +218,10 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
   }
 
   const handleNeu = async () => {
+    if (isSubmitting) return
     const berechneterBetrag = formPositionen.length > 0 ? berechneBetragAusPositionen(formPositionen) : form.betrag
     if (!form.kunde || !berechneterBetrag) return
+    setIsSubmitting(true)
     const today = new Date()
     const firmaDefaults = getLocalFirmaDefaults()
     const kunde = kunden.find(entry => entry.name === form.kunde)
@@ -247,13 +250,14 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
         generateRechnungPDF(newRe, newRe.kunde, { archive: true })
           .then(() => setRechnungen(prev => prev.map(x => x.id === newRe.id ? { ...x, pdf_archived_at: new Date().toISOString() } : x)))
           .catch(() => {})
-      } catch { showToast('Fehler beim Speichern', true); return }
+      } catch { setIsSubmitting(false); showToast('Fehler beim Speichern', true); return }
     }
     setRechnungen(prev => [newRe, ...prev])
     setForm({ kunde: '', betrag: '', faellig: '', dokumentId: '' })
     setFormPositionen([])
     setShowForm(false)
     showToast(`✅ Rechnung ${newRe.id} wurde erstellt`)
+    setIsSubmitting(false)
   }
 
   const openEdit = (r: Rechnung) => {
@@ -453,7 +457,7 @@ function RechnungenTab({ isDemo, kunden, initialFilterStatus, sharedRechnungen, 
             </div>
           </div>
           <div style={{ marginTop: 16 }}>
-            <button className="pk-btn" onClick={handleNeu}>Rechnung erstellen</button>
+            <button className="pk-btn" onClick={handleNeu} disabled={isSubmitting}>{isSubmitting ? '⏳ Wird erstellt…' : 'Rechnung erstellen'}</button>
           </div>
         </div>
       )}

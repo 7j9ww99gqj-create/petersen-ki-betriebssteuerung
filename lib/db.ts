@@ -1017,14 +1017,13 @@ export async function syncWerkstattMaterialToLager(input: {
       .eq('id', art.id)
   }
 
-  // Lager-Bewegung "Ausgang" loggen
-  await client.from('lager_bewegungen').insert({
+  // Lager-Bewegung "Ausgang" via insertLagerBewegung loggen (Audit-Konsistenz)
+  await insertLagerBewegung({
     typ: 'Ausgang',
     artikel: input.artikelName,
     menge: input.menge,
     mitarbeiter: input.mitarbeiter ?? '',
     status: `Werkstatt-Entnahme: ${input.auftragsnr}`,
-    datum: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
   })
 }
 
@@ -2385,7 +2384,7 @@ export async function upsertSteuerBeleg(b: {
 }
 
 export async function deleteSteuerBeleg(id: string) {
-  const supabase = createSupabaseClient()
+  const supabase = db()
   const { data: existing } = await supabase
     .from('steuer_belege')
     .select('datei_url')
@@ -2393,7 +2392,8 @@ export async function deleteSteuerBeleg(id: string) {
     .single()
   const storagePath = normalizeDocumentStoragePath((existing as { datei_url?: string | null } | null)?.datei_url)
   if (storagePath && !storagePath.startsWith('http')) {
-    const { error: storageError } = await supabase.storage.from('dokumente').remove([storagePath])
+    const supabaseBrowser = createSupabaseClient()
+    const { error: storageError } = await supabaseBrowser.storage.from('dokumente').remove([storagePath])
     if (storageError && !/not found/i.test(storageError.message ?? '')) throw storageError
   }
   const { error } = await supabase.from('steuer_belege').delete().eq('id', id)
@@ -2420,7 +2420,7 @@ export async function uploadSteuerBeleg(file: File, userId: string): Promise<str
   const supabase = createSupabaseClient()
   const ext = file.name.split('.').pop()
   const path = `steuer/${userId}/${Date.now()}.${ext}`
-  const { error } = await supabase.storage.from('dokumente').upload(path, file)
+  const { error } = await supabase.storage.from('ocr-originale').upload(path, file)
   if (error) throw error
   return path
 }

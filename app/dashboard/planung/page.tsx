@@ -550,6 +550,10 @@ function KalenderTab({ isDemo: _isDemo }: { isDemo: boolean }) {
   const [form, setForm] = useState<TerminFormState>(emptyTerminForm)
   const [editForm, setEditForm] = useState<TerminFormState>(emptyTerminForm)
 
+  const showToast = (msg: string, error = false) => {
+    if (error) toast.error(msg); else toast.success(msg)
+  }
+
   useEffect(() => {
     getPlanungTermine()
       .then(data => setTermine(data as Termin[]))
@@ -557,10 +561,6 @@ function KalenderTab({ isDemo: _isDemo }: { isDemo: boolean }) {
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const showToast = (msg: string, error = false) => {
-    if (error) toast.error(msg); else toast.success(msg)
-  }
 
   const sortFn = (a: Termin, b: Termin) => {
     const da = a.datum.split('.').reverse().join('')
@@ -731,6 +731,10 @@ function RessourcenTab({ isDemo: _isDemo }: { isDemo: boolean }) {
   const [form, setForm] = useState<RessourceFormState>(emptyRessourceForm)
   const [editForm, setEditForm] = useState<RessourceFormState>(emptyRessourceForm)
 
+  const showToast = (msg: string, error = false) => {
+    if (error) toast.error(msg); else toast.success(msg)
+  }
+
   useEffect(() => {
     getPlanungRessourcen()
       .then(data => setRessourcen(data as Ressource[]))
@@ -738,10 +742,6 @@ function RessourcenTab({ isDemo: _isDemo }: { isDemo: boolean }) {
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const showToast = (msg: string, error = false) => {
-    if (error) toast.error(msg); else toast.success(msg)
-  }
 
   const personen = ressourcen.filter(r => r.typ === 'Person')
   const maschinen = ressourcen.filter(r => r.typ !== 'Person')
@@ -944,6 +944,10 @@ function AufgabenTab({ isDemo: _isDemo }: { isDemo: boolean }) {
   )
   const [ressourcen, setRessourcen] = useState<Ressource[]>([])
 
+  const showToast = (msg: string, error = false) => {
+    if (error) toast.error(msg); else toast.success(msg)
+  }
+
   useEffect(() => {
     getPlanungAufgaben()
       .then(data => setAufgaben(data as Aufgabe[]))
@@ -954,10 +958,6 @@ function AufgabenTab({ isDemo: _isDemo }: { isDemo: boolean }) {
       .catch(() => { /* ignore */ })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const showToast = (msg: string, error = false) => {
-    if (error) toast.error(msg); else toast.success(msg)
-  }
 
   const filtered = aufgaben.filter(a => filterStatus === 'Alle' || a.status === filterStatus)
   const counts: Record<string, number> = { Alle: aufgaben.length }
