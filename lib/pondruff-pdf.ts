@@ -580,67 +580,6 @@ function drawArbeitskartePage(doc: DocLike, banner: string | null) {
   doc.setDrawColor(60, 60, 60)
 }
 
-function metaLabel(doc: DocLike, label: string, value: string, x: number, y: number, colW: number) {
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
-  doc.setTextColor(120, 120, 120)
-  doc.text(label, x, y)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8.5)
-  doc.setTextColor(20, 20, 20)
-  const lines = doc.splitTextToSize(value || '—', colW - 2)
-  doc.text(lines[0] || '—', x, y + 4.5)
-}
-
-function drawCheckItem(doc: DocLike, checked: boolean, label: string, x: number, y: number) {
-  const bx = x, by = y - 2.8, bsize = 3.2
-  doc.setDrawColor(80, 80, 80)
-  doc.setLineWidth(0.3)
-  doc.rect(bx, by, bsize, bsize)
-  if (checked) {
-    doc.setDrawColor(229, 9, 9)
-    doc.setLineWidth(0.55)
-    doc.line(bx + 0.4, by + 1.6, bx + 1.3, by + bsize - 0.3)
-    doc.line(bx + 1.3, by + bsize - 0.3, bx + bsize - 0.3, by + 0.4)
-  }
-  doc.setDrawColor(80, 80, 80)
-  doc.setLineWidth(0.3)
-  doc.setFont('helvetica', checked ? 'bold' : 'normal')
-  doc.setFontSize(7.5)
-  doc.setTextColor(checked ? 20 : 130, 20, 20)
-  doc.text(label, bx + bsize + 1.5, y)
-}
-
-function drawStatusLines(doc: DocLike, y: number) {
-  const lineLen = CONTENT_W * 0.55
-  const datumLen = CONTENT_W * 0.28
-  const lineY = y + 4
-  const items = [
-    'Eingang geprüft:',
-    'Bearbeitung fertig:',
-    'Ausgabe an:',
-  ]
-  doc.setDrawColor(150, 150, 150)
-  doc.setLineWidth(0.25)
-  doc.line(MARGIN, y - 2, A5_W - MARGIN, y - 2)
-
-  for (let i = 0; i < items.length; i++) {
-    const iy = lineY + i * 9
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
-    doc.setTextColor(60, 60, 60)
-    doc.text(items[i], MARGIN, iy)
-    doc.setDrawColor(120, 120, 120)
-    doc.setLineWidth(0.2)
-    doc.line(MARGIN + 30, iy + 0.5, MARGIN + 30 + lineLen, iy + 0.5)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(6.5)
-    doc.setTextColor(120, 120, 120)
-    doc.text('Datum:', MARGIN + 30 + lineLen + 3, iy)
-    doc.line(MARGIN + 30 + lineLen + 15, iy + 0.5, MARGIN + 30 + lineLen + 15 + datumLen, iy + 0.5)
-  }
-}
-
 // ─── Kompakter Meta-Label (1 Zeile, mehrere Spalten) ────────────────────
 function drawCompactMeta(doc: DocLike, label: string, value: string, x: number, y: number, colW: number) {
   doc.setFont('helvetica', 'normal')
@@ -656,45 +595,63 @@ function drawCompactMeta(doc: DocLike, label: string, value: string, x: number, 
 
 // ─── Mini-Checkbox für die kompakten Positions-Zellen ───────────────────
 function drawMiniCheck(doc: DocLike, checked: boolean, label: string, x: number, y: number, maxW: number) {
-  const bx = x, by = y - 2.2, bsize = 2.5
+  const bx = x, by = y - 2.4, bsize = 2.8
   doc.setDrawColor(80, 80, 80)
   doc.setLineWidth(0.25)
   doc.rect(bx, by, bsize, bsize)
   if (checked) {
     doc.setDrawColor(229, 9, 9)
-    doc.setLineWidth(0.5)
-    doc.line(bx + 0.3, by + 1.3, bx + 1, by + bsize - 0.3)
-    doc.line(bx + 1, by + bsize - 0.3, bx + bsize - 0.2, by + 0.3)
+    doc.setLineWidth(0.55)
+    doc.line(bx + 0.35, by + 1.4, bx + 1.1, by + bsize - 0.3)
+    doc.line(bx + 1.1, by + bsize - 0.3, bx + bsize - 0.2, by + 0.35)
   }
   doc.setFont('helvetica', checked ? 'bold' : 'normal')
-  doc.setFontSize(6.5)
-  doc.setTextColor(checked ? 20 : 110, checked ? 20 : 110, checked ? 20 : 110)
+  doc.setFontSize(7)
+  doc.setTextColor(checked ? 20 : 100, checked ? 20 : 100, checked ? 20 : 100)
   const labelLines = doc.splitTextToSize(label, Math.max(8, maxW - bsize - 2))
-  doc.text(labelLines[0] || label, bx + bsize + 1, y)
+  doc.text(labelLines[0] || label, bx + bsize + 1.2, y)
 }
 
-// ─── Positions-Zelle (kompakt, im 3×2 Grid) ─────────────────────────────
+// ─── Positions-Zelle: 2 Spalten Services nach User-Wunsch ────────────────
+// Header: Pos.X | Menge × Artikelbezeichnung [Beschichtung rechts]
+// Maße:   Maße: 50×30×15mm
+// LEFT:   Polieren / Läppstrahlen / Wo polieren / Zusatzinfos
+// RIGHT:  Entschichtung / Polierstrahlen / Microstrahlen
 function drawPositionCell(doc: DocLike, p: ArbeitskartePosition, x: number, y: number, w: number, h: number) {
   // Zellen-Rahmen
-  doc.setDrawColor(220, 220, 220)
-  doc.setLineWidth(0.25)
+  doc.setDrawColor(215, 215, 215)
+  doc.setLineWidth(0.3)
   doc.rect(x, y, w, h)
 
   // Header-Leiste
-  doc.setFillColor(238, 238, 238)
-  doc.rect(x, y, w, 5, 'F')
+  doc.setFillColor(236, 236, 236)
+  doc.rect(x, y, w, 5.5, 'F')
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7.5)
+  doc.setFontSize(7.8)
   doc.setTextColor(229, 9, 9)
-  doc.text(`Pos. ${p.position_nr}`, x + 1.5, y + 3.6)
+  doc.text(`Pos. ${p.position_nr}`, x + 1.5, y + 4)
+
+  // Beschichtung rechts-aligned im Header
+  const beschichtung = p.beschichtung && p.beschichtung !== 'Keine' ? p.beschichtung : 'Keine'
+  const isCoated = beschichtung !== 'Keine'
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.8)
+  if (isCoated) doc.setTextColor(229, 9, 9)
+  else doc.setTextColor(140, 140, 140)
+  doc.text(beschichtung, x + w - 1.5, y + 4, { align: 'right' })
+  const beschichtungW = doc.getTextWidth(beschichtung) + 2
+
+  // Menge × Artikelbezeichnung (zwischen Pos und Beschichtung)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.8)
   doc.setTextColor(20, 20, 20)
   const nameStr = `${p.menge ? p.menge + '× ' : ''}${p.artikelbezeichnung || '—'}`
-  const nameLines = doc.splitTextToSize(nameStr, w - 12)
-  doc.text(nameLines[0] || '', x + 10.5, y + 3.6)
-
-  let cy = y + 8
+  const nameMaxW = w - 13 - beschichtungW - 2
+  const nameLines = doc.splitTextToSize(nameStr, Math.max(20, nameMaxW))
+  doc.text(nameLines[0] || '', x + 11, y + 4)
 
   // Maße
+  let cy = y + 9
   const masse = p.form === 'Rund'
     ? `Ø${p.durchmesser || '?'}×${p.durchmesser_laenge || '?'}mm`
     : `${p.laenge || '?'}×${p.breite || '?'}×${p.hoehe || '?'}mm`
@@ -702,59 +659,50 @@ function drawPositionCell(doc: DocLike, p: ArbeitskartePosition, x: number, y: n
   doc.setFontSize(7)
   doc.setTextColor(60, 60, 60)
   doc.text(`Maße: ${masse}`, x + 1.5, cy)
-  cy += 3.4
+  cy += 4
 
-  // Beschichtung
-  const beschichtung = p.beschichtung && p.beschichtung !== 'Keine' ? p.beschichtung : 'Keine'
-  const isCoated = beschichtung !== 'Keine'
-  doc.setFont('helvetica', isCoated ? 'bold' : 'normal')
-  doc.setFontSize(7)
-  if (isCoated) doc.setTextColor(229, 9, 9)
-  else doc.setTextColor(100, 100, 100)
-  doc.text(`Beschichtung: ${beschichtung}`, x + 1.5, cy)
-  cy += 4.2
+  // Services in 2 Spalten — Layout nach User-Wunsch
+  const colWInner = (w - 4) / 2
+  const leftX = x + 1.5
+  const rightX = x + 1.5 + colWInner + 2
+  const lineH = 3.7
 
-  // Services: 2 Spalten × 3 Zeilen, sehr eng beieinander
-  const svcColW = (w - 3) / 2
-  const svcs: { key: keyof ArbeitskartePosition; label: string }[] = [
-    { key: 'polieren', label: 'Polieren' },
-    { key: 'entschichtung', label: 'Entschichtung' },
-    { key: 'microstrahlen', label: 'Microstrahlen' },
-    { key: 'laeppstrahlen', label: 'Läppstrahlen' },
-    { key: 'polierstrahlen', label: 'Polierstrahlen' },
-  ]
-  svcs.forEach((s, si) => {
-    const col = si % 2
-    const row = Math.floor(si / 2)
-    const sx = x + 1.5 + col * svcColW
-    const sy = cy + row * 3.4
-    drawMiniCheck(doc, p[s.key] === 'Ja', s.label, sx, sy, svcColW - 1)
-  })
-  cy += Math.ceil(svcs.length / 2) * 3.4 + 1
-
-  // Polieren-Ort (wenn gesetzt) + Weitere Infos in einer Zeile, wenn möglich
-  if (p.polieren === 'Ja' && p.polieren_wo && cy < y + h - 2) {
+  // LEFT COLUMN
+  // Zeile 1: Polieren
+  drawMiniCheck(doc, p.polieren === 'Ja', 'Polieren', leftX, cy, colWInner - 1)
+  // Zeile 2: Läppstrahlen
+  drawMiniCheck(doc, p.laeppstrahlen === 'Ja', 'Läppstrahlen', leftX, cy + lineH, colWInner - 1)
+  // Zeile 3: Wo polieren (nur wenn polieren=Ja und polieren_wo gesetzt)
+  if (p.polieren === 'Ja' && p.polieren_wo) {
     doc.setFont('helvetica', 'italic')
     doc.setFontSize(6.5)
-    doc.setTextColor(100, 100, 100)
-    const polLines = doc.splitTextToSize(`→ Pol: ${p.polieren_wo}`, w - 3)
-    doc.text(polLines[0] || '', x + 1.5, cy)
-    cy += 3
+    doc.setTextColor(90, 90, 90)
+    const polLines = doc.splitTextToSize(`Wo polieren: ${p.polieren_wo}`, colWInner - 1)
+    doc.text(polLines[0] || '', leftX, cy + 2 * lineH)
   }
-
-  // Weitere Infos (max 2 Zeilen, abgeschnitten)
-  if (Array.isArray(p.weitere_infos) && p.weitere_infos.length > 0 && cy < y + h - 2) {
-    const wiText = p.weitere_infos.filter(w => w.key).map(w => `${w.key}:${w.value}`).join(' · ')
+  // Zeile 4: Zusatzinfos
+  if (Array.isArray(p.weitere_infos) && p.weitere_infos.length > 0) {
+    const wiText = p.weitere_infos.filter(w => w.key).map(w => `${w.key}: ${w.value}`).join(' · ')
     if (wiText) {
       doc.setFont('helvetica', 'normal')
-      doc.setFontSize(6)
-      doc.setTextColor(130, 130, 130)
-      const wiLines = doc.splitTextToSize(wiText, w - 3)
-      const remaining = Math.floor((y + h - cy) / 2.6)
-      const showLines = wiLines.slice(0, Math.min(remaining, 2))
-      doc.text(showLines, x + 1.5, cy)
+      doc.setFontSize(6.3)
+      doc.setTextColor(110, 110, 110)
+      const wiLines = doc.splitTextToSize(wiText, colWInner - 1)
+      doc.text(wiLines[0] || '', leftX, cy + 3 * lineH)
+      // optional zweite Zeile wenn sie noch passt
+      if (wiLines[1] && cy + 4 * lineH < y + h - 1.5) {
+        doc.text(wiLines[1], leftX, cy + 4 * lineH - 1)
+      }
     }
   }
+
+  // RIGHT COLUMN
+  // Zeile 1: Entschichtung
+  drawMiniCheck(doc, p.entschichtung === 'Ja', 'Entschichtung', rightX, cy, colWInner - 1)
+  // Zeile 2: Polierstrahlen
+  drawMiniCheck(doc, p.polierstrahlen === 'Ja', 'Polierstrahlen', rightX, cy + lineH, colWInner - 1)
+  // Zeile 3: Microstrahlen
+  drawMiniCheck(doc, p.microstrahlen === 'Ja', 'Microstrahlen', rightX, cy + 2 * lineH, colWInner - 1)
 }
 
 // ─── Kompakter Meta-Header (1 Zeile, 5 Spalten) ─────────────────────────
@@ -771,6 +719,53 @@ function drawCompactMetaBlock(doc: DocLike, we: ArbeitskarteData, dateStr: strin
   doc.line(MARGIN, y + 7, A5_W - MARGIN, y + 7)
 }
 
+// ─── Bottom-Section: Versandfertig + großes Notizfeld ───────────────────
+function drawVersandUndNotizen(doc: DocLike, y: number) {
+  // Trennlinie oben
+  doc.setDrawColor(150, 150, 150)
+  doc.setLineWidth(0.3)
+  doc.line(MARGIN, y, A5_W - MARGIN, y)
+
+  const sectionBottom = A5_H - 5
+  const sectionH = sectionBottom - y
+  const leftW = CONTENT_W * 0.42
+  const gap = 4
+  const rightX = MARGIN + leftW + gap
+  const notizW = CONTENT_W - leftW - gap
+
+  // LEFT: Versandfertig gepackt von
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8.5)
+  doc.setTextColor(40, 40, 40)
+  doc.text('Versandfertig gepackt von:', MARGIN, y + 5)
+
+  // Signaturlinie
+  doc.setDrawColor(120, 120, 120)
+  doc.setLineWidth(0.35)
+  const sigLineY = y + sectionH / 2 + 3
+  doc.line(MARGIN, sigLineY, MARGIN + leftW - 2, sigLineY)
+
+  // RIGHT: Notizen (großes Feld)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8.5)
+  doc.setTextColor(40, 40, 40)
+  doc.text('Notizen:', rightX, y + 5)
+
+  doc.setDrawColor(180, 180, 180)
+  doc.setLineWidth(0.35)
+  const notizBoxTop = y + 6.5
+  const notizBoxH = sectionH - 8
+  doc.rect(rightX, notizBoxTop, notizW, notizBoxH)
+  // Innere horizontale Hilfslinien (handschriftliche Notizen leichter)
+  doc.setDrawColor(225, 225, 225)
+  doc.setLineWidth(0.2)
+  const innerLines = Math.floor(notizBoxH / 5)
+  for (let i = 1; i < innerLines; i++) {
+    const ly = notizBoxTop + i * (notizBoxH / innerLines)
+    doc.line(rightX + 1, ly, rightX + notizW - 1, ly)
+  }
+}
+
 export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<void> {
   const { default: JsPDF } = await import('jspdf')
   const doc = new JsPDF({ unit: 'mm', format: 'a5', orientation: 'landscape' }) as unknown as DocLike
@@ -785,15 +780,16 @@ export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<voi
 
   drawCompactMetaBlock(doc, we, dateStr)
 
-  // ── Positionen im 3×2 Grid (6 pro Seite) ──────────────────────────────
-  const STATUS_H = 34
+  // ── Positionen im 2×3 Grid (6 pro Seite, Pos 7 → neue Seite) ──────────
+  const BOTTOM_H = 30                // Versand+Notizen-Bereich
   const POS_PER_PAGE = 6
-  const COLS = 3
-  const GAP = 2
+  const COLS = 2
+  const ROWS = 3
+  const GAP = 1.5
   const POS_TOP = HEADER_H + 13            // = 35
-  const POS_BOTTOM = A5_H - STATUS_H - 2   // = 112
+  const POS_BOTTOM = A5_H - BOTTOM_H - 2   // = 116
   const cellW = (CONTENT_W - GAP * (COLS - 1)) / COLS
-  const cellH = (POS_BOTTOM - POS_TOP - GAP) / 2
+  const cellH = (POS_BOTTOM - POS_TOP - GAP * (ROWS - 1)) / ROWS
 
   if (pos.length === 0) {
     doc.setFont('helvetica', 'normal')
@@ -818,20 +814,20 @@ export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<voi
     drawPositionCell(doc, pos[i], cx, cy, cellW, cellH)
   }
 
-  // ── Status-Zeilen am unteren Rand jeder Seite ─────────────────────────
+  // ── Versand + Notizen am unteren Rand jeder Seite ─────────────────────
   const pageCount = doc.getNumberOfPages()
   for (let pg = 1; pg <= pageCount; pg++) {
     doc.setPage(pg)
-    // Status-Zeilen NUR auf der letzten Seite (oder wenn nur 1 Seite)
+    // Versand+Notizen NUR auf der letzten Seite
     if (pg === pageCount) {
-      drawStatusLines(doc, A5_H - STATUS_H)
+      drawVersandUndNotizen(doc, A5_H - BOTTOM_H)
     }
     // Footer auf allen Seiten
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(6.5)
     doc.setTextColor(160, 160, 160)
-    doc.text('Pondruff Polier- & Beschichtungsservice', MARGIN, A5_H - 3)
-    doc.text(`Seite ${pg} / ${pageCount}`, A5_W - MARGIN, A5_H - 3, { align: 'right' })
+    doc.text('Pondruff Polier- & Beschichtungsservice', MARGIN, A5_H - 2)
+    doc.text(`Seite ${pg} / ${pageCount}`, A5_W - MARGIN, A5_H - 2, { align: 'right' })
   }
 
   const filename = `Arbeitskarte_${(we.customer || 'Pondruff').replace(/[^a-zA-Z0-9_\-]/g, '_')}_${(we.purchase_order || we.delivery_id || we.id?.slice(0, 8) || 'WE').replace(/[^a-zA-Z0-9_\-]/g, '_')}.pdf`
