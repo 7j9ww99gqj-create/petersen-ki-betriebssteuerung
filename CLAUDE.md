@@ -4,8 +4,34 @@
 KI-gestütztes Warenwirtschaftssystem als produktive SaaS-WebApp.
 
 **Stack:** Next.js 14 · TypeScript · Tailwind CSS · App Router  
-**Live:** https://petersen-ki-betriebssteuerung.vercel.app  
+**Live:** https://petersen-ki-betriebssteuerung.vercel.app · https://app.petersen-ki-pilot.de  
 **Repo:** https://github.com/7j9ww99gqj-create/petersen-ki-betriebssteuerung
+
+---
+
+## 🎨 Design-System — Master-Übersicht
+
+Alles Design-Bezogene ist nach Verantwortung getrennt. Diese Tabelle ist die **Single Source of Truth** — bei Design-Themen hier zuerst nachschlagen.
+
+| Bereich | Datei / Pfad | Verantwortlichkeit |
+|---------|--------------|---------------------|
+| **🎨 Piloten-Farben** | `lib/pilot-colors.ts` | Zentrale Farb-Palette für alle Piloten (Lager=Blau, Büro=Cyan, Werkstatt=Lila, Marketing=Orange, Analyse=Grün, Planung=Pink, KI=Lila-light, Steuer=Gold, QM=Teal). Mit Helpers `pilotTabStyle()` + `pilotHeaderIconStyle()` |
+| **🛠 User-Personalisierung** | `lib/design-flag.ts` | 6 ein-/ausschaltbare Module: `notifications` · `typography` · `effects` · `colors` · `icons` · `layout`. Plus DP1: Theme + Akzent + Glow + 7 Features. APIs: `useDesignPrefs()`, `patchDesignPrefs()`, `writeDesignPrefs()`, `DEFAULT_PREFS` |
+| **☁️ Multi-Device-Sync** | `lib/design-sync.ts` | Opt-in Cloud-Sync via Supabase. `isCloudSyncEnabled()`, `pullPrefsFromCloud()`, `pushPrefsToCloud()`, `useCloudDesignSync()`-Hook (eingebaut in dashboard/layout.tsx) |
+| **🔔 Toast-Sounds** | `lib/toast-sound.ts` | WebAudio-Beep für success/error/info. `playToastSound(type)` |
+| **🖼 Brand-Logo** | `components/brand/Logo.tsx` | `<Logo variant="mark" />` lädt `/public/logo.png` (Hexagon-PNG), `wordmark`-Variante als SVG-Text |
+| **📐 Design-Customization-UI** | `components/einstellungen/DesignCustomizationPanel.tsx` | 6-Tab-Panel (Allgemein/Benachrichtigungen/Typografie/Effekte/Farben/Icons & Layout). Mobile: `<select>`-Dropdown, Desktop: Pill-Grid. Mit Cloud-Sync-Toggle + Live-Demo-Buttons |
+| **🍞 Toast-System (global)** | `components/AppToast.tsx` | Globaler Toast-Container in `app/dashboard/layout.tsx`. Event-API `pushAppToast(msg, type)`. Auto-Dismiss, Sound, Stapelung |
+| **🍞 Toast-Komponenten** | `components/ui/Toast.tsx` + `ToastProvider.tsx` | Atomic `<Toast>` + Context-Hook `useGlobalToast()`. Beide nutzen `.pk-toast`-Klasse |
+| **🎨 Global Stylesheet** | `app/globals.css` | CSS-Variablen (`--bg`, `--blue`, ...), 3 Themes (`data-design="modern\|glow"`), 7 Features (`data-feat-*`), DP12-Module (`body[data-pers-*]`), Toast-Position/Animation, Mobile-Härtung |
+| **💾 Cloud-Storage** | `supabase/migrations/20260523100000_user_design_prefs.sql` | Tabelle `user_design_prefs` (user_id PK + prefs JSONB + updated_at, RLS) |
+| **📜 Migration-Doku** | DP1–DP12-Phase2 in dieser Datei (siehe „DP12 — Personalisierungs-Module") | Vollständige Historie der Design-Entwicklung |
+
+**UI-Klassen-Bibliothek (globals.css):** `.pk-card` · `.pk-btn` · `.pk-btn-ghost` · `.pk-input` · `.pk-table` · `.pk-tab-bar` · `.pk-toast` · `.badge` · `.fade-in` · `.stats-grid` · `.bottom-nav`
+
+**User-Settings-Pfad:** Einstellungen → **🎨 Design** (eigener Menüpunkt seit `31f924a`)
+
+---
 
 ### Aktueller Zwischenstand (2026-05-20)
 - **Design-Panel als eigener Menüpunkt + Mobile-Select** (`31f924a`): `DesignCustomizationPanel` aus dem Benachrichtigungen-Tab herausgelöst und unter neuen Menüpunkt `🎨 Design` (`section = 'design'`) verlegt. Tab-Navigation im Panel ist jetzt auf Mobile ein natives `<select>`-Dropdown (≤640px) statt horizontal-scrollender Pills — kein Overflow-Bug mehr. Desktop bleibt Pill-Grid mit `auto-fit minmax(140px, 1fr)`.
