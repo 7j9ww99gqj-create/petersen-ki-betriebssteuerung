@@ -16,6 +16,19 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import OnboardingWizard from '@/components/OnboardingWizard'
 import DemoBanner from '@/components/DemoBanner'
 import { WhatsNewModal } from '@/components/ui'
+import { useDesignV2 } from '@/lib/design-flag'
+import { PilotIcon, type PilotIconName } from '@/components/brand/PilotIcon'
+
+// Icon-Map für Bottom-Nav im Design-V2 (Lucide).
+const BN_V2_ICONS: Record<string, PilotIconName | undefined> = {
+  '/dashboard': 'start',
+  '/dashboard/lager': 'lager',
+  '/dashboard/buero': 'buero',
+  '/dashboard/werkstatt': 'werkstatt',
+  '/dashboard/steuer': 'steuer',
+  '/dashboard/ki-erkennung': 'ki',
+  '#menu': 'menue',
+}
 
 // Bottom-Nav Einträge (Mobile)
 const bottomNavItems = [
@@ -31,6 +44,7 @@ const bottomNavItems = [
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
+  const v2 = useDesignV2()
   const [checked, setChecked] = useState(false)
   const [userName, setUserName] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -327,7 +341,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }}
               aria-label={item.label}
             >
-              <span className="bn-icon">{item.icon}</span>
+              <span className="bn-icon">
+                {v2 && BN_V2_ICONS[item.href]
+                  ? <PilotIcon name={BN_V2_ICONS[item.href] as PilotIconName} size={22} />
+                  : item.icon}
+              </span>
               <span>{item.label}</span>
             </button>
           )
