@@ -1764,9 +1764,9 @@ export default function LagerPilotPage() {
 
       {/* Header */}
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-        <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(22,132,255,.15)', border: '1px solid rgba(22,132,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0 }}>📦</div>
+        <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(22,132,255,.15)', border: '1px solid rgba(22,132,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0, boxShadow: '0 0 16px rgba(22,132,255,.35)' }}>📦</div>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>LagerPilot</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}><span style={{ color: '#1684ff' }}>Lager</span>Pilot</h1>
           <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Wareneingang · Warenausgang · Bestände · Inventur</p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>

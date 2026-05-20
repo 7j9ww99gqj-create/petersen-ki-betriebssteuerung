@@ -2784,13 +2784,52 @@ function CompanySettingsSection({ isDemo: _isDemo, currentRole, showToast }: {
       <div className="pk-card">
         <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 800 }}>🏢 Firmendaten & Logo</h3>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
-          <div style={{ width: 74, height: 74, borderRadius: 16, overflow: 'hidden', background: 'rgba(32,200,255,.12)', border: '1px solid rgba(32,200,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 900, color: '#20c8ff', position: 'relative' }}>
-            {firma.logo_url ? <Image src={firma.logo_url} alt="Firmenlogo" fill style={{ objectFit: 'cover' }} /> : (firma.firmenname || 'F').slice(0, 2).toUpperCase()}
+          <div style={{
+            width: 74, height: 74, borderRadius: 16, overflow: 'hidden',
+            background: 'rgba(32,200,255,.12)', border: '1px solid rgba(32,200,255,.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 26, fontWeight: 900, color: '#20c8ff', position: 'relative', flexShrink: 0,
+          }}>
+            {firma.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Signed Supabase-URL; kein next/image-Optimizer nötig
+              <img
+                src={firma.logo_url}
+                alt="Firmenlogo"
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                onError={(e) => {
+                  // Falls die URL kaputt ist → Fallback-Initialen anzeigen
+                  const target = e.currentTarget
+                  target.style.display = 'none'
+                  const fallback = target.nextElementSibling as HTMLElement | null
+                  if (fallback) fallback.style.display = 'flex'
+                }}
+              />
+            ) : null}
+            <span style={{
+              display: firma.logo_url ? 'none' : 'flex',
+              position: 'absolute', inset: 0,
+              alignItems: 'center', justifyContent: 'center',
+              fontSize: 26, fontWeight: 900, color: '#20c8ff',
+            }}>
+              {(firma.firmenname || 'F').slice(0, 2).toUpperCase()}
+            </span>
           </div>
-          <label className="pk-btn-ghost" style={{ cursor: canEdit ? 'pointer' : 'not-allowed', opacity: canEdit ? 1 : .5 }}>
-            {logoUploading ? '⏳ Logo…' : 'Logo hochladen'}
-            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={!canEdit} onChange={e => handleLogo(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
-          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label className="pk-btn-ghost" style={{ cursor: canEdit ? 'pointer' : 'not-allowed', opacity: canEdit ? 1 : .5 }}>
+              {logoUploading ? '⏳ Logo…' : (firma.logo_url ? '🖼️ Logo ändern' : 'Logo hochladen')}
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" disabled={!canEdit} onChange={e => handleLogo(e.target.files?.[0] ?? null)} style={{ display: 'none' }} />
+            </label>
+            {firma.logo_url && canEdit && (
+              <button
+                type="button"
+                className="pk-btn-ghost"
+                onClick={() => { setField('logo_url', ''); showToast('Logo entfernt — bitte speichern') }}
+                style={{ fontSize: 12, padding: '6px 10px', color: '#ff8080', borderColor: 'rgba(255,80,80,.3)' }}
+              >
+                🗑️ Logo entfernen
+              </button>
+            )}
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           {input('firmenname', 'Firmenname *')}

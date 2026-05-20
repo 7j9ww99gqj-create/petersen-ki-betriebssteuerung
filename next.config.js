@@ -3,6 +3,14 @@ const { withSentryConfig } = require('@sentry/nextjs')
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  images: {
+    // Erlaubt next/image für Supabase-Storage (signed + public URLs).
+    // Ohne diese Konfiguration blockt next/image externe URLs und zeigt nur das Fallback-„?".
+    remotePatterns: [
+      { protocol: 'https', hostname: '*.supabase.co', pathname: '/storage/v1/object/**' },
+      { protocol: 'https', hostname: '*.supabase.in', pathname: '/storage/v1/object/**' },
+    ],
+  },
   async rewrites() {
     return [
       // API-Versionierung: /api/v1/foo → /api/foo (Aliase für künftige Breaking-Changes)

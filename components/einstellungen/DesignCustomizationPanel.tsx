@@ -227,22 +227,22 @@ function ColorField({
 }: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
+      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
       padding: '10px 14px', borderRadius: 10,
       border: '1px solid rgba(255,255,255,.08)',
       background: 'rgba(255,255,255,.02)', opacity: disabled ? .5 : 1,
     }}>
-      <div style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>{label}</div>
+      <div style={{ flex: '1 1 140px', minWidth: 0, fontSize: 13, fontWeight: 700 }}>{label}</div>
       <input
         type="color" value={value} onChange={e => onChange(e.target.value)}
         disabled={disabled}
-        style={{ width: 38, height: 32, padding: 0, border: 'none', borderRadius: 6, background: 'transparent', cursor: disabled ? 'not-allowed' : 'pointer' }}
+        style={{ width: 38, height: 32, padding: 0, border: 'none', borderRadius: 6, background: 'transparent', cursor: disabled ? 'not-allowed' : 'pointer', flexShrink: 0 }}
       />
       <input
         type="text" value={value} onChange={e => /^#[0-9a-f]{0,6}$/i.test(e.target.value) && onChange(e.target.value)}
         disabled={disabled}
         className="pk-input"
-        style={{ width: 90, fontFamily: 'monospace', fontSize: 12, textAlign: 'center' }}
+        style={{ width: 90, fontFamily: 'monospace', fontSize: 12, textAlign: 'center', flexShrink: 0 }}
       />
     </div>
   )
@@ -285,7 +285,7 @@ export default function DesignCustomizationPanel() {
   const reset = () => writeDesignPrefs(DEFAULT_PREFS)
 
   return (
-    <div className="pk-card" style={{ padding: 20 }}>
+    <div className="pk-card design-custom-panel" style={{ padding: 'clamp(12px, 4vw, 20px)', overflow: 'hidden' }}>
       {/* Kopfzeile */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
         <div style={{ flex: 1, minWidth: 220 }}>
@@ -341,7 +341,7 @@ export default function DesignCustomizationPanel() {
       {tab === 'allgemein' && (
         <div>
           <SectionTitle>1) Theme</SectionTitle>
-          <div role="radiogroup" aria-label="Design-Theme" style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+          <div role="radiogroup" aria-label="Design-Theme" style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))' }}>
             {THEME_OPTIONS.map(opt => {
               const active = prefs.theme === opt.id
               return (

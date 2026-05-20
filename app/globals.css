@@ -550,6 +550,30 @@ button, a, [role="button"] {
   .settings-nav button[data-active="true"] {
     border-bottom-color: #1684ff !important;
   }
+
+  /* ── Design-Customization-Panel: Mobile-Härtung ─────────────────────── */
+  .design-custom-panel {
+    /* Overflow verhindert, dass Tab-Bar oder breite Grids die Karte sprengen */
+    overflow: hidden !important;
+    max-width: 100% !important;
+  }
+  .design-custom-panel [role="radiogroup"] {
+    /* Grids dürfen nie breiter werden als der Container */
+    max-width: 100%;
+  }
+  .design-custom-panel .pk-tab-bar {
+    margin-left: -4px;
+    margin-right: -4px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .design-custom-panel .pk-tab-bar button {
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+  }
+  .design-custom-panel code {
+    word-break: break-all;
+  }
 }
 
 /* ── Small mobile (≤ 480 px) ─────────────────────────────────────────────── */

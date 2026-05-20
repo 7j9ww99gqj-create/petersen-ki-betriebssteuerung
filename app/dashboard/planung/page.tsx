@@ -1324,9 +1324,9 @@ export default function PlanungPilotPage() {
     <div className="fade-in">
       {/* Header */}
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(244,63,94,.15)', border: '1px solid rgba(244,63,94,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0 }}>📅</div>
+        <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(244,63,94,.15)', border: '1px solid rgba(244,63,94,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0, boxShadow: '0 0 16px rgba(244,63,94,.35)' }}>📅</div>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>PlanungPilot</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}><span style={{ color: '#f43f5e' }}>Planung</span>Pilot</h1>
           <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Projekte · Kalender · Ressourcen · Aufgaben</p>
         </div>
         {isDemo && <span className="badge badge-orange" style={{ marginLeft: 'auto' }}>DEMO</span>}

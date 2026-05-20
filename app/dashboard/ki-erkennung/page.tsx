@@ -710,9 +710,9 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     cursor: 'pointer',
     border: 'none',
     transition: 'all .18s',
-    background: activeTab === t ? 'rgba(167,139,250,.18)' : 'transparent',
-    color: activeTab === t ? '#a78bfa' : '#aeb9c8',
-    borderBottom: activeTab === t ? '2px solid #a78bfa' : '2px solid transparent',
+    background: activeTab === t ? 'rgba(192,132,252,.18)' : 'transparent',
+    color: activeTab === t ? '#c084fc' : '#aeb9c8',
+    borderBottom: activeTab === t ? '2px solid #c084fc' : '2px solid transparent',
   })
 
   const filteredDocs = savedDocs.filter(d =>
@@ -751,11 +751,12 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
       <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{
           width: 52, height: 52, borderRadius: 14,
-          background: 'rgba(167,139,250,.15)', border: '1px solid rgba(167,139,250,.3)',
+          background: 'rgba(192,132,252,.15)', border: '1px solid rgba(192,132,252,.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0,
+          boxShadow: '0 0 16px rgba(192,132,252,.35)',
         }}>🧠</div>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>KI-Assistent</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}><span style={{ color: '#c084fc' }}>KI</span>-Assistent</h1>
           <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Tagesbrief · Dokumente · Chat</p>
         </div>
       </div>

@@ -1,9 +1,11 @@
 'use client'
-// Petersen KI Brand-Logo als reine SVG-Komponente.
-// Additiv — bestehende /pondruff/banner.png, app-icon.png usw. bleiben.
+// Petersen KI Brand-Logo.
+// - mark / full  → echtes Marken-PNG aus /public/logo.png (Hexagon mit „P")
+// - wordmark     → reines SVG-Text-Logo („Petersen KI")
 // Verwendung: <Logo /> oder <Logo variant="mark" /> oder <Logo variant="wordmark" />.
 
 import React from 'react'
+import Image from 'next/image'
 
 export type LogoVariant = 'full' | 'mark' | 'wordmark'
 
@@ -15,33 +17,32 @@ export interface LogoProps {
   title?: string
 }
 
-const BRAND_BLUE = '#1684ff'
 const BRAND_BLUE_LIGHT = '#20c8ff'
 const TEXT = '#f8fbff'
 
+// Echtes PNG-Logo aus /public/logo.png (transparenter Hintergrund wird via CSS gerundet)
 function Mark({ size = 32 }: { size?: number }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 48 48"
-      role="img"
-      aria-label="Petersen KI"
-      xmlns="http://www.w3.org/2000/svg"
+    <span
+      style={{
+        display: 'inline-block',
+        width: size,
+        height: size,
+        borderRadius: Math.round(size * 0.22),
+        overflow: 'hidden',
+        flexShrink: 0,
+        position: 'relative',
+      }}
     >
-      <defs>
-        <linearGradient id="pkLogoGrad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor={BRAND_BLUE} />
-          <stop offset="1" stopColor={BRAND_BLUE_LIGHT} />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="44" height="44" rx="12" fill="url(#pkLogoGrad)" />
-      <path
-        d="M16 14h9.5c4.7 0 7.5 2.7 7.5 6.6 0 3.9-2.9 6.6-7.5 6.6H20V34h-4V14zm9.1 9.4c2.5 0 3.9-1 3.9-2.8s-1.4-2.8-3.9-2.8H20v5.6h5.1z"
-        fill="#ffffff"
+      <Image
+        src="/logo.png"
+        alt="Petersen KI"
+        width={size}
+        height={size}
+        priority
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
       />
-      <circle cx="34" cy="34" r="4" fill="#ffffff" opacity="0.95" />
-    </svg>
+    </span>
   )
 }
 

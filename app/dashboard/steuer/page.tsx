@@ -52,7 +52,7 @@ type SteuerTab =
 
 // ── Konstanten ─────────────────────────────────────────────────────────────────
 
-const STEUER_COLOR = '#f59e0b'
+const STEUER_COLOR = '#fbbf24'
 const STEUERSAETZE = [0, 7, 19]
 
 const BELEG_KATEGORIEN: Record<string, string[]> = {

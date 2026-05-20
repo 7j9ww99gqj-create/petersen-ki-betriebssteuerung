@@ -137,9 +137,10 @@ export default function BueroPilotPage() {
           width: 52, height: 52, borderRadius: 14,
           background: 'rgba(32,200,255,.15)', border: '1px solid rgba(32,200,255,.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0,
+          boxShadow: '0 0 16px rgba(32,200,255,.35)',
         }}>🧾</div>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>BüroPilot</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}><span style={{ color: '#20c8ff' }}>Büro</span>Pilot</h1>
           <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Kunden · Angebote · Aufträge · Rechnungen · Eingangsrechnungen · Dokumente · Einkauf</p>
         </div>
         <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>

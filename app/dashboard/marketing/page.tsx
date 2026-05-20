@@ -152,7 +152,7 @@ type IntegrationItem = {
   naechsterSchritt: string
 }
 
-const COLOR = '#f59e0b'
+const COLOR = '#f97316'
 const leadPipeline: LeadStatus[] = ['Neu', 'Kontaktiert', 'Qualifiziert', 'Angebot', 'Gewonnen', 'Verloren']
 
 const demoKampagnen: Kampagne[] = [
@@ -2658,9 +2658,9 @@ export default function MarketingPilotPage() {
   return (
     <div className="fade-in">
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0 }}>📣</div>
+        <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(249,115,22,.15)', border: '1px solid rgba(249,115,22,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0, boxShadow: '0 0 16px rgba(249,115,22,.35)' }}>📣</div>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>MarketingPilot</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}><span style={{ color: '#f97316' }}>Marketing</span>Pilot</h1>
           <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Kampagnen · Leads · Newsletter · Auswertungen · KI-Suite</p>
         </div>
         <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>
@@ -2720,7 +2720,7 @@ export default function MarketingPilotPage() {
               fontWeight: 600,
               background: 'transparent',
               borderBottom: tab === item.id ? `2px solid ${COLOR}` : '2px solid transparent',
-              color: tab === item.id ? '#fbbf24' : '#aeb9c8',
+              color: tab === item.id ? COLOR : '#aeb9c8',
               marginBottom: -1,
               transition: 'color .15s',
             }}

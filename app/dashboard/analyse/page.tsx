@@ -550,9 +550,10 @@ export default function AnalysePilotPage() {
             width: 48, height: 48, borderRadius: 14,
             background: 'rgba(16,185,129,.15)', border: '1px solid rgba(16,185,129,.3)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0,
+            boxShadow: '0 0 16px rgba(16,185,129,.35)',
           }}>📊</div>
           <div style={{ minWidth: 0 }}>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: '-.04em' }}>AnalysePilot</h1>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: '-.04em' }}><span style={{ color: '#10b981' }}>Analyse</span>Pilot</h1>
             <p style={{ margin: 0, color: '#aeb9c8', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Echtzeit-Dashboards · KPIs · Diagramme</p>
           </div>
         </div>

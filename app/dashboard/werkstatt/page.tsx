@@ -2131,9 +2131,10 @@ export default function WerkstattPilotPage() {
           width: 52, height: 52, borderRadius: 14,
           background: 'rgba(167,139,250,.15)', border: '1px solid rgba(167,139,250,.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0,
+          boxShadow: '0 0 16px rgba(167,139,250,.35)',
         }}>🛠️</div>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}>WerkstattPilot</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, letterSpacing: '-.04em' }}><span style={{ color: '#a78bfa' }}>Werkstatt</span>Pilot</h1>
           <p style={{ margin: 0, color: '#aeb9c8', fontSize: 14 }}>Arbeitskarten · Zeiterfassung · Material · Qualität</p>
         </div>
         <span className="badge badge-green" style={{ marginLeft: 'auto' }}>● AKTIV</span>
