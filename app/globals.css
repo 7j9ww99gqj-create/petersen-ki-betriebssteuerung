@@ -602,3 +602,74 @@ button, a, [role="button"] {
   #pruefplan-table th, #pruefplan-table td { border: 1px solid #ccc !important; padding: 6px !important; color: #000 !important; }
   .pk-card { background: #fff !important; border: 1px solid #ddd !important; }
 }
+
+/* ── Typography-Scale (G2, additiv) ─────────────────────────────────────── */
+/* Optionale Utility-Klassen für konsistente Schriftgrößen in neuen Views. */
+/* Bestehende inline-styles bleiben unangetastet — diese Klassen ergänzen.  */
+.pk-h1 {
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text, #f8fbff);
+  margin: 0 0 12px 0;
+}
+.pk-h2 {
+  font-size: 22px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: var(--text, #f8fbff);
+  margin: 0 0 10px 0;
+}
+.pk-h3 {
+  font-size: 18px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: var(--text, #f8fbff);
+  margin: 0 0 8px 0;
+}
+.pk-h4 {
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 700;
+  color: var(--text, #f8fbff);
+  margin: 0 0 6px 0;
+}
+.pk-body {
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 400;
+  color: var(--text, #f8fbff);
+}
+.pk-body-lg {
+  font-size: 15px;
+  line-height: 1.55;
+  font-weight: 400;
+  color: var(--text, #f8fbff);
+}
+.pk-caption {
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 500;
+  color: var(--muted, #aeb9c8);
+}
+.pk-label {
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted, #aeb9c8);
+}
+.pk-mono {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 640px) {
+  .pk-h1 { font-size: 24px; }
+  .pk-h2 { font-size: 20px; }
+  .pk-h3 { font-size: 17px; }
+}
