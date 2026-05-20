@@ -13,6 +13,18 @@ import {
 
 const QM_COLOR = '#14b8a6'
 
+type PruefplanPosition = {
+  reihenfolge: number
+  messstelle: string
+  sollwert: number | null
+  einheit: string
+  toleranz_plus: number | null
+  toleranz_minus: number | null
+  pruefmittel: string
+  kritisch: boolean
+  hinweis: string
+}
+
 type AnalyseResult = {
   masse?: Array<{
     name?: string
@@ -67,6 +79,8 @@ export default function QmZeichnungDetailPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const [pruefplan, setPruefplan] = useState<PruefplanPosition[] | null>(null)
+  const [pruefplanLoading, setPruefplanLoading] = useState(false)
 
   // Editable fields
   const [name, setName] = useState('')
@@ -225,6 +239,44 @@ export default function QmZeichnungDetailPage() {
   function startPruefbericht() {
     if (!zeichnung) return
     router.push(`/dashboard/qm/pruefen?zeichnung=${zeichnung.id}`)
+  }
+
+  async function generatePruefplan() {
+    if (!zeichnung) return
+    if (isDemo) {
+      // Demo: lokale Berechnung mit Demo-Daten
+      const demoMasse = masse.length ? masse : (zeichnung.erkannte_masse ?? [])
+      const plan = demoMasse.map((m, i) => ({
+        reihenfolge: i + 1,
+        messstelle: m.name,
+        sollwert: m.wert,
+        einheit: m.einheit,
+        toleranz_plus: m.toleranz_plus ?? null,
+        toleranz_minus: m.toleranz_minus ?? null,
+        pruefmittel: 'Messschieber digital (0,01mm)',
+        kritisch: m.kritisch ?? false,
+        hinweis: m.kritisch ? '⚠️ kritisches Maß' : '',
+      }))
+      setPruefplan(plan)
+      showToast(`Prüfplan generiert (${plan.length} Positionen)`)
+      return
+    }
+    setPruefplanLoading(true)
+    try {
+      const res = await fetch('/api/qm/pruefplan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zeichnung_id: zeichnung.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`)
+      setPruefplan(data as PruefplanPosition[])
+      showToast(`Prüfplan generiert (${(data as PruefplanPosition[]).length} Positionen)`)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Prüfplan-Generierung fehlgeschlagen', false)
+    } finally {
+      setPruefplanLoading(false)
+    }
   }
 
   const konfBadge = konfidenzColor(zeichnung?.ki_konfidenz ?? null)
@@ -405,6 +457,59 @@ export default function QmZeichnungDetailPage() {
             <div style={{ marginTop: 12 }}>
               <button className="pk-btn-ghost" onClick={addMass} style={{ fontSize: 12, padding: '6px 12px' }}>+ Messstelle hinzufügen</button>
             </div>
+          </div>
+
+          {/* Prüfplan */}
+          <div className="pk-card" style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 800, fontSize: 14 }}>📋 Prüfplan</span>
+              <button className="pk-btn" disabled={pruefplanLoading || masse.length === 0}
+                onClick={() => void generatePruefplan()}
+                style={{ marginLeft: 'auto', background: QM_COLOR, border: 'none', fontSize: 13, padding: '8px 14px' }}>
+                {pruefplanLoading ? '⏳ Generiere…' : '📋 Prüfplan generieren'}
+              </button>
+              {pruefplan && (
+                <button className="pk-btn-ghost" style={{ fontSize: 13, padding: '8px 14px' }}
+                  onClick={() => window.print()}>
+                  🖨️ Drucken
+                </button>
+              )}
+            </div>
+            {masse.length === 0 && !pruefplan && (
+              <div style={{ color: '#aeb9c8', fontSize: 13 }}>Erst Maße erfassen oder KI-Analyse starten.</div>
+            )}
+            {pruefplan && pruefplan.length > 0 && (
+              <div className="pk-table-wrap">
+                <table className="pk-table" id="pruefplan-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 36 }}>#</th>
+                      <th>Messstelle</th>
+                      <th>Soll</th>
+                      <th>Tol +/−</th>
+                      <th>Einheit</th>
+                      <th>Prüfmittel</th>
+                      <th>Hinweis</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pruefplan.map(p => (
+                      <tr key={p.reihenfolge}>
+                        <td style={{ fontWeight: 700, color: QM_COLOR }}>{p.reihenfolge}</td>
+                        <td style={{ fontWeight: 700 }}>{p.messstelle}</td>
+                        <td style={{ fontFamily: 'monospace' }}>{p.sollwert ?? '—'}</td>
+                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                          {p.toleranz_plus != null ? `+${p.toleranz_plus}` : '—'} / {p.toleranz_minus != null ? `−${p.toleranz_minus}` : '—'}
+                        </td>
+                        <td style={{ color: '#aeb9c8' }}>{p.einheit}</td>
+                        <td style={{ fontSize: 12 }}>{p.pruefmittel}</td>
+                        <td style={{ fontSize: 12, color: p.kritisch ? '#f59e0b' : '#aeb9c8' }}>{p.hinweis || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Speichern */}

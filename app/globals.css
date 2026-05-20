@@ -594,3 +594,11 @@ button, a, [role="button"] {
   0%   { background-position: 200% 0 }
   100% { background-position: -200% 0 }
 }
+
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  .bottom-nav, .support-btn-wrap, .pk-btn, .pk-btn-ghost, nav, aside { display: none !important; }
+  #pruefplan-table { color: #000 !important; }
+  #pruefplan-table th, #pruefplan-table td { border: 1px solid #ccc !important; padding: 6px !important; color: #000 !important; }
+  .pk-card { background: #fff !important; border: 1px solid #ddd !important; }
+}

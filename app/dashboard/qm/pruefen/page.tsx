@@ -182,6 +182,7 @@ export default function PruefeWizardPage() {
   const [gesperrt, setGesperrt] = useState(false)
   const [teamMitglieder, setTeamMitglieder] = useState<QmTeamMitglied[]>([])
   const [prueferFreitext, setPrueferFreitext] = useState(false)
+  const [pruefplanLoading, setPruefplanLoading] = useState(false)
 
   // ── Save + PDF state
   const [saving, setSaving] = useState(false)
@@ -257,6 +258,35 @@ export default function PruefeWizardPage() {
 
   function addMw() {
     setMesswerte(prev => [...prev, makeMwRow()])
+  }
+
+  async function loadPruefplan() {
+    if (!selectedZ || isDemo) return
+    setPruefplanLoading(true)
+    try {
+      const res = await fetch('/api/qm/pruefplan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zeichnung_id: selectedZ }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const plan: any[] = Array.isArray(data) ? data : []
+      setMesswerte(plan.map((p) => recomputeStatus(makeMwRow({
+        messstelle: String(p.messstelle ?? ''),
+        sollwert: p.sollwert !== null && p.sollwert !== undefined ? String(p.sollwert) : '',
+        toleranz_plus: p.toleranz_plus !== null && p.toleranz_plus !== undefined ? String(p.toleranz_plus) : '',
+        toleranz_minus: p.toleranz_minus !== null && p.toleranz_minus !== undefined ? String(p.toleranz_minus) : '',
+        einheit: String(p.einheit ?? 'mm'),
+        pruefmittel: String(p.pruefmittel ?? ''),
+      }))))
+      showToast(`Prüfplan geladen (${plan.length} Positionen)`)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Prüfplan-Laden fehlgeschlagen', false)
+    } finally {
+      setPruefplanLoading(false)
+    }
   }
 
   function removeMw(id: string) {
@@ -463,6 +493,19 @@ export default function PruefeWizardPage() {
             </div>
           )}
 
+          {selectedZ && !isDemo && (
+            <div style={{ marginTop: 14, padding: '12px 14px', borderRadius: 10, background: `${QM_COLOR}10`, border: `1px solid ${QM_COLOR}25` }}>
+              <div style={{ fontSize: 13, color: QM_COLOR, fontWeight: 700, marginBottom: 8 }}>Prüfplan automatisch laden?</div>
+              <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 10 }}>
+                Befüllt Schritt 3 (Messwerte) mit Reihenfolge und Prüfmitteln aus dem generierten Plan.
+              </div>
+              <button className="pk-btn-ghost" disabled={pruefplanLoading}
+                onClick={() => void loadPruefplan()}
+                style={{ fontSize: 12, padding: '6px 14px' }}>
+                {pruefplanLoading ? '⏳ Lädt…' : '📋 Prüfplan laden'}
+              </button>
+            </div>
+          )}
           <div style={{ marginTop: 8 }}>
             <Link href="/dashboard/qm/zeichnungen" style={{ color: QM_COLOR, fontSize: 13, textDecoration: 'none' }}>
               + Neue Zeichnung hochladen
