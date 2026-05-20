@@ -22,25 +22,27 @@
 
 ## 1. Aktueller Stand
 
-- **HEAD:** `939e831` (`docs: Design-System Master-Übersicht in CLAUDE.md`)
-- **Letzte Iteration:** 2026-05-20 — Design-Panel Umzug + Token-Optimierung (in Arbeit)
+- **HEAD:** `2831819` (DP13 — Design: Light-Theme, Auto-Theme, Font-Family, LivePreview, FOUC-Fix)
+- **Letzte Iteration:** 2026-05-20 — Design-Panel Phase 3 (Marktreife-Features)
 - **TypeScript:** `npx tsc --noEmit` — ✅ 0 Fehler
-- **Tests:** 87 Tests in 7 Files — ✅
+- **Tests:** 87 Tests in 7 Files — ✅ alle grün
 - **CI/CD:** Vercel Auto-Deploy auf `main` — ✅
 
 ---
 
 ## 2. Aktueller Arbeitsstand (letzte 3 Iterationen)
 
-### 2.1 UI-Polish & Mobile-Fixes + Pilot-Farb-System (2026-05-20)
-**Commits:** `79913d9` → `13b02b8` → `31f924a` → `423cba2` → `939e831`
+### 2.1 DP13 — Design-System Phase 3: Marktreife (2026-05-20)
+**Commits:** `2831819`
 
-- **Mobile-Bug behoben:** `DesignCustomizationPanel` läuft auf Handy nicht mehr über. Tabs sind auf Mobile (≤640px) jetzt natives `<select>`-Dropdown, auf Desktop Pill-Grid.
-- **Design-Panel umgezogen:** Aus Benachrichtigungen → eigener Menüpunkt `🎨 Design` in Einstellungen.
-- **Logo-Upload Firmendaten repariert:** `next.config.js` erhält `images.remotePatterns` für `*.supabase.co`. Native `<img>` mit `onError`-Fallback statt next/image.
-- **Sidebar-Logo:** Echtes Hexagon-PNG aus `/public/logo.png` statt SVG-„P".
-- **Pilot-Farb-System:** Neue zentrale Palette in `lib/pilot-colors.ts`. Jeder Pilot hat farbigen Namen im Header (z.B. `<Lager>Pilot` blau, `<Steuer>Pilot` gold) + Glow-Box + Tab-Active-Highlight in Pilot-Farbe.
-- **Design-System-Master-Übersicht** in `CLAUDE.md` als Single Source of Truth.
+- **Light-Theme** (`body[data-design="light"]`): vollständig in `globals.css` — alle CSS-Vars, .pk-card, .pk-btn, .pk-input, .pk-table, Badges, Scrollbar, Bottom-Nav.
+- **Auto-Theme**: `DesignPrefs.autoTheme` toggle; `lib/design-flag.ts` liest `prefers-color-scheme` in `applyBodyAttrs()` + Real-Time `matchMedia`-Listener in `useDesignPrefs()`.
+- **Font-Family-Picker**: 5 Optionen (System/Inter/Roboto/Mono/Georgia) mit visuellen Schrift-Samples. `lib/design-flag.ts`: `FontFamily`-Typ + `VALID_FONT_FAMILIES` + `body[data-font]`-Attribut. `globals.css`: `body[data-pers-typo="on"][data-font="..."]`-Regeln.
+- **Color Presets**: 6 kuratierte Farbsets (Standard/Smaragd/Lila/Sunset/Arktis/Rose). Ein Klick setzt alle 5 Farbfelder gleichzeitig.
+- **WCAG-Kontrast-Check**: `wcagContrastVsWhite(hex)` berechnet Kontrastverhältnis; Warnung bei < 4.5:1 (AA-Fail) direkt im Farb-Tab.
+- **LivePreview**: Miniatur-Karte im Panel-Header zeigt aktuellen Theme/Farb-/Typografie-Zustand live.
+- **FOUC-Prevention**: Inline-Sync-Script in `app/layout.tsx` `<head>` setzt Body-Attribute + CSS-Vars vor dem ersten React-Paint — kein Theme-Flash.
+- **`prefers-reduced-motion`**: Global-Catch-All-Block in `globals.css` — alle Animationen/Transitions auf `0.01ms` bei aktivierter Systemeinstellung.
 
 ### 2.2 DP12-Phase2 — Toast-Unifikation + Cloud-Sync (2026-05-20)
 **Commits:** `bb57741` → `25ce34f`
@@ -51,60 +53,92 @@
 - Demo-Vorschau-Buttons im Benachrichtigungen-Tab.
 - Multi-Device Cloud-Sync via Supabase-Tabelle `user_design_prefs` (RLS, Opt-in via `lib/design-sync.ts`).
 
-### 2.3 DP12 — Personalisierungs-Module (2026-05-20)
-**Commits:** `019efae` → `990e58b`
+### 2.3 DP12 + UI-Polish — Design-Panel + Pilot-Farben + Mobile-Fixes (2026-05-20)
+**Commits:** `019efae` → `990e58b` → `79913d9` → `13b02b8` → `31f924a` → `423cba2` → `939e831`
 
-- 6 neue Module mit Master-Toggle pro Modul: `notifications` · `typography` · `effects` · `colors` · `icons` · `layout`.
-- Bei deaktiviertem Modul bleibt der aktuelle Look 1:1 erhalten.
-- 6-Tab-UI im Design-Panel (Allgemein/Benachrichtigungen/Typografie/Effekte/Farben/Icons & Layout) mit „↺ Alles zurücksetzen".
-- CSS-Regeln rein additiv (`body[data-pers-*="on"]`), bricht nichts Bestehendes.
+- 6 Personalisierungs-Module mit Master-Toggle: `notifications` · `typography` · `effects` · `colors` · `icons` · `layout`.
+- Design-Panel aus Benachrichtigungen herausgelöst → eigener Menüpunkt `🎨 Design` in Einstellungen.
+- Mobile: Tab-Navigation ist natives `<select>`-Dropdown (≤640px), Desktop: Pill-Grid.
+- `lib/pilot-colors.ts`: zentrale Farbpalette für alle Piloten mit `pilotTabStyle()` + `pilotHeaderIconStyle()`.
+- Logo-Upload in Firmendaten repariert (`next.config.js` `remotePatterns`).
 
 > **Ältere Iterationen** (DP1–DP11, QM-Pilot, BugFix-Sprints, Wareneingang-Redesign, etc.) → siehe `PROJECT_STATUS_ARCHIVE.md`
 
 ---
 
-## 3. Bekannte Probleme
+## 3. Piloten-Status
 
-- Inhaber-Live-Datenrisiko: `app/api/chat/route.ts` ist Server-SSR-gehärtet, weitere API-Routen noch nicht durchgängig.
-- MarketingPilot: Edit + Delete für Kampagnen/Leads/Newsletter fehlen.
-- Cloud & Sync: zeigt echte Kennzahlen, aber kein vollwertiges Backup-Backend.
+| Pilot | Status | Anmerkung |
+|-------|--------|-----------|
+| LagerPilot | ✅ Vollständig | 12 Tabs, Stellplätze, Umlagerung, Kommissionierung, KI-Tagesbericht |
+| BüroPilot | ✅ Vollständig | Kunden/Angebote/Aufträge/Rechnungen/Dokumente/Einkauf + Detailseiten |
+| WerkstattPilot | ✅ Vollständig | Karten/Zeit/Material/Prüfprotokoll |
+| MarketingPilot | ⚠️ Teilweise | Create OK; **Edit + Delete fehlen** für Kampagnen/Leads/Newsletter |
+| AnalysePilot | ✅ Live-Daten | Recharts + Supabase, Demo-Fallback |
+| PlanungPilot | ✅ Vollständig | Projekte/Aufgaben/Kalender/Ressourcen |
+| KI-Assistent | ✅ Vollständig | Tagesbrief/OCR/Chat + Aktions-Ausführung (gpt-4o-mini) |
+| SteuerPilot | ✅ Vollständig | Belege, OCR-Upload, DATEV-Export |
+| QM-Pilot | ✅ Vollständig | Checklisten, Audits, Maßnahmen |
+| Cloud & Sync | ✅ Live-Basis | echte Kennzahlen, Aktivität, Storage — kein vollwertiges Backup-Backend |
+| Einstellungen | ✅ Vollständig | Profil/Firmendaten/Billing/Benachrichtigungen/Design/Rollen/Info |
+| PondruffPilot | ✅ Vollständig | OCR, Preisrechner, Bauteile-Sync, Feature-Flags |
 
 ---
 
-## 4. Offene Aufgaben
+## 4. Bekannte Bugs (P0 — aus QA 2026-05-19, verifiziert)
 
-### 🔴 Pre-Release-Blocker
-- [ ] **Key-Rotation:** Supabase Service Role + Vercel Token rotieren; OpenAI-Key auf Commit-History prüfen.
-- [ ] **Manuelle E2E-Tests QM-Pilot** in Production.
+### 🔴 Race Condition: Angebots-Nummer
+- **Datei:** `supabase/schema.sql` → Funktion `pk_next_angebot_number()`
+- **Problem:** `SELECT MAX(angebotsnummer) + 1` — nicht-atomar. Bei parallelen Inserts kann dieselbe Nummer doppelt vergeben werden.
+- **Fix:** Umstellen auf `SEQUENCE` oder atomares `UPDATE ... RETURNING`.
+
+### 🔴 PDF-Archivierung — Dead Code
+- **Datei:** `lib/db.ts` → `archiveRechnungPdf()` + `archiveAngebotPdf()`
+- **Problem:** Funktionen sind definiert, werden aber nirgendwo aufgerufen. Generierte PDFs landen nicht im Storage.
+- **Fix:** In `lib/pdf.ts` nach jeder PDF-Generierung `archiveRechnungPdf()` / `archiveAngebotPdf()` aufrufen.
+
+### 🔴 Pondruff: Preiskonfig ignoriert DB
+- **Datei:** `lib/pondruff.ts` → `getPriceConfig()`
+- **Problem:** Gibt statisches JSON aus `lib/pondruff-price-config.json` zurück; die Supabase-Tabelle `pondruff_price_config` und Owner-Panel-Änderungen werden komplett ignoriert.
+- **Fix:** DB-Tabelle lesen, JSON als Fallback.
+
+### 🟡 Cloud & Sync: Backup-Backend nicht real
+- **Datei:** `app/dashboard/cloud/page.tsx`
+- **Problem:** „Manuelles Backup erstellen" zeigt nur optimistisches UI ohne echten Backup-Mechanismus. Backup-Einträge in der Historie sind aus lokalen Aktivitäts-Logs berechnet, kein echter Export.
+- **Fix:** Export-Endpoint implementieren oder Feature als „In Entwicklung" kennzeichnen.
+
+---
+
+## 5. Offene Aufgaben
 
 ### 🟡 Feature-Vervollständigung
-- [ ] MarketingPilot Edit + Delete für Kampagnen/Leads/Newsletter.
-- [ ] LagerPilot Umlagerung atomarisieren: Supabase-RPC `pk_umlager_artikel` statt 4 sequentieller Awaits.
-- [ ] Rechnungsmodell für Buchungen/Abos (`invoices` + Versandstatus + PDF-Flow).
+- [ ] **MarketingPilot**: Edit + Delete für Kampagnen/Leads/Newsletter
+- [ ] **PDF-Archivierung**: `archiveRechnungPdf`/`archiveAngebotPdf` aufrufen (Datei-Pfad zurück ins UI)
+- [ ] **Angebots-Nummer**: Race Condition mit SEQUENCE/atomarem Update beheben
 
-### 🟢 Grafikdesigner-Folge (Übergabe in `docs/DESIGN_HANDOVER.md`)
-- [ ] H1 Schriftart entscheiden (Inter / IBM Plex / System).
-- [ ] H2 Produktfotos für Hero / OG-Images.
-- [ ] H5 PDF-Vorlagen-Header (Logo + Briefpapier).
-- [ ] H7/H8 Bottom-Nav + Sidebar Icons von Emoji auf `<PilotIcon />`.
+### 🟢 Grafikdesigner-Folge
+- [ ] H1 Schriftart entscheiden (Inter / IBM Plex / System)
+- [ ] H2 Produktfotos für Hero / OG-Images
+- [ ] H5 PDF-Vorlagen-Header (Logo + Briefpapier)
 
 ### 🔵 Langfristig
-- [ ] Stripe Integration (Abos/Bezahlung).
-- [ ] E-Mail-Benachrichtigungen bei Mindestbestand (echte E-Mail).
-- [ ] Rollen-basierte Sidebar-Filterung.
-- [ ] PWA-Push-Service-Worker erweitern.
+- [ ] Stripe Integration (Abos/Bezahlung)
+- [ ] E-Mail-Benachrichtigungen bei Mindestbestand (echte E-Mail)
+- [ ] Rollen-basierte Sidebar-Filterung
+- [ ] PWA-Push-Service-Worker erweitern
+- [ ] Offline-Modus
 
 ---
 
-## 5. Nächste Empfehlung
+## 6. Nächste Empfehlung
 
-1. **Key-Rotation** (Release-Blocker).
-2. **QM-Pilot E2E-Tests** in Production.
-3. **MarketingPilot Edit/Delete** als nächste Feature-Iteration.
-4. **PDF-Header mit Logo** für Briefpapier (Vorbereitung Grafikdesigner-Übergabe).
+1. **Angebots-Nummer Race Condition** beheben (Daten-Integrität).
+2. **PDF-Archivierung** aktivieren (2 Aufruf-Zeilen in `lib/pdf.ts`).
+3. **Pondruff Preiskonfig** auf DB-Lesen umstellen.
+4. **MarketingPilot Edit/Delete** als nächste Feature-Iteration.
 
 ---
 
 ## 📚 Archiv
 
-Alle früheren Iterationen, BugFix-Sprints, Phase-Berichte, ausführliche Schema-Analysen → **[`PROJECT_STATUS_ARCHIVE.md`](./PROJECT_STATUS_ARCHIVE.md)** (197 KB Historie, NICHT beim Onboarding lesen — nur bei spezifischen Fragen).
+Alle früheren Iterationen, BugFix-Sprints, Phase-Berichte → **[`PROJECT_STATUS_ARCHIVE.md`](./PROJECT_STATUS_ARCHIVE.md)** (197 KB, NICHT beim Onboarding lesen).
