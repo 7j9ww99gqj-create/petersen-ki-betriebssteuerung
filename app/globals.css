@@ -734,3 +734,66 @@ button, a, [role="button"] {
   background: currentColor;
   display: inline-block;
 }
+
+/* ── Modal-Animationen (G8, additiv) ────────────────────────────────────── */
+/* Sanftere Übergänge für neue Modals — bestehende .fade-in / .fade-in-scale */
+/* bleiben unverändert verfügbar.                                           */
+@keyframes pk-modal-overlay-in {
+  from { opacity: 0; backdrop-filter: blur(0px); }
+  to   { opacity: 1; backdrop-filter: blur(8px); }
+}
+@keyframes pk-modal-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(.96);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+@keyframes pk-modal-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes pk-modal-card-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(8px) scale(.97); }
+}
+
+.pk-modal-overlay {
+  animation: pk-modal-overlay-in 220ms cubic-bezier(.16,1,.3,1) forwards;
+  will-change: opacity, backdrop-filter;
+}
+.pk-modal-card {
+  animation: pk-modal-card-in 260ms cubic-bezier(.16,1,.3,1) forwards;
+  will-change: opacity, transform, filter;
+  transform-origin: center;
+}
+.pk-modal-overlay[data-state="closing"] {
+  animation: pk-modal-overlay-out 180ms ease-in forwards;
+}
+.pk-modal-card[data-state="closing"] {
+  animation: pk-modal-card-out 200ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pk-modal-overlay,
+  .pk-modal-card,
+  .pk-modal-overlay[data-state="closing"],
+  .pk-modal-card[data-state="closing"] {
+    animation: none !important;
+  }
+}
+
+/* Bottom-Sheet-Variante auf Mobile (Slide-Up statt Scale) */
+@keyframes pk-sheet-in {
+  from { transform: translateY(100%); opacity: .6; }
+  to   { transform: translateY(0);    opacity: 1;  }
+}
+.pk-modal-sheet {
+  animation: pk-sheet-in 280ms cubic-bezier(.16,1,.3,1) forwards;
+  will-change: transform, opacity;
+}
