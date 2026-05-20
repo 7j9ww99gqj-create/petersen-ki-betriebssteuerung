@@ -300,11 +300,54 @@ export default function DesignCustomizationPanel() {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="pk-tab-bar" style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
+      {/* Tabs — Mobile: natives Select, Desktop: Pill-Grid */}
+      {/* Native Select für Mobile (≤640px) — keine Scroll-Probleme */}
+      <div className="design-panel-tabs-mobile" style={{ marginBottom: 16 }}>
+        <label style={{ display: 'block', fontSize: 11, color: '#aeb9c8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>
+          Bereich wählen
+        </label>
+        <select
+          value={tab}
+          onChange={e => setTab(e.target.value as PanelTab)}
+          className="pk-input"
+          style={{
+            width: '100%',
+            fontSize: 14, fontWeight: 700,
+            padding: '12px 14px',
+            appearance: 'none',
+            backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'8\' viewBox=\'0 0 12 8\'%3E%3Cpath fill=\'%236cb6ff\' d=\'M6 8L0 0h12z\'/%3E%3C/svg%3E")',
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 16px center',
+            backgroundSize: '10px',
+            paddingRight: 40,
+          }}
+        >
+          {PANEL_TABS.map(t => {
+            const moduleEnabled =
+              t.id === 'benachrichtigungen' ? prefs.notifications.enabled :
+              t.id === 'typografie' ? prefs.typography.enabled :
+              t.id === 'effekte' ? prefs.effects.enabled :
+              t.id === 'farben' ? prefs.colors.enabled :
+              t.id === 'icons-layout' ? (prefs.icons.enabled || prefs.layout.enabled) :
+              false
+            return (
+              <option key={t.id} value={t.id}>
+                {t.icon} {t.label}{moduleEnabled && t.id !== 'allgemein' ? ' ●' : ''}
+              </option>
+            )
+          })}
+        </select>
+      </div>
+
+      {/* Pill-Tabs für Desktop (>640px) */}
+      <div className="design-panel-tabs-desktop" style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+        gap: 6,
+        marginBottom: 16,
+      }}>
         {PANEL_TABS.map(t => {
           const active = tab === t.id
-          // Zeige Indikator wenn Modul aktiviert ist
           const moduleEnabled =
             t.id === 'benachrichtigungen' ? prefs.notifications.enabled :
             t.id === 'typografie' ? prefs.typography.enabled :
@@ -318,8 +361,8 @@ export default function DesignCustomizationPanel() {
               onClick={() => setTab(t.id)}
               style={{
                 all: 'unset', cursor: 'pointer',
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '8px 12px', borderRadius: 10,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                padding: '10px 12px', borderRadius: 10,
                 background: active ? 'rgba(22,132,255,.18)' : 'rgba(255,255,255,.03)',
                 border: `1px solid ${active ? 'rgba(22,132,255,.45)' : 'rgba(255,255,255,.06)'}`,
                 color: active ? '#6cb6ff' : '#aeb9c8',

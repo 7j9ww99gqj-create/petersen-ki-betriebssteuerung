@@ -561,19 +561,17 @@ button, a, [role="button"] {
     /* Grids dürfen nie breiter werden als der Container */
     max-width: 100%;
   }
-  .design-custom-panel .pk-tab-bar {
-    margin-left: -4px;
-    margin-right: -4px;
-    padding-left: 4px;
-    padding-right: 4px;
-  }
-  .design-custom-panel .pk-tab-bar button {
-    padding: 8px 10px !important;
-    font-size: 11px !important;
-  }
   .design-custom-panel code {
     word-break: break-all;
   }
+}
+
+/* ── Design-Panel Tab-Switching: Mobile = Select, Desktop = Pills ──────────── */
+.design-panel-tabs-mobile  { display: none; }
+.design-panel-tabs-desktop { display: grid; }
+@media (max-width: 640px) {
+  .design-panel-tabs-mobile  { display: block; }
+  .design-panel-tabs-desktop { display: none !important; }
 }
 
 /* ── Small mobile (≤ 480 px) ─────────────────────────────────────────────── */

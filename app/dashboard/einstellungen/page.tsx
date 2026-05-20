@@ -74,9 +74,9 @@ type ManagedUsersEntitlement = {
   reason: string
 }
 
-type SettingsSection = 'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'registrierungen' | 'kunden-eingerichtet' | 'aktivitaetslog' | 'postfach' | 'benachrichtigungen' | 'rollen' | 'info' | 'import'
+type SettingsSection = 'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'registrierungen' | 'kunden-eingerichtet' | 'aktivitaetslog' | 'postfach' | 'benachrichtigungen' | 'design' | 'rollen' | 'info' | 'import'
 
-const SETTINGS_SECTIONS: SettingsSection[] = ['profil', 'firma', 'billing', 'kundensteuerung', 'registrierungen', 'kunden-eingerichtet', 'aktivitaetslog', 'postfach', 'benachrichtigungen', 'rollen', 'info', 'import']
+const SETTINGS_SECTIONS: SettingsSection[] = ['profil', 'firma', 'billing', 'kundensteuerung', 'registrierungen', 'kunden-eingerichtet', 'aktivitaetslog', 'postfach', 'benachrichtigungen', 'design', 'rollen', 'info', 'import']
 
 const ACCESS_STATUS_OPTIONS: AccessStatus[] = ['pending', 'active', 'suspended']
 const ACCESS_MODE_OPTIONS: AccessMode[] = ['standard', 'demo']
@@ -659,6 +659,7 @@ export default function EinstellungenPage() {
           {isInhaberAccount && <NavItem id="aktivitaetslog" icon="📋" label="Aktivitätslog" />}
           <NavItem id="postfach" icon="📬" label="Postfach" />
           <NavItem id="benachrichtigungen" icon="🔔" label="Benachricht." />
+          <NavItem id="design" icon="🎨" label="Design" />
           <NavItem id="rollen" icon="🔑" label="Rollen" />
           <NavItem id="import" icon="📥" label="Import" />
           <NavItem id="info" icon="ℹ️" label="Info" />
@@ -1143,8 +1144,7 @@ export default function EinstellungenPage() {
                 </div>
               </div>
 
-              {/* ── Design-Customization (DP11: voll modular) ───────────────────── */}
-              <DesignCustomizationPanel />
+              {/* Design-Customization wurde in eigenen Menüpunkt „🎨 Design" verschoben */}
 
               {/* ── Push-Benachrichtigungen (PWA) ─────────────────────────────────── */}
               <div className="pk-card">
@@ -1271,6 +1271,12 @@ export default function EinstellungenPage() {
                   Safari → Teilen → &bdquo;Zum Home-Bildschirm hinzufügen&ldquo; · Chrome → Menü → &bdquo;App installieren&ldquo;
                 </div>
               </div>
+            </div>
+          )}
+
+          {section === 'design' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <DesignCustomizationPanel />
             </div>
           )}
 
