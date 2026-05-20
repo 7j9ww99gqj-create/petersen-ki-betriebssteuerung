@@ -33,6 +33,41 @@ Alles Design-Bezogene ist nach Verantwortung getrennt. Diese Tabelle ist die **S
 
 ---
 
+## 👑 Spezial-Accounts (Inhaber & Pondruff)
+
+### Inhaber-Account — `info@petersen-ki-pilot.de`
+
+| Bereich | Pfad |
+|---------|------|
+| E-Mail-Konstante | `lib/roles.ts` → `INHABER_EMAIL` |
+| Zugriffs-Logik | `lib/access.ts` → `getAccessProfile()` (`isInhaber`-Check) |
+| UI-Panels (7 Stück) | `components/billing/Owner*.tsx` (`OwnerCustomerControlPanel`, `OwnerMrrPanel`, `OwnerAiControlPanel`, `OwnerOpenAiCostsPanel`, `OwnerPondruffFeaturesPanel`, `OwnerAuditLogPanel`) |
+| API | `app/api/owner/` |
+| Einstellungen-Tabs (nur Inhaber sieht) | `Kundensteuerung` · `Offene Registrierungen` · `Kunden eingerichtet` · `Aktivitätslog` |
+| Supabase-Tabellen | `billing_subscriptions`, `billing_entities`, `owner_billing_controls`, `owner_notifications_inbox`, `owner_ai_feature_toggles`, `owner_audit_log`, `stripe_owner_source` |
+
+### Pondruff-Modul — `info@pondruffpolierservice.de`
+
+> **Master-Doku:** `PONDRUFF.md` ist der Einstiegspunkt für alle Pondruff-Themen. Bei Pondruff-Arbeit zuerst diese Datei lesen.
+
+| Bereich | Pfad |
+|---------|------|
+| Account-Konstanten | `lib/pondruff.ts` → `POND_USER_EMAIL`, `POND_USER_ID` |
+| Gate-Helper | `lib/pondruff.ts` → `isPondruffUser(email)` |
+| Libs | `lib/pondruff.ts`, `lib/pondruff-ocr.ts`, `lib/pondruff-pdf.ts`, `lib/pondruff-server.ts` |
+| Preis-Config | `lib/pondruff-price-config.json` (Single Source of Truth) |
+| UI | `app/dashboard/pondruff/` + `components/pondruff/` |
+| API | `app/api/pondruff/` + `app/api/owner/pondruff-flags/` |
+| Owner-Panel | `components/billing/OwnerPondruffFeaturesPanel.tsx` |
+| Feature-Flags | `ocr_wareneingang` · `ocr_preisrechner` · `ki_bauteilsuche` · `wiso_sync` |
+| Assets | `public/pondruff/` |
+| Tests | `tests/pondruff-price.test.ts` |
+| Supabase-Tabellen | `pondruff_module`, `pondruff_auftrag_rechnung`, `pondruff_bauteile_sync`, `pondruff_embeddings`, `pondruff_feature_flags`, `pondruff_price_config`, `pondruff_we_*` |
+
+**Wichtig:** Pondruff-User sieht in der Bottom-Nav statt Werkstatt/Steuer/KI nur das **runde Pondruff-Logo**. Alle Pondruff-UI-Elemente und API-Routes prüfen `isPondruffUser()` — andere Nutzer sehen nichts.
+
+---
+
 ## ⚙️ Workflow & Automation
 
 ### Automatische Hooks (in `.claude/settings.json`)
