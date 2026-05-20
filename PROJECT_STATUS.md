@@ -447,6 +447,12 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
 
 ## 2. Aktueller Arbeitsstand
 
+- **Zuletzt erledigt (2026-05-20 — BUGFIX-SPRINT-2 komplett, HEAD `e374670`, P1-9 bis P1-12):**
+  - P1-9: `/api/document-ai` — Cost-Limit-Check + Usage-Logging ergänzt (Parität mit `/api/chat`)
+  - P1-10: `werkstatt_material.karte_id` FK → `werkstatt_karten(id)` ON DELETE SET NULL; `insertWerkstattMaterial` setzt `karte_id` automatisch via `auftragsnr`-Lookup
+  - P1-11: `EingangsrechnungenTab` — localStorage-OCR: Typ-Validierung, Fehler-Toast, kein silentes Schlucken mehr
+  - P1-12: `lib/ai-settings.ts` — Marketing-KI + OpenAI-Tools: fail-open bei fehlendem `SUPABASE_SERVICE_ROLE_KEY` statt stiller Komplettdeaktivierung
+
 - **Zuletzt erledigt (2026-05-20 — API-Konsolidierung, HEAD `fbbd1b1`):**
   - Anthropic/Claude API vollständig entfernt — App läuft jetzt ausschließlich über OpenAI
   - `app/api/ocr-beleg/route.ts`: Anthropic claude-haiku → OpenAI `gpt-4o-mini` Vision (Bild-Upload + Text-Modus, ~0,001–0,002€/Scan)
