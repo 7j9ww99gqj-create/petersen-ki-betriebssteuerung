@@ -8,6 +8,7 @@ KI-gestütztes Warenwirtschaftssystem als produktive SaaS-WebApp.
 **Repo:** https://github.com/7j9ww99gqj-create/petersen-ki-betriebssteuerung
 
 ### Aktueller Zwischenstand (2026-05-20)
+- **Design-Panel als eigener Menüpunkt + Mobile-Select** (`31f924a`): `DesignCustomizationPanel` aus dem Benachrichtigungen-Tab herausgelöst und unter neuen Menüpunkt `🎨 Design` (`section = 'design'`) verlegt. Tab-Navigation im Panel ist jetzt auf Mobile ein natives `<select>`-Dropdown (≤640px) statt horizontal-scrollender Pills — kein Overflow-Bug mehr. Desktop bleibt Pill-Grid mit `auto-fit minmax(140px, 1fr)`.
 - **UI-Fixes — Mobile, Logo, Piloten-Farben** (`79913d9`): (1) Mobile-Bug Einstellungen → Benachrichtigungen behoben (overflow + responsive padding). (2) Logo-Upload in Firmendaten repariert — `next.config.js` `remotePatterns` für Supabase-Storage + nativer `<img>`-Fallback mit Initialen. (3) `components/brand/Logo.tsx` mark-Variante nutzt jetzt `/public/logo.png` (echtes Hexagon-Logo). (4) `lib/pilot-colors.ts`: zentrale Pilot-Farbpalette. Jeder Pilot-Header hat farbigen Namen (`<span style={{color}}>Lager</span>Pilot`) + Glow-Box. Marketing auf `#f97316`, Steuer auf `#fbbf24` umgestellt.
 - **DP12-Phase2 — Toast-Unifikation + Cloud-Sync** (`bb57741`): Alle Piloten-Toasts (Lager/Werkstatt/QM/Büro/Steuer) auf `.pk-toast` umgestellt → Position/Animation/Dauer/Größe folgen jetzt den User-Prefs. Neue `components/AppToast.tsx` mit Event-API `pushAppToast(msg, type)`. WebAudio-Beep über `lib/toast-sound.ts` (Sound für success/error/info). Demo-Buttons im Benachrichtigungen-Tab. Cloud-Sync via `user_design_prefs` (RLS, Opt-in) — `lib/design-sync.ts`.
 - **DP12 — Design-Personalisierung ausgebaut** (`019efae`): 6 neue Module im Einstellungen-Tab „Benachrichtigungen" mit Master-Toggle pro Modul. Bei deaktiviertem Modul bleibt der aktuelle Look 1:1 erhalten. Tab-Layout (`Allgemein / Benachrichtigungen / Typografie / Effekte / Farben / Icons & Layout`). „↺ Alles zurücksetzen" setzt alle Module wieder auf disabled. CSS-Regeln rein additiv (`body[data-pers-*="on"]`), brechen nichts Bestehendes.
@@ -111,7 +112,7 @@ insertEinkaufWareneingang(w: { bestellung_id, eingangsdatum, menge_bestellt, men
 | KI-Assistent | `/dashboard/ki-erkennung` | ✅ Vollständig | Tagesbrief/Erkennung/Chat + Aktions-Ausführung |
 | Cloud & Sync | `/dashboard/cloud` | ✅ Live-Basis | echte Kennzahlen, Aktivität, Storage, ehrliche Geräte-/Backup-Übersicht |
 | Archiv | `/dashboard/archiv` | ✅ Live-Basis | globales Archiv für Büro-Dokumente + Steuerbelege |
-| Einstellungen | `/dashboard/einstellungen` | ✅ Vollständig | Profil/Benachrichtigungen/Rollen |
+| Einstellungen | `/dashboard/einstellungen` | ✅ Vollständig | Profil/Firmendaten/Billing/Postfach/Benachrichtigungen/**Design**/Rollen/Info |
 
 ### LagerPilot — Alle Tabs
 ```ts
