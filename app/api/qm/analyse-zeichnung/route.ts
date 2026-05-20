@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { getServerQmKiSettings } from '@/lib/ai-settings'
 import { parseBody } from '@/lib/validation'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { checkCostLimit, extractUsage, logAiUsage } from '@/lib/ai-usage'
@@ -40,7 +41,25 @@ Regeln:
 export async function POST(req: NextRequest) {
   const access = await getRouteAccess(req)
   if (access.error) return access.error
+
+  // Demo-Mock-Response: keine echte OpenAI-Anfrage
+  if (access.isDemo) {
+    return NextResponse.json({
+      masse: [{ name: 'Länge', wert: 100, einheit: 'mm', toleranz_plus: 0.1, toleranz_minus: 0.1, kritisch: false, konfidenz: 90 }],
+      material: 'C45', oberflaeche: { ra: 0.8, rz: null, anforderung: 'poliert' },
+      gewinde: [], beschichtung: null, sonderanforderungen: [], zeichnungsnummer: 'DEMO-001', revision: 'A', gesamt_konfidenz: 85,
+    })
+  }
+
   if (!access.user) return NextResponse.json({ error: 'Nicht authentifiziert.' }, { status: 401 })
+
+  const settings = await getServerQmKiSettings(access.user.id, access.user.email ?? undefined)
+  if (!settings.qm_ki_zeichnungs_analyse) {
+    return NextResponse.json({
+      error: 'KI-Zeichnungs-Analyse ist für diesen Account nicht freigeschaltet.',
+      feature_disabled: true,
+    }, { status: 403 })
+  }
 
   const limited = checkRateLimit(access.user.id, 'ocr')
   if (limited) return limited

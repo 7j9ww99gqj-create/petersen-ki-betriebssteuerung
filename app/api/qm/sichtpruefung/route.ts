@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getRouteAccess } from '@/lib/server-auth'
+import { getServerQmKiSettings } from '@/lib/ai-settings'
 import { parseBody } from '@/lib/validation'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { checkCostLimit, extractUsage, logAiUsage } from '@/lib/ai-usage'
@@ -44,7 +45,24 @@ Regeln:
 export async function POST(req: NextRequest) {
   const access = await getRouteAccess(req)
   if (access.error) return access.error
+
+  // Demo-Mock-Response: keine echte OpenAI-Anfrage
+  if (access.isDemo) {
+    return NextResponse.json({
+      gesamtbewertung: 'ok', konfidenz: 92,
+      befunde: [], empfehlung: 'OK für Versand', hinweise: ['Demo-Modus aktiv — keine echte Analyse'],
+    })
+  }
+
   if (!access.user) return NextResponse.json({ error: 'Nicht authentifiziert.' }, { status: 401 })
+
+  const settings = await getServerQmKiSettings(access.user.id, access.user.email ?? undefined)
+  if (!settings.qm_ki_sichtpruefung) {
+    return NextResponse.json({
+      error: 'KI-Sichtprüfung ist für diesen Account nicht freigeschaltet.',
+      feature_disabled: true,
+    }, { status: 403 })
+  }
 
   const limited = checkRateLimit(access.user.id, 'ocr')
   if (limited) return limited
