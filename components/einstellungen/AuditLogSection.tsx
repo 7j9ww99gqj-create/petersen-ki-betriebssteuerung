@@ -6,12 +6,13 @@ import { createSupabaseClient } from '@/lib/supabase'
  * AuditLogSection + CustomerInvoicePreview.
  * Aus app/dashboard/einstellungen/page.tsx ausgelagert (DP14-Refactor Schritt 2).
  */
-export function AuditLogSection({ isInhaber, showToast }: { isInhaber: boolean; showToast: (msg: string, type?: 'error') => void }) {
+export function AuditLogSection({ isInhaber, showToast, refreshKey = 0 }: { isInhaber: boolean; showToast: (msg: string, type?: 'error') => void; refreshKey?: number }) {
   const [logs, setLogs] = useState<{ id: string; action: string; actor_email?: string; target_email?: string; created_at: string; details?: string }[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!isInhaber) return
+    setLoading(true)
     const supabase = createSupabaseClient()
     supabase
       .from('audit_logs')
@@ -22,7 +23,7 @@ export function AuditLogSection({ isInhaber, showToast }: { isInhaber: boolean; 
         if (!error && data) setLogs(data)
         setLoading(false)
       })
-  }, [isInhaber])
+  }, [isInhaber, refreshKey])
 
   if (loading) return <div style={{ color: '#aeb9c8', fontSize: 13 }}>Wird geladen…</div>
   if (logs.length === 0) return <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine Einträge vorhanden.</div>

@@ -11,11 +11,13 @@ import DesignCustomizationPanel from '@/components/einstellungen/DesignCustomiza
 import ProfilTab from '@/components/einstellungen/ProfilTab'
 import BenachrichtigungenTab from '@/components/einstellungen/BenachrichtigungenTab'
 import InfoSection from '@/components/einstellungen/InfoSection'
-import { AuditLogSection, CustomerInvoicePreview } from '@/components/einstellungen/AuditLogSection'
+import { CustomerInvoicePreview } from '@/components/einstellungen/AuditLogSection'
 import CompanySettingsSection from '@/components/einstellungen/CompanySettingsSection'
 import ImportWizard from '@/components/einstellungen/ImportWizard'
 import PostfachTab from '@/components/einstellungen/PostfachTab'
-import { PricingSettingsPage } from '@/components/billing/PricingSettingsPage'
+import BillingTab from '@/components/einstellungen/BillingTab'
+import AktivitaetslogTab from '@/components/einstellungen/AktivitaetslogTab'
+import { useManagedUsers, buildRegistrationMailHref, type ManagedUser, type ManagedUserAccessDraft, type ManagedUsersEntitlement } from '@/lib/hooks/useManagedUsers'
 import { OwnerAiControlPanel } from '@/components/billing/OwnerAiControlPanel'
 import { OwnerCustomerControlPanel } from '@/components/billing/OwnerCustomerControlPanel'
 import { OwnerPondruffFeaturesPanel } from '@/components/billing/OwnerPondruffFeaturesPanel'
@@ -23,40 +25,6 @@ import { OwnerOpenAiCostsPanel } from '@/components/billing/OwnerOpenAiCostsPane
 import { OwnerAuditLogPanel } from '@/components/billing/OwnerAuditLogPanel'
 import { OwnerMrrPanel } from '@/components/billing/OwnerMrrPanel'
 import type { PilotId } from '@/lib/pricingConfig'
-
-type ManagedUser = {
-  id: string
-  email: string
-  fullName: string
-  role: AppRole
-  accessStatus: AccessStatus
-  accessMode: AccessMode
-  accessExpiresAt: string | null
-  allowedPilotIds: PilotId[]
-  createdAt: string
-  lastSignInAt: string
-  isOwnerAccount: boolean
-}
-
-type ManagedUserAccessDraft = {
-  accessStatus: AccessStatus
-  accessMode: AccessMode
-  accessExpiresAt: string
-  allowedPilotIds: PilotId[]
-}
-
-type ManagedUsersEntitlement = {
-  subscriptionId?: string
-  ownerUserId?: string
-  ownerEmail?: string
-  employeeTier?: string
-  maxSeats: number
-  usedSeats: number
-  remainingSeats: number
-  hasActiveSubscription: boolean
-  canCreateUsers: boolean
-  reason: string
-}
 
 type SettingsSection = 'profil' | 'firma' | 'billing' | 'kundensteuerung' | 'registrierungen' | 'kunden-eingerichtet' | 'aktivitaetslog' | 'postfach' | 'benachrichtigungen' | 'design' | 'rollen' | 'info' | 'import'
 
@@ -95,24 +63,8 @@ export default function EinstellungenPage() {
 
   const { role: currentRole, setRole: applyRole } = useRole()
   const [selectedRole, setSelectedRole] = useState<AppRole>('Admin')
-  const [paymentBanner, setPaymentBanner] = useState<{ type: 'success' | 'cancelled'; invoiceId?: string } | null>(null)
-  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([])
-  const [managedRoleDrafts, setManagedRoleDrafts] = useState<Record<string, AppRole>>({})
-  const [managedAccessDrafts, setManagedAccessDrafts] = useState<Record<string, ManagedUserAccessDraft>>({})
-  const [loadingManagedUsers, setLoadingManagedUsers] = useState(false)
-  const [savingManagedUserId, setSavingManagedUserId] = useState('')
-  const [managedUsersError, setManagedUsersError] = useState('')
-  const [managedUsersEntitlement, setManagedUsersEntitlement] = useState<ManagedUsersEntitlement | null>(null)
-  const [inviteForm, setInviteForm] = useState({ email: '', fullName: '', role: 'Mitarbeiter' as AppRole })
-  const [createForm, setCreateForm] = useState({ email: '', fullName: '', role: 'Mitarbeiter' as AppRole, password: '' })
-  const [creatingMode, setCreatingMode] = useState<'invite' | 'create' | ''>('')
-  const [newlyCreatedSecret, setNewlyCreatedSecret] = useState<{ email: string; password: string } | null>(null)
-  const [pendingPilotSelections, setPendingPilotSelections] = useState<Record<string, PilotId[]>>({})
-  const [deleteConfirmId, setDeleteConfirmId] = useState('')
-  const [expandedCustomerInvoices, setExpandedCustomerInvoices] = useState<string | null>(null)
-  const [userSearchQuery, setUserSearchQuery] = useState('')
-  const [disableConfirmId, setDisableConfirmId] = useState('')
-  const [userActionInProgress, setUserActionInProgress] = useState('')
+  // Managed-Users-State-Machine kommt aus dem Hook (DP14-Schritt 3b).
+  // Wird unten nach isInhaberAccount/canManageLiveUsers initialisiert.
 
   // Sync picker with current role once loaded
   useEffect(() => { setSelectedRole(currentRole) }, [currentRole])
@@ -131,17 +83,15 @@ export default function EinstellungenPage() {
       setSection('billing')
     }
 
-    if (payment === 'success' || payment === 'cancelled') {
-      setPaymentBanner({ type: payment as 'success' | 'cancelled', invoiceId: invoice || undefined })
-    }
-
-    if (sectionParam || payment) {
+    // payment + invoice URL-Cleanup übernimmt BillingTab, sobald er gemountet ist.
+    // Hier nur das section-Param entfernen.
+    if (sectionParam) {
       const url = new URL(window.location.href)
-      url.searchParams.delete('payment')
-      url.searchParams.delete('invoice')
       url.searchParams.delete('section')
       window.history.replaceState({}, '', url.toString())
     }
+    // suppress unused-var warning für `invoice` (wird in BillingTab gelesen)
+    void invoice
   }, [])
 
   // profil.email + setProfil werden noch außerhalb von ProfilTab gebraucht
@@ -172,267 +122,24 @@ export default function EinstellungenPage() {
 
   const canManageLiveUsers = !isDemo && PERMISSIONS.canManageUsers(currentRole)
 
-  const loadManagedUsers = useCallback(async () => {
-    if (!canManageLiveUsers) return
-    setLoadingManagedUsers(true)
-    setManagedUsersError('')
-    try {
-      const res = await fetch('/api/admin/users', { cache: 'no-store' })
-      const data = await res.json().catch(() => null) as { error?: string; users?: ManagedUser[]; entitlement?: ManagedUsersEntitlement } | null
-      if (!res.ok) throw new Error(data?.error || 'Benutzer konnten nicht geladen werden.')
-      const users = Array.isArray(data?.users) ? data.users : []
-      setManagedUsers(users)
-      setManagedRoleDrafts(Object.fromEntries(users.map(user => [user.id, user.role])))
-      setManagedAccessDrafts(Object.fromEntries(users.map(user => [user.id, {
-        accessStatus: user.accessStatus,
-        accessMode: user.accessMode,
-        accessExpiresAt: user.accessExpiresAt ? user.accessExpiresAt.slice(0, 10) : '',
-        allowedPilotIds: user.allowedPilotIds,
-      }])))
-      setManagedUsersEntitlement(data?.entitlement ?? null)
-    } catch (error) {
-      setManagedUsersError(error instanceof Error ? error.message : 'Benutzer konnten nicht geladen werden.')
-    } finally {
-      setLoadingManagedUsers(false)
-    }
-  }, [canManageLiveUsers])
-
-  useEffect(() => {
-    if ((section === 'rollen' || section === 'registrierungen' || section === 'kunden-eingerichtet' || section === 'postfach') && canManageLiveUsers) {
-      void loadManagedUsers()
-    }
-  }, [section, canManageLiveUsers, loadManagedUsers])
-
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast(msg); setToastType(type)
     setTimeout(() => setToast(''), 4000)
   }
 
+  // Managed-Users-State + Async-Actions kommen aus dem Hook (DP14-Schritt 3b).
+  const mu = useManagedUsers({ enabled: canManageLiveUsers, showToast })
+
+  useEffect(() => {
+    if ((section === 'rollen' || section === 'registrierungen' || section === 'kunden-eingerichtet' || section === 'postfach') && canManageLiveUsers) {
+      void mu.loadManagedUsers()
+    }
+  }, [section, canManageLiveUsers, mu.loadManagedUsers])
+
   // handleProfilSave/handlePwSave/handleNotifSave wurden in ProfilTab + BenachrichtigungenTab verlagert
 
   const handleLogout = () => performLogout()
 
-  const handleManagedUserSave = async (user: ManagedUser) => {
-    const nextRole = managedRoleDrafts[user.id] ?? user.role
-    const accessDraft = managedAccessDrafts[user.id] ?? {
-      accessStatus: user.accessStatus,
-      accessMode: user.accessMode,
-      accessExpiresAt: user.accessExpiresAt ? user.accessExpiresAt.slice(0, 10) : '',
-      allowedPilotIds: user.allowedPilotIds,
-    }
-    setSavingManagedUserId(user.id)
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          role: nextRole,
-          accessStatus: accessDraft.accessStatus,
-          accessMode: accessDraft.accessMode,
-          accessExpiresAt: accessDraft.accessExpiresAt || null,
-          allowedPilotIds: accessDraft.allowedPilotIds,
-        }),
-      })
-      const data = await res.json().catch(() => null) as { error?: string; user?: ManagedUser } | null
-      if (!res.ok || !data?.user) throw new Error(data?.error || 'Rolle konnte nicht gespeichert werden.')
-      setManagedUsers(prev => prev.map(entry => entry.id === data.user!.id ? data.user! : entry))
-      setManagedRoleDrafts(prev => ({ ...prev, [data.user!.id]: data.user!.role }))
-      setManagedAccessDrafts(prev => ({
-        ...prev,
-        [data.user!.id]: {
-          accessStatus: data.user!.accessStatus,
-          accessMode: data.user!.accessMode,
-          accessExpiresAt: data.user!.accessExpiresAt ? data.user!.accessExpiresAt.slice(0, 10) : '',
-          allowedPilotIds: data.user!.allowedPilotIds,
-        },
-      }))
-      showToast(`✅ Zugang aktualisiert: ${data.user.email}`)
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Zugang konnte nicht gespeichert werden.', 'error')
-    } finally {
-      setSavingManagedUserId('')
-    }
-  }
-
-  const handleManagedUserCreate = async (mode: 'invite' | 'create') => {
-    const form = mode === 'invite' ? inviteForm : createForm
-    setCreatingMode(mode)
-    setNewlyCreatedSecret(null)
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          mode,
-          email: form.email,
-          fullName: form.fullName,
-          role: form.role,
-          password: mode === 'create' ? createForm.password : undefined,
-        }),
-      })
-      const data = await res.json().catch(() => null) as {
-        error?: string
-        user?: ManagedUser
-        entitlement?: ManagedUsersEntitlement
-        temporaryPassword?: string | null
-      } | null
-      if (!res.ok || !data?.user) throw new Error(data?.error || 'Benutzer konnte nicht erstellt werden.')
-
-      setManagedUsers(prev => [data.user!, ...prev])
-      setManagedRoleDrafts(prev => ({ ...prev, [data.user!.id]: data.user!.role }))
-      setManagedUsersEntitlement(data?.entitlement ?? managedUsersEntitlement)
-      if (mode === 'invite') {
-        setInviteForm({ email: '', fullName: '', role: 'Mitarbeiter' })
-        showToast(`✅ Einladung gesendet: ${data.user.email}`)
-      } else {
-        setCreateForm({ email: '', fullName: '', role: 'Mitarbeiter', password: '' })
-        if (data.temporaryPassword) {
-          setNewlyCreatedSecret({ email: data.user.email, password: data.temporaryPassword })
-        }
-        showToast(`✅ Benutzer angelegt: ${data.user.email}`)
-      }
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Benutzer konnte nicht erstellt werden.', 'error')
-    } finally {
-      setCreatingMode('')
-    }
-  }
-
-  const handleDisableUser = async (user: ManagedUser) => {
-    setUserActionInProgress(user.id)
-    setDisableConfirmId('')
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'disable', userId: user.id }),
-      })
-      const data = await res.json().catch(() => null) as { error?: string; user?: ManagedUser } | null
-      if (!res.ok || !data?.user) throw new Error(data?.error || 'Benutzer konnte nicht deaktiviert werden.')
-      setManagedUsers(prev => prev.map(entry => entry.id === data.user!.id ? data.user! : entry))
-      setManagedAccessDrafts(prev => ({
-        ...prev,
-        [data.user!.id]: {
-          accessStatus: data.user!.accessStatus,
-          accessMode: data.user!.accessMode,
-          accessExpiresAt: data.user!.accessExpiresAt ? data.user!.accessExpiresAt.slice(0, 10) : '',
-          allowedPilotIds: data.user!.allowedPilotIds,
-        },
-      }))
-      showToast(`✅ ${data.user.email} wurde deaktiviert`)
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Deaktivierung fehlgeschlagen.', 'error')
-    } finally {
-      setUserActionInProgress('')
-    }
-  }
-
-  const handleDeleteUser = async (user: ManagedUser) => {
-    setUserActionInProgress(user.id)
-    setDeleteConfirmId('')
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'DELETE',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: user.id }),
-      })
-      const data = await res.json().catch(() => null) as { error?: string; deletedUserId?: string } | null
-      if (!res.ok) throw new Error(data?.error || 'Benutzer konnte nicht geloescht werden.')
-      setManagedUsers(prev => prev.filter(entry => entry.id !== user.id))
-      showToast(`✅ ${user.email} wurde geloescht`)
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Loeschen fehlgeschlagen.', 'error')
-    } finally {
-      setUserActionInProgress('')
-    }
-  }
-
-  const handleResendInvite = async (user: ManagedUser) => {
-    setUserActionInProgress(user.id)
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'resend-invite', email: user.email }),
-      })
-      const data = await res.json().catch(() => null) as { error?: string } | null
-      if (!res.ok) throw new Error(data?.error || 'Einladung konnte nicht erneut gesendet werden.')
-      showToast(`✅ Einladung erneut gesendet an ${user.email}`)
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Einladung fehlgeschlagen.', 'error')
-    } finally {
-      setUserActionInProgress('')
-    }
-  }
-
-  const applyRegistrationPreset = async (user: ManagedUser, preset: 'demo7' | 'demo14' | 'standard', customPilotIds?: PilotId[]) => {
-    const expiresAt = preset === 'standard'
-      ? null
-      : new Date(Date.now() + (preset === 'demo7' ? 7 : 14) * 24 * 60 * 60 * 1000).toISOString()
-    const defaultPilotIds: PilotId[] = preset === 'standard'
-      ? ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer']
-      : ['buero', 'lager', 'analyse']
-    const pilotIds: PilotId[] = customPilotIds ?? defaultPilotIds
-    setSavingManagedUserId(user.id)
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          role: user.role,
-          accessStatus: 'active',
-          accessMode: preset === 'standard' ? 'standard' : 'demo',
-          accessExpiresAt: expiresAt,
-          allowedPilotIds: pilotIds,
-        }),
-      })
-      const data = await res.json().catch(() => null) as { error?: string; user?: ManagedUser } | null
-      if (!res.ok || !data?.user) throw new Error(data?.error || 'Freigabe konnte nicht gespeichert werden.')
-      setManagedUsers(prev => prev.map(entry => entry.id === data.user!.id ? data.user! : entry))
-      setManagedRoleDrafts(prev => ({ ...prev, [data.user!.id]: data.user!.role }))
-      setManagedAccessDrafts(prev => ({
-        ...prev,
-        [data.user!.id]: {
-          accessStatus: data.user!.accessStatus,
-          accessMode: data.user!.accessMode,
-          accessExpiresAt: data.user!.accessExpiresAt ? data.user!.accessExpiresAt.slice(0, 10) : '',
-          allowedPilotIds: data.user!.allowedPilotIds,
-        },
-      }))
-      showToast(`✅ ${data.user.email} wurde freigeschaltet`)
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Freigabe konnte nicht gespeichert werden.', 'error')
-    } finally {
-      setSavingManagedUserId('')
-    }
-  }
-
-  const buildRegistrationMailHref = (user: ManagedUser, preset: 'demo7' | 'demo14' | 'standard' | 'pending') => {
-    const subject = preset === 'pending'
-      ? 'Ihre Registrierung bei Petersen KI'
-      : 'Ihr Zugang bei Petersen KI wurde freigeschaltet'
-    const label = preset === 'demo7'
-      ? 'Demo-Zugang fuer 7 Tage'
-      : preset === 'demo14'
-        ? 'Demo-Zugang fuer 14 Tage'
-        : preset === 'standard'
-          ? 'Standard-Zugang'
-          : 'Registrierung in Pruefung'
-    const body = [
-      `Guten Tag ${user.fullName || ''}`.trim() + ',',
-      '',
-      preset === 'pending'
-        ? 'vielen Dank fuer Ihre Registrierung. Ihr Zugang wird aktuell geprueft.'
-        : `Ihr ${label} wurde freigeschaltet.`,
-      preset === 'pending' ? '' : `Login: ${user.email}`,
-      preset === 'pending' ? '' : 'Portal: https://petersen-ki-pilot.de/login',
-      '',
-      'Viele Gruesse',
-    ].filter(Boolean).join('\n')
-    return `mailto:${encodeURIComponent(user.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-  }
 
   const NavItem = ({ id, icon, label }: { id: SettingsSection; icon: string; label: string }) => (
     <button onClick={() => setSection(id)} data-active={section === id} style={{
@@ -508,32 +215,7 @@ export default function EinstellungenPage() {
             <CompanySettingsSection isDemo={isDemo} currentRole={currentRole} showToast={showToast} />
           )}
 
-          {section === 'billing' && (
-            <>
-              {paymentBanner && (
-                <div style={{
-                  marginBottom: 14, padding: '14px 18px', borderRadius: 14,
-                  background: paymentBanner.type === 'success' ? 'rgba(16,185,129,.1)' : 'rgba(245,158,11,.1)',
-                  border: `1px solid ${paymentBanner.type === 'success' ? 'rgba(16,185,129,.3)' : 'rgba(245,158,11,.3)'}`,
-                  color: paymentBanner.type === 'success' ? '#86efac' : '#fbbf24',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12,
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 800, fontSize: 15 }}>
-                      {paymentBanner.type === 'success' ? '✅ Zahlung erfolgreich eingegangen' : '⚠️ Checkout abgebrochen'}
-                    </div>
-                    <div style={{ fontSize: 13, marginTop: 4, opacity: .85 }}>
-                      {paymentBanner.type === 'success'
-                        ? 'Ihre Stripe-Zahlung wurde registriert. Der Inhaber prüft und schaltet Sie schnellstmöglich frei.'
-                        : 'Der Checkout-Vorgang wurde abgebrochen. Sie können die Zahlung unten jederzeit erneut starten.'}
-                    </div>
-                  </div>
-                  <button onClick={() => setPaymentBanner(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', cursor: 'pointer', fontSize: 20, flexShrink: 0, lineHeight: 1 }}>✕</button>
-                </div>
-              )}
-              <PricingSettingsPage isDemo={isDemo} showToast={showToast} />
-            </>
-          )}
+          {section === 'billing' && <BillingTab isDemo={isDemo} showToast={showToast} />}
 
           {section === 'kundensteuerung' && (
             <div style={{ display: 'grid', gap: 16 }}>
@@ -553,19 +235,19 @@ export default function EinstellungenPage() {
                   <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>Offene Registrierungen</h3>
                   <p style={{ margin: 0, color: '#aeb9c8', fontSize: 13 }}>Neue Accounts bleiben gesperrt, bis Sie Demo oder Standard freischalten.</p>
                 </div>
-                <button className="pk-btn-ghost" onClick={() => void loadManagedUsers()} style={{ fontWeight: 700 }}>
+                <button className="pk-btn-ghost" onClick={() => void mu.loadManagedUsers()} style={{ fontWeight: 700 }}>
                   Aktualisieren
                 </button>
               </div>
 
-              {loadingManagedUsers ? (
+              {mu.loadingManagedUsers ? (
                 <div style={{ color: '#aeb9c8', fontSize: 13 }}>Registrierungen werden geladen…</div>
-              ) : managedUsers.filter(user => user.accessStatus === 'pending').length === 0 ? (
+              ) : mu.managedUsers.filter(user => user.accessStatus === 'pending').length === 0 ? (
                 <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine offenen Registrierungen vorhanden.</div>
               ) : (
                 <div style={{ display: 'grid', gap: 10 }}>
-                  {managedUsers.filter(user => user.accessStatus === 'pending').map(user => {
-                    const selectedPilots = pendingPilotSelections[user.id] ?? ['buero', 'lager', 'analyse']
+                  {mu.managedUsers.filter(user => user.accessStatus === 'pending').map(user => {
+                    const selectedPilots = mu.pendingPilotSelections[user.id] ?? ['buero', 'lager', 'analyse']
                     return (
                     <div key={user.id} style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 14, background: 'rgba(255,255,255,.03)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -587,13 +269,13 @@ export default function EinstellungenPage() {
                               <button
                                 key={pilotId}
                                 type="button"
-                                onClick={() => setPendingPilotSelections(prev => ({
+                                onClick={() => mu.setPendingPilotSelections(prev => ({
                                   ...prev,
                                   [user.id]: active
                                     ? selectedPilots.filter(id => id !== pilotId)
                                     : [...selectedPilots, pilotId],
                                 }))}
-                                disabled={savingManagedUserId === user.id}
+                                disabled={mu.savingManagedUserId === user.id}
                                 style={{
                                   borderRadius: 999,
                                   border: `1px solid ${active ? 'rgba(22,132,255,.38)' : 'rgba(255,255,255,.08)'}`,
@@ -611,13 +293,13 @@ export default function EinstellungenPage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-                        <button className="pk-btn-ghost" disabled={savingManagedUserId === user.id} onClick={() => void applyRegistrationPreset(user, 'demo7', selectedPilots)} style={{ fontWeight: 800 }}>
+                        <button className="pk-btn-ghost" disabled={mu.savingManagedUserId === user.id} onClick={() => void mu.applyRegistrationPreset(user, 'demo7', selectedPilots)} style={{ fontWeight: 800 }}>
                           Demo 7 Tage
                         </button>
-                        <button className="pk-btn-ghost" disabled={savingManagedUserId === user.id} onClick={() => void applyRegistrationPreset(user, 'demo14', selectedPilots)} style={{ fontWeight: 800 }}>
+                        <button className="pk-btn-ghost" disabled={mu.savingManagedUserId === user.id} onClick={() => void mu.applyRegistrationPreset(user, 'demo14', selectedPilots)} style={{ fontWeight: 800 }}>
                           Demo 14 Tage
                         </button>
-                        <button className="pk-btn" disabled={savingManagedUserId === user.id} onClick={() => void applyRegistrationPreset(user, 'standard', selectedPilots)} style={{ fontWeight: 800 }}>
+                        <button className="pk-btn" disabled={mu.savingManagedUserId === user.id} onClick={() => void mu.applyRegistrationPreset(user, 'standard', selectedPilots)} style={{ fontWeight: 800 }}>
                           Standard freischalten
                         </button>
                         <a className="pk-btn-ghost" href={buildRegistrationMailHref(user, 'pending')} style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', fontWeight: 800 }}>
@@ -633,7 +315,7 @@ export default function EinstellungenPage() {
           )}
 
           {section === 'kunden-eingerichtet' && (() => {
-            const activeUsers = managedUsers.filter(user => user.accessStatus === 'active' && !user.isOwnerAccount)
+            const activeUsers = mu.managedUsers.filter(user => user.accessStatus === 'active' && !user.isOwnerAccount)
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div className="pk-card">
@@ -642,19 +324,19 @@ export default function EinstellungenPage() {
                       <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>Kunden eingerichtet</h3>
                       <p style={{ margin: 0, color: '#aeb9c8', fontSize: 13 }}>Alle aktiven Zugänge — Piloten, Testzeitraum und Kontakt verwalten.</p>
                     </div>
-                    <button className="pk-btn-ghost" onClick={() => void loadManagedUsers()} style={{ fontWeight: 700 }}>
+                    <button className="pk-btn-ghost" onClick={() => void mu.loadManagedUsers()} style={{ fontWeight: 700 }}>
                       Aktualisieren
                     </button>
                   </div>
 
-                  {loadingManagedUsers ? (
+                  {mu.loadingManagedUsers ? (
                     <div style={{ color: '#aeb9c8', fontSize: 13 }}>Zugänge werden geladen…</div>
                   ) : activeUsers.length === 0 ? (
                     <div style={{ color: '#aeb9c8', fontSize: 13 }}>Keine aktiven Zugänge vorhanden.</div>
                   ) : (
                     <div style={{ display: 'grid', gap: 14 }}>
                       {activeUsers.map(user => {
-                        const accessDraft = managedAccessDrafts[user.id] ?? {
+                        const accessDraft = mu.managedAccessDrafts[user.id] ?? {
                           accessStatus: user.accessStatus,
                           accessMode: user.accessMode,
                           accessExpiresAt: user.accessExpiresAt ? user.accessExpiresAt.slice(0, 10) : '',
@@ -670,7 +352,7 @@ export default function EinstellungenPage() {
                             ? new Date(accessDraft.accessExpiresAt)
                             : new Date()
                           base.setDate(base.getDate() + days)
-                          setManagedAccessDrafts(prev => ({
+                          mu.setManagedAccessDrafts(prev => ({
                             ...prev,
                             [user.id]: { ...accessDraft, accessExpiresAt: base.toISOString().slice(0, 10) },
                           }))
@@ -727,7 +409,7 @@ export default function EinstellungenPage() {
                                     <button
                                       key={pilotId}
                                       type="button"
-                                      onClick={() => setManagedAccessDrafts(prev => ({
+                                      onClick={() => mu.setManagedAccessDrafts(prev => ({
                                         ...prev,
                                         [user.id]: {
                                           ...accessDraft,
@@ -736,7 +418,7 @@ export default function EinstellungenPage() {
                                             : [...accessDraft.allowedPilotIds, pilotId],
                                         },
                                       }))}
-                                      disabled={savingManagedUserId === user.id}
+                                      disabled={mu.savingManagedUserId === user.id}
                                       style={{
                                         borderRadius: 999,
                                         border: `1px solid ${active ? 'rgba(22,132,255,.38)' : 'rgba(255,255,255,.08)'}`,
@@ -755,13 +437,13 @@ export default function EinstellungenPage() {
                             </div>
 
                             {/* Rechnungsübersicht */}
-                            {expandedCustomerInvoices === user.id ? (
-                              <CustomerInvoicePreview userId={user.id} userEmail={user.email} onClose={() => setExpandedCustomerInvoices(null)} />
+                            {mu.expandedCustomerInvoices === user.id ? (
+                              <CustomerInvoicePreview userId={user.id} userEmail={user.email} onClose={() => mu.setExpandedCustomerInvoices(null)} />
                             ) : (
                               <button
                                 className="pk-btn-ghost"
                                 style={{ fontSize: 12, marginTop: 8 }}
-                                onClick={() => setExpandedCustomerInvoices(user.id)}
+                                onClick={() => mu.setExpandedCustomerInvoices(user.id)}
                               >
                                 📄 Rechnungen anzeigen
                               </button>
@@ -775,7 +457,7 @@ export default function EinstellungenPage() {
                                   type="button"
                                   className="pk-btn-ghost"
                                   onClick={() => extendExpiry(7)}
-                                  disabled={savingManagedUserId === user.id}
+                                  disabled={mu.savingManagedUserId === user.id}
                                   style={{ fontSize: 12, padding: '6px 12px' }}
                                 >
                                   +7 Tage
@@ -784,7 +466,7 @@ export default function EinstellungenPage() {
                                   type="button"
                                   className="pk-btn-ghost"
                                   onClick={() => extendExpiry(14)}
-                                  disabled={savingManagedUserId === user.id}
+                                  disabled={mu.savingManagedUserId === user.id}
                                   style={{ fontSize: 12, padding: '6px 12px' }}
                                 >
                                   +14 Tage
@@ -793,7 +475,7 @@ export default function EinstellungenPage() {
                                   type="button"
                                   className="pk-btn-ghost"
                                   onClick={() => extendExpiry(30)}
-                                  disabled={savingManagedUserId === user.id}
+                                  disabled={mu.savingManagedUserId === user.id}
                                   style={{ fontSize: 12, padding: '6px 12px' }}
                                 >
                                   +30 Tage
@@ -802,11 +484,11 @@ export default function EinstellungenPage() {
                                   className="pk-input"
                                   type="date"
                                   value={accessDraft.accessExpiresAt}
-                                  onChange={e => setManagedAccessDrafts(prev => ({
+                                  onChange={e => mu.setManagedAccessDrafts(prev => ({
                                     ...prev,
                                     [user.id]: { ...accessDraft, accessExpiresAt: e.target.value },
                                   }))}
-                                  disabled={savingManagedUserId === user.id}
+                                  disabled={mu.savingManagedUserId === user.id}
                                   style={{ width: 160, fontSize: 13 }}
                                 />
                               </div>
@@ -816,11 +498,11 @@ export default function EinstellungenPage() {
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                               <button
                                 className="pk-btn"
-                                onClick={() => void handleManagedUserSave(user)}
-                                disabled={!hasChanges || savingManagedUserId === user.id}
-                                style={{ fontWeight: 700, opacity: !hasChanges || savingManagedUserId === user.id ? .55 : 1 }}
+                                onClick={() => void mu.handleManagedUserSave(user)}
+                                disabled={!hasChanges || mu.savingManagedUserId === user.id}
+                                style={{ fontWeight: 700, opacity: !hasChanges || mu.savingManagedUserId === user.id ? .55 : 1 }}
                               >
-                                {savingManagedUserId === user.id ? 'Speichert…' : 'Änderungen speichern'}
+                                {mu.savingManagedUserId === user.id ? 'Speichert…' : 'Änderungen speichern'}
                               </button>
                               <a
                                 href={mailHref}
@@ -830,15 +512,15 @@ export default function EinstellungenPage() {
                                 ✉️ Kontakt
                               </a>
                             </div>
-                            {deleteConfirmId === user.id ? (
+                            {mu.deleteConfirmId === user.id ? (
                               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
                                 <span style={{ fontSize: 12, color: '#fb7185' }}>Wirklich sperren?</span>
                                 <button
                                   className="pk-btn-ghost"
                                   style={{ fontSize: 12, color: '#fb7185', borderColor: 'rgba(244,63,94,.3)' }}
                                   onClick={async () => {
-                                    setDeleteConfirmId('')
-                                    setSavingManagedUserId(user.id)
+                                    mu.setDeleteConfirmId('')
+                                    mu.setSavingManagedUserId(user.id)
                                     try {
                                       const res = await fetch('/api/admin/users', {
                                         method: 'PATCH',
@@ -847,24 +529,24 @@ export default function EinstellungenPage() {
                                       })
                                       const data = await res.json().catch(() => null) as { error?: string; user?: ManagedUser } | null
                                       if (!res.ok) throw new Error(data?.error || 'Fehler')
-                                      setManagedUsers(prev => prev.map(u => u.id === user.id ? { ...u, accessStatus: 'suspended', allowedPilotIds: [] } : u))
+                                      mu.setManagedUsers(prev => prev.map(u => u.id === user.id ? { ...u, accessStatus: 'suspended', allowedPilotIds: [] } : u))
                                       showToast(`🚫 ${user.email} wurde gesperrt`)
                                     } catch (e) {
                                       showToast(e instanceof Error ? e.message : 'Fehler', 'error')
                                     } finally {
-                                      setSavingManagedUserId('')
+                                      mu.setSavingManagedUserId('')
                                     }
                                   }}
                                 >
                                   Ja, sperren
                                 </button>
-                                <button className="pk-btn-ghost" style={{ fontSize: 12 }} onClick={() => setDeleteConfirmId('')}>Abbrechen</button>
+                                <button className="pk-btn-ghost" style={{ fontSize: 12 }} onClick={() => mu.setDeleteConfirmId('')}>Abbrechen</button>
                               </div>
                             ) : (
                               <button
                                 className="pk-btn-ghost"
                                 style={{ fontSize: 12, color: '#fb7185', borderColor: 'rgba(244,63,94,.3)', marginTop: 8 }}
-                                onClick={() => setDeleteConfirmId(user.id)}
+                                onClick={() => mu.setDeleteConfirmId(user.id)}
                               >
                                 🚫 Kunden sperren
                               </button>
@@ -880,16 +562,7 @@ export default function EinstellungenPage() {
           })()}
 
           {section === 'aktivitaetslog' && (
-            <div className="pk-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' }}>
-                <div>
-                  <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>📋 Aktivitätslog</h3>
-                  <p style={{ margin: 0, color: '#aeb9c8', fontSize: 13 }}>Letzte Systemereignisse und Buchungsaktivitäten.</p>
-                </div>
-                <button className="pk-btn-ghost" onClick={() => void loadManagedUsers()} style={{ fontWeight: 700 }}>Aktualisieren</button>
-              </div>
-              <AuditLogSection isInhaber={isInhaberAccount} showToast={showToast} />
-            </div>
+            <AktivitaetslogTab isInhaber={isInhaberAccount} showToast={showToast} />
           )}
 
           {section === 'benachrichtigungen' && <BenachrichtigungenTab showToast={showToast} />}
@@ -900,7 +573,7 @@ export default function EinstellungenPage() {
             </div>
           )}
 
-          {section === 'postfach' && <PostfachTab isInhaberAccount={isInhaberAccount} isDemo={isDemo} showToast={showToast} managedUsers={managedUsers} />}
+          {section === 'postfach' && <PostfachTab isInhaberAccount={isInhaberAccount} isDemo={isDemo} showToast={showToast} managedUsers={mu.managedUsers} />}
 
           {section === 'rollen' && (() => {
             const roleDescriptions: Record<AppRole, string> = {
@@ -1030,49 +703,49 @@ export default function EinstellungenPage() {
                         <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>👥 Live-Benutzerverwaltung</h3>
                         <div style={{ color: '#aeb9c8', fontSize: 13 }}>Rollen werden serverseitig per Supabase Admin API am Benutzerkonto gespeichert.</div>
                       </div>
-                      <button className="pk-btn-ghost" onClick={() => void loadManagedUsers()} style={{ fontWeight: 700 }}>
+                      <button className="pk-btn-ghost" onClick={() => void mu.loadManagedUsers()} style={{ fontWeight: 700 }}>
                         Aktualisieren
                       </button>
                     </div>
 
-                    {managedUsersEntitlement && (
+                    {mu.managedUsersEntitlement && (
                       <div style={{
                         marginBottom: 16,
                         padding: '14px 16px',
                         borderRadius: 14,
-                        background: managedUsersEntitlement.canCreateUsers ? 'rgba(22,132,255,.08)' : 'rgba(255,179,71,.08)',
-                        border: managedUsersEntitlement.canCreateUsers ? '1px solid rgba(22,132,255,.22)' : '1px solid rgba(255,179,71,.18)',
+                        background: mu.managedUsersEntitlement.canCreateUsers ? 'rgba(22,132,255,.08)' : 'rgba(255,179,71,.08)',
+                        border: mu.managedUsersEntitlement.canCreateUsers ? '1px solid rgba(22,132,255,.22)' : '1px solid rgba(255,179,71,.18)',
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                           <div>
                             <div style={{ fontWeight: 800, fontSize: 14 }}>
-                              Seat-Limit: {managedUsersEntitlement.usedSeats} / {managedUsersEntitlement.maxSeats || 0} belegt
+                              Seat-Limit: {mu.managedUsersEntitlement.usedSeats} / {mu.managedUsersEntitlement.maxSeats || 0} belegt
                             </div>
                             <div style={{ color: '#aeb9c8', fontSize: 12, marginTop: 4 }}>
-                              {managedUsersEntitlement.employeeTier ? `Abo ${managedUsersEntitlement.employeeTier}` : 'Kein zugeordnetes Abo'} · {managedUsersEntitlement.reason}
+                              {mu.managedUsersEntitlement.employeeTier ? `Abo ${mu.managedUsersEntitlement.employeeTier}` : 'Kein zugeordnetes Abo'} · {mu.managedUsersEntitlement.reason}
                             </div>
                           </div>
-                          <span className={managedUsersEntitlement.canCreateUsers ? 'badge badge-green' : 'badge badge-orange'}>
-                            {managedUsersEntitlement.remainingSeats} freie Plaetze
+                          <span className={mu.managedUsersEntitlement.canCreateUsers ? 'badge badge-green' : 'badge badge-orange'}>
+                            {mu.managedUsersEntitlement.remainingSeats} freie Plaetze
                           </span>
                         </div>
                       </div>
                     )}
 
-                    {newlyCreatedSecret && (
+                    {mu.newlyCreatedSecret && (
                       <div style={{
                         marginBottom: 16, padding: '14px 16px', borderRadius: 12,
                         background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.22)',
                       }}>
                         <div style={{ fontWeight: 800, color: '#4ddb7e', marginBottom: 8 }}>Temporäres Passwort nur jetzt sichtbar</div>
-                        <div style={{ fontSize: 13, color: '#dbe4ef', marginBottom: 6 }}>{newlyCreatedSecret.email}</div>
-                        <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 14, fontWeight: 700 }}>{newlyCreatedSecret.password}</div>
+                        <div style={{ fontSize: 13, color: '#dbe4ef', marginBottom: 6 }}>{mu.newlyCreatedSecret.email}</div>
+                        <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 14, fontWeight: 700 }}>{mu.newlyCreatedSecret.password}</div>
                       </div>
                     )}
 
-                    {managedUsersError && (
+                    {mu.managedUsersError && (
                       <div style={{ marginBottom: 14, padding: 12, borderRadius: 12, background: 'rgba(244,63,94,.12)', border: '1px solid rgba(244,63,94,.28)', color: '#fb7185', fontSize: 13 }}>
-                        {managedUsersError}
+                        {mu.managedUsersError}
                       </div>
                     )}
 
@@ -1083,22 +756,22 @@ export default function EinstellungenPage() {
                           <input
                             className="pk-input"
                             placeholder="E-Mail"
-                            value={inviteForm.email}
-                            onChange={e => setInviteForm(prev => ({ ...prev, email: e.target.value }))}
-                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                            value={mu.inviteForm.email}
+                            onChange={e => mu.setInviteForm(prev => ({ ...prev, email: e.target.value }))}
+                            disabled={!mu.managedUsersEntitlement?.canCreateUsers || mu.creatingMode !== ''}
                           />
                           <input
                             className="pk-input"
                             placeholder="Name (optional)"
-                            value={inviteForm.fullName}
-                            onChange={e => setInviteForm(prev => ({ ...prev, fullName: e.target.value }))}
-                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                            value={mu.inviteForm.fullName}
+                            onChange={e => mu.setInviteForm(prev => ({ ...prev, fullName: e.target.value }))}
+                            disabled={!mu.managedUsersEntitlement?.canCreateUsers || mu.creatingMode !== ''}
                           />
                           <select
                             className="pk-input"
-                            value={inviteForm.role}
-                            onChange={e => setInviteForm(prev => ({ ...prev, role: e.target.value as AppRole }))}
-                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                            value={mu.inviteForm.role}
+                            onChange={e => mu.setInviteForm(prev => ({ ...prev, role: e.target.value as AppRole }))}
+                            disabled={!mu.managedUsersEntitlement?.canCreateUsers || mu.creatingMode !== ''}
                           >
                             {managedRoleOptions.map(role => (
                               <option key={role} value={role}>{ROLE_LABELS[role]}</option>
@@ -1106,11 +779,11 @@ export default function EinstellungenPage() {
                           </select>
                           <button
                             className="pk-btn"
-                            onClick={() => void handleManagedUserCreate('invite')}
-                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
-                            style={{ fontWeight: 700, opacity: !managedUsersEntitlement?.canCreateUsers || creatingMode !== '' ? .6 : 1 }}
+                            onClick={() => void mu.handleManagedUserCreate('invite')}
+                            disabled={!mu.managedUsersEntitlement?.canCreateUsers || mu.creatingMode !== ''}
+                            style={{ fontWeight: 700, opacity: !mu.managedUsersEntitlement?.canCreateUsers || mu.creatingMode !== '' ? .6 : 1 }}
                           >
-                            {creatingMode === 'invite' ? 'Einladung wird gesendet…' : 'Einladung senden'}
+                            {mu.creatingMode === 'invite' ? 'Einladung wird gesendet…' : 'Einladung senden'}
                           </button>
                         </div>
                       </div>
@@ -1121,22 +794,22 @@ export default function EinstellungenPage() {
                           <input
                             className="pk-input"
                             placeholder="E-Mail"
-                            value={createForm.email}
-                            onChange={e => setCreateForm(prev => ({ ...prev, email: e.target.value }))}
-                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                            value={mu.createForm.email}
+                            onChange={e => mu.setCreateForm(prev => ({ ...prev, email: e.target.value }))}
+                            disabled={!mu.managedUsersEntitlement?.canCreateUsers || mu.creatingMode !== ''}
                           />
                           <input
                             className="pk-input"
                             placeholder="Name (optional)"
-                            value={createForm.fullName}
-                            onChange={e => setCreateForm(prev => ({ ...prev, fullName: e.target.value }))}
-                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                            value={mu.createForm.fullName}
+                            onChange={e => mu.setCreateForm(prev => ({ ...prev, fullName: e.target.value }))}
+                            disabled={!mu.managedUsersEntitlement?.canCreateUsers || mu.creatingMode !== ''}
                           />
                           <select
                             className="pk-input"
-                            value={createForm.role}
-                            onChange={e => setCreateForm(prev => ({ ...prev, role: e.target.value as AppRole }))}
-                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                            value={mu.createForm.role}
+                            onChange={e => mu.setCreateForm(prev => ({ ...prev, role: e.target.value as AppRole }))}
+                            disabled={!mu.managedUsersEntitlement?.canCreateUsers || mu.creatingMode !== ''}
                           >
                             {managedRoleOptions.map(role => (
                               <option key={role} value={role}>{ROLE_LABELS[role]}</option>
@@ -1145,41 +818,41 @@ export default function EinstellungenPage() {
                           <input
                             className="pk-input"
                             placeholder="Temporäres Passwort (leer = automatisch)"
-                            value={createForm.password}
-                            onChange={e => setCreateForm(prev => ({ ...prev, password: e.target.value }))}
-                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
+                            value={mu.createForm.password}
+                            onChange={e => mu.setCreateForm(prev => ({ ...prev, password: e.target.value }))}
+                            disabled={!mu.managedUsersEntitlement?.canCreateUsers || mu.creatingMode !== ''}
                           />
                           <button
                             className="pk-btn"
-                            onClick={() => void handleManagedUserCreate('create')}
-                            disabled={!managedUsersEntitlement?.canCreateUsers || creatingMode !== ''}
-                            style={{ fontWeight: 700, opacity: !managedUsersEntitlement?.canCreateUsers || creatingMode !== '' ? .6 : 1 }}
+                            onClick={() => void mu.handleManagedUserCreate('create')}
+                            disabled={!mu.managedUsersEntitlement?.canCreateUsers || mu.creatingMode !== ''}
+                            style={{ fontWeight: 700, opacity: !mu.managedUsersEntitlement?.canCreateUsers || mu.creatingMode !== '' ? .6 : 1 }}
                           >
-                            {creatingMode === 'create' ? 'Benutzer wird angelegt…' : 'Benutzer anlegen'}
+                            {mu.creatingMode === 'create' ? 'Benutzer wird angelegt…' : 'Benutzer anlegen'}
                           </button>
                         </div>
                       </div>
                     </div>
 
-                    {loadingManagedUsers ? (
+                    {mu.loadingManagedUsers ? (
                       <div style={{ color: '#aeb9c8', fontSize: 14 }}>Benutzer werden geladen…</div>
                     ) : (
                       <div style={{ display: 'grid', gap: 14 }}>
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                           <span className="badge badge-blue">
-                            {managedUsers.filter(user => user.accessStatus === 'pending').length} Registrierungen offen
+                            {mu.managedUsers.filter(user => user.accessStatus === 'pending').length} Registrierungen offen
                           </span>
                           <span className="badge badge-green">
-                            {managedUsers.filter(user => user.accessStatus === 'active').length} Zugänge aktiv
+                            {mu.managedUsers.filter(user => user.accessStatus === 'active').length} Zugänge aktiv
                           </span>
                           <span className="badge badge-gray">
-                            {managedUsers.filter(user => user.accessMode === 'demo').length} Demo-Zugänge
+                            {mu.managedUsers.filter(user => user.accessMode === 'demo').length} Demo-Zugänge
                           </span>
                           <input
                             className="pk-input"
                             placeholder="Suche nach Name oder E-Mail…"
-                            value={userSearchQuery}
-                            onChange={e => setUserSearchQuery(e.target.value)}
+                            value={mu.userSearchQuery}
+                            onChange={e => mu.setUserSearchQuery(e.target.value)}
                             style={{ marginLeft: 'auto', minWidth: 220, maxWidth: 320 }}
                           />
                         </div>
@@ -1197,16 +870,16 @@ export default function EinstellungenPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {managedUsers.filter(user => {
-                              if (!userSearchQuery.trim()) return true
-                              const q = userSearchQuery.toLowerCase()
+                            {mu.managedUsers.filter(user => {
+                              if (!mu.userSearchQuery.trim()) return true
+                              const q = mu.userSearchQuery.toLowerCase()
                               return user.email.toLowerCase().includes(q) || (user.fullName || '').toLowerCase().includes(q)
                             }).map(user => {
                               const isSelf = user.email.toLowerCase() === profil.email.toLowerCase()
                               const targetIsInhaber = user.role === 'Inhaber' || user.isOwnerAccount
                               const mayEdit = !isSelf && (currentRole === 'Inhaber' || !targetIsInhaber)
-                              const hasChanges = (managedRoleDrafts[user.id] ?? user.role) !== user.role
-                              const accessDraft = managedAccessDrafts[user.id] ?? {
+                              const hasChanges = (mu.managedRoleDrafts[user.id] ?? user.role) !== user.role
+                              const accessDraft = mu.managedAccessDrafts[user.id] ?? {
                                 accessStatus: user.accessStatus,
                                 accessMode: user.accessMode,
                                 accessExpiresAt: user.accessExpiresAt ? user.accessExpiresAt.slice(0, 10) : '',
@@ -1237,10 +910,10 @@ export default function EinstellungenPage() {
                                   <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{ROLE_LABELS[user.role]}</td>
                                   <td style={{ padding: '10px 12px' }}>
                                     <select
-                                      value={managedRoleDrafts[user.id] ?? user.role}
-                                      onChange={e => setManagedRoleDrafts(prev => ({ ...prev, [user.id]: e.target.value as AppRole }))}
+                                      value={mu.managedRoleDrafts[user.id] ?? user.role}
+                                      onChange={e => mu.setManagedRoleDrafts(prev => ({ ...prev, [user.id]: e.target.value as AppRole }))}
                                       className="pk-input"
-                                      disabled={!mayEdit || savingManagedUserId === user.id}
+                                      disabled={!mayEdit || mu.savingManagedUserId === user.id}
                                       style={{ minWidth: 170, opacity: mayEdit ? 1 : .6 }}
                                     >
                                       {managedRoleOptions.map(role => (
@@ -1252,9 +925,9 @@ export default function EinstellungenPage() {
                                     <div style={{ display: 'grid', gap: 8 }}>
                                       <select
                                         value={accessDraft.accessStatus}
-                                        onChange={e => setManagedAccessDrafts(prev => ({ ...prev, [user.id]: { ...accessDraft, accessStatus: e.target.value as AccessStatus } }))}
+                                        onChange={e => mu.setManagedAccessDrafts(prev => ({ ...prev, [user.id]: { ...accessDraft, accessStatus: e.target.value as AccessStatus } }))}
                                         className="pk-input"
-                                        disabled={!mayEdit || savingManagedUserId === user.id}
+                                        disabled={!mayEdit || mu.savingManagedUserId === user.id}
                                         style={{ opacity: mayEdit ? 1 : .6 }}
                                       >
                                         {ACCESS_STATUS_OPTIONS.map(status => (
@@ -1264,9 +937,9 @@ export default function EinstellungenPage() {
                                       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8 }}>
                                         <select
                                           value={accessDraft.accessMode}
-                                          onChange={e => setManagedAccessDrafts(prev => ({ ...prev, [user.id]: { ...accessDraft, accessMode: e.target.value as AccessMode } }))}
+                                          onChange={e => mu.setManagedAccessDrafts(prev => ({ ...prev, [user.id]: { ...accessDraft, accessMode: e.target.value as AccessMode } }))}
                                           className="pk-input"
-                                          disabled={!mayEdit || savingManagedUserId === user.id}
+                                          disabled={!mayEdit || mu.savingManagedUserId === user.id}
                                           style={{ opacity: mayEdit ? 1 : .6 }}
                                         >
                                           {ACCESS_MODE_OPTIONS.map(mode => (
@@ -1277,8 +950,8 @@ export default function EinstellungenPage() {
                                           className="pk-input"
                                           type="date"
                                           value={accessDraft.accessExpiresAt}
-                                          onChange={e => setManagedAccessDrafts(prev => ({ ...prev, [user.id]: { ...accessDraft, accessExpiresAt: e.target.value } }))}
-                                          disabled={!mayEdit || savingManagedUserId === user.id}
+                                          onChange={e => mu.setManagedAccessDrafts(prev => ({ ...prev, [user.id]: { ...accessDraft, accessExpiresAt: e.target.value } }))}
+                                          disabled={!mayEdit || mu.savingManagedUserId === user.id}
                                           style={{ opacity: mayEdit ? 1 : .6 }}
                                         />
                                       </div>
@@ -1293,7 +966,7 @@ export default function EinstellungenPage() {
                                             <button
                                               key={pilotId}
                                               type="button"
-                                              onClick={() => setManagedAccessDrafts(prev => ({
+                                              onClick={() => mu.setManagedAccessDrafts(prev => ({
                                                 ...prev,
                                                 [user.id]: {
                                                   ...accessDraft,
@@ -1302,7 +975,7 @@ export default function EinstellungenPage() {
                                                     : [...accessDraft.allowedPilotIds, pilotId],
                                                 },
                                               }))}
-                                              disabled={!mayEdit || savingManagedUserId === user.id}
+                                              disabled={!mayEdit || mu.savingManagedUserId === user.id}
                                               style={{
                                                 borderRadius: 999,
                                                 border: `1px solid ${active ? 'rgba(22,132,255,.38)' : 'rgba(255,255,255,.08)'}`,
@@ -1331,33 +1004,33 @@ export default function EinstellungenPage() {
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                       <button
                                         className="pk-btn"
-                                        onClick={() => void handleManagedUserSave(user)}
-                                        disabled={!mayEdit || (!hasChanges && !hasAccessChanges) || savingManagedUserId === user.id || userActionInProgress === user.id}
-                                        style={{ fontWeight: 700, opacity: !mayEdit || (!hasChanges && !hasAccessChanges) || savingManagedUserId === user.id || userActionInProgress === user.id ? .55 : 1 }}
+                                        onClick={() => void mu.handleManagedUserSave(user)}
+                                        disabled={!mayEdit || (!hasChanges && !hasAccessChanges) || mu.savingManagedUserId === user.id || mu.userActionInProgress === user.id}
+                                        style={{ fontWeight: 700, opacity: !mayEdit || (!hasChanges && !hasAccessChanges) || mu.savingManagedUserId === user.id || mu.userActionInProgress === user.id ? .55 : 1 }}
                                       >
-                                        {savingManagedUserId === user.id ? 'Speichert…' : 'Zugang speichern'}
+                                        {mu.savingManagedUserId === user.id ? 'Speichert…' : 'Zugang speichern'}
                                       </button>
                                       {mayEdit && !isSelf && (
                                         <>
                                           <button
                                             className="pk-btn-ghost"
-                                            onClick={() => void handleResendInvite(user)}
-                                            disabled={userActionInProgress === user.id || savingManagedUserId === user.id}
-                                            style={{ fontWeight: 600, fontSize: 12, opacity: userActionInProgress === user.id ? .6 : 1 }}
+                                            onClick={() => void mu.handleResendInvite(user)}
+                                            disabled={mu.userActionInProgress === user.id || mu.savingManagedUserId === user.id}
+                                            style={{ fontWeight: 600, fontSize: 12, opacity: mu.userActionInProgress === user.id ? .6 : 1 }}
                                           >
-                                            {userActionInProgress === user.id ? '⏳ Läuft…' : '📨 Einladung erneut senden'}
+                                            {mu.userActionInProgress === user.id ? '⏳ Läuft…' : '📨 Einladung erneut senden'}
                                           </button>
-                                          {disableConfirmId === user.id ? (
+                                          {mu.disableConfirmId === user.id ? (
                                             <div style={{ display: 'flex', gap: 6 }}>
                                               <button
-                                                onClick={() => void handleDisableUser(user)}
-                                                disabled={userActionInProgress === user.id}
+                                                onClick={() => void mu.handleDisableUser(user)}
+                                                disabled={mu.userActionInProgress === user.id}
                                                 style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(255,179,71,.4)', background: 'rgba(255,179,71,.12)', color: '#ffd7a1', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
                                               >
                                                 Ja, sperren
                                               </button>
                                               <button
-                                                onClick={() => setDisableConfirmId('')}
+                                                onClick={() => mu.setDisableConfirmId('')}
                                                 style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', color: '#aeb9c8', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
                                               >
                                                 Abbrechen
@@ -1366,24 +1039,24 @@ export default function EinstellungenPage() {
                                           ) : (
                                             <button
                                               className="pk-btn-ghost"
-                                              onClick={() => setDisableConfirmId(user.id)}
-                                              disabled={user.accessStatus === 'suspended' || userActionInProgress === user.id}
-                                              style={{ fontWeight: 600, fontSize: 12, opacity: user.accessStatus === 'suspended' || userActionInProgress === user.id ? .5 : 1 }}
+                                              onClick={() => mu.setDisableConfirmId(user.id)}
+                                              disabled={user.accessStatus === 'suspended' || mu.userActionInProgress === user.id}
+                                              style={{ fontWeight: 600, fontSize: 12, opacity: user.accessStatus === 'suspended' || mu.userActionInProgress === user.id ? .5 : 1 }}
                                             >
                                               🚫 Deaktivieren
                                             </button>
                                           )}
-                                          {deleteConfirmId === user.id ? (
+                                          {mu.deleteConfirmId === user.id ? (
                                             <div style={{ display: 'flex', gap: 6 }}>
                                               <button
-                                                onClick={() => void handleDeleteUser(user)}
-                                                disabled={userActionInProgress === user.id}
+                                                onClick={() => void mu.handleDeleteUser(user)}
+                                                disabled={mu.userActionInProgress === user.id}
                                                 style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(244,63,94,.4)', background: 'rgba(244,63,94,.12)', color: '#fb7185', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
                                               >
                                                 Ja, loeschen
                                               </button>
                                               <button
-                                                onClick={() => setDeleteConfirmId('')}
+                                                onClick={() => mu.setDeleteConfirmId('')}
                                                 style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.05)', color: '#aeb9c8', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
                                               >
                                                 Abbrechen
@@ -1392,9 +1065,9 @@ export default function EinstellungenPage() {
                                           ) : (
                                             <button
                                               className="pk-btn-ghost"
-                                              onClick={() => setDeleteConfirmId(user.id)}
-                                              disabled={userActionInProgress === user.id}
-                                              style={{ fontWeight: 600, fontSize: 12, color: '#fb7185', borderColor: 'rgba(244,63,94,.28)', opacity: userActionInProgress === user.id ? .5 : 1 }}
+                                              onClick={() => mu.setDeleteConfirmId(user.id)}
+                                              disabled={mu.userActionInProgress === user.id}
+                                              style={{ fontWeight: 600, fontSize: 12, color: '#fb7185', borderColor: 'rgba(244,63,94,.28)', opacity: mu.userActionInProgress === user.id ? .5 : 1 }}
                                             >
                                               🗑️ Loeschen
                                             </button>
@@ -1411,9 +1084,9 @@ export default function EinstellungenPage() {
                                 </tr>
                               )
                             })}
-                            {managedUsers.filter(u => {
-                              if (!userSearchQuery.trim()) return true
-                              const q = userSearchQuery.toLowerCase()
+                            {mu.managedUsers.filter(u => {
+                              if (!mu.userSearchQuery.trim()) return true
+                              const q = mu.userSearchQuery.toLowerCase()
                               return u.email.toLowerCase().includes(q) || (u.fullName || '').toLowerCase().includes(q)
                             }).length === 0 && (
                               <tr>

@@ -22,8 +22,8 @@
 
 ## 1. Aktueller Stand
 
-- **HEAD:** DP14-Refactor Schritt 3a — Einstellungen 3.773 → 1.443 LOC (−61,8 %)
-- **Letzte Iteration:** 2026-05-21 — PostfachTab ausgelagert
+- **HEAD:** DP14-Refactor Schritt 3b — Einstellungen 3.773 → 1.116 LOC (−70,4 %)
+- **Letzte Iteration:** 2026-05-21 — useManagedUsers-Hook + BillingTab + AktivitaetslogTab
 - **TypeScript:** `npx tsc --noEmit` — ✅ 0 Fehler
 - **Tests:** 87 Tests in 7 Files — ✅ alle grün
 - **CI/CD:** Vercel Auto-Deploy auf `main` — ✅
@@ -33,7 +33,18 @@
 ## 2. Aktueller Arbeitsstand (letzte 3 Iterationen)
 
 ### 2.1 DP14 — Monster-Page-Refactor (Aufgabe #1 aus Marktreife-Audit)
-**Scope kumuliert:** `app/dashboard/einstellungen/page.tsx` 3.773 → **1.443 LOC (−61,8 %)**
+**Scope kumuliert:** `app/dashboard/einstellungen/page.tsx` 3.773 → **1.116 LOC (−70,4 %)**
+
+**Schritt 3b (2026-05-21):** Custom-Hook + zwei kleine Tabs.
+- `lib/hooks/useManagedUsers.ts` (464 LOC) — komplette Owner-Tool-State-Machine in einem Hook:
+  - 17 useState-Felder (managedUsers, drafts, entitlement, forms, transient UI)
+  - 7 Async-Actions (load, save, create/invite, disable, delete, resendInvite, applyPreset)
+  - Exportiert `ManagedUser` / `ManagedUserAccessDraft` / `ManagedUsersEntitlement` Typen
+  - + pure helper `buildRegistrationMailHref()`
+- `BillingTab.tsx` (90 LOC) — Stripe-Callback-Banner + PricingSettingsPage, kapselt URL-Param-Cleanup
+- `AktivitaetslogTab.tsx` (50 LOC) — Refresh-Button trickst jetzt `refreshKey` in AuditLogSection (vorher Bug: rief `loadManagedUsers` auf, lud also User-Liste statt Logs)
+- AuditLogSection bekam `refreshKey?: number`-Prop (deps-Trigger)
+- page.tsx: 3 Typdefs, 17 useState, 1 useCallback, 6 Handler, 1 pure helper, 1 broken-useEffect entfernt — alle 149 Bezüge in JSX automatisch auf `mu.*` umgestellt
 
 **Schritt 3a (2026-05-21):** PostfachTab ausgelagert.
 - `PostfachTab.tsx` (583 LOC) — Inhaber-Inbox + Versendete + Broadcast-Form + Member-Postfach in einer Komponente
