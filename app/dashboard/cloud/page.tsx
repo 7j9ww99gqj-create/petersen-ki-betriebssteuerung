@@ -378,14 +378,14 @@ function summarizeModules(modules: Record<string, number>) {
 
 export default function CloudPage() {
   const isDemo = hasDemoCookie()
-  const [loading, setLoading] = useState(!isDemo)
+  const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [snapshot, setSnapshot] = useState<CloudSnapshot>(demoSnapshot)
 
   // Backup-State
   const [backups, setBackups] = useState<CloudBackup[]>([])
-  const [backupsLoading, setBackupsLoading] = useState(!isDemo)
+  const [backupsLoading, setBackupsLoading] = useState(true)
   const [backupConfirm, setBackupConfirm] = useState(false)
   const [backupRunning, setBackupRunning] = useState(false)
   const toast = useGlobalToast()
@@ -406,12 +406,6 @@ export default function CloudPage() {
   ]), [snapshot, lastBackup, isDemo])
 
   const loadData = async () => {
-    if (isDemo) {
-      setSnapshot(demoSnapshot)
-      setLoading(false)
-      setBackupsLoading(false)
-      return
-    }
     trackVisit({ href: '/dashboard/cloud', label: 'CloudPilot', icon: '☁️' })
     setError('')
     try {
@@ -432,7 +426,6 @@ export default function CloudPage() {
   }, [isDemo])
 
   const triggerRefresh = async () => {
-    if (isDemo) return
     setRefreshing(true)
     setError('')
     try {
@@ -447,7 +440,7 @@ export default function CloudPage() {
   }
 
   const handleBackup = async () => {
-    if (isDemo || backupRunning) return
+    if (backupRunning) return
     setBackupRunning(true)
     setBackupConfirm(false)
     try {
