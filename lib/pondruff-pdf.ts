@@ -246,16 +246,24 @@ function drawPondruffContent(doc: DocLike, c: ContentBlock) {
   doc.text(introLines, margin, y)
   y += introLines.length * 5 + 8
 
-  // Tabelle
+  // Tabelle — Spaltenbreite hängt davon ab, ob Rabatt-Spalten benötigt werden
   const tableW = rightEdge - margin
-  const colPosW = 11
-  const colMengeW = 16
-  const colPreisW = 26
-  const colSumW = 28
+  const hasAnyDiscount = c.positionen.some(p => (p.rabatt_pct ?? 0) > 0)
+
+  const colPosW = hasAnyDiscount ? 9 : 11
+  const colMengeW = hasAnyDiscount ? 11 : 16
+  const colListW = hasAnyDiscount ? 21 : 26      // Einzelpreis (= Listenpreis vor Rabatt)
+  const colRabW = hasAnyDiscount ? 13 : 0        // Rabatt %
+  const colRabPriceW = hasAnyDiscount ? 21 : 0   // Rabatt-Preis (nach Rabatt)
+  const colSumW = hasAnyDiscount ? 24 : 28       // Gesamt
+  // Spalten-Rechtskanten (für rechtsbündigen Text)
+  const colSumXR = rightEdge
+  const colRabPriceXR = colSumXR - colSumW
+  const colRabXR = colRabPriceXR - colRabPriceW
+  const colListXR = colRabXR - colRabW
+  const colMengeXR = colListXR - colListW
   const colDescX = margin + colPosW
-  const colMengeX = rightEdge - colSumW - colPreisW - colMengeW
-  const colPreisX = rightEdge - colSumW - colPreisW
-  const colSumX = rightEdge
+  const colDescMaxW = colMengeXR - colMengeW - colDescX - 2
 
   // Header-Zeile schwarz mit rotem Akzent
   doc.setFillColor(...POND_DARK)
@@ -263,33 +271,59 @@ function drawPondruffContent(doc: DocLike, c: ContentBlock) {
   doc.setFillColor(...POND_RED)
   doc.rect(margin, y, 3, 9, 'F')
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
+  doc.setFontSize(hasAnyDiscount ? 7.5 : 8)
   doc.setTextColor(255, 255, 255)
-  doc.text('Pos.', margin + 4, y + 6)
+  doc.text('Pos.', margin + 3, y + 6)
   doc.text('Beschreibung', colDescX, y + 6)
-  doc.text('Menge', colMengeX + colMengeW - 1, y + 6, { align: 'right' })
-  doc.text('Einzelpreis', colPreisX + colPreisW - 1, y + 6, { align: 'right' })
-  doc.text('Gesamt', colSumX - 1, y + 6, { align: 'right' })
+  doc.text('Menge', colMengeXR - 1, y + 6, { align: 'right' })
+  doc.text('Einzelpreis', colListXR - 1, y + 6, { align: 'right' })
+  if (hasAnyDiscount) {
+    doc.text('Rabatt', colRabXR - 1, y + 6, { align: 'right' })
+    doc.text('Rabatt-Preis', colRabPriceXR - 1, y + 6, { align: 'right' })
+  }
+  doc.text('Gesamt', colSumXR - 1, y + 6, { align: 'right' })
   y += 9
 
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8.5)
+  doc.setFontSize(hasAnyDiscount ? 7.8 : 8.5)
   c.positionen.forEach((p, i) => {
     if (y > bottomY - 30) {
       // Neue Seite
       doc.addPage()
       y = topY
     }
-    const lines = doc.splitTextToSize(p.beschreibung || '', colPreisX - colDescX - 4)
+    const lines = doc.splitTextToSize(p.beschreibung || '', colDescMaxW)
     const rowH = Math.max(7, lines.length * 4.5 + 2)
     doc.setFillColor(i % 2 === 0 ? 252 : 246, i % 2 === 0 ? 252 : 246, 252)
     doc.rect(margin, y, tableW, rowH, 'F')
     doc.setTextColor(...POND_DARK)
-    doc.text(String(i + 1).padStart(2, '0'), margin + 4, y + 5)
+    doc.text(String(i + 1).padStart(2, '0'), margin + 3, y + 5)
     doc.text(lines, colDescX, y + 5)
-    doc.text(String(p.menge), colMengeX + colMengeW - 1, y + 5, { align: 'right' })
-    doc.text(de(p.einzelpreis) + ' €', colPreisX + colPreisW - 1, y + 5, { align: 'right' })
-    doc.text(de(p.menge * p.einzelpreis) + ' €', colSumX - 1, y + 5, { align: 'right' })
+    doc.text(String(p.menge), colMengeXR - 1, y + 5, { align: 'right' })
+
+    const listenpreis = p.listenpreis ?? p.einzelpreis
+    const rabattPct = p.rabatt_pct ?? 0
+    const rabattPreis = p.einzelpreis // = einzelpreis nach Rabatt
+    const gesamt = p.menge * p.einzelpreis
+
+    doc.text(de(listenpreis) + ' €', colListXR - 1, y + 5, { align: 'right' })
+    if (hasAnyDiscount) {
+      // Rabatt-Zelle: rot wenn > 0, sonst grau strich
+      if (rabattPct > 0) {
+        doc.setTextColor(...POND_RED)
+        doc.text(de(rabattPct) + '%', colRabXR - 1, y + 5, { align: 'right' })
+        doc.setTextColor(...POND_DARK)
+        doc.setFont('helvetica', 'bold')
+        doc.text(de(rabattPreis) + ' €', colRabPriceXR - 1, y + 5, { align: 'right' })
+        doc.setFont('helvetica', 'normal')
+      } else {
+        doc.setTextColor(...POND_GREY)
+        doc.text('—', colRabXR - 1, y + 5, { align: 'right' })
+        doc.text('—', colRabPriceXR - 1, y + 5, { align: 'right' })
+        doc.setTextColor(...POND_DARK)
+      }
+    }
+    doc.text(de(gesamt) + ' €', colSumXR - 1, y + 5, { align: 'right' })
     y += rowH
   })
 
