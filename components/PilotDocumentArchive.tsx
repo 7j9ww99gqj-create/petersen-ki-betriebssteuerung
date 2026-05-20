@@ -154,8 +154,8 @@ export default function PilotDocumentArchive({ pilotType }: Props) {
           // Bucket existiert eventuell noch nicht – trotzdem Eintrag anlegen
           console.warn('Storage-Upload fehlgeschlagen (Bucket vorhanden?):', uploadErr.message)
         } else {
-          const { data: urlData } = supabase.storage.from('pilot-documents').getPublicUrl(path)
-          fileUrl = urlData?.publicUrl ?? null
+          const { data: urlData } = await supabase.storage.from('pilot-documents').createSignedUrl(path, 3600)
+          fileUrl = urlData?.signedUrl ?? null
           filePath = path
           fileSize = uploadFile.size
           mimeType = uploadFile.type
