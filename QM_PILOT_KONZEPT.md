@@ -42,13 +42,13 @@ QM-Pilot ist ein **eigenständiges, zubuchbares Modul** für kleine/mittlere Wer
 
 ### Phase 3 — Nice-to-Have
 
-| # | Aufgabe |
-|---|---------|
-| 1 | SPC-Trend-Analyse (Cp/Cpk vereinfacht) |
-| 2 | Messmittel-Kalibrierungs-Tracking |
-| 3 | E-Mail PDF direkt an Kunden |
-| 4 | Barcode/QR-Code für Bauteil-ID |
-| 5 | CSV/Excel-Export |
+| # | Aufgabe | Status |
+|---|---------|--------|
+| 1 | SPC-Trend-Analyse (Cp/Cpk vereinfacht) | — |
+| 2 | Messmittel-Kalibrierungs-Tracking | ✅ 2026-05-20 |
+| 3 | E-Mail PDF direkt an Kunden | ✅ 2026-05-20 |
+| 4 | Barcode/QR-Code für Bauteil-ID | ✅ 2026-05-20 |
+| 5 | CSV/Excel-Export | ✅ 2026-05-20 |
 
 ---
 
@@ -348,23 +348,16 @@ Badge-Stile (wie andere Piloten):
 - [x] `lib/pricingConfig.ts`: Enterprise-Paket enthält QM (249→279 €/Monat)
 - [x] `app/dashboard/einstellungen/page.tsx`: `MANAGED_PILOT_OPTIONS` + `PILOT_LABELS` + AGB
 
-### ❌ Phase 1 — Noch zu implementieren
+### ✅ Phase 1 — Vollständig (alle 13 Aufgaben)
+### ✅ Phase 2 — Vollständig (alle 5 Aufgaben)
+### ✅ Phase 3A — Vollständig (2026-05-20)
 
-| # | Aufgabe | Prio |
-|---|---------|------|
-| 1 | SQL-Migration: `qm_zeichnungen`, `qm_pruefberichte`, `qm_messwerte`, `qm_fotos` + RLS | 🔴 |
-| 2 | Supabase Storage Buckets: `qm-zeichnungen`, `qm-fotos` | 🔴 |
-| 3 | Zeichnungs-Upload-Seite mit Drag&Drop + Komprimierung | 🔴 |
-| 4 | `POST /api/qm/analyse-zeichnung` → OpenAI Vision → JSON | 🔴 |
-| 5 | Zeichnungs-Detail-Ansicht (extrahierte Daten + Edit-Möglichkeit) | 🔴 |
-| 6 | Prüfbericht-Wizard: 6 Schritte mit State-Management | 🔴 |
-| 7 | Messwert-Ampel: Live-Farbcodierung beim Eintippen | 🔴 |
-| 8 | Foto-Upload (Schritt 4), inkl. Mobile-Kamera | 🔴 |
-| 9 | Gesamtstatus-Auto-Logik (Bestanden/Nachbesserung/Ausschuss) | 🔴 |
-| 10 | `lib/qm-pdf.ts`: PDF-Export mit Messwert-Tabelle + Fotos | 🔴 |
-| 11 | Archiv-Tab: echte DB-Abfragen (statt Demo-Daten) | 🔴 |
-| 12 | Dashboard: echte DB-KPIs (statt Demo-Daten) | 🔴 |
-| 13 | Prüfbericht-Nummer auto-generieren (`PB-2026-001`) | 🔴 |
+| # | Aufgabe | Commit |
+|---|---------|--------|
+| 5 | CSV/Excel-Export (Archiv + Messwerte pro Bericht) | `2c4a7fb` |
+| 4 | QR-Code für Bauteil-ID (UI Wizard + PDF oben rechts) | `f497f36` |
+| 3 | E-Mail PDF (Resend API + mailto-Fallback) | `f330e42` |
+| 2 | Messmittel-Kalibrierungs-Tracking (Tab, DB, Dashboard-Warn) | `7ce3a3d` |
 
 ---
 

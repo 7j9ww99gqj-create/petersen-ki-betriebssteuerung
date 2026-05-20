@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **Arbeitskarte 2×3 Grid + neues Footer-Layout**: 2 Spalten × 3 Reihen = 6 Pos./Seite (Pos 7 → neue Seite), Beschichtung rechts im Header neben Artikel, Services LEFT=Polieren/Läppstr./Wo polieren/Zusatzinfos · RIGHT=Entschichtung/Polierstr./Microstr.; Footer: "Versandfertig gepackt von:" + Signaturlinie (links) + großes Notizen-Feld mit Hilfslinien (rechts), alte Status-Zeilen entfernt. HEAD `10e46df`.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **QM Phase 3A komplett** (4 Aufgaben): CSV-Export Archiv, QR-Code Bauteil-ID (PDF+UI), E-Mail PDF via Resend/mailto, Messmittel-Kalibrierungs-Tab (ISO 9001 §7.1.5). HEAD `7ce3a3d`.
+- Davor: **Arbeitskarte 2×3 Grid + neues Footer-Layout**: 2 Spalten × 3 Reihen = 6 Pos./Seite. HEAD `10e46df`.
 - Davor: **QM Phase 2 — KI-Sichtprüfung live**: `POST /api/qm/sichtpruefung` mit gpt-4o Vision, neue Spalte `qm_fotos.ki_analyse_ergebnis` (jsonb), Wizard-Schritt 5 mit aktivem KI-Button + Ergebnis-Card (Befunde, Empfehlung, Hinweise) + „Befund übernehmen"-Logik, 🤖 KI-Badge in Dashboard + Archiv, Demo-Mock-Response, Cost-Tracking + Rate-Limit + RLS-Pfad-Check. HEAD `28b89b7`. Damit Phase 2A 5/5 ✅.
 - Davor: **Arbeitskarte kompakt 3×2 Grid + WE-Workflow-Erweiterungen**: 6 Positionen/Seite statt 2 (3 Spalten × 2 Reihen), Service-Checkboxen 2×3 eng, Meta-Header 1-zeilig; WE-Löschen mit Bestätigung; Büro/WISO: 📦 Archivieren + 💶 AB-Konvertierung (Preis aus Maßen); Archiv zeigt nur archivierte WEs mit 🖨️-Button. HEAD `f9228ce`.
 - Davor: **QM Phase 2A (4/5 Aufgaben)**: Team-Management (qm_team_mitglieder, Tab 👥), Push-Alerts Cron, Prüfplan-Generator (Regel-Engine, Drucken), Statistik-Dashboard mit echten Supabase-Queries + Recharts-Charts (PieChart, LineChart, BarChart). HEAD `f3d85e4` (nach Merge mit WE-Features).
@@ -463,6 +464,12 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+
+- **Zuletzt erledigt (2026-05-20 — QM Phase 3A: 4 Aufgaben, HEAD `7ce3a3d`, Commits `2c4a7fb`→`7ce3a3d`):**
+  - **Aufgabe 1 CSV-Export** (`2c4a7fb`): Archiv-Tab: Button "📥 CSV Export" exportiert gefilterte Berichte als Semikolon-CSV (UTF-8-BOM, deutsches Excel). Per Zeile: "📊"-Button exportiert Messwerte des Berichts als CSV (Messstelle/Sollwert/Tol±/Istwert/Abweichung/Status/Prüfmittel). Demo: DEMO_BERICHTE-Export / Messwerte-Toast.
+  - **Aufgabe 2 QR-Code** (`f497f36`): `npm install react-qr-code`. Prüfbericht-Wizard Schritt 6 + Erfolgs-Karte: QR-Code 100–120px (JSON-Payload: bauteil_id, pruefbericht_nr, datum, system). `lib/qm-pdf.ts`: QR via qr.js + Canvas als PNG, 22×22mm oben rechts auf Seite 1. `types/qrjs.d.ts` Modul-Deklaration.
+  - **Aufgabe 3 E-Mail PDF** (`f330e42`): `npm install resend`. `app/api/qm/send-pdf/route.ts` (GET: Konfigurationsstatus, POST: Resend-Versand mit PDF-Attachment). Archiv-Tab: "📧"-Button pro Zeile öffnet Modal (Email+Name). Kein RESEND_API_KEY → mailto-Fallback mit vorausgefülltem Betreff/Body. Demo-Toast.
+  - **Aufgabe 4 Messmittel-Tracking** (`7ce3a3d`): SQL-Migration `20260521200000_qm_messmittel.sql` + exec_sql ausgeführt. `lib/db/qm.ts`: `getQmMessmittel/upsertQmMessmittel/deleteQmMessmittel` mit auto-Status (ok/faellig/ueberfaellig, Schwelle 30 Tage). Neuer Tab "🔧 Messmittel": Tabelle + Modal Add/Edit + 2-Klick-Delete. Dashboard-Warn-Karte bei überfälligen Messmitteln (Klick → Tab). Wizard Schritt 3: Prüfmittel-Dropdown aus qm_messmittel + ⚠️-Icon + "Sonstiges"-Fallback. Demo: 3 DEMO_MESSMITTEL (ok/faellig/ueberfaellig).
 
 - **Zuletzt erledigt (2026-05-20 — QM Phase 2 KI-Sichtprüfung, HEAD `28b89b7`):**
   - **API** `app/api/qm/sichtpruefung/route.ts`: `POST { foto_path, bauteil_beschreibung?, material? }` → gpt-4o Vision (höhere Bildqualität als gpt-4o-mini) → strukturiertes JSON `{ gesamtbewertung, konfidenz, befunde[], empfehlung, hinweise[] }`. Cost-Tracking + Rate-Limit + RLS-Pfad-Check (erstes Segment = user_id).
