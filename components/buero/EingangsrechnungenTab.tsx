@@ -60,10 +60,13 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
   }, [initialFilterStatus])
 
   useEffect(() => {
+    let raw: string | null = null
     try {
-      const raw = localStorage.getItem('pk_doc_ai_eingangsrechnung')
+      raw = localStorage.getItem('pk_doc_ai_eingangsrechnung')
       if (!raw) return
-      const imported = JSON.parse(raw) as Partial<Eingangsrechnung>
+      const parsed: unknown = JSON.parse(raw)
+      if (!parsed || typeof parsed !== 'object') return
+      const imported = parsed as Partial<Eingangsrechnung>
       if (!imported.lieferant && !imported.rechnungsnummer) return
       setForm({
         lieferant: imported.lieferant ?? '',
@@ -84,7 +87,10 @@ function EingangRechnungenTab({ isDemo, initialFilterStatus }: { isDemo: boolean
       setShowForm(true)
       localStorage.removeItem('pk_doc_ai_eingangsrechnung')
       showToast('📄 Erkannte Rechnung aus dem KI-Assistenten vorbereitet')
-    } catch {}
+    } catch {
+      if (raw) localStorage.removeItem('pk_doc_ai_eingangsrechnung')
+      showToast('KI-Übernahme fehlgeschlagen — Daten konnten nicht gelesen werden', true)
+    }
   }, [])
 
   const today = new Date().toISOString().slice(0, 10)

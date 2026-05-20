@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRouteAccess } from '@/lib/server-auth'
 import { getServerAiFeatureSettings } from '@/lib/ai-settings'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { checkCostLimit, logAiUsage, extractUsage } from '@/lib/ai-usage'
 
 export const runtime = 'nodejs'
 
@@ -51,6 +52,16 @@ export async function POST(req: NextRequest) {
     if (access.user) {
       const limited = checkRateLimit(access.user.id, 'ocr')
       if (limited) return limited
+
+      if (!access.isDemo) {
+        const costCheck = await checkCostLimit(access.user.id)
+        if (!costCheck.allowed) {
+          return NextResponse.json(
+            emptyResult(`Dein monatliches KI-Budget von ${costCheck.limit.toFixed(2)} € wurde erreicht (verbraucht: ${costCheck.spent.toFixed(4)} €). Bitte kontaktiere den Administrator.`),
+            { status: 429, headers: { 'X-Cost-Limit-Reached': '1' } },
+          )
+        }
+      }
     }
 
     const aiSettings = await getServerAiFeatureSettings(access.supabase)
@@ -210,6 +221,11 @@ export async function POST(req: NextRequest) {
         ? String((data.error as { message?: unknown }).message)
         : 'OpenAI konnte das Dokument nicht analysieren.'
       return NextResponse.json(emptyResult(isPdf ? `PDF-Analyse aktuell nicht möglich: ${message}` : message), { status: 502 })
+    }
+
+    if (access.user) {
+      const usage = extractUsage(data)
+      logAiUsage({ userId: access.user.id, route: 'document-ai', model: process.env.OPENAI_DOCUMENT_MODEL || 'gpt-4o-mini', inputTokens: usage.input, outputTokens: usage.output })
     }
 
     const text = pickOutputText(data)

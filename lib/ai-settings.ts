@@ -44,9 +44,16 @@ const DEFAULT_MARKETING_KI: MarketingKiSettings = {
   salesAssistantEnabled: false,
 }
 
+// Wenn Service-Role-Key fehlt, können Einstellungen nicht geprüft werden → fail-open
+const MARKETING_KI_FAIL_OPEN: MarketingKiSettings = {
+  contentDailyEnabled: true,
+  autopilotEnabled: true,
+  salesAssistantEnabled: true,
+}
+
 export async function getServerMarketingKiSettings(userId: string): Promise<MarketingKiSettings> {
   try {
-    if (!isSupabaseAdminConfigured()) return DEFAULT_MARKETING_KI
+    if (!isSupabaseAdminConfigured()) return MARKETING_KI_FAIL_OPEN
     const admin = createSupabaseAdminClient()
     const { data } = await admin
       .from('firma_einstellungen')
@@ -72,9 +79,16 @@ const DEFAULT_OPENAI_TOOLS: OpenAiToolSettings = {
   monatsberichtEnabled: false,
 }
 
+const OPENAI_TOOLS_FAIL_OPEN: OpenAiToolSettings = {
+  steuerprognoseEnabled: true,
+  mahnungsgeneratorEnabled: true,
+  emailAssistentEnabled: true,
+  monatsberichtEnabled: true,
+}
+
 export async function getServerOpenAiToolSettings(userId: string): Promise<OpenAiToolSettings> {
   try {
-    if (!isSupabaseAdminConfigured()) return DEFAULT_OPENAI_TOOLS
+    if (!isSupabaseAdminConfigured()) return OPENAI_TOOLS_FAIL_OPEN
     const admin = createSupabaseAdminClient()
     const { data } = await admin
       .from('firma_einstellungen')

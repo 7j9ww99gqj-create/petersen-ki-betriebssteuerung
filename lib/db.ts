@@ -1798,9 +1798,19 @@ export async function insertWerkstattMaterial(m: {
   artikel: string; menge: number; einheit?: string
   auftragsnr?: string; mitarbeiter?: string
 }) {
-  const { data, error } = await db()
+  const client = db()
+  let karte_id: string | null = null
+  if (m.auftragsnr) {
+    const { data: karten } = await client
+      .from('werkstatt_karten')
+      .select('id')
+      .eq('auftragsnr', m.auftragsnr)
+      .limit(1)
+    if (karten && karten.length > 0) karte_id = (karten[0] as { id: string }).id
+  }
+  const { data, error } = await client
     .from('werkstatt_material')
-    .insert({ ...m, datum: today() })
+    .insert({ ...m, datum: today(), karte_id })
     .select()
   if (error) throw error
   return data
