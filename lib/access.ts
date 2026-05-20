@@ -1,3 +1,6 @@
+import { INHABER_EMAIL } from './roles'
+import { isPondruffUser } from './pondruff'
+
 type AuthMetadata = Record<string, unknown>
 
 export type AccessStatus = 'pending' | 'active' | 'suspended'
@@ -8,6 +11,7 @@ export type AccessRole = 'Inhaber' | 'Admin' | 'Mitarbeiter' | 'Büro' | 'Werkst
 type MetadataCarrier = {
   app_metadata?: AuthMetadata | null
   user_metadata?: AuthMetadata | null
+  email?: string | null
 }
 
 const ACCESS_PILOTS: AccessPilotId[] = ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer', 'qm']
@@ -85,11 +89,26 @@ export function getAccessProfile(user: MetadataCarrier): UserAccessProfile {
   const expired = isAccessExpired(expiresAt)
   const canAccessDashboard = status === 'active' && !expired
 
+  const userEmail = (
+    (user.email) ??
+    (getMetadataValue(user.user_metadata, 'email') as string | undefined) ??
+    ''
+  ).toString().toLowerCase()
+
+  const isInhaber = userEmail === INHABER_EMAIL.toLowerCase()
+  const isPondruff = isPondruffUser(userEmail)
+  const isAutoQmAccount = isInhaber || isPondruff
+
+  let finalAllowedPilotIds = allowedPilotIds
+  if (isAutoQmAccount && !finalAllowedPilotIds.includes('qm')) {
+    finalAllowedPilotIds = [...finalAllowedPilotIds, 'qm']
+  }
+
   return {
     role,
     status,
     mode,
-    allowedPilotIds,
+    allowedPilotIds: finalAllowedPilotIds,
     hasExplicitPilotGrant,
     expiresAt,
     isExpired: expired,
