@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-const MODEL = 'claude-haiku-4-5-20251001'
+const MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini'
 
 const EXTRACT_PROMPT = `Analysiere diesen Beleg/diese Rechnung und extrahiere die Felder.
 Antworte NUR als JSON-Objekt mit genau diesen Feldern (unbekannte Werte als null):
@@ -43,16 +43,15 @@ async function archiveOriginal(userId: string, fileName: string, data: Uint8Arra
   }
 }
 
-async function callAnthropic(messages: object[]): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY nicht konfiguriert')
+async function callOpenAI(messages: object[]): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error('OPENAI_API_KEY nicht konfiguriert')
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: MODEL,
@@ -60,9 +59,12 @@ async function callAnthropic(messages: object[]): Promise<string> {
       messages,
     }),
   })
-  if (!res.ok) throw new Error(`Anthropic ${res.status}`)
-  const data = await res.json() as { content?: Array<{ text?: string }> }
-  return data.content?.[0]?.text ?? ''
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`OpenAI ${res.status}: ${err.slice(0, 200)}`)
+  }
+  const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> }
+  return data.choices?.[0]?.message?.content ?? ''
 }
 
 function parseExtracted(raw: string): Record<string, unknown> {
@@ -88,7 +90,7 @@ export async function POST(req: NextRequest) {
     let storagePath: string | null = null
 
     if (ct.includes('multipart/form-data')) {
-      // ── Bild / PDF via Vision ──────────────────────────────────────────────
+      // ── Bild via Vision ────────────────────────────────────────────────────
       const form = await req.formData()
       const file = form.get('file') as File | null
       if (!file) return NextResponse.json({ error: 'Keine Datei übermittelt' }, { status: 400 })
@@ -96,24 +98,23 @@ export async function POST(req: NextRequest) {
       const bytes = await file.arrayBuffer()
       const uint8 = new Uint8Array(bytes)
       const b64 = Buffer.from(uint8).toString('base64')
-      const mime = file.type || 'application/octet-stream'
+      const mime = file.type || 'image/jpeg'
 
-      storagePath = await archiveOriginal(userId, file.name, uint8, mime)
-
-      const isImage = mime.startsWith('image/')
-      if (!isImage) {
+      if (!mime.startsWith('image/')) {
         return NextResponse.json({ error: 'Nur Bilddateien (JPEG/PNG/WEBP) werden als Upload unterstützt. Für PDFs bitte Text einfügen.' }, { status: 400 })
       }
 
-      replyText = await callAnthropic([{
+      storagePath = await archiveOriginal(userId, file.name, uint8, mime)
+
+      replyText = await callOpenAI([{
         role: 'user',
         content: [
-          { type: 'image', source: { type: 'base64', media_type: mime as 'image/jpeg', data: b64 } },
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}`, detail: 'low' } },
           { type: 'text', text: EXTRACT_PROMPT },
         ],
       }])
     } else {
-      // ── Roher Text (bisherige API, rückwärtskompatibel) ────────────────────
+      // ── Roher Text (rückwärtskompatibel) ──────────────────────────────────
       const body = await req.json() as { text?: string }
       const text = (body.text ?? '').trim()
       if (!text || text.length < 10) {
@@ -123,7 +124,7 @@ export async function POST(req: NextRequest) {
       const textBytes = new TextEncoder().encode(text)
       storagePath = await archiveOriginal(userId, `ocr_text_${Date.now()}.txt`, textBytes, 'text/plain')
 
-      replyText = await callAnthropic([{
+      replyText = await callOpenAI([{
         role: 'user',
         content: `${EXTRACT_PROMPT}\n\nBelegtext:\n${text.slice(0, 4000)}`,
       }])

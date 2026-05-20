@@ -27,9 +27,9 @@ export async function POST(req: NextRequest) {
     if (!parsed.ok) return parsed.error
     const { kunde, titel, betrag, notiz } = parsed.data
 
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
-      return NextResponse.json({ error: 'ANTHROPIC_API_KEY nicht konfiguriert' }, { status: 500 })
+      return NextResponse.json({ error: 'OPENAI_API_KEY nicht konfiguriert' }, { status: 500 })
     }
 
     const prompt = `Du bist ein professioneller Texter für Handwerks- und Industriebetriebe. Erstelle einen professionellen, sachlichen Angebotstext auf Deutsch.
@@ -48,15 +48,14 @@ Erstelle einen kurzen, professionellen Angebotstext (3-5 Sätze) der:
 
 Antworte NUR mit dem Angebotstext, ohne Überschriften oder Einleitung.`
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'claude-haiku-20240307',
+        model: process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini',
         max_tokens: 400,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -64,12 +63,12 @@ Antworte NUR mit dem Angebotstext, ohne Überschriften oder Einleitung.`
 
     if (!response.ok) {
       const err = await response.text()
-      console.error('Anthropic API error:', err)
+      console.error('OpenAI API error:', err)
       return NextResponse.json({ error: 'KI-Dienst nicht verfügbar' }, { status: 502 })
     }
 
-    const data = await response.json()
-    const text = data.content?.[0]?.text ?? ''
+    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
+    const text = data.choices?.[0]?.message?.content ?? ''
 
     return NextResponse.json({ text })
   } catch (err) {
