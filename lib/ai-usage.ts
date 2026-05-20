@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 const PRICING_EUR_PER_M: Record<string, { input: number; output: number }> = {
   'gpt-4o-mini':         { input: 0.138, output: 0.552 },
   'gpt-4o':              { input: 2.300, output: 9.200 },
-  'gpt-5.4-mini':        { input: 0.138, output: 0.552 }, // Fallback bis Pricing klar
+  'gpt-4o-mini-2024-07-18': { input: 0.138, output: 0.552 },
   'text-embedding-3-small': { input: 0.018, output: 0 },
 }
 

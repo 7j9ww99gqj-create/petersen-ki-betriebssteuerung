@@ -397,7 +397,7 @@ Regeln:
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_CHAT_MODEL || 'gpt-5.4-mini',
+        model: process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini',
         instructions: fullSystem,
         input: inputMessages,
         max_output_tokens: 1024,

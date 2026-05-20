@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_DOCUMENT_MODEL || 'gpt-5.4-mini',
+        model: process.env.OPENAI_DOCUMENT_MODEL || 'gpt-4o-mini',
         instructions: [
           'Du bist eine Dokumenten-KI für ein Warenwirtschaftssystem.',
           'Du klassifizierst Rechnungen, Angebote, Aufträge, Lieferscheine, Wareneingänge, Kundendokumente und sonstige Dokumente.',
