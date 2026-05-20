@@ -14,6 +14,8 @@ export type OwnerAuditAction =
   | 'customer.suspend'
   | 'customer.status_change'
   | 'pondruff_flag.toggle'
+  | 'qm_ki_zeichnungs_analyse.toggle'
+  | 'qm_ki_sichtpruefung.toggle'
   | 'invoice.create'
 
 export type OwnerAuditActor = {
