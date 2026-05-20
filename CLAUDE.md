@@ -8,6 +8,7 @@ KI-gestütztes Warenwirtschaftssystem als produktive SaaS-WebApp.
 **Repo:** https://github.com/7j9ww99gqj-create/petersen-ki-betriebssteuerung
 
 ### Aktueller Zwischenstand (2026-05-20)
+- **UI-Fixes — Mobile, Logo, Piloten-Farben** (`79913d9`): (1) Mobile-Bug Einstellungen → Benachrichtigungen behoben (overflow + responsive padding). (2) Logo-Upload in Firmendaten repariert — `next.config.js` `remotePatterns` für Supabase-Storage + nativer `<img>`-Fallback mit Initialen. (3) `components/brand/Logo.tsx` mark-Variante nutzt jetzt `/public/logo.png` (echtes Hexagon-Logo). (4) `lib/pilot-colors.ts`: zentrale Pilot-Farbpalette. Jeder Pilot-Header hat farbigen Namen (`<span style={{color}}>Lager</span>Pilot`) + Glow-Box. Marketing auf `#f97316`, Steuer auf `#fbbf24` umgestellt.
 - **DP12-Phase2 — Toast-Unifikation + Cloud-Sync** (`bb57741`): Alle Piloten-Toasts (Lager/Werkstatt/QM/Büro/Steuer) auf `.pk-toast` umgestellt → Position/Animation/Dauer/Größe folgen jetzt den User-Prefs. Neue `components/AppToast.tsx` mit Event-API `pushAppToast(msg, type)`. WebAudio-Beep über `lib/toast-sound.ts` (Sound für success/error/info). Demo-Buttons im Benachrichtigungen-Tab. Cloud-Sync via `user_design_prefs` (RLS, Opt-in) — `lib/design-sync.ts`.
 - **DP12 — Design-Personalisierung ausgebaut** (`019efae`): 6 neue Module im Einstellungen-Tab „Benachrichtigungen" mit Master-Toggle pro Modul. Bei deaktiviertem Modul bleibt der aktuelle Look 1:1 erhalten. Tab-Layout (`Allgemein / Benachrichtigungen / Typografie / Effekte / Farben / Icons & Layout`). „↺ Alles zurücksetzen" setzt alle Module wieder auf disabled. CSS-Regeln rein additiv (`body[data-pers-*="on"]`), brechen nichts Bestehendes.
 - Büro-/Einkaufsrelationen wurden weiter abgesichert: `kunde_id` und `lieferant_id` laufen jetzt in `lib/db.ts`, Schema und Büro-UI konsistenter mit.
@@ -391,16 +392,24 @@ CSS-Klassen:
 - `.support-btn-wrap` – SupportButton-Wrapper (über Bottom-Nav)
 - `.hide-xs` – Versteckt Element auf sehr kleinen Screens
 
-### Piloten-Farben
-| Pilot | Farbe | Hex |
-|-------|-------|-----|
-| LagerPilot | Blau | `#1684ff` |
-| BüroPilot | Cyan | `#20c8ff` |
-| WerkstattPilot | Violett | `#a78bfa` / `#7c3aed` |
-| MarketingPilot | Orange | `#f59e0b` |
-| AnalysePilot | Grün | `#10b981` |
-| PlanungPilot | Pink/Rot | `#f43f5e` / `#e11d48` |
-| KI-Assistent | Lila | `#7c3aed` / `#a78bfa` |
+### Piloten-Farben (zentral in `lib/pilot-colors.ts`)
+| Pilot | Farbe | Hex | Akzent |
+|-------|-------|-----|--------|
+| LagerPilot | Blau | `#1684ff` | `#20c8ff` |
+| BüroPilot | Cyan | `#20c8ff` | `#67e8f9` |
+| WerkstattPilot | Violett | `#a78bfa` | `#c4b5fd` |
+| MarketingPilot | Orange | `#f97316` | `#fb923c` |
+| AnalysePilot | Grün | `#10b981` | `#34d399` |
+| PlanungPilot | Pink/Rot | `#f43f5e` | `#fb7185` |
+| KI-Assistent | Lila | `#c084fc` | `#d8b4fe` |
+| SteuerPilot | Gold/Gelb | `#fbbf24` | `#fcd34d` |
+| QM | Teal | `#06b6d4` | `#22d3ee` |
+
+**Pattern in jedem Pilot:**
+- Header-Icon-Box: `background: c.bgSoft, border: c.border, boxShadow: c.glow`
+- Header-Name: `<h1><span style={{color: c.primary}}>Lager</span>Pilot</h1>`
+- Tab-Active: `borderBottom: 2px solid c.primary, color: c.primary`
+- Buttons & KPIs übernehmen die Pilot-Farbe via Helper aus `lib/pilot-colors.ts`
 
 ### DP12 — Personalisierungs-Module (`lib/design-flag.ts` + `DesignCustomizationPanel.tsx`)
 
