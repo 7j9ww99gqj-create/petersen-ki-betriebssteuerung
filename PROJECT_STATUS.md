@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **QM-Pilot Konzept + Access-Grundgerüst** (2 Commits `d94a1e7` + `34056cc`): QM als buchbares Modul, Sidebar-Eintrag, Pricing (40€), Enterprise-Paket (279€), Demo-Dashboard 4 Tabs. Vollständiges Konzept-Dokument: `QM_PILOT_KONZEPT.md`. Phase 1 (DB + Wizard + KI + PDF) steht an.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **QM-Pilot Phase 1 — Aufgaben 1–5/13** (5 Commits `9cef745` → `52b71ee`): DB-Schema + 2 Storage-Buckets, `lib/db/qm.ts` mit CRUD + Ampel-Logik + Prüfbericht-Nr-Generator, Zeichnungs-Upload-Seite mit Drag&Drop + Komprimierung, OpenAI Vision API-Route (`gpt-4o-mini` + Cost-Tracking + Rate-Limit), Zeichnungs-Detail-Ansicht mit KI-Analyse-Button + editierbarer Maß-Tabelle + „Prüfbericht starten". Aufgaben 6–13 (Wizard + Fotos + PDF + Archiv-DB-Anbindung) noch offen.
+- Davor: `2026-05-20`, `main`, **QM-Pilot Konzept + Access-Grundgerüst** (2 Commits `d94a1e7` + `34056cc`): QM als buchbares Modul, Sidebar-Eintrag, Pricing (40€), Enterprise-Paket (279€), Demo-Dashboard 4 Tabs. Vollständiges Konzept-Dokument: `QM_PILOT_KONZEPT.md`.
 - Davor: **5 Wareneingang-Optimierungen**: Multi-Image-OCR (bis 6 Fotos), Post-Save-Druckbutton, WE-Liste am Seitenende, visuelle Checkboxen auf Arbeitskarte, Status-Zeilen. HEAD `3fd88a8`.
 - Davor: **Arbeitskarte PDF + Büropilot-Sync**: A5-Arbeitskarte druckbar, alle WE-Daten vollständig. HEAD `0d485c6`.
 - Davor: **Wareneingang-Workflow-Redesign**: KI-Modus + Manuell-Modus, neue OCR-API, Positions-Details, Büro/WISO-Detailansicht. HEAD `b6f97eb`.
@@ -425,16 +426,23 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
 - ✅ ~~**Aufgabe 13: einkaufspreis-Spalte lager_artikel**~~ — `b9185eb` Migration + lib/db.ts + Modal-Feld.
 - 🟡 **Stripe Analytics Integration** (4h) — MRR-Verlauf im Marketing-Auswertungs-Tab.
 - 🟡 **Mailchimp API** (5h) — Echtzeit-Öffnungsraten + Lead→Subscriber-Automatisierung.
+- ✅ ~~**QM-Pilot Phase 1 Aufgabe 1: SQL-Migration**~~ **Erledigt 2026-05-20** (Commit `9cef745`) — 4 Tabellen + RLS + 2 Storage-Buckets via `exec_sql` live.
+- ✅ ~~**QM-Pilot Phase 1 Aufgabe 2: DB-Funktionen**~~ **Erledigt 2026-05-20** (Commit `8e737e9`) — `lib/db/qm.ts` mit Typen + CRUD + Ampel-Logik + PB-Nr-Generator.
+- ✅ ~~**QM-Pilot Phase 1 Aufgabe 3: Zeichnungs-Upload-Seite**~~ **Erledigt 2026-05-20** (Commit `59f6eaf`) — Drag&Drop + Komprimierung + Bibliothek.
+- ✅ ~~**QM-Pilot Phase 1 Aufgabe 4: OpenAI Vision API**~~ **Erledigt 2026-05-20** (Commit `5e46226`) — `/api/qm/analyse-zeichnung` mit gpt-4o-mini + Cost-Tracking.
+- ✅ ~~**QM-Pilot Phase 1 Aufgabe 5: Zeichnungs-Detail-Ansicht**~~ **Erledigt 2026-05-20** (Commit `52b71ee`) — Vorschau + Edit + KI-Analyse + „Prüfbericht starten".
+- 🔴 **QM-Pilot Phase 1 Aufgabe 6: Prüfbericht-Wizard** — `/dashboard/qm/pruefen` mit 6 Schritten (Zeichnung wählen → Bauteil → Messwerte → Fotos → Sichtprüfung → Abschluss). Detail-Seite verlinkt bereits darauf.
+- 🔴 **QM-Pilot Phase 1 Aufgaben 7–13** — Foto-Upload, Ampel-Live-Update, Gesamtstatus-Logik, PDF-Export `lib/qm-pdf.ts`, Archiv-DB-Anbindung, Dashboard-KPIs aus DB.
 
 ### 0.3 Aktuelle Blocker
 - **Keine Blocker.** Alle SQL-Schemas eingespielt, alle Env-Vars gesetzt, Storage Bucket erstellt.
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-20, **QM-Pilot Grundgerüst** (Konzept + Access + Pricing + Demo-Dashboard) — HEAD `34056cc`  
-**Letzte Session:** QM-Pilot als buchbares Modul eingerichtet: Sidebar-Eintrag, Access-System (nur bei Buchung sichtbar), Pricing 40€/Monat, Enterprise-Paket 279€, Demo-Dashboard 4 Tabs, vollständiges Konzept in `QM_PILOT_KONZEPT.md`  
-**Nächster Focus:** QM-Pilot Phase 1 — DB-Schema + Zeichnungs-Upload + OpenAI Vision + Prüfbericht-Wizard + PDF-Export (siehe `QM_PILOT_KONZEPT.md` Abschnitt „Phase 1 — Noch zu implementieren")  
-**Blocker:** Keine  
+**Letzter Stand:** 2026-05-20, **QM-Pilot Phase 1 Aufgaben 1–5 von 13** — HEAD `52b71ee`  
+**Letzte Session:** DB-Schema (4 Tabellen + RLS) + 2 Storage-Buckets (`qm-zeichnungen`, `qm-fotos`) live, `lib/db/qm.ts` (Typen + CRUD + Ampel-Logik + PB-Nr-Auto-Gen), `/dashboard/qm/zeichnungen` (Drag&Drop + Komprimierung + Bibliothek), `/api/qm/analyse-zeichnung` (gpt-4o-mini Vision + Cost-Tracking), `/dashboard/qm/zeichnungen/[id]` (Vorschau + Edit + KI-Analyse-Button + „Prüfbericht starten")  
+**Nächster Focus:** QM-Pilot Phase 1 Aufgaben 6–13 — Prüfbericht-Wizard (6 Schritte), Foto-Upload, PDF-Export (`lib/qm-pdf.ts`), Archiv/Dashboard auf echte DB-Daten umstellen  
+**Blocker:** Keine — die Detail-Seite verlinkt bereits auf `/dashboard/qm/pruefen?zeichnung=ID`; diese Route existiert noch nicht und kommt mit Aufgabe 6 (Wizard).  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur/QM-Wizard
 
 ## 1. Kurzüberblick
@@ -450,6 +458,14 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+
+- **Zuletzt erledigt (2026-05-20 — QM-Pilot Phase 1 Aufgaben 1–5/13, HEAD `52b71ee`, 5 Commits):**
+  - **Aufgabe 1** (`9cef745`): `supabase/migrations/20260520600000_qm_schema.sql` mit 4 Tabellen (`qm_zeichnungen`, `qm_pruefberichte`, `qm_messwerte`, `qm_fotos`) + RLS-Policies (user-scoped via `auth.uid()`) + 2 Storage-Buckets (`qm-zeichnungen` 10MB, `qm-fotos` 5MB) mit Path-Prefix-Policies. Via `exec_sql` ausgeführt.
+  - **Aufgabe 2** (`8e737e9`): `lib/db/qm.ts` mit Typen (`QmZeichnung`, `QmPruefbericht`, `QmMesswert`, `QmFoto`, `QmErkanntesMass`) + CRUD-Funktionen + Storage-Helpern (Upload/Signed URL/Delete für beide Buckets) + `nextQmPruefberichtNummer()` (Format `PB-{YYYY}-{NNN}`) + `ampelStatus()` (grün/orange/rot/offen via Soll/Ist/Toleranzband).
+  - **Aufgabe 3** (`59f6eaf`): `app/dashboard/qm/zeichnungen/page.tsx` mit Drag&Drop Upload-Zone, Multi-File-Upload, Bild-Komprimierung (max 2200px, webp 85%), Zeichnungs-Bibliothek mit Vorschau-Thumbnail (signed URL), KI-Konfidenz-Badge, Inline-Delete (2-Klick), Demo-Modus-Fallback, Toast.
+  - **Aufgabe 4** (`5e46226`): `app/api/qm/analyse-zeichnung/route.ts` — `POST { datei_path }` → Pfad-Prefix-Check (RLS-Safety) → Service-Role Signed URL (1h) → OpenAI `gpt-4o-mini` Vision mit `response_format: json_object` → strukturiertes JSON (Maße/Toleranzen/Material/Oberfläche/Beschichtung/Sonderanforderungen/Konfidenz). Rate-Limit `ocr`-Bucket + monatliches Kostenlimit + `logAiUsage()`.
+  - **Aufgabe 5** (`52b71ee`): `app/dashboard/qm/zeichnungen/[id]/page.tsx` mit Datei-Vorschau, editierbaren Stammdaten (Name, Nr, Revision, Material, Oberfläche, Beschichtung, Sonder), editierbare Maß-Tabelle (Add/Edit/Delete + Kritisch-Flag + Konfidenz-Badge), `✨ KI-Analyse starten`-Button (ruft `/api/qm/analyse-zeichnung` und speichert direkt), `📋 Prüfbericht starten`-Button (Navigation zu `/dashboard/qm/pruefen?zeichnung=ID`, Wizard-Route folgt mit Aufgabe 6).
+  - **Noch offen aus Phase 1 (Aufgaben 6–13):** Prüfbericht-Wizard (6 Schritte), Foto-Upload (Mobile-Kamera), Gesamtstatus-Auto-Logik, PDF-Export (`lib/qm-pdf.ts`), Archiv mit echten DB-Abfragen, Dashboard-KPIs aus DB statt Demo-Daten.
 
 - **Zuletzt erledigt (2026-05-20 — QM-Pilot Grundgerüst, HEAD `34056cc`, 2 Commits):**
   - `lib/access.ts`: `'qm'` als neuer `AccessPilotId` — nur bei expliziter Buchung sichtbar (NICHT in DEFAULT_ROLE_PILOTS)
@@ -1346,11 +1362,11 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
 
 ## 15. Nächste Empfehlung
 - Als NÄCHSTES umsetzen:
-  1. **Marketing-KI testen + live schalten**: In Einstellungen → KI-Funktionen → Marketing-KI die 3 Module einzeln aktivieren und testen. Dann für Kunden freigeben.
-  2. **SteuerPilot: ELSTER-XML-Export vorbereiten** (Aufgabe 13): Formular-Mapping §§ 81/83 UStVA; schrittweise als Download-Dummy umsetzen.
-  3. **SteuerPilot: Jahres-Zusammenfassung** mit vereinfachter G&V (Einnahmen – Gesamtausgaben) auf Basis der vorhandenen Daten.
-  4. **Stripe Webhook-URL** im Stripe-Dashboard prüfen; echter End-to-End-Test Buchung → Auftrag → Zahlung → Rechnung.
-  5. **Multi-Positions-Rechnungen/-Angebote** im BüroPilot (aktuell nur 1 Position hardcoded).
+  1. **QM-Pilot Phase 1 Aufgabe 6** — Prüfbericht-Wizard (`/dashboard/qm/pruefen` + `/dashboard/qm/pruefen/[id]`) mit 6 Schritten: Zeichnung wählen → Bauteil-Infos → Messwerte (Live-Ampel) → Fotos (Drop-Zones inkl. Mobile-Kamera) → Sichtprüfung → Abschluss/Abzeichnung. Detail-Seite verlinkt bereits darauf.
+  2. **QM-Pilot Phase 1 Aufgaben 7–9** — Foto-Upload-Inline im Wizard, Messwert-Ampel-Live-Update beim Tippen, Gesamtstatus-Auto-Logik (bestanden/nachbesserung/ausschuss/offen).
+  3. **QM-Pilot Phase 1 Aufgabe 10** — `lib/qm-pdf.ts` (jsPDF + jspdf-autotable) mit Seite 1 (Header + Bauteil-Infos + farbige Messwert-Tabelle) und Seite 2 (Sichtprüfung + Foto-Grid + Bemerkungen). `/api/qm/pdf/[id]`-Route.
+  4. **QM-Pilot Phase 1 Aufgaben 11–13** — Archiv-Tab + Dashboard-KPIs auf echte DB-Abfragen umstellen; Prüfbericht-Nr Auto-Generierung im Wizard integrieren.
+  5. **Marketing-KI testen + live schalten** (Folge-Sprint nach QM).
 
 ### Marketing-KI Aktivierungs-Anleitung (Owner)
 1. Login als `info@petersen-ki-pilot.de`
