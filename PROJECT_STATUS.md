@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **QM Phase 3A komplett** (4 Aufgaben): CSV-Export Archiv, QR-Code Bauteil-ID (PDF+UI), E-Mail PDF via Resend/mailto, Messmittel-Kalibrierungs-Tab (ISO 9001 §7.1.5). HEAD `7ce3a3d`.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **WE-Workflow: Artikelnummer, Polierkosten, AB-Rabatt**: OCR erkennt Art.-Nr. + Menge-Synonyme (Stück/Anzahl/Qty); neues Polierkosten-Feld (öffnet bei Polieren=Ja); Arbeitskarte zeigt Art.-Nr. über Maße; 2-Step AB-Workflow (Ja/Nein → Rabatt% auf Beschichtungen) erzeugt pro Position 2 AB-Rows (Beschichtung mit Rabatt + Polieren ohne Rabatt). HEAD `04fd0d7`.
+- Davor: **QM Phase 3A komplett** (4 Aufgaben): CSV-Export Archiv, QR-Code Bauteil-ID (PDF+UI), E-Mail PDF via Resend/mailto, Messmittel-Kalibrierungs-Tab (ISO 9001 §7.1.5). HEAD `7ce3a3d`.
 - Davor: **Arbeitskarte 2×3 Grid + neues Footer-Layout**: 2 Spalten × 3 Reihen = 6 Pos./Seite. HEAD `10e46df`.
 - Davor: **QM Phase 2 — KI-Sichtprüfung live**: `POST /api/qm/sichtpruefung` mit gpt-4o Vision, neue Spalte `qm_fotos.ki_analyse_ergebnis` (jsonb), Wizard-Schritt 5 mit aktivem KI-Button + Ergebnis-Card (Befunde, Empfehlung, Hinweise) + „Befund übernehmen"-Logik, 🤖 KI-Badge in Dashboard + Archiv, Demo-Mock-Response, Cost-Tracking + Rate-Limit + RLS-Pfad-Check. HEAD `28b89b7`. Damit Phase 2A 5/5 ✅.
 - Davor: **Arbeitskarte kompakt 3×2 Grid + WE-Workflow-Erweiterungen**: 6 Positionen/Seite statt 2 (3 Spalten × 2 Reihen), Service-Checkboxen 2×3 eng, Meta-Header 1-zeilig; WE-Löschen mit Bestätigung; Büro/WISO: 📦 Archivieren + 💶 AB-Konvertierung (Preis aus Maßen); Archiv zeigt nur archivierte WEs mit 🖨️-Button. HEAD `f9228ce`.
