@@ -371,19 +371,19 @@ export async function uploadFirmenLogo(file: File) {
   if (!userId) throw new Error('Kein Benutzer für Logo-Upload gefunden.')
   const ext = file.name.split('.').pop() || 'png'
   const path = `${userId}/firma/logo_${Date.now()}.${ext}`
-  const { error } = await supabase.storage.from('dokumente').upload(path, file, { upsert: true })
+  const { error } = await supabase.storage.from('firma-branding').upload(path, file, { upsert: true })
   if (error) throw error
-  const { data } = await supabase.storage.from('dokumente').createSignedUrl(path, 60 * 60 * 24 * 365)
+  const { data } = await supabase.storage.from('firma-branding').createSignedUrl(path, 60 * 60 * 24 * 365)
   return { path, url: data?.signedUrl ?? path }
 }
 
 export async function deleteFirmenLogo(pathOrUrl: string) {
-  const marker = '/object/sign/dokumente/'
+  const marker = '/object/sign/firma-branding/'
   const path = pathOrUrl.includes(marker)
     ? decodeURIComponent(pathOrUrl.split(marker)[1]?.split('?')[0] ?? '')
     : pathOrUrl
   if (!path) return
-  const { error } = await db().storage.from('dokumente').remove([path])
+  const { error } = await db().storage.from('firma-branding').remove([path])
   if (error) throw error
 }
 
@@ -394,19 +394,19 @@ export async function uploadBriefpapier(file: File) {
   if (!userId) throw new Error('Kein Benutzer für Briefpapier-Upload gefunden.')
   const ext = file.name.split('.').pop() || 'pdf'
   const path = `${userId}/firma/briefpapier_${Date.now()}.${ext}`
-  const { error } = await supabase.storage.from('dokumente').upload(path, file, { upsert: true })
+  const { error } = await supabase.storage.from('firma-branding').upload(path, file, { upsert: true })
   if (error) throw error
-  const { data } = await supabase.storage.from('dokumente').createSignedUrl(path, 60 * 60 * 24 * 365)
+  const { data } = await supabase.storage.from('firma-branding').createSignedUrl(path, 60 * 60 * 24 * 365)
   return { path, url: data?.signedUrl ?? path }
 }
 
 export async function deleteBriefpapier(pathOrUrl: string) {
-  const marker = '/object/sign/dokumente/'
+  const marker = '/object/sign/firma-branding/'
   const path = pathOrUrl.includes(marker)
     ? decodeURIComponent(pathOrUrl.split(marker)[1]?.split('?')[0] ?? '')
     : pathOrUrl
   if (!path) return
-  const { error } = await db().storage.from('dokumente').remove([path])
+  const { error } = await db().storage.from('firma-branding').remove([path])
   if (error) throw error
 }
 
