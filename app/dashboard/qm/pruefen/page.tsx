@@ -26,6 +26,7 @@ import {
   type QmTeamMitglied,
   type QmZeichnung,
 } from '@/lib/db/qm'
+import { getQmKiSettings, type QmKiSettings } from '@/lib/db'
 
 const QM_COLOR = '#14b8a6'
 
@@ -193,6 +194,7 @@ export default function PruefeWizardPage() {
   const [teamMitglieder, setTeamMitglieder] = useState<QmTeamMitglied[]>([])
   const [prueferFreitext, setPrueferFreitext] = useState(false)
   const [pruefplanLoading, setPruefplanLoading] = useState(false)
+  const [qmKiSettings, setQmKiSettings] = useState<QmKiSettings>({ qm_ki_zeichnungs_analyse: false, qm_ki_sichtpruefung: false })
   const [verfuegbareMessmittel, setVerfuegbareMessmittel] = useState<QmMessmittel[]>([])
 
   // ── Save + PDF state
@@ -233,6 +235,7 @@ export default function PruefeWizardPage() {
   }, [isDemo])
 
   useEffect(() => { void loadZeichnungen() }, [loadZeichnungen])
+  useEffect(() => { getQmKiSettings().then(setQmKiSettings).catch(() => {}) }, [])
 
   useEffect(() => {
     if (isDemo) return
@@ -938,15 +941,22 @@ export default function PruefeWizardPage() {
                 <div style={{ padding: '12px 16px', borderRadius: 10, background: `${QM_COLOR}08`, border: `1px solid ${QM_COLOR}25`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <button
                     className="pk-btn-ghost"
-                    disabled={!hatFoto || kiSichtLoading}
+                    disabled={!hatFoto || kiSichtLoading || !qmKiSettings.qm_ki_sichtpruefung}
                     onClick={() => void runKiSichtpruefung()}
-                    style={{ fontSize: 13, opacity: hatFoto && !kiSichtLoading ? 1 : 0.5, cursor: hatFoto && !kiSichtLoading ? 'pointer' : 'not-allowed', color: QM_COLOR, borderColor: `${QM_COLOR}40` }}
+                    style={{ fontSize: 13, opacity: hatFoto && !kiSichtLoading && qmKiSettings.qm_ki_sichtpruefung ? 1 : 0.5, cursor: hatFoto && !kiSichtLoading && qmKiSettings.qm_ki_sichtpruefung ? 'pointer' : 'not-allowed', color: QM_COLOR, borderColor: `${QM_COLOR}40` }}
+                    title={!qmKiSettings.qm_ki_sichtpruefung ? 'KI-Sichtprüfung für deinen Account nicht freigeschaltet — bitte Inhaber kontaktieren.' : undefined}
                   >
                     {kiSichtLoading ? '⏳ KI analysiert Oberfläche…' : '🔍 KI-Sichtprüfung starten'}
                   </button>
-                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>
-                    {hatFoto ? 'OpenAI Vision analysiert das erste hochgeladene Foto.' : 'Lade zuerst in Schritt 4 mindestens ein Foto hoch.'}
-                  </span>
+                  {!qmKiSettings.qm_ki_sichtpruefung ? (
+                    <span style={{ fontSize: 12, padding: '6px 10px', borderRadius: 6, background: 'rgba(20,184,166,.08)', border: '1px solid rgba(20,184,166,.2)', color: '#5eead4' }}>
+                      🔒 KI-Sichtprüfung für deinen Account nicht freigeschaltet — bitte Inhaber kontaktieren.
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 12, color: '#aeb9c8' }}>
+                      {hatFoto ? 'OpenAI Vision analysiert das erste hochgeladene Foto.' : 'Lade zuerst in Schritt 4 mindestens ein Foto hoch.'}
+                    </span>
+                  )}
                   {kiSichtError && (
                     <div style={{ width: '100%', fontSize: 12, color: '#ff8080' }}>⚠️ {kiSichtError}</div>
                   )}

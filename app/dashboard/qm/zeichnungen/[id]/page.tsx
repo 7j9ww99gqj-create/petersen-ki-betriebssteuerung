@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { hasDemoCookie } from '@/lib/auth'
+import { getQmKiSettings, type QmKiSettings } from '@/lib/db'
 import {
   getQmZeichnung,
   getQmZeichnungsSignedUrl,
@@ -81,6 +82,7 @@ export default function QmZeichnungDetailPage() {
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const [pruefplan, setPruefplan] = useState<PruefplanPosition[] | null>(null)
   const [pruefplanLoading, setPruefplanLoading] = useState(false)
+  const [qmKiSettings, setQmKiSettings] = useState<QmKiSettings>({ qm_ki_zeichnungs_analyse: false, qm_ki_sichtpruefung: false })
 
   // Editable fields
   const [name, setName] = useState('')
@@ -137,6 +139,7 @@ export default function QmZeichnungDetailPage() {
   }, [id, isDemo, applyZeichnung])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => { getQmKiSettings().then(setQmKiSettings).catch(() => {}) }, [])
 
   async function runAnalyse() {
     if (isDemo) { showToast('Demo-Modus: KI-Analyse deaktiviert', false); return }
@@ -344,9 +347,10 @@ export default function QmZeichnungDetailPage() {
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <button
                     className="pk-btn"
-                    disabled={analyzing || !zeichnung.datei_pfad}
+                    disabled={analyzing || !zeichnung.datei_pfad || !qmKiSettings.qm_ki_zeichnungs_analyse}
                     onClick={() => void runAnalyse()}
-                    style={{ background: QM_COLOR, border: 'none' }}
+                    style={{ background: QM_COLOR, border: 'none', opacity: qmKiSettings.qm_ki_zeichnungs_analyse ? 1 : 0.5 }}
+                    title={!qmKiSettings.qm_ki_zeichnungs_analyse ? 'KI-Analyse für deinen Account nicht freigeschaltet — bitte Inhaber kontaktieren.' : undefined}
                   >
                     {analyzing ? '⏳ Analysiere…' : '✨ KI-Analyse starten'}
                   </button>
@@ -358,7 +362,12 @@ export default function QmZeichnungDetailPage() {
                     📋 Prüfbericht starten
                   </button>
                 </div>
-                {!zeichnung.datei_pfad && (
+                {!qmKiSettings.qm_ki_zeichnungs_analyse && (
+                  <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(20,184,166,.08)', border: '1px solid rgba(20,184,166,.2)', color: '#5eead4', fontSize: 12 }}>
+                    🔒 KI-Analyse für deinen Account nicht freigeschaltet — bitte Inhaber kontaktieren.
+                  </div>
+                )}
+                {!zeichnung.datei_pfad && qmKiSettings.qm_ki_zeichnungs_analyse && (
                   <div style={{ marginTop: 10, color: '#f59e0b', fontSize: 12 }}>
                     ⚠️ Keine Datei hinterlegt — KI-Analyse benötigt eine hochgeladene Zeichnung.
                   </div>
