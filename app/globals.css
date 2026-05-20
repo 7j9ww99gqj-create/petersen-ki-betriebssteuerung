@@ -673,3 +673,64 @@ button, a, [role="button"] {
   .pk-h2 { font-size: 20px; }
   .pk-h3 { font-size: 17px; }
 }
+
+/* ── Semantische Farb-Tokens (G7, additiv) ──────────────────────────────── */
+/* Konsistente Status-Farben für Erfolg / Warnung / Fehler / Info.          */
+/* Ergänzen die bestehenden Markenfarben (--blue, --blue2, --green, …).     */
+:root {
+  --success: #10b981;
+  --success-bg: rgba(16,185,129,.12);
+  --success-border: rgba(16,185,129,.35);
+  --warning: #f59e0b;
+  --warning-bg: rgba(245,158,11,.12);
+  --warning-border: rgba(245,158,11,.35);
+  --danger: #ef4444;
+  --danger-bg: rgba(239,68,68,.12);
+  --danger-border: rgba(239,68,68,.35);
+  --info: #38bdf8;
+  --info-bg: rgba(56,189,248,.12);
+  --info-border: rgba(56,189,248,.35);
+  --neutral: #94a3b8;
+  --neutral-bg: rgba(148,163,184,.10);
+  --neutral-border: rgba(148,163,184,.28);
+
+  /* Pilot-Akzente als Tokens — bleiben Hex-kompatibel zu CLAUDE.md */
+  --pilot-lager: #1684ff;
+  --pilot-buero: #20c8ff;
+  --pilot-werkstatt: #a78bfa;
+  --pilot-marketing: #f59e0b;
+  --pilot-analyse: #10b981;
+  --pilot-planung: #f43f5e;
+  --pilot-steuer: #facc15;
+  --pilot-qm: #14b8a6;
+  --pilot-ki: #7c3aed;
+  --pilot-pondruff: #e50909;
+}
+
+/* Status-Pill-Klassen (additiv — bestehende .badge-* bleiben) */
+.pk-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  line-height: 1;
+}
+.pk-status-success { color: var(--success); background: var(--success-bg); border-color: var(--success-border); }
+.pk-status-warning { color: var(--warning); background: var(--warning-bg); border-color: var(--warning-border); }
+.pk-status-danger  { color: var(--danger);  background: var(--danger-bg);  border-color: var(--danger-border); }
+.pk-status-info    { color: var(--info);    background: var(--info-bg);    border-color: var(--info-border); }
+.pk-status-neutral { color: var(--neutral); background: var(--neutral-bg); border-color: var(--neutral-border); }
+
+.pk-status-dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+}
