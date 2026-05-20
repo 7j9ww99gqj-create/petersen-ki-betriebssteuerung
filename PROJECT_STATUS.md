@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **API-Konsolidierung**: Anthropic vollständig entfernt, alles über OpenAI (`gpt-4o-mini`). HEAD `fbbd1b1`.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **Wareneingang-Workflow-Redesign**: KI-Modus + Manuell-Modus, neue OCR-API, Positions-Details, Büro/WISO-Detailansicht. HEAD `b6f97eb`.
+- Davor: **API-Konsolidierung**: Anthropic vollständig entfernt, alles über OpenAI (`gpt-4o-mini`). HEAD `fbbd1b1`.
 - Davor: **BUGFIX-SPRINT-2** (P1-1 bis P1-8): 8 wichtige P1-Bugs behoben. HEAD `55821e3`.
 - Davor: `2026-05-20`, `main`, **BUGFIX-SPRINT-1** (P0-1 bis P0-10): Alle 10 Release-Blocker behoben. HEAD `2b0fa7f`.
 - Davor: `2026-05-20`, Branch `sprint-20-phase-d`, **Demo-Mode-Code-Migration (Sprint 20D)**: 10 Piloten-Seiten von isDemo-Daten-Routing-Branches befreit (~150 Branches), Demo-User nutzt jetzt RLS-DB-Pfad. Tests 87/87, Build grün.
@@ -447,7 +448,18 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
 
 ## 2. Aktueller Arbeitsstand
 
-- **Zuletzt erledigt (2026-05-20 — BUGFIX-SPRINT-2 komplett, HEAD `e374670`, P1-9 bis P1-12):**
+- **Zuletzt erledigt (2026-05-20 — Wareneingang-Workflow-Redesign, HEAD `b6f97eb`):**
+  - Neue Moduswahl-Kacheln: "KI-Wareneingang" und "Wareneingang manuell erfassen"
+  - KI-Modus: Upload-Schritt → neue OCR-API `/api/pondruff/ocr-wareneingang` → editierbare Felder
+  - Manuell-Modus: alle Felder direkt leer + dynamische Position-Verwaltung
+  - Pro Position: Menge, Artikel, Maße (L×B×H / Ø×L), Weitere Infos (Key:Value), Polieren (Ja/Nein + Wo), Entschichtung, Microstrahlen, Läppstrahlen, Polierstrahlen, Beschichtung (13 Optionen)
+  - Pflichtfelder: Lieferbedingungen + Eingelagert von — Save-Button deaktiviert bis gesetzt
+  - Migration `20260520500000_pondruff_we_new_fields.sql`: 5 neue Spalten ausgeführt
+  - `WE_COATINGS` in `lib/pondruff.ts` exportiert
+  - Büro/WISO: Wareneingänge-Tab mit neuen Spalten (Bestell-Nr., Pos., Lieferbedingungen, Eingelagert von) + anklickbare Detailansicht mit vollständiger Positions-Tabelle
+  - `sync-buero-wareneingang`: alle neuen Felder in Büro-Dokument-Beschreibung
+
+- **Davor (2026-05-20 — BUGFIX-SPRINT-2 komplett, HEAD `e374670`, P1-9 bis P1-12):**
   - P1-9: `/api/document-ai` — Cost-Limit-Check + Usage-Logging ergänzt (Parität mit `/api/chat`)
   - P1-10: `werkstatt_material.karte_id` FK → `werkstatt_karten(id)` ON DELETE SET NULL; `insertWerkstattMaterial` setzt `karte_id` automatisch via `auftragsnr`-Lookup
   - P1-11: `EingangsrechnungenTab` — localStorage-OCR: Typ-Validierung, Fehler-Toast, kein silentes Schlucken mehr
