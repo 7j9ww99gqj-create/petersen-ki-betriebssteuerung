@@ -798,16 +798,155 @@ button, a, [role="button"] {
   will-change: transform, opacity;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   ── BLUE-GLOW-THEME (data-design="glow") ────────────────────────────────
+   Übertragung der Pondruff-Designsprache (Gradient + Box-Shadow-Glow) auf
+   die App-Hauptfarbe Blau (#1684ff/#20c8ff). Aktiviert sich nur, wenn
+   body[data-design="glow"] gesetzt ist — Standard bleibt unverändert.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Body-Hintergrund mit stärkerem Tiefen-Effekt */
+body[data-design="glow"] {
+  background:
+    radial-gradient(circle at 18% -8%, rgba(22,132,255,.42), transparent 38%),
+    radial-gradient(circle at 88% -2%, rgba(32,200,255,.22), transparent 30%),
+    radial-gradient(circle at 50% 110%, rgba(22,132,255,.10), transparent 60%),
+    linear-gradient(180deg, #03060d, #06121f 52%, #02060c) !important;
+}
+
+/* Primär-Button mit Gradient + Glow */
+body[data-design="glow"] .pk-btn {
+  background: linear-gradient(135deg, #1684ff, #0d5cbf) !important;
+  border-color: rgba(22,132,255,.55) !important;
+  box-shadow:
+    0 4px 18px rgba(22,132,255,.32),
+    0 0 0 1px rgba(255,255,255,.04) inset !important;
+  transition: transform .15s, box-shadow .2s, filter .2s;
+}
+body[data-design="glow"] .pk-btn:hover {
+  box-shadow:
+    0 8px 28px rgba(22,132,255,.50),
+    0 0 0 1px rgba(255,255,255,.08) inset !important;
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+body[data-design="glow"] .pk-btn:active {
+  transform: translateY(0) scale(.98);
+  box-shadow: 0 2px 10px rgba(22,132,255,.28) !important;
+}
+
+/* Sekundär-Button (ghost) mit subtilem Blau-Glow */
+body[data-design="glow"] .pk-btn-ghost {
+  background: rgba(22,132,255,.06) !important;
+  border-color: rgba(22,132,255,.28) !important;
+  color: #c9deff !important;
+  box-shadow: 0 2px 12px rgba(22,132,255,.08);
+  transition: background .2s, border-color .2s, box-shadow .2s, transform .15s;
+}
+body[data-design="glow"] .pk-btn-ghost:hover {
+  background: rgba(22,132,255,.14) !important;
+  border-color: rgba(22,132,255,.55) !important;
+  box-shadow: 0 4px 20px rgba(22,132,255,.22);
+  transform: translateY(-1px);
+}
+body[data-design="glow"] .pk-btn-ghost:active {
+  transform: translateY(0) scale(.98);
+}
+
+/* Karten mit Tiefen-Gradient + zarter Glow-Border */
+body[data-design="glow"] .pk-card {
+  background: linear-gradient(180deg, rgba(14,24,40,.96), rgba(6,12,22,.96)) !important;
+  border: 1px solid rgba(22,132,255,.16) !important;
+  box-shadow:
+    0 10px 32px rgba(0,0,0,.45),
+    0 0 0 1px rgba(22,132,255,.05) inset;
+  transition: border-color .2s, box-shadow .2s, transform .15s;
+}
+body[data-design="glow"] .pk-card:hover {
+  border-color: rgba(22,132,255,.34) !important;
+  box-shadow:
+    0 14px 40px rgba(0,0,0,.55),
+    0 0 0 1px rgba(22,132,255,.12) inset,
+    0 0 24px rgba(22,132,255,.10);
+}
+
+/* Inputs mit klarem Blau-Focus-Ring */
+body[data-design="glow"] .pk-input {
+  background: rgba(8,14,24,.7);
+  border-color: rgba(22,132,255,.18);
+  transition: border-color .2s, box-shadow .2s, background .2s;
+}
+body[data-design="glow"] .pk-input:hover {
+  border-color: rgba(22,132,255,.32);
+}
+body[data-design="glow"] .pk-input:focus {
+  border-color: #1684ff !important;
+  background: rgba(8,14,24,.92);
+  box-shadow: 0 0 0 3px rgba(22,132,255,.22), 0 0 16px rgba(22,132,255,.15) !important;
+}
+
+/* Tabellen-Header mit Akzent */
+body[data-design="glow"] .pk-table th {
+  background: rgba(22,132,255,.09);
+  color: #c0d7ff;
+  border-bottom-color: rgba(22,132,255,.25);
+}
+
+/* Links mit Glow-Underline */
+body[data-design="glow"] a:not(.pk-btn):not(.pk-btn-ghost) {
+  color: #6cb6ff;
+  transition: color .2s, text-shadow .2s;
+}
+body[data-design="glow"] a:not(.pk-btn):not(.pk-btn-ghost):hover {
+  color: #20c8ff;
+  text-shadow: 0 0 8px rgba(32,200,255,.45);
+}
+
+/* Status-Pills aus G7 bekommen leichten Glow */
+body[data-design="glow"] .pk-status-success { box-shadow: 0 0 12px rgba(16,185,129,.20); }
+body[data-design="glow"] .pk-status-warning { box-shadow: 0 0 12px rgba(245,158,11,.20); }
+body[data-design="glow"] .pk-status-danger  { box-shadow: 0 0 12px rgba(239,68,68,.22); }
+body[data-design="glow"] .pk-status-info    { box-shadow: 0 0 12px rgba(56,189,248,.20); }
+
+/* Standard-Badges (Legacy) auch mit subtilem Glow */
+body[data-design="glow"] .badge { box-shadow: 0 0 10px currentColor; opacity: .95; }
+body[data-design="glow"] .badge { --x: 0; }
+body[data-design="glow"] .badge-blue   { box-shadow: 0 0 10px rgba(22,132,255,.35); }
+body[data-design="glow"] .badge-green  { box-shadow: 0 0 10px rgba(16,185,129,.30); }
+body[data-design="glow"] .badge-orange { box-shadow: 0 0 10px rgba(245,158,11,.30); }
+body[data-design="glow"] .badge-red    { box-shadow: 0 0 10px rgba(239,68,68,.30); }
+body[data-design="glow"] .badge-purple { box-shadow: 0 0 10px rgba(167,139,250,.30); }
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-design="glow"] .pk-btn,
+  body[data-design="glow"] .pk-btn-ghost,
+  body[data-design="glow"] .pk-card {
+    transition: none !important;
+  }
+  body[data-design="glow"] .pk-btn:hover,
+  body[data-design="glow"] .pk-btn-ghost:hover {
+    transform: none !important;
+  }
+}
+
 /* ── M4: Modal-Animationen App-weit aktivieren bei data-design="v2" ─────── */
-/* Bestehende .fade-in / .fade-in-scale bleiben für v1 unverändert.          */
-/* Im v2-Modus bekommen Modal-Karten zusätzlich die neue Scale+Blur-Animation. */
+/* Bestehende .fade-in / .fade-in-scale bleiben für classic unverändert.     */
+/* Im modern + glow Modus bekommen Modal-Karten Scale+Blur-Animation.        */
 body[data-design="v2"] .pk-card.fade-in,
-body[data-design="v2"] .pk-card.fade-in-scale {
+body[data-design="v2"] .pk-card.fade-in-scale,
+body[data-design="modern"] .pk-card.fade-in,
+body[data-design="modern"] .pk-card.fade-in-scale,
+body[data-design="glow"] .pk-card.fade-in,
+body[data-design="glow"] .pk-card.fade-in-scale {
   animation: pk-modal-card-in 260ms cubic-bezier(.16,1,.3,1) forwards;
 }
 @media (prefers-reduced-motion: reduce) {
   body[data-design="v2"] .pk-card.fade-in,
-  body[data-design="v2"] .pk-card.fade-in-scale {
+  body[data-design="v2"] .pk-card.fade-in-scale,
+  body[data-design="modern"] .pk-card.fade-in,
+  body[data-design="modern"] .pk-card.fade-in-scale,
+  body[data-design="glow"] .pk-card.fade-in,
+  body[data-design="glow"] .pk-card.fade-in-scale {
     animation: none !important;
   }
 }
