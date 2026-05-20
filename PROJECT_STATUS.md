@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, Branch `sprint-20-phase-d`, **Demo-Mode-Code-Migration (Sprint 20D)**: 10 Piloten-Seiten von isDemo-Daten-Routing-Branches befreit (~150 Branches), Demo-User nutzt jetzt RLS-DB-Pfad. Tests 87/87, Build grün.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **BUGFIX-SPRINT-1** (P0-1 bis P0-10): Alle 10 Release-Blocker behoben. HEAD `2b0fa7f`.
+- Davor: `2026-05-20`, Branch `sprint-20-phase-d`, **Demo-Mode-Code-Migration (Sprint 20D)**: 10 Piloten-Seiten von isDemo-Daten-Routing-Branches befreit (~150 Branches), Demo-User nutzt jetzt RLS-DB-Pfad. Tests 87/87, Build grün.
 - Davor: `2026-05-19`, `main`, **Demo-Mode-Foundation-Sprint** (Aufgabe 20A+B+C+E): Demo-User als echter Supabase-Account, Seed-SQL, Reset-CRON, Login-Flow, UI-Banner.
 - Davor: **Compliance-Sprint** (Aufgaben 15-18): DSGVO-Export UI-Button, CONTRIBUTING+PR-Template, Backup-Restore-Drill.
 - Davor: **Optimierungs-Sprint Phase-3** (HEAD `c0bbb45`): 13 Verbesserungen live (paralleler Agent).
@@ -443,6 +444,18 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+
+- **Zuletzt erledigt (2026-05-20 — BUGFIX-SPRINT-1, HEAD `2b0fa7f`, alle 10 P0-Release-Blocker):**
+  - P0-1: KI-Assistent Chat + Tagesbrief an echte `/api/chat` angeschlossen (Commits `89d37bf`)
+  - P0-2: Default-Model `gpt-5.4-mini` → `gpt-4o-mini` in chat/document-ai/ai-usage (`16b6d0c`)
+  - P0-3: LagerPilot Bestand-Tab Bild-`<th>` ergänzt + `colSpan` 9→10 (`c5710ea`)
+  - P0-4: `archiveRechnungPdf`/`archiveAngebotPdf` werden jetzt nach Upsert automatisch aufgerufen (`668f552`)
+  - P0-5: `pk_next_angebot_number` auf `billing_sequences` (atomar) + UNIQUE auf `buero_angebote.nummer` (`820a62f`)
+  - P0-6: `uploadFirmenLogo`/`uploadBriefpapier` auf `firma-branding`-Bucket umgestellt (`aad9a63`)
+  - P0-7: `PilotDocumentArchive` `getPublicUrl` → `createSignedUrl` 1h TTL (`8d57c40`)
+  - P0-8: Manueller Backup (`createCloudBackup`) → neuer `/api/backup/manual` mit echtem gzip-Dump aller 26 Tabellen (`ca0fbbc`)
+  - P0-9: `getPriceConfig(userId)` liest DB-Config aus `pondruff_price_config`; `calcPricePosition` erhält optionalen `cfg`-Parameter (`bd1364a`)
+  - P0-10: OCR-Beleg-Pipeline neu: Bild/PDF via Vision + `ocr-originale`-Bucket + `claude-haiku-4-5-20251001` (`2b0fa7f`)
 
 - **Zuletzt erledigt (2026-05-20 — Sprint 20D Demo-Mode-Code-Migration, Branch `sprint-20-phase-d`):**
   - 10 Pilot-Seiten von `isDemo`-Daten-Routing-Branches befreit. Demo-User nutzt jetzt RLS-geschützten echten DB-Pfad.
