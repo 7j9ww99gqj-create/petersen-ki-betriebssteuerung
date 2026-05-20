@@ -33,7 +33,7 @@ import {
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  BarChart, Bar,
+  BarChart, Bar, ReferenceLine,
 } from 'recharts'
 
 const QM_COLOR = '#14b8a6'
@@ -110,6 +110,113 @@ const DEMO_MESSMITTEL: QmMessmittel[] = [
     kalibrierungs_intervall_tage: 365, status: 'ueberfaellig', notiz: 'Kalibrierung abgelaufen!', aktiv: true, erstellt_am: '2025-03-01T10:00:00Z',
   },
 ]
+
+// ─────────────────────────────────────────────────────────────────────
+// SPC types & demo data
+// ─────────────────────────────────────────────────────────────────────
+
+type SpcRow = {
+  istwert: number
+  sollwert: number
+  toleranz_plus: number
+  toleranz_minus: number
+  status: string
+  pruef_datum: string
+  pruefbericht_nr: string
+}
+
+type SpcResult = {
+  n: number
+  mean: number
+  stddev: number
+  cp: number | null
+  cpk: number | null
+  cpu: number | null
+  cpl: number | null
+  usl: number
+  lsl: number
+  trend: string
+  trendSlope: number
+}
+
+const DEMO_SPC_DATEN: SpcRow[] = [
+  { istwert: 150.02, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-01', pruefbericht_nr: 'PB-2026-001' },
+  { istwert: 149.97, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-02', pruefbericht_nr: 'PB-2026-002' },
+  { istwert: 150.03, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-03', pruefbericht_nr: 'PB-2026-003' },
+  { istwert: 149.98, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-04', pruefbericht_nr: 'PB-2026-004' },
+  { istwert: 150.01, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-05', pruefbericht_nr: 'PB-2026-005' },
+  { istwert: 149.99, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-06', pruefbericht_nr: 'PB-2026-006' },
+  { istwert: 150.02, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-07', pruefbericht_nr: 'PB-2026-007' },
+  { istwert: 150.04, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-08', pruefbericht_nr: 'PB-2026-008' },
+  { istwert: 149.96, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-09', pruefbericht_nr: 'PB-2026-009' },
+  { istwert: 150.00, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-10', pruefbericht_nr: 'PB-2026-010' },
+  { istwert: 150.01, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-11', pruefbericht_nr: 'PB-2026-011' },
+  { istwert: 149.97, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-12', pruefbericht_nr: 'PB-2026-012' },
+  { istwert: 150.03, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-13', pruefbericht_nr: 'PB-2026-013' },
+  { istwert: 149.99, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-14', pruefbericht_nr: 'PB-2026-014' },
+  { istwert: 150.00, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-15', pruefbericht_nr: 'PB-2026-015' },
+  { istwert: 150.02, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-16', pruefbericht_nr: 'PB-2026-016' },
+  { istwert: 149.96, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-17', pruefbericht_nr: 'PB-2026-017' },
+  { istwert: 150.04, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-18', pruefbericht_nr: 'PB-2026-018' },
+  { istwert: 149.98, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-19', pruefbericht_nr: 'PB-2026-019' },
+  { istwert: 150.01, sollwert: 150, toleranz_plus: 0.1, toleranz_minus: 0.1, status: 'gruen', pruef_datum: '2026-05-20', pruefbericht_nr: 'PB-2026-020' },
+]
+
+function calculateSPC(
+  messwerte: number[],
+  sollwert: number,
+  toleranz_plus: number,
+  toleranz_minus: number,
+): SpcResult {
+  const n = messwerte.length
+  const usl = sollwert + toleranz_plus
+  const lsl = sollwert - toleranz_minus
+  const mean = messwerte.reduce((s, x) => s + x, 0) / n
+  const stddev = n > 1
+    ? Math.sqrt(messwerte.reduce((s, x) => s + (x - mean) ** 2, 0) / (n - 1))
+    : 0
+
+  let cp: number | null = null
+  let cpu: number | null = null
+  let cpl: number | null = null
+  let cpk: number | null = null
+
+  if (stddev > 0) {
+    cp  = (usl - lsl) / (6 * stddev)
+    cpu = (usl - mean) / (3 * stddev)
+    cpl = (mean - lsl) / (3 * stddev)
+    cpk = Math.min(cpu, cpl)
+  }
+
+  const xi = messwerte.map((_, i) => i)
+  const sumX  = xi.reduce((s, x) => s + x, 0)
+  const sumY  = messwerte.reduce((s, y) => s + y, 0)
+  const sumXY = xi.reduce((s, x, i) => s + x * messwerte[i], 0)
+  const sumX2 = xi.reduce((s, x) => s + x * x, 0)
+  const denom = n * sumX2 - sumX * sumX
+  const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0
+
+  const trend =
+    slope > 0.001  ? 'steigend ↗ (möglicher Werkzeugverschleiß)' :
+    slope < -0.001 ? 'fallend ↘' : 'stabil →'
+
+  return { n, mean, stddev, cp, cpk, cpu, cpl, usl, lsl, trend, trendSlope: slope }
+}
+
+function spcKpiColor(val: number | null): string {
+  if (val === null) return '#aeb9c8'
+  if (val >= 1.33) return '#10b981'
+  if (val >= 1.0)  return '#f59e0b'
+  return '#ef4444'
+}
+
+function spcKpiLabel(val: number | null): string {
+  if (val === null) return '—'
+  if (val >= 1.67) return '🟢 Sehr gut'
+  if (val >= 1.33) return '🟢 Gut'
+  if (val >= 1.0)  return '🟡 Akzeptabel'
+  return '🔴 Kritisch'
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // Helpers
@@ -223,6 +330,15 @@ export default function QMPage() {
   }>({ name: '', seriennummer: '', hersteller: '', typ: 'Schieblehre', messbereich: '', aufloesung: '', kalibriert_am: '', kalibrierung_faellig_am: '', kalibrierungs_intervall_tage: '365', notiz: '' })
   const [mmSaving, setMmSaving] = useState(false)
 
+  // SPC state
+  const [spcBauteilId, setSpcBauteilId] = useState<string>('')
+  const [spcMessstelle, setSpcMessstelle] = useState<string>('')
+  const [spcData, setSpcData] = useState<SpcRow[] | null>(null)
+  const [spcLoading, setSpcLoading] = useState(false)
+  const [spcMessstellen, setSpcMessstellen] = useState<string[]>([])
+  const [spcMsLoading, setSpcMsLoading] = useState(false)
+  const [spcCpkWarnung, setSpcCpkWarnung] = useState<{ bauteil_id: string; messstelle: string; cpk: number } | null>(null)
+
   function showToast(msg: string, ok = true) {
     setToast({ msg, ok })
     setTimeout(() => setToast(null), 3500)
@@ -270,6 +386,16 @@ export default function QMPage() {
   }, [isDemo])
 
   useEffect(() => { if (tab === 'messmittel' || tab === 'dashboard') void loadMessmittel() }, [tab, loadMessmittel])
+
+  useEffect(() => {
+    if (tab !== 'dashboard' || isDemo) return
+    fetch('/api/qm/spc-daten?mode=warnung')
+      .then(r => r.json())
+      .then((d: { bauteil_id: string; messstelle: string; cpk: number } | null) => {
+        if (d && d.cpk < 1.0) setSpcCpkWarnung(d)
+      })
+      .catch(() => { /* ignore */ })
+  }, [tab, isDemo])
 
   const loadStats = useCallback(async (zeitraum: QmStatistikZeitraum) => {
     if (isDemo) return
@@ -601,6 +727,27 @@ export default function QMPage() {
                             : `${faellig} Messmittel bald fällig — Kalibrierung planen`}
                         </div>
                         <div style={{ fontSize: 11, color: '#aeb9c8' }}>Klicken für Details → Messmittel-Tab</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* SPC Cpk-Warnung */}
+              {(spcCpkWarnung || isDemo) && (() => {
+                const w = isDemo
+                  ? { bauteil_id: 'Stempel-B', messstelle: 'Länge', cpk: 0.87 }
+                  : spcCpkWarnung!
+                return (
+                  <div className="pk-card" style={{ marginBottom: 16, border: '1px solid rgba(239,68,68,.4)', cursor: 'pointer' }}
+                    onClick={() => setTab('statistiken')}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 20 }}>⚠️</span>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: '#ef4444' }}>
+                          Prozess kritisch: {w.bauteil_id} / {w.messstelle} — Cpk {w.cpk.toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#aeb9c8' }}>Klicken für SPC-Analyse → Statistiken-Tab</div>
                       </div>
                     </div>
                   </div>
@@ -987,6 +1134,236 @@ export default function QMPage() {
                 )}
               </div>
             </div>
+
+            {/* ── SPC-Analyse-Panel ── */}
+            {(() => {
+              // Bauteil-IDs from loaded berichte
+              const bauteilIds = Array.from(new Set(berichte.map(b => b.bauteil_id).filter(Boolean))) as string[]
+
+              async function loadSpcMessstellen(bId: string) {
+                setSpcMessstellen([])
+                setSpcMessstelle('')
+                if (isDemo) {
+                  setSpcMessstellen(['Länge', 'Ø Bohrung', 'Breite'])
+                  return
+                }
+                setSpcMsLoading(true)
+                try {
+                  const r = await fetch(`/api/qm/spc-daten?mode=messstellen&bauteil_id=${encodeURIComponent(bId)}`)
+                  const ms = await r.json() as string[]
+                  setSpcMessstellen(ms)
+                } catch { /* ignore */ } finally { setSpcMsLoading(false) }
+              }
+
+              async function runSpcAnalyse() {
+                if (!spcBauteilId || !spcMessstelle) return
+                if (isDemo) {
+                  setSpcData(DEMO_SPC_DATEN)
+                  return
+                }
+                setSpcLoading(true)
+                setSpcData(null)
+                try {
+                  const r = await fetch(`/api/qm/spc-daten?messstelle=${encodeURIComponent(spcMessstelle)}&bauteil_id=${encodeURIComponent(spcBauteilId)}&limit=50`)
+                  const rows = await r.json() as SpcRow[]
+                  setSpcData(Array.isArray(rows) ? rows : [])
+                } catch { setSpcData([]) } finally { setSpcLoading(false) }
+              }
+
+              // Compute SPC if data available
+              const spcRows = spcData ?? []
+              const validRows = spcRows.filter(r => r.istwert != null && r.sollwert != null)
+              const spcResult: SpcResult | null = validRows.length >= 2
+                ? calculateSPC(
+                    validRows.map(r => r.istwert),
+                    validRows[0].sollwert,
+                    validRows[0].toleranz_plus ?? 0,
+                    validRows[0].toleranz_minus ?? 0,
+                  )
+                : null
+
+              const chartData = validRows.map((r, i) => ({
+                idx: i + 1,
+                datum: r.pruef_datum?.slice(5) ?? '',
+                wert: r.istwert,
+                status: r.status,
+              }))
+
+              const dotColor = (status: string) =>
+                status === 'rot' ? '#ef4444' : status === 'orange' ? '#f59e0b' : '#10b981'
+
+              return (
+                <div className="pk-card" style={{ marginTop: 16 }}>
+                  <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ color: QM_COLOR }}>📐</span> Prozessfähigkeit (SPC)
+                  </div>
+
+                  {/* Auswahl */}
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'flex-end' }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Bauteil-ID</div>
+                      <select
+                        className="pk-input"
+                        value={spcBauteilId}
+                        onChange={e => { setSpcBauteilId(e.target.value); void loadSpcMessstellen(e.target.value) }}
+                        style={{ minWidth: 160 }}
+                      >
+                        <option value="">— Bauteil wählen —</option>
+                        {(isDemo ? ['Stempel-B', 'Flansch-A', 'Welle-C'] : bauteilIds).map(id => (
+                          <option key={id} value={id}>{id}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>
+                        Messstelle {spcMsLoading && <span>⏳</span>}
+                      </div>
+                      <select
+                        className="pk-input"
+                        value={spcMessstelle}
+                        onChange={e => setSpcMessstelle(e.target.value)}
+                        disabled={!spcBauteilId}
+                        style={{ minWidth: 160 }}
+                      >
+                        <option value="">— Messstelle wählen —</option>
+                        {spcMessstellen.map(ms => (
+                          <option key={ms} value={ms}>{ms}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      className="pk-btn"
+                      disabled={!spcBauteilId || !spcMessstelle || spcLoading}
+                      onClick={() => void runSpcAnalyse()}
+                      style={{ background: QM_COLOR, border: 'none', padding: '8px 20px' }}
+                    >
+                      {spcLoading ? '⏳ Lädt…' : '▶ Analyse starten'}
+                    </button>
+                  </div>
+
+                  {spcData === null && !spcLoading && (
+                    <div style={{ color: '#aeb9c8', fontSize: 13, padding: '12px 0' }}>
+                      Bauteil und Messstelle wählen, dann &quot;Analyse starten&quot; klicken.
+                    </div>
+                  )}
+
+                  {spcData !== null && validRows.length === 0 && (
+                    <div style={{ color: '#aeb9c8', fontSize: 13, padding: '12px 0' }}>
+                      Keine Messwerte für diese Kombination gefunden.
+                    </div>
+                  )}
+
+                  {spcResult && (
+                    <>
+                      {/* Hinweis wenn n < 10 */}
+                      {spcResult.n < 10 && (
+                        <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', color: '#f59e0b', fontSize: 13 }}>
+                          ⚠️ Mindestens 10 Messungen für aussagekräftige SPC empfohlen (aktuell: {spcResult.n})
+                        </div>
+                      )}
+
+                      {/* KPI-Karten */}
+                      <div className="stats-grid" style={{ marginBottom: 16 }}>
+                        <div className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+                          <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Cp</div>
+                          <div style={{ fontSize: 22, fontWeight: 900, color: spcKpiColor(spcResult.cp) }}>
+                            {spcResult.cp !== null ? spcResult.cp.toFixed(2) : '—'}
+                          </div>
+                          <div style={{ fontSize: 11, marginTop: 4 }}>{spcKpiLabel(spcResult.cp)}</div>
+                        </div>
+                        <div className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+                          <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Cpk</div>
+                          <div style={{ fontSize: 22, fontWeight: 900, color: spcKpiColor(spcResult.cpk) }}>
+                            {spcResult.cpk !== null ? spcResult.cpk.toFixed(2) : '—'}
+                          </div>
+                          <div style={{ fontSize: 11, marginTop: 4 }}>{spcKpiLabel(spcResult.cpk)}</div>
+                        </div>
+                        <div className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+                          <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Ø Wert</div>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: QM_COLOR }}>
+                            {spcResult.mean.toFixed(3)}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 4 }}>mm (n={spcResult.n})</div>
+                        </div>
+                        <div className="pk-card" style={{ textAlign: 'center', padding: '14px 10px' }}>
+                          <div style={{ fontSize: 11, color: '#aeb9c8', marginBottom: 4 }}>Trend</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: spcResult.trendSlope > 0.001 ? '#f59e0b' : spcResult.trendSlope < -0.001 ? '#f59e0b' : '#10b981', marginTop: 4 }}>
+                            {spcResult.trend}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Cp/Cpk Legende (klappbar) */}
+                      <details style={{ marginBottom: 16 }}>
+                        <summary style={{ fontSize: 12, color: '#aeb9c8', cursor: 'pointer', userSelect: 'none' }}>
+                          ℹ️ Cp/Cpk Bewertungsskala
+                        </summary>
+                        <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {[
+                            { label: '≥ 1.67', desc: 'Sehr gut (Six Sigma)', color: '#10b981' },
+                            { label: '≥ 1.33', desc: 'Gut (ISO 9001)', color: '#10b981' },
+                            { label: '1.00–1.33', desc: 'Akzeptabel (überwachen)', color: '#f59e0b' },
+                            { label: '< 1.00', desc: 'Kritisch (verbessern)', color: '#ef4444' },
+                          ].map(e => (
+                            <div key={e.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '4px 10px', borderRadius: 6, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: e.color, flexShrink: 0 }} />
+                              <strong style={{ color: e.color }}>{e.label}</strong>
+                              <span style={{ color: '#aeb9c8' }}>{e.desc}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+
+                      {/* LineChart: Messwerte über Zeit */}
+                      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
+                        📈 Messwert-Verlauf — {spcBauteilId} / {spcMessstelle}
+                      </div>
+                      <ResponsiveContainer width="100%" height={260}>
+                        <LineChart data={chartData} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
+                          <XAxis dataKey="datum" tick={{ fill: '#aeb9c8', fontSize: 10 }} />
+                          <YAxis
+                            tick={{ fill: '#aeb9c8', fontSize: 10 }}
+                            domain={[
+                              (dataMin: number) => Math.min(dataMin, spcResult.lsl) - 0.02,
+                              (dataMax: number) => Math.max(dataMax, spcResult.usl) + 0.02,
+                            ]}
+                            tickFormatter={(v: number) => v.toFixed(2)}
+                          />
+                          <Tooltip
+                            formatter={(v) => [`${Number(v).toFixed(3)} mm`, 'Istwert']}
+                            contentStyle={{ background: '#0b1420', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, fontSize: 12 }}
+                          />
+                          <ReferenceLine y={spcResult.usl} stroke="#ef4444" strokeDasharray="4 2" label={{ value: 'USL', fill: '#ef4444', fontSize: 10 }} />
+                          <ReferenceLine y={spcResult.lsl} stroke="#ef4444" strokeDasharray="4 2" label={{ value: 'LSL', fill: '#ef4444', fontSize: 10 }} />
+                          <ReferenceLine y={validRows[0].sollwert} stroke="rgba(174,185,200,.5)" strokeDasharray="4 2" label={{ value: 'Soll', fill: '#aeb9c8', fontSize: 10 }} />
+                          <ReferenceLine y={spcResult.mean} stroke="#f59e0b" strokeDasharray="4 2" label={{ value: 'Ø', fill: '#f59e0b', fontSize: 10 }} />
+                          <Line
+                            type="monotone"
+                            dataKey="wert"
+                            stroke={QM_COLOR}
+                            strokeWidth={2}
+                            dot={(props: { cx?: number; cy?: number; payload?: { status: string }; index?: number }) => {
+                              const { cx = 0, cy = 0, payload, index } = props
+                              return (
+                                <circle
+                                  key={index}
+                                  cx={cx}
+                                  cy={cy}
+                                  r={4}
+                                  fill={dotColor(payload?.status ?? '')}
+                                  stroke="none"
+                                />
+                              )
+                            }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         )
       })()}
