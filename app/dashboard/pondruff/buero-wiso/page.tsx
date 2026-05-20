@@ -235,73 +235,86 @@ export default function BueroWisoPage() {
           ? `Ø${p.durchmesser || '?'}×${p.durchmesser_laenge || '?'}mm`
           : `${p.laenge || '?'}×${p.breite || '?'}×${p.hoehe || '?'}mm`
 
-        // ── Beschichtungs-Zeile (mit Rabatt) ─────────────────────────
         const hasCoating = p.beschichtung && p.beschichtung !== 'Keine'
-        const coating = normalizePriceCoating(hasCoating ? p.beschichtung || '' : 'TiCN')
+        const hasPolieren = p.polieren === 'Ja' && parseDecimal(p.polier_kosten) > 0
         const otherServices = [
           p.entschichtung === 'Ja' && 'Entschichtung',
           p.microstrahlen === 'Ja' && 'Microstrahlen',
           p.laeppstrahlen === 'Ja' && 'Läppstrahlen',
           p.polierstrahlen === 'Ja' && 'Polierstrahlen',
         ].filter(Boolean) as string[]
-        const beschParts = [artName, masse]
-        if (hasCoating) beschParts.push(`${p.beschichtung} beschichtet`)
-        if (otherServices.length) beschParts.push(`(${otherServices.join(', ')})`)
-        const beschDesc = beschParts.join(' ')
 
-        const pricePos: PricePosition = {
-          description: beschDesc,
-          article_no: articleNo,
-          position_no: posNr,
-          order_no: '', cost_center: '',
-          purchase_order: w.purchase_order || w.delivery_id || '',
-          quantity: qty,
-          shape: (isRund ? 'Rund' : 'Eckig') as 'Rund' | 'Eckig',
-          coating,
-          factor: cfg.coating_factors[coating] ?? priceDefaultFactor(coating),
-          diameter: isRund ? parseDecimal(p.durchmesser) : 0,
-          length: isRund ? parseDecimal(p.durchmesser_laenge) : parseDecimal(p.laenge),
-          width: isRund ? 0 : parseDecimal(p.breite),
-          height: isRund ? 0 : parseDecimal(p.hoehe),
-          discount: rabatt, // Rabatt NUR auf Beschichtung
-          note: '', source: 'wareneingang',
-          raw_dimension_text: p.raw_dimension_text,
+        // ── Beschichtungs-Preis berechnen (mit Rabatt) ───────────────
+        let beschListenUnit = 0
+        let beschEinzelUnit = 0
+        let beschGesamt = 0
+        if (hasCoating) {
+          const coating = normalizePriceCoating(p.beschichtung || 'TiCN')
+          const pricePos: PricePosition = {
+            description: `${artName} ${masse} ${p.beschichtung} beschichtet`,
+            article_no: articleNo,
+            position_no: posNr,
+            order_no: '', cost_center: '',
+            purchase_order: w.purchase_order || w.delivery_id || '',
+            quantity: qty,
+            shape: (isRund ? 'Rund' : 'Eckig') as 'Rund' | 'Eckig',
+            coating,
+            factor: cfg.coating_factors[coating] ?? priceDefaultFactor(coating),
+            diameter: isRund ? parseDecimal(p.durchmesser) : 0,
+            length: isRund ? parseDecimal(p.durchmesser_laenge) : parseDecimal(p.laenge),
+            width: isRund ? 0 : parseDecimal(p.breite),
+            height: isRund ? 0 : parseDecimal(p.hoehe),
+            discount: rabatt, // nur auf Beschichtung
+            note: '', source: 'wareneingang',
+            raw_dimension_text: p.raw_dimension_text,
+          }
+          const result = calcPricePosition(pricePos, cfg)
+          beschListenUnit = result.unit_price
+          beschEinzelUnit = result.final_total / qty
+          beschGesamt = result.final_total
         }
-        const result = calcPricePosition(pricePos, cfg)
-        const singleAfter = money(result.final_total / qty)
+
+        // ── Polier-Preis (kein Rabatt) ───────────────────────────────
+        const polierUnit = hasPolieren ? parseDecimal(p.polier_kosten) : 0
+        const polierGesamt = money(polierUnit * qty)
+
+        // ── Multi-Line Beschreibung (1 Position, mehrere Service-Zeilen) ──
+        const descLines: string[] = []
+        if (hasCoating) {
+          descLines.push(`${artName} ${masse} ${p.beschichtung} beschichtet`)
+        }
+        if (hasPolieren) {
+          const wo = p.polieren_wo ? ` (${p.polieren_wo})` : ''
+          descLines.push(`${artName} ${masse} poliert${wo}`)
+        }
+        if (!hasCoating && !hasPolieren) {
+          descLines.push(`${artName} ${masse}`)
+        }
+        if (otherServices.length) {
+          descLines.push(`+ ${otherServices.join(', ')}`)
+        }
+        const description = descLines.join('\n')
+
+        // ── Kombinierte Preise ───────────────────────────────────────
+        const totalListenUnit = money(beschListenUnit + polierUnit)
+        const totalEinzelUnit = money(beschEinzelUnit + polierUnit)
+        const totalGesamt = money(beschGesamt + polierGesamt)
+        const effectiveRabatt = totalListenUnit > 0
+          ? Math.round(((totalListenUnit - totalEinzelUnit) / totalListenUnit) * 100 * 10) / 10
+          : 0
 
         rows.push({
           'Pos.': posNr,
           Menge: qty,
           'Artikel-Nr.': articleNo,
           Einheit: '',
-          Beschreibung: beschDesc,
+          Beschreibung: description,
           Liefertermin: '',
-          Listenpreis: result.unit_price.toFixed(2),
-          'Rabatt (%)': String(rabatt),
-          Einzelpreis: singleAfter.toFixed(2),
-          Gesamtpreis: result.final_total.toFixed(2),
+          Listenpreis: totalListenUnit.toFixed(2),
+          'Rabatt (%)': effectiveRabatt > 0 ? String(effectiveRabatt) : '0',
+          Einzelpreis: totalEinzelUnit.toFixed(2),
+          Gesamtpreis: totalGesamt.toFixed(2),
         })
-
-        // ── Polier-Zeile (kein Rabatt) ────────────────────────────────
-        if (p.polieren === 'Ja') {
-          const polierEinzel = parseDecimal(p.polier_kosten) || 0
-          const polierTotal = money(polierEinzel * qty)
-          const polierDescParts = [artName, masse, 'poliert']
-          if (p.polieren_wo) polierDescParts.push(`(${p.polieren_wo})`)
-          rows.push({
-            'Pos.': posNr, // selbe Pos.-Nr.
-            Menge: qty,
-            'Artikel-Nr.': articleNo,
-            Einheit: '',
-            Beschreibung: polierDescParts.join(' '),
-            Liefertermin: '',
-            Listenpreis: polierEinzel.toFixed(2),
-            'Rabatt (%)': '0',
-            Einzelpreis: polierEinzel.toFixed(2),
-            Gesamtpreis: polierTotal.toFixed(2),
-          })
-        }
       })
 
       const total = money(rows.reduce((s, r) => s + parseFloat(r.Gesamtpreis), 0))

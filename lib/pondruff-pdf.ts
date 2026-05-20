@@ -458,13 +458,17 @@ export type PondPreisauftrag = {
 }
 
 export async function generatePondruffOrderPDF(o: PondPreisauftrag, returnBase64?: boolean): Promise<string | void> {
-  const positionen: PDFPosition[] = (o.rows || []).map(r => ({
-    id: r['Pos.'],
-    beschreibung: r.Beschreibung,
-    menge: Number(r.Menge) || 1,
-    einheit: 'Stk.',
-    einzelpreis: parseMoney(r.Einzelpreis),
-  }))
+  const positionen: PDFPosition[] = (o.rows || []).map(r => {
+    const artNr = r['Artikel-Nr.']
+    const desc = artNr ? `Art.-Nr.: ${artNr}\n${r.Beschreibung}` : r.Beschreibung
+    return {
+      id: r['Pos.'],
+      beschreibung: desc,
+      menge: Number(r.Menge) || 1,
+      einheit: 'Stk.',
+      einzelpreis: parseMoney(r.Einzelpreis),
+    }
+  })
   const netto = parseMoney(String(o.total || ''))
   const satz = 19
   const steuer = Math.round(netto * satz) / 100
@@ -653,14 +657,14 @@ function drawPositionCell(doc: DocLike, p: ArbeitskartePosition, x: number, y: n
   doc.text(nameLines[0] || '', x + 11, y + 4)
 
   // Artikelnummer (wenn gesetzt) und Maße
-  let cy = y + 9
+  let cy = y + 8
   if (p.artikelnummer) {
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(7)
     doc.setTextColor(40, 40, 40)
     const artLines = doc.splitTextToSize(`Art.-Nr.: ${p.artikelnummer}`, w - 3)
     doc.text(artLines[0] || '', x + 1.5, cy)
-    cy += 3.5
+    cy += 3.2
   }
   const masse = p.form === 'Rund'
     ? `Ø${p.durchmesser || '?'}×${p.durchmesser_laenge || '?'}mm`
@@ -669,13 +673,13 @@ function drawPositionCell(doc: DocLike, p: ArbeitskartePosition, x: number, y: n
   doc.setFontSize(7)
   doc.setTextColor(60, 60, 60)
   doc.text(`Maße: ${masse}`, x + 1.5, cy)
-  cy += 4
+  cy += 3.5
 
   // Services in 2 Spalten — Layout nach User-Wunsch
   const colWInner = (w - 4) / 2
   const leftX = x + 1.5
   const rightX = x + 1.5 + colWInner + 2
-  const lineH = 3.7
+  const lineH = 3.3
 
   // LEFT COLUMN
   // Zeile 1: Polieren
@@ -690,19 +694,16 @@ function drawPositionCell(doc: DocLike, p: ArbeitskartePosition, x: number, y: n
     const polLines = doc.splitTextToSize(`Wo polieren: ${p.polieren_wo}`, colWInner - 1)
     doc.text(polLines[0] || '', leftX, cy + 2 * lineH)
   }
-  // Zeile 4: Zusatzinfos
-  if (Array.isArray(p.weitere_infos) && p.weitere_infos.length > 0) {
+  // Zeile 4: Zusatzinfos — nur wenn innerhalb der Zelle Platz ist
+  const zusatzY = cy + 3 * lineH
+  if (Array.isArray(p.weitere_infos) && p.weitere_infos.length > 0 && zusatzY < y + h - 0.5) {
     const wiText = p.weitere_infos.filter(w => w.key).map(w => `${w.key}: ${w.value}`).join(' · ')
     if (wiText) {
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(6.3)
       doc.setTextColor(110, 110, 110)
       const wiLines = doc.splitTextToSize(wiText, colWInner - 1)
-      doc.text(wiLines[0] || '', leftX, cy + 3 * lineH)
-      // optional zweite Zeile wenn sie noch passt
-      if (wiLines[1] && cy + 4 * lineH < y + h - 1.5) {
-        doc.text(wiLines[1], leftX, cy + 4 * lineH - 1)
-      }
+      doc.text(wiLines[0] || '', leftX, zusatzY)
     }
   }
 
@@ -791,15 +792,16 @@ export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<voi
   drawCompactMetaBlock(doc, we, dateStr)
 
   // ── Positionen im 2×3 Grid (6 pro Seite, Pos 7 → neue Seite) ──────────
-  const BOTTOM_H = 30                // Versand+Notizen-Bereich
+  const BOTTOM_H = 28                // Versand+Notizen-Bereich (etwas schlanker)
   const POS_PER_PAGE = 6
   const COLS = 2
   const ROWS = 3
-  const GAP = 1.5
+  const GAP_X = 2                    // horizontaler Abstand zwischen Pos. 1 und 2
+  const GAP_Y = 4                    // vertikaler Abstand zwischen Reihen — deutlich mehr Luft
   const POS_TOP = HEADER_H + 13            // = 35
-  const POS_BOTTOM = A5_H - BOTTOM_H - 2   // = 116
-  const cellW = (CONTENT_W - GAP * (COLS - 1)) / COLS
-  const cellH = (POS_BOTTOM - POS_TOP - GAP * (ROWS - 1)) / ROWS
+  const POS_BOTTOM = A5_H - BOTTOM_H - 2   // = 118
+  const cellW = (CONTENT_W - GAP_X * (COLS - 1)) / COLS
+  const cellH = (POS_BOTTOM - POS_TOP - GAP_Y * (ROWS - 1)) / ROWS
 
   if (pos.length === 0) {
     doc.setFont('helvetica', 'normal')
@@ -819,8 +821,8 @@ export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<voi
       drawCompactMetaBlock(doc, we, dateStr)
     }
 
-    const cx = MARGIN + col * (cellW + GAP)
-    const cy = POS_TOP + row * (cellH + GAP)
+    const cx = MARGIN + col * (cellW + GAP_X)
+    const cy = POS_TOP + row * (cellH + GAP_Y)
     drawPositionCell(doc, pos[i], cx, cy, cellW, cellH)
   }
 

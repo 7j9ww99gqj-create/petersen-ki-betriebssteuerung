@@ -400,7 +400,7 @@ export default function WareneingangPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
             <label>
               <div style={lbl}>Lieferschein (Pflicht) — mehrere Bilder möglich</div>
-              <input type="file" accept="image/*" capture="environment" multiple
+              <input type="file" accept="image/*" multiple
                 onChange={e => setReceiptFiles(Array.from(e.target.files || []))} />
               {receiptFiles.length > 0 && (
                 <div style={{ fontSize: 10, color: '#4ddb7e', marginTop: 4 }}>
@@ -410,12 +410,12 @@ export default function WareneingangPage() {
             </label>
             <label>
               <div style={lbl}>Bauteil-Foto (optional)</div>
-              <input type="file" accept="image/*" capture="environment"
+              <input type="file" accept="image/*"
                 onChange={e => setPartsFile(e.target.files?.[0] ?? null)} />
             </label>
             <label>
               <div style={lbl}>Verpackung-Foto (optional)</div>
-              <input type="file" accept="image/*" capture="environment"
+              <input type="file" accept="image/*"
                 onChange={e => setPackagingFile(e.target.files?.[0] ?? null)} />
             </label>
           </div>
@@ -583,17 +583,17 @@ export default function WareneingangPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 14 }}>
                 <label>
                   <div style={lbl}>Lieferschein-Foto</div>
-                  <input type="file" accept="image/*" capture="environment" multiple
+                  <input type="file" accept="image/*" multiple
                     onChange={e => setReceiptFiles(Array.from(e.target.files || []))} />
                 </label>
                 <label>
                   <div style={lbl}>Bauteil-Foto</div>
-                  <input type="file" accept="image/*" capture="environment"
+                  <input type="file" accept="image/*"
                     onChange={e => setPartsFile(e.target.files?.[0] ?? null)} />
                 </label>
                 <label>
                   <div style={lbl}>Verpackung-Foto</div>
-                  <input type="file" accept="image/*" capture="environment"
+                  <input type="file" accept="image/*"
                     onChange={e => setPackagingFile(e.target.files?.[0] ?? null)} />
                 </label>
               </div>
