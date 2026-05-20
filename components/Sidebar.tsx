@@ -6,6 +6,31 @@ import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { hasDemoCookie, performLogout } from '@/lib/auth'
 import { getAccessProfile } from '@/lib/access'
 import { isPondruffUser } from '@/lib/pondruff'
+import { useDesignV2 } from '@/lib/design-flag'
+import { PilotIcon, type PilotIconName } from '@/components/brand/PilotIcon'
+import { Logo } from '@/components/brand/Logo'
+
+// Icon-Map für Design-V2 (Lucide). Wenn kein Mapping → Emoji-Fallback.
+const V2_ICONS: Record<string, PilotIconName | undefined> = {
+  '/dashboard': 'start',
+  '/dashboard/ki-erkennung': 'ki',
+  '/dashboard/cloud': 'cloud',
+  '/dashboard/archiv': 'archiv',
+  '/dashboard/einstellungen': 'einstellungen',
+  '/dashboard/lager': 'lager',
+  '/dashboard/buero': 'buero',
+  '/dashboard/werkstatt': 'werkstatt',
+  '/dashboard/marketing': 'marketing',
+  '/dashboard/analyse': 'analyse',
+  '/dashboard/planung': 'planung',
+  '/dashboard/steuer': 'steuer',
+  '/dashboard/qm': 'qm',
+  '/dashboard/pondruff/wareneingang': 'wareneingang',
+  '/dashboard/pondruff/preisrechner': 'preis',
+  '/dashboard/pondruff/buero-wiso': 'beleg',
+  '/dashboard/pondruff/ki-suche': 'suche',
+  '/dashboard/pondruff/archiv': 'archiv',
+}
 
 const pondruffNav = [
   { label: 'Wareneingang', icon: '📥', href: '/dashboard/pondruff/wareneingang' },
@@ -34,6 +59,15 @@ const navItems = [
   { label: 'Einstellungen', icon: '⚙️', href: '/dashboard/einstellungen' },
 ]
 
+// Helper: rendert je nach Design-Flag entweder Emoji-Span oder Lucide-Icon
+function NavIcon({ v2, href, emoji, size = 16 }: { v2: boolean; href: string; emoji: string; size?: number }) {
+  if (v2) {
+    const iconName = V2_ICONS[href]
+    if (iconName) return <PilotIcon name={iconName} size={size} />
+  }
+  return <span style={{ fontSize: size }}>{emoji}</span>
+}
+
 interface SidebarProps {
   isOpen?: boolean
   onClose?: () => void
@@ -42,6 +76,7 @@ interface SidebarProps {
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
+  const v2 = useDesignV2()
   const [isDemo, setIsDemo] = useState(false)
   const [allowedPilotIds, setAllowedPilotIds] = useState<string[]>(pilots.map(pilot => pilot.id))
   const [isPondruff, setIsPondruff] = useState(false)
@@ -93,13 +128,27 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       {/* Logo */}
       <div style={{ padding: '18px 16px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
         <button onClick={() => navigate('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
-          <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, overflow: 'hidden', border: '1px solid rgba(22,132,255,.35)', boxShadow: '0 0 16px rgba(22,132,255,.25)' }}>
-            <Image src="/logo.png" alt="Petersen KI Logo" width={42} height={42} style={{ objectFit: 'cover', borderRadius: 12 }} priority />
-          </div>
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: 14, fontWeight: 900, lineHeight: 1.1, color: '#f8fbff' }}>Petersen <span style={{ color: '#1684ff' }}>KI</span></div>
-            <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>Betriebssteuerung</div>
-          </div>
+          {v2 ? (
+            <>
+              <div style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 12, boxShadow: '0 0 16px rgba(22,132,255,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Logo variant="mark" height={42} />
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: 14, fontWeight: 900, lineHeight: 1.1, color: '#f8fbff' }}>Petersen <span style={{ color: '#1684ff' }}>KI</span></div>
+                <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>Betriebssteuerung</div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, overflow: 'hidden', border: '1px solid rgba(22,132,255,.35)', boxShadow: '0 0 16px rgba(22,132,255,.25)' }}>
+                <Image src="/logo.png" alt="Petersen KI Logo" width={42} height={42} style={{ objectFit: 'cover', borderRadius: 12 }} priority />
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: 14, fontWeight: 900, lineHeight: 1.1, color: '#f8fbff' }}>Petersen <span style={{ color: '#1684ff' }}>KI</span></div>
+                <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2 }}>Betriebssteuerung</div>
+              </div>
+            </>
+          )}
         </button>
         {isDemo && (
           <div style={{ marginTop: 10, padding: '4px 8px', borderRadius: 6, background: 'rgba(255,165,0,.12)', border: '1px solid rgba(255,165,0,.25)', fontSize: 10, color: '#ffb347', fontWeight: 700, textAlign: 'center', letterSpacing: '.05em' }}>
@@ -115,7 +164,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <button key={item.href} onClick={() => navigate(item.href)} style={navBtnStyle(isActive(item.href))}
             onMouseEnter={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.05)' }}
             onMouseLeave={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
-            <span style={{ fontSize: 16 }}>{item.icon}</span>{item.label}
+            <NavIcon v2={v2} href={item.href} emoji={item.icon} size={16} />{item.label}
           </button>
         ))}
       </div>
@@ -129,7 +178,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               style={{ ...navBtnStyle(isActive(item.href)), color: isActive(item.href) ? '#ff6b6b' : '#f5d4d4', borderLeft: isActive(item.href) ? '2px solid #e50909' : '2px solid transparent', background: isActive(item.href) ? 'rgba(229,9,9,.15)' : 'transparent' }}
               onMouseEnter={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(229,9,9,.08)' }}
               onMouseLeave={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
-              <span style={{ fontSize: 15 }}>{item.icon}</span>{item.label}
+              <NavIcon v2={v2} href={item.href} emoji={item.icon} size={15} />{item.label}
             </button>
           ))}
         </div>
@@ -143,7 +192,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             style={{ ...navBtnStyle(isActive(pilot.href)), color: isActive(pilot.href) ? '#6cb6ff' : '#d0d9e8' }}
             onMouseEnter={e => { if (!isActive(pilot.href)) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.05)' }}
             onMouseLeave={e => { if (!isActive(pilot.href)) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
-            <span style={{ fontSize: 15 }}>{pilot.icon}</span>{pilot.label}
+            <NavIcon v2={v2} href={pilot.href} emoji={pilot.icon} size={15} />{pilot.label}
           </button>
         ))}
       </div>
