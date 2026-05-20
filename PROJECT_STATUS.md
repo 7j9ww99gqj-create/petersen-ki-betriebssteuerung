@@ -430,7 +430,7 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
 ### 0.4 Quick Status Summary (für Statusabfragen)
 **Letzter Stand:** 2026-05-19, **Dual-Sprint A+B+C** (Pondruff Datenverlust-Fix + UX, Owner-Härtung) — 10 Aufgaben, HEAD `dcf29bb`  
 **Letzte Session:** Pondruff-Härtung (raw_dimension_text persistiert, Büro-Sync idempotent, Doppel-Klick-Schutz WISO, OCR-Fehlerdetail, Operator/Status durchgereicht, Zurück-Button, Mobile-Kamera, Preistabellen-Admin-Panel Teil-Lösung) + Owner-Härtung (case-insensitive Mail-Check, owner_audit_log Tabelle + UI-Viewer, OpenAI-Usage 1h-Cache + Refresh-Button)  
-**Nächster Focus:** C4 Voll-Integration (Preisrechner `getPriceConfig()` async aus DB), UI-Test in Production, Inhaber-Workflow Sprint-D (CSV-Export, Pending-Payment-Reminder)  
+**Nächster Focus:** UI-Test in Production, Inhaber-Workflow Sprint-D (CSV-Export, Pending-Payment-Reminder)  
 **Blocker:** Keine  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
@@ -514,7 +514,7 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
   - **Sprint C — Pondruff UX (4 Aufgaben):**
     - C1+C2 (`556c52e`): `operator` + `status` ins sessionStorage-Prefill aufgenommen und im Preisrechner als Read-only Info-Box "🧑 Bediener: X · Status: Y" angezeigt. "← Zurück zum Wareneingang"-Button erscheint wenn `prefill=1` UND `delivery_id` vorhanden. sessionStorage wird erst nach `saveOrder()` gelöscht.
     - C3 (`9725e10`): `capture="environment"` ergänzt auf allen Pondruff Foto-Inputs (Wareneingang, Preisrechner, KI-Bauteilsuche). Auf iOS/Android öffnet sich jetzt Kamera direkt mit Option Galerie statt umgekehrt.
-    - C4 (`dcf29bb`, **Teil-Lösung**): Tabelle `pondruff_price_config` (Migration `20260519800000_pondruff_price_config.sql`). Route `app/api/pondruff/admin-price-config` (GET/POST, nur Inhaber). UI-Panel `/dashboard/pondruff/admin/page.tsx` zum Editieren von Preistabelle/Faktoren/Multipliern. ⚠️ Voll-Integration aufgeschoben: `lib/pondruff.ts` liest noch sync aus JSON-Datei — Preisrechner muss `getPriceConfig()` async aus DB laden, um Live-Wirksamkeit zu erreichen.
+    - C4 (`dcf29bb` + P0-9 `bd1364a`, ✅ vollständig): Tabelle `pondruff_price_config`, Route `admin-price-config`, UI-Panel `/dashboard/pondruff/admin/page.tsx`. `getPriceConfig(userId)` liest DB-Config mit JSON-Fallback — DB hat Priorität wenn etwas geändert wurde, sonst immer statische JSON.
 
 - **Vorheriger Stand (2026-05-19 — Pondruff Komma-Zahlen-Fix, HEAD `ec679ac`):**
   - **Inhaber-Feature-Flags** (`56854e2`): Tabelle `pondruff_feature_flags` (4 Boolean-Schalter: `ocr_wareneingang`, `ocr_preisrechner`, `ki_bauteilsuche`, `wiso_sync`, Default true, RLS select_self). Panel `OwnerPondruffFeaturesPanel` in Einstellungen → Kundensteuerung. API `/api/owner/pondruff-flags` (GET/POST, nur Inhaber-Email + Service-Role-Upsert). Server-Guard `requirePondruffFeature()` in 5 API-Routes (`ocr-price`, `ocr-lieferschein`, `bauteil-suche`, `wiso-export(-wareneingang)`). Client-Hook `usePondruffFlags` für UI-Disabled-Zustände.
