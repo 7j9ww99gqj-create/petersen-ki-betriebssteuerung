@@ -8,6 +8,7 @@ import { getBueroKunden, getBueroAngebote, getBueroAuftraege, getBueroRechnungen
 import { useRole } from '@/lib/roles'
 import { TabBar } from '@/components/buero/shared'
 import type { Kunde, Angebot, Auftrag, Rechnung, Tab } from '@/types/buero'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { demoKunden, demoAngebote, demoAuftraege, demoRechnungen, parseBetrag, demoBueroZeiterfassung, demoBueroArtikel, demoAnsprechpartner, demoLieferanten } from '@/types/buero'
 import KundenTab from '@/components/buero/KundenTab'
 import AngeboteTab from '@/components/buero/AngeboteTab'
@@ -42,20 +43,19 @@ export default function BueroPilotPage() {
   }
   const BUERO_TABS: Tab[] = ['kunden', 'angebote', 'auftraege', 'rechnungen', 'eingangsrechnungen', 'dokumente', 'einkauf', 'ki-tools', 'zeiterfassung', 'lieferanten', 'artikel']
   useSwipeTabs(BUERO_TABS, tab, (t) => setTab(t as Tab))
-  const [kunden, setKunden] = useState<Kunde[]>(isDemo ? demoKunden : [])
-  const [angebote, setAngebote] = useState<Angebot[]>(isDemo ? demoAngebote : [])
-  const [auftraege, setAuftraege] = useState<Auftrag[]>(isDemo ? demoAuftraege : [])
-  const [sharedRechnungen, setSharedRechnungen] = useState<Rechnung[]>(isDemo ? demoRechnungen : [])
-  const [lieferantenCount, setLieferantenCount] = useState(isDemo ? demoLieferanten.length : 0)
-  const [zeiterfassungCount] = useState(isDemo ? demoBueroZeiterfassung.length : 0)
-  const [artikelCount] = useState(isDemo ? demoBueroArtikel.length : 0)
+  const [kunden, setKunden] = useState<Kunde[]>([])
+  const [angebote, setAngebote] = useState<Angebot[]>([])
+  const [auftraege, setAuftraege] = useState<Auftrag[]>([])
+  const [sharedRechnungen, setSharedRechnungen] = useState<Rechnung[]>([])
+  const [lieferantenCount, setLieferantenCount] = useState(0)
+  const [zeiterfassungCount] = useState(0)
+  const [artikelCount] = useState(0)
   const [sharedMailTarget, setSharedMailTarget] = useState<{ id: string; email: string; typ: 'rechnung' } | null>(null)
-  const [loading, setLoading] = useState(!isDemo)
+  const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set())
 
   const loadData = () => {
-    if (isDemo) return
     trackVisit({ href: '/dashboard/buero', label: 'BüroPilot', icon: '🧾' })
     setLoading(true)
     setErrorMsg('')
@@ -78,7 +78,6 @@ export default function BueroPilotPage() {
 
   // Lazy Loading: Angebote + Aufträge erst bei Tab-Wechsel
   useEffect(() => {
-    if (isDemo) return
     if ((tab === 'angebote' || tab === 'auftraege' || tab === 'pipeline' || tab === 'alerts') && !loadedTabs.has('angebote')) {
       Promise.all([getBueroAngebote(), getBueroAuftraege()])
         .then(([a, au]) => {
