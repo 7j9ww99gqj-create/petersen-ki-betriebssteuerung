@@ -1,7 +1,9 @@
 import 'server-only'
 
 import { createSupabaseAdminClient, isSupabaseAdminConfigured } from './supabase-admin'
-import type { AiFeatureSettings, MarketingKiSettings, OpenAiToolSettings } from './db'
+import type { AiFeatureSettings, MarketingKiSettings, OpenAiToolSettings, QmKiSettings } from './db'
+import { INHABER_EMAIL } from './roles'
+import { isPondruffUser } from './pondruff'
 
 const DEFAULT_AI_FEATURE_SETTINGS: AiFeatureSettings = {
   enabled: true,
@@ -84,6 +86,35 @@ const OPENAI_TOOLS_FAIL_OPEN: OpenAiToolSettings = {
   mahnungsgeneratorEnabled: true,
   emailAssistentEnabled: true,
   monatsberichtEnabled: true,
+}
+
+const DEFAULT_QM_KI: QmKiSettings = {
+  qm_ki_zeichnungs_analyse: false,
+  qm_ki_sichtpruefung: false,
+}
+
+export async function getServerQmKiSettings(userId: string, userEmail?: string): Promise<QmKiSettings> {
+  const email = (userEmail ?? '').toLowerCase()
+  if (email === INHABER_EMAIL.toLowerCase() || isPondruffUser(email)) {
+    return { qm_ki_zeichnungs_analyse: true, qm_ki_sichtpruefung: true }
+  }
+  try {
+    if (!isSupabaseAdminConfigured()) return DEFAULT_QM_KI
+    const admin = createSupabaseAdminClient()
+    const { data } = await admin
+      .from('firma_einstellungen')
+      .select('qm_ki_zeichnungs_analyse, qm_ki_sichtpruefung')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (!data) return DEFAULT_QM_KI
+    const row = data as Record<string, unknown>
+    return {
+      qm_ki_zeichnungs_analyse: Boolean(row.qm_ki_zeichnungs_analyse),
+      qm_ki_sichtpruefung: Boolean(row.qm_ki_sichtpruefung),
+    }
+  } catch {
+    return DEFAULT_QM_KI
+  }
 }
 
 export async function getServerOpenAiToolSettings(userId: string): Promise<OpenAiToolSettings> {
