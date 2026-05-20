@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-19`, `main`, **Demo-Mode-Foundation-Sprint** (Aufgabe 20A+B+C+E): Demo-User als echter Supabase-Account, Seed-SQL, Reset-CRON, Login-Flow, UI-Banner.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, Branch `sprint-20-phase-d`, **Demo-Mode-Code-Migration (Sprint 20D)**: 10 Piloten-Seiten von isDemo-Daten-Routing-Branches befreit (~150 Branches), Demo-User nutzt jetzt RLS-DB-Pfad. Tests 87/87, Build grün.
+- Davor: `2026-05-19`, `main`, **Demo-Mode-Foundation-Sprint** (Aufgabe 20A+B+C+E): Demo-User als echter Supabase-Account, Seed-SQL, Reset-CRON, Login-Flow, UI-Banner.
 - Davor: **Compliance-Sprint** (Aufgaben 15-18): DSGVO-Export UI-Button, CONTRIBUTING+PR-Template, Backup-Restore-Drill.
 - Davor: **Optimierungs-Sprint Phase-3** (HEAD `c0bbb45`): 13 Verbesserungen live (paralleler Agent).
 - Davor: **Phase-2-Sprint** (HEAD `0e89a9f`): Audit-Logs, OpenAI-Cost-Tracking, Modal/Toast-Konsolidierung, Test-Coverage +47, API-Versionierung.
@@ -442,6 +443,13 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+
+- **Zuletzt erledigt (2026-05-20 — Sprint 20D Demo-Mode-Code-Migration, Branch `sprint-20-phase-d`):**
+  - 10 Pilot-Seiten von `isDemo`-Daten-Routing-Branches befreit. Demo-User nutzt jetzt RLS-geschützten echten DB-Pfad.
+  - Entfernt: ~150 Daten-Routing-Branches (Lese-Fallbacks, Schreib-Skip, Ternary-Demo-Daten, useEffect-Blocker). Belassen: UI-Banner, Demo-Hint-Toasts, gefährliche Demo-Aktions-Blocker (Snapshot, BulkDelete, Permissions-Bypass für Rollen-Toggle).
+  - Pilot-Commits: CloudPilot (4), AnalysePilot (2), KI-Erkennung (3), SteuerPilot (8), BueroPilot (5+useEffect), PlanungPilot (~30), WerkstattPilot (~50), MarketingPilot (~25), LagerPilot (~25), EinstellungenPilot (~10).
+  - `npm test`: 87/87 grün. `npm run build`: erfolgreich. `npx tsc --noEmit`: 0 Fehler.
+  - Verbleibende `isDemo`-Vorkommen sind reine UI-Conditionals (Banner, Disable-Schutz, Toast-Texte mit "(Demo)"-Suffix). Hardcoded `demo*`-Constants wurden mit `eslint-disable @typescript-eslint/no-unused-vars` markiert (Aufräumen in Folge-Sprint).
 
 - **Zuletzt erledigt (2026-05-19 — Dual-Sprint A+B+C, HEAD `dcf29bb`):**
   - **Sprint A — Pondruff Datenverlust-/Duplikat-Risiko (3 Aufgaben):**
