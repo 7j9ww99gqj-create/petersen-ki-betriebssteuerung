@@ -232,14 +232,7 @@ export default function SteuerPilotPage() {
   const loadData = async () => {
     setLoading(true)
     setLoadError('')
-    if (!isDemo) trackVisit({ href: '/dashboard/steuer', label: 'SteuerPilot', icon: '🧮' })
-    if (isDemo) {
-      setBelege(demoBelege); setUstva(demoUstva); setRechnungen(demoRechnungen)
-      setFixkosten(demoFixkosten); setBetriebsausgaben(demoBetriebsausgaben); setAnschaffungen(demoAnschaffungen)
-      setStripeZahlungen(demoStripeZahlungen)
-      setWarnings(await getSteuerWarnings(true))
-      setLoading(false); return
-    }
+    trackVisit({ href: '/dashboard/steuer', label: 'SteuerPilot', icon: '🧮' })
     try {
       const supabase = createSupabaseClient()
       const start12 = new Date(); start12.setFullYear(start12.getFullYear() - 1)
@@ -399,10 +392,6 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
       datei_url: editBeleg.datei_url,
       notiz: editBeleg.notiz,
     }
-    if (isDemo) {
-      setBelege(prev => prev.some(b => b.id === toSave.id) ? prev.map(b => b.id === toSave.id ? toSave : b) : [toSave, ...prev])
-      showToast('Beleg gespeichert'); setEditBeleg(null); setSaving(false); return
-    }
     try {
       let dateiUrl = toSave.datei_url
       if (uploadFile) {
@@ -419,7 +408,6 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
   }
 
   const handleDeleteBeleg = async (id: string) => {
-    if (isDemo) { setBelege(prev => prev.filter(b => b.id !== id)); setDeleteConfirm(null); showToast('Beleg gelöscht'); return }
     try {
       await deleteSteuerBeleg(id)
       setBelege(prev => prev.filter(b => b.id !== id))
@@ -436,7 +424,6 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
       zahllast: ust - vorsteuerGesamt,
       status: 'geprüft',
     }
-    if (isDemo) { setUstva(prev => prev.map(u => u.monat === selectedMonat ? entry : u)); showToast('UStVA als geprüft markiert'); return }
     try {
       await upsertSteuerUstva(entry)
       setUstva((await getSteuerUstva()) as Ustva[])
@@ -453,7 +440,7 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
     setNewBelegSaving(true)
     try {
       let fileUrl: string | undefined
-      if (newBelegFile && !isDemo) {
+      if (newBelegFile) {
         const supabase = createSupabaseClient()
         const { data: { session } } = await supabase.auth.getSession()
         fileUrl = await uploadSteuerBelegFile(newBelegFile, session?.user.id ?? 'anon')
@@ -468,12 +455,8 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
         datum: newBelegDetails.datum || null,
         notiz: [newBelegKategorie, newBelegDetails.beschreibung].filter(Boolean).join(' – ') || null,
       }
-      if (!isDemo) {
-        await upsertSteuerBelegUpload(entry)
-        setBelegUploads(await getSteuerBelegUploads())
-      } else {
-        setBelegUploads(prev => [entry, ...prev])
-      }
+      await upsertSteuerBelegUpload(entry)
+      setBelegUploads(await getSteuerBelegUploads())
 
       showToast('Beleg erfasst')
       setShowNewBelegModal(false)
@@ -1010,10 +993,7 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
                 const supabase = createSupabaseClient()
                 const { data: { session } } = await supabase.auth.getSession()
                 const userId = session?.user.id ?? 'anon'
-                let dateiUrl: string | undefined
-                if (!isDemo) {
-                  dateiUrl = await uploadSteuerBelegFile(uploadFile2, userId)
-                }
+                const dateiUrl = await uploadSteuerBelegFile(uploadFile2, userId)
                 const entry: SteuerBelegUpload = {
                   id: `BU-${Date.now().toString(36).toUpperCase()}`,
                   kategorie: uploadForm.kategorie as SteuerBelegUpload['kategorie'],
@@ -1022,12 +1002,8 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
                   datum: uploadForm.datum || null,
                   notiz: uploadForm.notiz || null,
                 }
-                if (!isDemo) {
-                  await upsertSteuerBelegUpload(entry)
-                  setBelegUploads(await getSteuerBelegUploads())
-                } else {
-                  setBelegUploads(prev => [entry, ...prev])
-                }
+                await upsertSteuerBelegUpload(entry)
+                setBelegUploads(await getSteuerBelegUploads())
                 setUploadForm({ kategorie: 'Sonstiges', betrag: '', datum: new Date().toISOString().split('T')[0], notiz: '' })
                 setUploadFile2(null)
                 if (uploadFileRef.current) uploadFileRef.current.value = ''
@@ -1037,7 +1013,6 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
             }
 
             const handleDeleteUpload = async (id: string) => {
-              if (isDemo) { setBelegUploads(prev => prev.filter(u => u.id !== id)); setDeleteUploadConfirm(null); showToast('Beleg gelöscht'); return }
               try {
                 await deleteSteuerBelegUpload(id)
                 setBelegUploads(prev => prev.filter(u => u.id !== id))
@@ -1161,7 +1136,6 @@ Wähle das passendste Konto aus dem SKR 04 Kontenrahmen. Häufige Konten:
                           value={b.status}
                           onChange={async e => {
                             const updated = { ...b, status: e.target.value as Beleg['status'] }
-                            if (isDemo) { setBelege(prev => prev.map(x => x.id === b.id ? updated : x)); return }
                             try { await upsertSteuerBeleg(updated); setBelege(prev => prev.map(x => x.id === b.id ? updated : x)) }
                             catch { showToast('Fehler', 'error') }
                           }}
