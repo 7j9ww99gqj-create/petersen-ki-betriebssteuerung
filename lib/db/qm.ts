@@ -563,3 +563,81 @@ export async function getQmPrueferPerformance(zeitraum: QmStatistikZeitraum): Pr
   }
   return Object.entries(stats).map(([pruefer_name, v]) => ({ pruefer_name, ...v }))
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Messmittel-Kalibrierungs-Tracking (ISO 9001 §7.1.5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type QmMessmittelStatus = 'ok' | 'faellig' | 'ueberfaellig'
+export type QmMessmittelTyp = 'Schieblehre' | 'Mikrometer' | 'Rauheitsmesser' | 'Lehrdorn' | 'Sonstiges'
+
+export type QmMessmittel = {
+  id: string
+  user_id: string
+  name: string
+  seriennummer: string | null
+  hersteller: string | null
+  typ: string | null
+  messbereich: string | null
+  aufloesung: string | null
+  kalibriert_am: string | null
+  kalibrierung_faellig_am: string | null
+  kalibrierungs_intervall_tage: number | null
+  status: QmMessmittelStatus
+  notiz: string | null
+  aktiv: boolean
+  erstellt_am: string
+}
+
+function computeMessmittelStatus(m: QmMessmittel): QmMessmittelStatus {
+  if (!m.kalibrierung_faellig_am) return 'ok'
+  const heute = new Date()
+  const faellig = new Date(m.kalibrierung_faellig_am)
+  const bald = new Date(heute)
+  bald.setDate(bald.getDate() + 30)
+  if (faellig < heute) return 'ueberfaellig'
+  if (faellig < bald) return 'faellig'
+  return 'ok'
+}
+
+export async function getQmMessmittel(): Promise<QmMessmittel[]> {
+  const { data, error } = await db()
+    .from('qm_messmittel')
+    .select('*')
+    .eq('aktiv', true)
+    .order('erstellt_am', { ascending: false })
+  if (error) throw error
+  return ((data ?? []) as QmMessmittel[]).map(m => ({ ...m, status: computeMessmittelStatus(m) }))
+}
+
+export type UpsertQmMessmittelInput = {
+  id?: string
+  name: string
+  seriennummer?: string | null
+  hersteller?: string | null
+  typ?: string | null
+  messbereich?: string | null
+  aufloesung?: string | null
+  kalibriert_am?: string | null
+  kalibrierung_faellig_am?: string | null
+  kalibrierungs_intervall_tage?: number | null
+  notiz?: string | null
+  aktiv?: boolean
+}
+
+export async function upsertQmMessmittel(m: UpsertQmMessmittelInput): Promise<QmMessmittel> {
+  const payload = { ...m, id: m.id ?? undefined }
+  const { data, error } = await db()
+    .from('qm_messmittel')
+    .upsert(payload, { onConflict: 'id' })
+    .select()
+    .single()
+  if (error) throw error
+  const row = data as QmMessmittel
+  return { ...row, status: computeMessmittelStatus(row) }
+}
+
+export async function deleteQmMessmittel(id: string): Promise<void> {
+  const { error } = await db().from('qm_messmittel').delete().eq('id', id)
+  if (error) throw error
+}

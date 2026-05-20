@@ -15,6 +15,9 @@ import {
   getQmFehlerquoteTrend,
   getQmHaeufigsteAbweichungen,
   getQmPrueferPerformance,
+  getQmMessmittel,
+  upsertQmMessmittel,
+  deleteQmMessmittel,
   type QmGesamtstatus,
   type QmPruefbericht,
   type QmTeamMitglied,
@@ -24,6 +27,8 @@ import {
   type QmFehlerquoteTrend,
   type QmHaeufigsteAbweichung,
   type QmPrueferPerformance,
+  type QmMessmittel,
+  type QmMessmittelTyp,
 } from '@/lib/db/qm'
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -85,6 +90,27 @@ const DEMO_BERICHTE: QmPruefbericht[] = [
   },
 ]
 
+const DEMO_MESSMITTEL: QmMessmittel[] = [
+  {
+    id: 'MM-001', user_id: 'demo', name: 'Schieblehre digital #1', seriennummer: 'SN-4892', hersteller: 'Mitutoyo',
+    typ: 'Schieblehre', messbereich: '0-150mm', aufloesung: '0,01mm',
+    kalibriert_am: '2025-05-20', kalibrierung_faellig_am: '2026-06-15',
+    kalibrierungs_intervall_tage: 365, status: 'ok', notiz: null, aktiv: true, erstellt_am: '2025-05-20T10:00:00Z',
+  },
+  {
+    id: 'MM-002', user_id: 'demo', name: 'Mikrometer 0-25mm', seriennummer: 'SN-7231', hersteller: 'Mahr',
+    typ: 'Mikrometer', messbereich: '0-25mm', aufloesung: '0,001mm',
+    kalibriert_am: '2025-11-20', kalibrierung_faellig_am: '2026-05-30',
+    kalibrierungs_intervall_tage: 180, status: 'faellig', notiz: null, aktiv: true, erstellt_am: '2025-11-20T10:00:00Z',
+  },
+  {
+    id: 'MM-003', user_id: 'demo', name: 'Rauheitsmessgerät Surftest', seriennummer: 'SN-1055', hersteller: 'Mitutoyo',
+    typ: 'Rauheitsmesser', messbereich: null, aufloesung: null,
+    kalibriert_am: '2025-03-01', kalibrierung_faellig_am: '2026-03-01',
+    kalibrierungs_intervall_tage: 365, status: 'ueberfaellig', notiz: 'Kalibrierung abgelaufen!', aktiv: true, erstellt_am: '2025-03-01T10:00:00Z',
+  },
+]
+
 // ─────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────
@@ -133,7 +159,7 @@ function computeKpis(berichte: QmPruefbericht[]): KpiData {
   return { woche, bestanden, nachbesserung, ausschuss, fehlerquote }
 }
 
-type Tab = 'dashboard' | 'zeichnungen' | 'archiv' | 'statistiken' | 'team'
+type Tab = 'dashboard' | 'zeichnungen' | 'archiv' | 'statistiken' | 'team' | 'messmittel'
 
 // ─────────────────────────────────────────────────────────────────────
 // Component
@@ -184,6 +210,19 @@ export default function QMPage() {
   const [teamForm, setTeamForm] = useState<{ name: string; email: string; rolle: QmTeamRolle }>({ name: '', email: '', rolle: 'pruefer' })
   const [teamSaving, setTeamSaving] = useState(false)
 
+  // Messmittel state
+  const [messmittel, setMessmittel] = useState<QmMessmittel[]>([])
+  const [messmittelLoading, setMessmittelLoading] = useState(false)
+  const [deleteConfirmMM, setDeleteConfirmMM] = useState<string | null>(null)
+  const [showMMModal, setShowMMModal] = useState(false)
+  const [editingMM, setEditingMM] = useState<QmMessmittel | null>(null)
+  const [mmForm, setMmForm] = useState<{
+    name: string; seriennummer: string; hersteller: string; typ: string
+    messbereich: string; aufloesung: string; kalibriert_am: string; kalibrierung_faellig_am: string
+    kalibrierungs_intervall_tage: string; notiz: string
+  }>({ name: '', seriennummer: '', hersteller: '', typ: 'Schieblehre', messbereich: '', aufloesung: '', kalibriert_am: '', kalibrierung_faellig_am: '', kalibrierungs_intervall_tage: '365', notiz: '' })
+  const [mmSaving, setMmSaving] = useState(false)
+
   function showToast(msg: string, ok = true) {
     setToast({ msg, ok })
     setTimeout(() => setToast(null), 3500)
@@ -221,6 +260,16 @@ export default function QMPage() {
   }, [isDemo])
 
   useEffect(() => { if (tab === 'team') void loadTeam() }, [tab, loadTeam])
+
+  const loadMessmittel = useCallback(async () => {
+    setMessmittelLoading(true)
+    try {
+      if (isDemo) setMessmittel(DEMO_MESSMITTEL)
+      else setMessmittel(await getQmMessmittel())
+    } catch { /* ignore */ } finally { setMessmittelLoading(false) }
+  }, [isDemo])
+
+  useEffect(() => { if (tab === 'messmittel' || tab === 'dashboard') void loadMessmittel() }, [tab, loadMessmittel])
 
   const loadStats = useCallback(async (zeitraum: QmStatistikZeitraum) => {
     if (isDemo) return
@@ -367,6 +416,57 @@ export default function QMPage() {
     return `mailto:?subject=${subject}&body=${body}`
   }
 
+  function openMMModal(m?: QmMessmittel) {
+    setEditingMM(m ?? null)
+    setMmForm(m ? {
+      name: m.name, seriennummer: m.seriennummer ?? '', hersteller: m.hersteller ?? '',
+      typ: m.typ ?? 'Schieblehre', messbereich: m.messbereich ?? '', aufloesung: m.aufloesung ?? '',
+      kalibriert_am: m.kalibriert_am ?? '', kalibrierung_faellig_am: m.kalibrierung_faellig_am ?? '',
+      kalibrierungs_intervall_tage: String(m.kalibrierungs_intervall_tage ?? 365), notiz: m.notiz ?? '',
+    } : { name: '', seriennummer: '', hersteller: '', typ: 'Schieblehre', messbereich: '', aufloesung: '', kalibriert_am: '', kalibrierung_faellig_am: '', kalibrierungs_intervall_tage: '365', notiz: '' })
+    setShowMMModal(true)
+  }
+
+  async function handleSaveMM() {
+    if (!mmForm.name.trim()) return
+    if (isDemo) { showToast('Demo: Änderungen werden nicht gespeichert'); setShowMMModal(false); return }
+    setMmSaving(true)
+    try {
+      await upsertQmMessmittel({
+        id: editingMM?.id,
+        name: mmForm.name.trim(),
+        seriennummer: mmForm.seriennummer.trim() || null,
+        hersteller: mmForm.hersteller.trim() || null,
+        typ: mmForm.typ || null,
+        messbereich: mmForm.messbereich.trim() || null,
+        aufloesung: mmForm.aufloesung.trim() || null,
+        kalibriert_am: mmForm.kalibriert_am || null,
+        kalibrierung_faellig_am: mmForm.kalibrierung_faellig_am || null,
+        kalibrierungs_intervall_tage: parseInt(mmForm.kalibrierungs_intervall_tage) || 365,
+        notiz: mmForm.notiz.trim() || null,
+      })
+      setShowMMModal(false)
+      await loadMessmittel()
+      showToast(editingMM ? 'Messmittel aktualisiert' : 'Messmittel hinzugefügt')
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Fehler', false)
+    } finally {
+      setMmSaving(false)
+    }
+  }
+
+  async function handleDeleteMM(id: string) {
+    if (isDemo) { showToast('Demo: Löschen nicht verfügbar'); setDeleteConfirmMM(null); return }
+    try {
+      await deleteQmMessmittel(id)
+      setDeleteConfirmMM(null)
+      await loadMessmittel()
+      showToast('Messmittel gelöscht')
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Fehler', false)
+    }
+  }
+
   // ── Computed
   const kpis = computeKpis(berichte)
 
@@ -391,6 +491,7 @@ export default function QMPage() {
     { id: 'archiv',      label: 'Archiv',      icon: '📁' },
     { id: 'statistiken', label: 'Statistiken', icon: '📈' },
     { id: 'team',        label: 'Team',        icon: '👥' },
+    { id: 'messmittel',  label: 'Messmittel',  icon: '🔧' },
   ]
 
   return (
@@ -482,6 +583,29 @@ export default function QMPage() {
                   <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 4 }}>Fehlerquote</div>
                 </div>
               </div>
+
+              {/* Messmittel-Warnung */}
+              {(() => {
+                const ueberfaellig = messmittel.filter(m => m.status === 'ueberfaellig').length
+                const faellig = messmittel.filter(m => m.status === 'faellig').length
+                if (ueberfaellig === 0 && faellig === 0) return null
+                return (
+                  <div className="pk-card" style={{ marginBottom: 16, border: `1px solid ${ueberfaellig > 0 ? 'rgba(239,68,68,.4)' : 'rgba(245,158,11,.4)'}`, cursor: 'pointer' }}
+                    onClick={() => setTab('messmittel')}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 20 }}>{ueberfaellig > 0 ? '❌' : '⚠️'}</span>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: ueberfaellig > 0 ? '#ef4444' : '#f59e0b' }}>
+                          {ueberfaellig > 0
+                            ? `${ueberfaellig} Messmittel überfällig — Kalibrierung prüfen`
+                            : `${faellig} Messmittel bald fällig — Kalibrierung planen`}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#aeb9c8' }}>Klicken für Details → Messmittel-Tab</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Letzte Prüfberichte */}
               <div className="pk-card">
@@ -1008,6 +1132,156 @@ export default function QMPage() {
                       style={{ background: QM_COLOR, border: 'none', marginTop: 8 }}>
                       {teamSaving ? '⏳ Speichere…' : '💾 Speichern'}
                     </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* ─── Messmittel Tab ─── */}
+      {tab === 'messmittel' && (() => {
+        function mmStatusBadge(status: string) {
+          if (status === 'ueberfaellig') return { label: '❌ Überfällig', bg: 'rgba(239,68,68,.15)', color: '#ef4444' }
+          if (status === 'faellig')      return { label: '⚠️ Bald fällig', bg: 'rgba(245,158,11,.15)', color: '#f59e0b' }
+          return                              { label: '✓ OK',            bg: 'rgba(16,185,129,.15)', color: '#10b981' }
+        }
+
+        const TYPEN: QmMessmittelTyp[] = ['Schieblehre', 'Mikrometer', 'Rauheitsmesser', 'Lehrdorn', 'Sonstiges']
+
+        return (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <span style={{ fontWeight: 800, fontSize: 15 }}>🔧 Messmittel-Kalibrierung</span>
+              <span style={{ fontSize: 11, color: '#aeb9c8' }}>ISO 9001 §7.1.5</span>
+              <button className="pk-btn" style={{ marginLeft: 'auto', background: QM_COLOR, border: 'none', fontSize: 13, padding: '8px 16px' }}
+                onClick={() => openMMModal()}>
+                + Messmittel hinzufügen
+              </button>
+            </div>
+
+            <div className="pk-card">
+              {messmittelLoading ? (
+                <div style={{ padding: '20px 0', color: '#aeb9c8', textAlign: 'center' }}>Lade…</div>
+              ) : messmittel.length === 0 ? (
+                <div style={{ padding: '20px 0', color: '#aeb9c8', textAlign: 'center' }}>
+                  Noch keine Messmittel erfasst. Klicke &quot;+ Messmittel hinzufügen&quot;.
+                </div>
+              ) : (
+                <div className="pk-table-wrap">
+                  <table className="pk-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Typ</th>
+                        <th>Serien-Nr.</th>
+                        <th>Kalibriert am</th>
+                        <th>Fällig am</th>
+                        <th>Status</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {messmittel.map(m => {
+                        const badge = mmStatusBadge(m.status)
+                        return (
+                          <tr key={m.id}>
+                            <td style={{ fontWeight: 700 }}>{m.name}</td>
+                            <td style={{ color: '#aeb9c8', fontSize: 13 }}>{m.typ ?? '—'}</td>
+                            <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{m.seriennummer ?? '—'}</td>
+                            <td style={{ fontSize: 13 }}>{fmtDate(m.kalibriert_am)}</td>
+                            <td style={{ fontSize: 13, color: m.status !== 'ok' ? badge.color : undefined }}>{fmtDate(m.kalibrierung_faellig_am)}</td>
+                            <td>
+                              <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>
+                                {badge.label}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button className="pk-btn-ghost" style={{ fontSize: 11, padding: '4px 8px' }}
+                                  onClick={() => openMMModal(m)}>✏️</button>
+                                {deleteConfirmMM === m.id ? (
+                                  <>
+                                    <button className="pk-btn-ghost" style={{ fontSize: 11, padding: '4px 8px', color: '#ef4444' }}
+                                      onClick={() => void handleDeleteMM(m.id)}>Ja</button>
+                                    <button className="pk-btn-ghost" style={{ fontSize: 11, padding: '4px 8px' }}
+                                      onClick={() => setDeleteConfirmMM(null)}>Nein</button>
+                                  </>
+                                ) : (
+                                  <button className="pk-btn-ghost" style={{ fontSize: 11, padding: '4px 8px' }}
+                                    onClick={() => setDeleteConfirmMM(m.id)}>🗑️</button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Add/Edit Modal */}
+            {showMMModal && (
+              <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+                onClick={() => setShowMMModal(false)}>
+                <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{editingMM ? 'Messmittel bearbeiten' : 'Neues Messmittel'}</h3>
+                    <button onClick={() => setShowMMModal(false)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div style={{ gridColumn: '1/-1' }}>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Name *</div>
+                      <input className="pk-input" value={mmForm.name} onChange={e => setMmForm(f => ({ ...f, name: e.target.value }))} placeholder="Schieblehre digital #1" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Typ</div>
+                      <select className="pk-input" value={mmForm.typ} onChange={e => setMmForm(f => ({ ...f, typ: e.target.value }))}>
+                        {TYPEN.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Seriennummer</div>
+                      <input className="pk-input" value={mmForm.seriennummer} onChange={e => setMmForm(f => ({ ...f, seriennummer: e.target.value }))} placeholder="SN-12345" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Hersteller</div>
+                      <input className="pk-input" value={mmForm.hersteller} onChange={e => setMmForm(f => ({ ...f, hersteller: e.target.value }))} placeholder="Mitutoyo" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Messbereich</div>
+                      <input className="pk-input" value={mmForm.messbereich} onChange={e => setMmForm(f => ({ ...f, messbereich: e.target.value }))} placeholder="0-150mm" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Auflösung</div>
+                      <input className="pk-input" value={mmForm.aufloesung} onChange={e => setMmForm(f => ({ ...f, aufloesung: e.target.value }))} placeholder="0,01mm" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Kalibriert am</div>
+                      <input className="pk-input" type="date" value={mmForm.kalibriert_am} onChange={e => setMmForm(f => ({ ...f, kalibriert_am: e.target.value }))} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Kalibrierung fällig am</div>
+                      <input className="pk-input" type="date" value={mmForm.kalibrierung_faellig_am} onChange={e => setMmForm(f => ({ ...f, kalibrierung_faellig_am: e.target.value }))} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Intervall (Tage)</div>
+                      <input className="pk-input" type="number" value={mmForm.kalibrierungs_intervall_tage} onChange={e => setMmForm(f => ({ ...f, kalibrierungs_intervall_tage: e.target.value }))} />
+                    </div>
+                    <div style={{ gridColumn: '1/-1' }}>
+                      <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Notiz</div>
+                      <textarea className="pk-input" value={mmForm.notiz} onChange={e => setMmForm(f => ({ ...f, notiz: e.target.value }))} rows={2} />
+                    </div>
+                    <div style={{ gridColumn: '1/-1' }}>
+                      <button className="pk-btn" disabled={mmSaving || !mmForm.name.trim()}
+                        onClick={() => void handleSaveMM()}
+                        style={{ background: QM_COLOR, border: 'none', width: '100%' }}>
+                        {mmSaving ? '⏳ Speichere…' : '💾 Speichern'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

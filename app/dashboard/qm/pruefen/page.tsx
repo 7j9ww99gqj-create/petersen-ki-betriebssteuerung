@@ -10,6 +10,7 @@ import {
   ampelStatus,
   getQmZeichnungen,
   getQmTeamMitglieder,
+  getQmMessmittel,
   insertQmFoto,
   nextQmPruefberichtNummer,
   updateQmFotoKiAnalyse,
@@ -20,6 +21,7 @@ import {
   type QmFotoTyp,
   type QmGesamtstatus,
   type QmKiSichtErgebnis,
+  type QmMessmittel,
   type QmMesswertStatus,
   type QmTeamMitglied,
   type QmZeichnung,
@@ -191,6 +193,7 @@ export default function PruefeWizardPage() {
   const [teamMitglieder, setTeamMitglieder] = useState<QmTeamMitglied[]>([])
   const [prueferFreitext, setPrueferFreitext] = useState(false)
   const [pruefplanLoading, setPruefplanLoading] = useState(false)
+  const [verfuegbareMessmittel, setVerfuegbareMessmittel] = useState<QmMessmittel[]>([])
 
   // ── Save + PDF state
   const [saving, setSaving] = useState(false)
@@ -234,6 +237,7 @@ export default function PruefeWizardPage() {
   useEffect(() => {
     if (isDemo) return
     getQmTeamMitglieder().then(rows => setTeamMitglieder(rows.filter(m => m.aktiv))).catch(() => {})
+    getQmMessmittel().then(rows => setVerfuegbareMessmittel(rows)).catch(() => {})
   }, [isDemo])
 
   // Pre-select zeichnung from URL query param
@@ -701,7 +705,30 @@ export default function PruefeWizardPage() {
                           <input className="pk-input" value={mw.einheit} onChange={e => updateMw(mw._id, { einheit: e.target.value })} style={{ width: 55 }} />
                         </td>
                         <td>
-                          <input className="pk-input" value={mw.pruefmittel} onChange={e => updateMw(mw._id, { pruefmittel: e.target.value })} placeholder="Messschieber" style={{ width: 95 }} />
+                          {verfuegbareMessmittel.length > 0 ? (
+                            <select className="pk-input" value={mw.pruefmittel}
+                              onChange={e => updateMw(mw._id, { pruefmittel: e.target.value })}
+                              style={{ width: 120 }}
+                              title={verfuegbareMessmittel.find(m => m.name === mw.pruefmittel)?.status === 'ueberfaellig' ? '⚠️ Kalibrierung überfällig!' : undefined}>
+                              <option value="">Sonstiges / Nicht verwaltet</option>
+                              {verfuegbareMessmittel.map(m => (
+                                <option key={m.id} value={m.name}>
+                                  {m.status === 'ueberfaellig' ? '⚠️ ' : m.status === 'faellig' ? '⏰ ' : ''}{m.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input className="pk-input" value={mw.pruefmittel} onChange={e => updateMw(mw._id, { pruefmittel: e.target.value })} placeholder="Messschieber" style={{ width: 95 }} />
+                          )}
+                          {(() => {
+                            const mm = verfuegbareMessmittel.find(m => m.name === mw.pruefmittel)
+                            if (!mm || mm.status === 'ok') return null
+                            return (
+                              <div style={{ fontSize: 10, color: mm.status === 'ueberfaellig' ? '#ef4444' : '#f59e0b', marginTop: 2 }}>
+                                {mm.status === 'ueberfaellig' ? '⚠️ Überfällig!' : '⏰ Bald fällig'}
+                              </div>
+                            )
+                          })()}
                         </td>
                         <td>
                           <span style={{ padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: amp.bg, color: amp.color, whiteSpace: 'nowrap' }}>
