@@ -36,7 +36,7 @@ QM-Pilot ist ein **eigenständiges, zubuchbares Modul** für kleine/mittlere Wer
 |---|---------|--------|--------|
 | 1 | Team-Management (Prüfer hinzufügen) | Mittel | ✅ 2026-05-20 |
 | 2 | Push-Benachrichtigungen (VAPID vorhanden) | Niedrig | ✅ 2026-05-20 |
-| 3 | KI-Sichtprüfung (Foto → OpenAI Vision → Befund) | Hoch | ⏭️ übersprungen |
+| 3 | KI-Sichtprüfung (Foto → OpenAI Vision → Befund) | Hoch | ✅ 2026-05-20 |
 | 4 | Prüfplan-Generator aus Zeichnungs-Daten | Mittel | ✅ 2026-05-20 |
 | 5 | Statistik-Dashboard (Fehlerquoten, Trends) | Mittel | ✅ 2026-05-20 |
 
@@ -163,9 +163,29 @@ Generierung: `SELECT count(*) FROM qm_pruefberichte WHERE user_id=... AND pruef_
 
 ## KI-Analyse (OpenAI Vision)
 
+### Zeichnungs-Analyse
 **API-Route:** `POST /api/qm/analyse-zeichnung`  
 **Input:** `{ datei_path: string }` — Signed URL aus Storage  
 **Modell:** `gpt-4o-mini` (Vision, ~0,002–0,005 €/Analyse)
+
+### Sichtprüfung (Phase 2 — ✅ live seit 2026-05-20)
+**API-Route:** `POST /api/qm/sichtpruefung`  
+**Input:** `{ foto_path: string, bauteil_beschreibung?: string, material?: string }`  
+**Modell:** `gpt-4o` (höhere Bildqualität als gpt-4o-mini)  
+**Output-Schema:**
+```json
+{
+  "gesamtbewertung": "ok" | "mangelhaft" | "ausschuss",
+  "konfidenz": 0-100,
+  "befunde": [{ "typ": "kratzer|delle|grat|verschmutzung|polierfehler|beschaedigung|sonstiges", "schwere": "leicht|mittel|schwer", "position": "...", "beschreibung": "..." }],
+  "empfehlung": "...",
+  "hinweise": ["..."]
+}
+```
+- Ergebnis wird in `qm_fotos.ki_analyse_ergebnis` (jsonb) gespeichert
+- Cost-Tracking via `lib/ai-usage.ts` (5 €/Monat-Limit greift)
+- Demo-Modus: Mock-Antwort (kein API-Call)
+- Pfad-Check: erstes Segment muss `user_id` sein (RLS-Safety)
 
 **System-Prompt:**
 ```
@@ -229,7 +249,13 @@ Antworte NUR mit validem JSON, kein Markdown, keine Erklärung.
 - Entgratung: Ja / Nein / Nicht erforderlich
 - Beschädigungen: Ja (+ Freitext) / Nein
 - Sichtprüfungs-Ergebnis: OK / Mangelhaft / Ausschuss
-- Optional: „🔍 KI-Sichtprüfung starten" (Phase 2 Button, in Phase 1 disabled mit Hinweis)
+- „🔍 KI-Sichtprüfung starten" (Phase 2 ✅ live):
+  - Voraussetzung: mind. 1 Foto in Schritt 4 hochgeladen
+  - `POST /api/qm/sichtpruefung` → gpt-4o Vision → strukturierter Befund
+  - Ergebnis-Card: Gesamtbewertung (ok/mangelhaft/ausschuss), Konfidenz, Befunde (typ/schwere/position/beschreibung), Empfehlung, Hinweise
+  - „Befund übernehmen" befüllt Sichtprüfungs-Ergebnis + Bemerkungen
+  - KI-Resultat wird beim Speichern in `qm_fotos.ki_analyse_ergebnis` (jsonb) am ersten Foto gespeichert
+  - Demo-Modus: Mock-Antwort (kein API-Call)
 
 ### Schritt 6 — Abschluss & Abzeichnung
 - Zusammenfassung: alle Messwerte tabellarisch + Gesamtstatus

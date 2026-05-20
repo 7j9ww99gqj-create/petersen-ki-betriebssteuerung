@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **Arbeitskarte kompakt 3×2 Grid + WE-Workflow-Erweiterungen**: 6 Positionen/Seite statt 2 (3 Spalten × 2 Reihen), Service-Checkboxen 2×3 eng, Meta-Header 1-zeilig; WE-Löschen mit Bestätigung; Büro/WISO: 📦 Archivieren + 💶 AB-Konvertierung (Preis aus Maßen); Archiv zeigt nur archivierte WEs mit 🖨️-Button. HEAD `f9228ce`.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **QM Phase 2 — KI-Sichtprüfung live**: `POST /api/qm/sichtpruefung` mit gpt-4o Vision, neue Spalte `qm_fotos.ki_analyse_ergebnis` (jsonb), Wizard-Schritt 5 mit aktivem KI-Button + Ergebnis-Card (Befunde, Empfehlung, Hinweise) + „Befund übernehmen"-Logik, 🤖 KI-Badge in Dashboard + Archiv, Demo-Mock-Response, Cost-Tracking + Rate-Limit + RLS-Pfad-Check. HEAD `28b89b7`. Damit Phase 2A 5/5 ✅.
+- Davor: **Arbeitskarte kompakt 3×2 Grid + WE-Workflow-Erweiterungen**: 6 Positionen/Seite statt 2 (3 Spalten × 2 Reihen), Service-Checkboxen 2×3 eng, Meta-Header 1-zeilig; WE-Löschen mit Bestätigung; Büro/WISO: 📦 Archivieren + 💶 AB-Konvertierung (Preis aus Maßen); Archiv zeigt nur archivierte WEs mit 🖨️-Button. HEAD `f9228ce`.
 - Davor: **QM Phase 2A (4/5 Aufgaben)**: Team-Management (qm_team_mitglieder, Tab 👥), Push-Alerts Cron, Prüfplan-Generator (Regel-Engine, Drucken), Statistik-Dashboard mit echten Supabase-Queries + Recharts-Charts (PieChart, LineChart, BarChart). HEAD `f3d85e4` (nach Merge mit WE-Features).
 - Davor: **Mobile-Fix Arbeitskarte PDF**: `window.open` → `doc.save()` — PDF lädt jetzt als direkter Download auf iOS/Android. HEAD `cc8f743`.
 - Davor: **QM-Pilot Phase 1 VOLLSTÄNDIG** (8 Commits `9cef745` → `ccb4389`): DB-Schema + Storage-Buckets + CRUD (`lib/db/qm.ts`), Zeichnungs-Upload mit KI-Analyse, Zeichnungs-Detail + Edit, Prüfbericht-Wizard 6 Schritte (Messwert-Ampel + Mobile-Fotos + Sichtprüfung + DB-Speicherung), PDF-Export (`lib/qm-pdf.ts`), Archiv + Dashboard-KPIs aus echter Supabase-DB. Alle 13 Phase-1-Aufgaben ✅.
@@ -462,12 +463,21 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
 
 ## 2. Aktueller Arbeitsstand
 
+- **Zuletzt erledigt (2026-05-20 — QM Phase 2 KI-Sichtprüfung, HEAD `28b89b7`):**
+  - **API** `app/api/qm/sichtpruefung/route.ts`: `POST { foto_path, bauteil_beschreibung?, material? }` → gpt-4o Vision (höhere Bildqualität als gpt-4o-mini) → strukturiertes JSON `{ gesamtbewertung, konfidenz, befunde[], empfehlung, hinweise[] }`. Cost-Tracking + Rate-Limit + RLS-Pfad-Check (erstes Segment = user_id).
+  - **Migration** `20260521200000_qm_fotos_ki_analyse.sql`: Spalte `qm_fotos.ki_analyse_ergebnis jsonb`.
+  - **lib/db/qm.ts**: Typen `QmKiSichtBefund`, `QmKiSichtErgebnis`, Funktionen `updateQmFotoKiAnalyse`, `getQmPruefberichtIdsMitKiAnalyse`, `uploadQmFotoTemp` (für KI vor dem Save).
+  - **Wizard Schritt 5** (`app/dashboard/qm/pruefen/page.tsx`): Disabled „Phase 2"-Hinweis ersetzt durch aktiven Button (Voraussetzung: mind. 1 Foto). Lade-Animation, Fehler-Banner, Ergebnis-Card mit farbcodierter Gesamtbewertung + Befund-Liste (Schwere-Icons) + Empfehlung + Hinweise. „✓ Befund übernehmen" setzt `sichtErgebnis` + erweitert Bemerkungen. „✗ Ignorieren" verwirft. Temporärer Upload-Pfad wird beim Save wiederverwendet (kein doppelter Upload). KI-Ergebnis wird beim Save am ersten Foto in `qm_fotos.ki_analyse_ergebnis` gespeichert.
+  - **Dashboard + Archiv** (`app/dashboard/qm/page.tsx`): 🤖 KI-Badge neben Status, basierend auf `getQmPruefberichtIdsMitKiAnalyse()`.
+  - **Demo-Modus**: Mock-Response (kein API-Call); Demo-Bericht `PB-2026-011` markiert mit KI-Badge.
+  - Damit Phase 2A komplett: 5/5 ✅.
+
 - **Zuletzt erledigt (2026-05-20 — QM Phase 2A: 4 Aufgaben, Commits `227912e`→`a60697a`):**
   - **Aufgabe 1 Team-Management** (`227912e`): SQL-Migration `qm_team_mitglieder` (RLS), DB-Funktionen `getQmTeamMitglieder/upsertQmTeamMitglied/deleteQmTeamMitglied`, neuer Tab 👥 Team in `app/dashboard/qm/page.tsx` (Tabelle, Rolle-Badges Admin/Prüfer/Viewer, Inline-Delete, Add-Modal), Prüfbericht-Wizard Schritt 6: Prüfer-Dropdown aus DB (Fallback Freitext).
   - **Aufgabe 2 Push-Benachrichtigungen** (`6ee9e9b`): Neuer Cron-Endpunkt `app/api/cron/qm-alerts/route.ts` (07:00 täglich), sucht Zeichnungen der letzten 24h ohne Prüfbericht, sendet Push via `lib/push.server.ts`, `vercel.json` ergänzt.
   - **Aufgabe 3 Prüfplan-Generator** (`a60697a`): API `POST /api/qm/pruefplan` (pure Regel-Engine: Toleranz-Mapping → Prüfmittel, Reihenfolge kritisch-zuerst), Zeichnungs-Detail: Prüfplan-Tabelle + 🖨️ Drucken (`window.print`, `@media print` in `globals.css`), Wizard Schritt 1: "Prüfplan laden" befüllt Schritt 3 automatisch.
   - **Aufgabe 4 Statistik-Dashboard** (in HEAD nach Merge): 4 echte Supabase-Queries in `lib/db/qm.ts` (`getQmStatusVerteilung`, `getQmFehlerquoteTrend`, `getQmHaeufigsteAbweichungen`, `getQmPrueferPerformance`), Zeitraum-Filter (Woche/Monat/Quartal/Gesamt), Recharts-Charts (PieChart, LineChart, BarChart horizontal, Tabelle), Demo-Fallback.
-  - **KI-Sichtprüfung übersprungen** (Aufgabe 3 in Phase-2-Tabelle) — für separate Session.
+  - **KI-Sichtprüfung** (Aufgabe 3 in Phase-2-Tabelle): in separater Session 2026-05-20 nachgereicht — siehe Block oben.
 
 - **Zuletzt erledigt (2026-05-20 — QM-Pilot Phase 1 Aufgaben 5–13 VOLLSTÄNDIG, HEAD `ccb4389`, 3 Commits):**
   - **Aufgaben 6–10** (`9168d0f`): `app/dashboard/qm/pruefen/page.tsx` — 6-Schritte-Wizard: Schritt 1 (Zeichnung-Auswahl aus DB, Pre-select via URL `?zeichnung=ID`), Schritt 2 (Bauteil-ID, Zeichnungs-Nr, Revision, Charge, Anzahl), Schritt 3 (Messwert-Tabelle aus `erkannte_masse` vorausgefüllt, Live-Ampel-Farbcodierung Grün/Orange/Rot per `ampelStatus()`), Schritt 4 (5 Foto-Drop-Zones mit `capture="environment"` für Mobile, Komprimierung via `image-compress.ts`), Schritt 5 (Sichtprüfung: Entgratung/Beschädigung/Ergebnis-Buttons, Phase-2-KI-Button disabled), Schritt 6 (Zusammenfassung-Tabelle, Gesamtstatus-Auto-Berechnung, Prüfer/Initialen/Bemerkungen/Sperren). Speichern: `nextQmPruefberichtNummer()` → `upsertQmPruefbericht()` → `upsertQmMesswert()` × N → `uploadQmFoto()` + `insertQmFoto()` × Fotos. Demo-Fallback + Toast.
