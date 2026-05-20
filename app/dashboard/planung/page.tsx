@@ -48,7 +48,8 @@ type Ressource = {
   status: 'Verfügbar' | 'Belegt' | 'Wartung'
 }
 
-// ── Demo-Daten ────────────────────────────────────────────────────────────────
+// ── Demo-Daten (nur noch als Referenz, unused nach 20D-Migration) ────────────
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 const demoProjekte: Projekt[] = [
   {
@@ -129,6 +130,7 @@ const demoRessourcen: Ressource[] = [
   { id: 'R-007', name: 'Transporter LT35', typ: 'Fahrzeug', kapazitaet: 50, genutzt: 18, projekt: 'PRJ-004', status: 'Verfügbar' },
   { id: 'R-008', name: 'Bagger Compact', typ: 'Maschine', kapazitaet: 50, genutzt: 0, projekt: '—', status: 'Wartung' },
 ]
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -221,14 +223,15 @@ const emptyProjektForm: ProjektFormState = {
   name: '', kunde: '', verantwortlich: '', start: '', ende: '', budget: '', beschreibung: '', status: 'Planung', auftrag_id: '',
 }
 
-function ProjekteTab({ isDemo }: { isDemo: boolean }) {
-  const [projekte, setProjekte] = useState<Projekt[]>(isDemo ? demoProjekte : [])
+function ProjekteTab({ isDemo: _isDemo }: { isDemo: boolean }) {
+  void _isDemo
+  const [projekte, setProjekte] = useState<Projekt[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editProjekt, setEditProjekt] = useState<Projekt | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState('Alle')
   const toast = useGlobalToast()
-  const [loading, setLoading] = useState(!isDemo)
+  const [loading, setLoading] = useState(true)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [createForm, setCreateForm] = useState<ProjektFormState>(emptyProjektForm)
   const [editForm, setEditForm] = useState<ProjektFormState>(emptyProjektForm)
@@ -237,7 +240,6 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
   const [auftraege, setAuftraege] = useState<{ id: string; kunde: string; beschreibung: string }[]>([])
 
   useEffect(() => {
-    if (isDemo) return
     Promise.all([getPlanungProjekte(), getBueroAuftraege()])
       .then(([projData, auftragData]) => {
         setProjekte(projData as Projekt[])
@@ -246,7 +248,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
       .catch(() => showToast('Fehler beim Laden der Projekte', true))
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDemo])
+  }, [])
 
   const showToast = useCallback((msg: string, error = false) => {
     if (error) toast.error(msg); else toast.success(msg)
@@ -266,9 +268,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
       beschreibung: createForm.beschreibung, verantwortlich: createForm.verantwortlich,
       meilensteine: [], auftrag_id: createForm.auftrag_id || null,
     }
-    if (!isDemo) {
-      try { await upsertPlanungProjekt(newP) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertPlanungProjekt(newP) } catch { showToast('Fehler beim Speichern', true); return }
     setProjekte(prev => [newP, ...prev])
     setCreateForm(emptyProjektForm)
     setShowCreateForm(false)
@@ -296,9 +296,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
       beschreibung: editForm.beschreibung, status: editForm.status,
       auftrag_id: editForm.auftrag_id || null,
     }
-    if (!isDemo) {
-      try { await upsertPlanungProjekt(updated) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertPlanungProjekt(updated) } catch { showToast('Fehler beim Speichern', true); return }
     setProjekte(prev => prev.map(p => p.id === updated.id ? updated : p))
     setEditProjekt(null)
     showToast(`✅ Projekt "${updated.name}" aktualisiert`)
@@ -306,9 +304,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
 
   // Delete
   const handleDelete = async (id: string) => {
-    if (!isDemo) {
-      try { await deletePlanungProjekt(id) } catch { showToast('Fehler beim Löschen', true); return }
-    }
+    try { await deletePlanungProjekt(id) } catch { showToast('Fehler beim Löschen', true); return }
     setProjekte(prev => prev.filter(p => p.id !== id))
     setDeleteConfirm(null)
     showToast('🗑️ Projekt gelöscht')
@@ -321,9 +317,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
     const ms = projekt.meilensteine.map((m, i) => i === msIndex ? { ...m, erledigt: !m.erledigt } : m)
     const done = ms.filter(m => m.erledigt).length
     const updated = { ...projekt, meilensteine: ms, fortschritt: ms.length > 0 ? Math.round((done / ms.length) * 100) : 0 }
-    if (!isDemo) {
-      try { await upsertPlanungProjekt(updated) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertPlanungProjekt(updated) } catch { showToast('Fehler beim Speichern', true); return }
     setProjekte(prev => prev.map(p => p.id === projektId ? updated : p))
   }
 
@@ -336,9 +330,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
     const ms = [...projekt.meilensteine, { name: f.name, datum: f.datum || '—', erledigt: false }]
     const done = ms.filter(m => m.erledigt).length
     const updated = { ...projekt, meilensteine: ms, fortschritt: Math.round((done / ms.length) * 100) }
-    if (!isDemo) {
-      try { await upsertPlanungProjekt(updated) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertPlanungProjekt(updated) } catch { showToast('Fehler beim Speichern', true); return }
     setProjekte(prev => prev.map(p => p.id === projektId ? updated : p))
     setMsForm(prev => ({ ...prev, [projektId]: { name: '', datum: '' } }))
     showToast('✅ Meilenstein hinzugefügt')
@@ -351,9 +343,7 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
     const ms = projekt.meilensteine.filter((_, i) => i !== msIndex)
     const done = ms.filter(m => m.erledigt).length
     const updated = { ...projekt, meilensteine: ms, fortschritt: ms.length > 0 ? Math.round((done / ms.length) * 100) : 0 }
-    if (!isDemo) {
-      try { await upsertPlanungProjekt(updated) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertPlanungProjekt(updated) } catch { showToast('Fehler beim Speichern', true); return }
     setProjekte(prev => prev.map(p => p.id === projektId ? updated : p))
   }
 
@@ -549,23 +539,24 @@ function ProjekteTab({ isDemo }: { isDemo: boolean }) {
 type TerminFormState = { titel: string; datum: string; uhrzeit: string; typ: string; projekt: string; teilnehmer: string }
 const emptyTerminForm: TerminFormState = { titel: '', datum: '', uhrzeit: '', typ: 'Meeting', projekt: '', teilnehmer: '' }
 
-function KalenderTab({ isDemo }: { isDemo: boolean }) {
-  const [termine, setTermine] = useState<Termin[]>(isDemo ? demoTermine : [])
+function KalenderTab({ isDemo: _isDemo }: { isDemo: boolean }) {
+  void _isDemo
+  const [termine, setTermine] = useState<Termin[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editTermin, setEditTermin] = useState<Termin | null>(null)
   const toast = useGlobalToast()
-  const [loading, setLoading] = useState(!isDemo)
+  const [loading, setLoading] = useState(true)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [form, setForm] = useState<TerminFormState>(emptyTerminForm)
   const [editForm, setEditForm] = useState<TerminFormState>(emptyTerminForm)
 
   useEffect(() => {
-    if (isDemo) return
     getPlanungTermine()
       .then(data => setTermine(data as Termin[]))
       .catch(() => showToast('Fehler beim Laden der Termine', true))
       .finally(() => setLoading(false))
-  }, [isDemo])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const showToast = (msg: string, error = false) => {
     if (error) toast.error(msg); else toast.success(msg)
@@ -584,9 +575,7 @@ function KalenderTab({ isDemo }: { isDemo: boolean }) {
       uhrzeit: form.uhrzeit || '—', typ: form.typ as Termin['typ'],
       projekt: form.projekt || '—', teilnehmer: form.teilnehmer || '—',
     }
-    if (!isDemo) {
-      try { await upsertPlanungTermin(newT) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertPlanungTermin(newT) } catch { showToast('Fehler beim Speichern', true); return }
     setTermine(prev => [...prev, newT].sort(sortFn))
     setForm(emptyTerminForm)
     setShowForm(false)
@@ -601,18 +590,14 @@ function KalenderTab({ isDemo }: { isDemo: boolean }) {
   const handleUpdate = async () => {
     if (!editTermin || !editForm.titel) return
     const updated: Termin = { ...editTermin, ...editForm, typ: editForm.typ as Termin['typ'], uhrzeit: editForm.uhrzeit || '—', projekt: editForm.projekt || '—', teilnehmer: editForm.teilnehmer || '—' }
-    if (!isDemo) {
-      try { await upsertPlanungTermin(updated) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertPlanungTermin(updated) } catch { showToast('Fehler beim Speichern', true); return }
     setTermine(prev => prev.map(t => t.id === updated.id ? updated : t).sort(sortFn))
     setEditTermin(null)
     showToast(`✅ Termin aktualisiert`)
   }
 
   const handleDelete = async (id: string) => {
-    if (!isDemo) {
-      try { await deletePlanungTermin(id) } catch { showToast('Fehler beim Löschen', true); return }
-    }
+    try { await deletePlanungTermin(id) } catch { showToast('Fehler beim Löschen', true); return }
     setTermine(prev => prev.filter(t => t.id !== id))
     setDeleteConfirm(null)
     showToast('🗑️ Termin gelöscht')
@@ -735,9 +720,10 @@ function KalenderTab({ isDemo }: { isDemo: boolean }) {
 type RessourceFormState = { name: string; typ: string; kapazitaet: string; genutzt: string; projekt: string; status: string }
 const emptyRessourceForm: RessourceFormState = { name: '', typ: 'Person', kapazitaet: '40', genutzt: '0', projekt: '', status: 'Verfügbar' }
 
-function RessourcenTab({ isDemo }: { isDemo: boolean }) {
-  const [ressourcen, setRessourcen] = useState<Ressource[]>(isDemo ? demoRessourcen : [])
-  const [loading, setLoading] = useState(!isDemo)
+function RessourcenTab({ isDemo: _isDemo }: { isDemo: boolean }) {
+  void _isDemo
+  const [ressourcen, setRessourcen] = useState<Ressource[]>([])
+  const [loading, setLoading] = useState(true)
   const toast = useGlobalToast()
   const [showForm, setShowForm] = useState(false)
   const [editRessource, setEditRessource] = useState<Ressource | null>(null)
@@ -746,12 +732,12 @@ function RessourcenTab({ isDemo }: { isDemo: boolean }) {
   const [editForm, setEditForm] = useState<RessourceFormState>(emptyRessourceForm)
 
   useEffect(() => {
-    if (isDemo) return
     getPlanungRessourcen()
       .then(data => setRessourcen(data as Ressource[]))
       .catch(() => showToast('Fehler beim Laden der Ressourcen', true))
       .finally(() => setLoading(false))
-  }, [isDemo])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const showToast = (msg: string, error = false) => {
     if (error) toast.error(msg); else toast.success(msg)
@@ -778,9 +764,7 @@ function RessourcenTab({ isDemo }: { isDemo: boolean }) {
   const handleCreate = async () => {
     if (!form.name) return
     const newR = toRessource(form, genId('R'))
-    if (!isDemo) {
-      try { await upsertPlanungRessource(newR) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertPlanungRessource(newR) } catch { showToast('Fehler beim Speichern', true); return }
     setRessourcen(prev => [...prev, newR])
     setForm(emptyRessourceForm)
     setShowForm(false)
@@ -795,18 +779,14 @@ function RessourcenTab({ isDemo }: { isDemo: boolean }) {
   const handleUpdate = async () => {
     if (!editRessource || !editForm.name) return
     const updated = toRessource(editForm, editRessource.id)
-    if (!isDemo) {
-      try { await upsertPlanungRessource(updated) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertPlanungRessource(updated) } catch { showToast('Fehler beim Speichern', true); return }
     setRessourcen(prev => prev.map(r => r.id === updated.id ? updated : r))
     setEditRessource(null)
     showToast(`✅ Ressource "${updated.name}" aktualisiert`)
   }
 
   const handleDelete = async (id: string) => {
-    if (!isDemo) {
-      try { await deletePlanungRessource(id) } catch { /* ignore */ }
-    }
+    try { await deletePlanungRessource(id) } catch { /* ignore */ }
     setRessourcen(prev => prev.filter(r => r.id !== id))
     setDeleteConfirm(null)
     showToast('🗑️ Ressource entfernt')
@@ -949,22 +929,22 @@ function RessourcenTab({ isDemo }: { isDemo: boolean }) {
 type AufgabeFormState = { titel: string; projekt: string; verantwortlich: string; prioritaet: string; faellig: string; stunden_soll: string; stunden_ist: string }
 const emptyAufgabeForm: AufgabeFormState = { titel: '', projekt: '', verantwortlich: '', prioritaet: 'Mittel', faellig: '', stunden_soll: '', stunden_ist: '' }
 
-function AufgabenTab({ isDemo }: { isDemo: boolean }) {
-  const [aufgaben, setAufgaben] = useState<Aufgabe[]>(isDemo ? demoAufgaben : [])
+function AufgabenTab({ isDemo: _isDemo }: { isDemo: boolean }) {
+  void _isDemo
+  const [aufgaben, setAufgaben] = useState<Aufgabe[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editAufgabe, setEditAufgabe] = useState<Aufgabe | null>(null)
   const [filterStatus, setFilterStatus] = useState('Alle')
   const toast = useGlobalToast()
-  const [loading, setLoading] = useState(!isDemo)
+  const [loading, setLoading] = useState(true)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [form, setForm] = useState<AufgabeFormState>(emptyAufgabeForm)
   const [editForm, setEditForm] = useState<AufgabeFormState & { status: AufgabeStatus }>(
     { ...emptyAufgabeForm, status: 'Offen' }
   )
-  const [ressourcen, setRessourcen] = useState<Ressource[]>(isDemo ? demoRessourcen : [])
+  const [ressourcen, setRessourcen] = useState<Ressource[]>([])
 
   useEffect(() => {
-    if (isDemo) return
     getPlanungAufgaben()
       .then(data => setAufgaben(data as Aufgabe[]))
       .catch(() => showToast('Fehler beim Laden der Aufgaben', true))
@@ -972,7 +952,8 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
     getPlanungRessourcen()
       .then(data => setRessourcen(data as Ressource[]))
       .catch(() => { /* ignore */ })
-  }, [isDemo])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const showToast = (msg: string, error = false) => {
     if (error) toast.error(msg); else toast.success(msg)
@@ -992,9 +973,7 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
       stunden_soll: form.stunden_soll ? parseFloat(form.stunden_soll) : undefined,
       stunden_ist: form.stunden_ist ? parseFloat(form.stunden_ist) : undefined,
     }
-    if (!isDemo) {
-      try { await upsertPlanungAufgabe(newA) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertPlanungAufgabe(newA) } catch { showToast('Fehler beim Speichern', true); return }
     setAufgaben(prev => [newA, ...prev])
     setForm(emptyAufgabeForm)
     setShowForm(false)
@@ -1013,15 +992,13 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
     if (projektAufgaben.length === 0) return
     const alleErledigt = projektAufgaben.every(a => a.status === 'Erledigt')
     if (!alleErledigt) return
-    if (!isDemo) {
-      try {
-        const projekte = await getPlanungProjekte()
-        const proj = (projekte as Projekt[]).find(p => p.name === projektName || p.id === projektName)
-        if (proj) {
-          await upsertPlanungProjekt({ ...proj, fortschritt: 100 })
-        }
-      } catch { /* ignorieren – kein kritischer Fehler */ }
-    }
+    try {
+      const projekte = await getPlanungProjekte()
+      const proj = (projekte as Projekt[]).find(p => p.name === projektName || p.id === projektName)
+      if (proj) {
+        await upsertPlanungProjekt({ ...proj, fortschritt: 100 })
+      }
+    } catch { /* ignorieren – kein kritischer Fehler */ }
     showToast('✅ Alle Aufgaben erledigt — Fortschritt auf 100% gesetzt')
   }
 
@@ -1035,9 +1012,7 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
       stunden_soll: editForm.stunden_soll ? parseFloat(editForm.stunden_soll) : undefined,
       stunden_ist: editForm.stunden_ist ? parseFloat(editForm.stunden_ist) : undefined,
     }
-    if (!isDemo) {
-      try { await upsertPlanungAufgabe(updated) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertPlanungAufgabe(updated) } catch { showToast('Fehler beim Speichern', true); return }
     const newAufgaben = aufgaben.map(a => a.id === updated.id ? updated : a)
     setAufgaben(newAufgaben)
     setEditAufgabe(null)
@@ -1047,7 +1022,7 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
 
   const handleStatus = async (id: string, status: AufgabeStatus) => {
     const aufgabe = aufgaben.find(a => a.id === id)
-    if (!isDemo && aufgabe) {
+    if (aufgabe) {
       try { await upsertPlanungAufgabe({ ...aufgabe, status }) } catch { showToast('Fehler', true); return }
     }
     const newAufgaben = aufgaben.map(a => a.id === id ? { ...a, status } : a)
@@ -1057,9 +1032,7 @@ function AufgabenTab({ isDemo }: { isDemo: boolean }) {
   }
 
   const handleDelete = async (id: string) => {
-    if (!isDemo) {
-      try { await deletePlanungAufgabe(id) } catch { showToast('Fehler beim Löschen', true); return }
-    }
+    try { await deletePlanungAufgabe(id) } catch { showToast('Fehler beim Löschen', true); return }
     setAufgaben(prev => prev.filter(a => a.id !== id))
     setDeleteConfirm(null)
     showToast('🗑️ Aufgabe gelöscht')
@@ -1303,15 +1276,14 @@ type Tab = 'projekte' | 'kalender' | 'ressourcen' | 'aufgaben' | 'archiv'
 export default function PlanungPilotPage() {
   const [isDemo] = useState(() => hasDemoCookie())
   const [tab, setTab] = useState<Tab>('projekte')
-  const [projekte, setProjekte] = useState<Projekt[]>(isDemo ? demoProjekte : [])
-  const [termine, setTermine] = useState<Termin[]>(isDemo ? demoTermine : [])
-  const [aufgaben, setAufgaben] = useState<Aufgabe[]>(isDemo ? demoAufgaben : [])
-  const [ressourcen, setRessourcen] = useState<Ressource[]>(isDemo ? demoRessourcen : [])
-  const [loading, setLoading] = useState(!isDemo)
+  const [projekte, setProjekte] = useState<Projekt[]>([])
+  const [termine, setTermine] = useState<Termin[]>([])
+  const [aufgaben, setAufgaben] = useState<Aufgabe[]>([])
+  const [ressourcen, setRessourcen] = useState<Ressource[]>([])
+  const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
 
   const loadData = () => {
-    if (isDemo) return
     trackVisit({ href: '/dashboard/planung', label: 'PlanungPilot', icon: '📅' })
     setLoading(true)
     setErrorMsg('')
