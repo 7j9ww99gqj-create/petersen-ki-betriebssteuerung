@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { hasDemoCookie } from '@/lib/auth'
 import { compressImage } from '@/lib/image-compress'
+import { generateQmPruefberichtPDF } from '@/lib/qm-pdf'
 import {
   ampelStatus,
   getQmZeichnungen,
@@ -178,8 +179,9 @@ export default function PruefeWizardPage() {
   const [bemerkungen, setBemerkungen] = useState('')
   const [gesperrt, setGesperrt] = useState(false)
 
-  // ── Save state
+  // ── Save + PDF state
   const [saving, setSaving] = useState(false)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
   const [savedBerichtId, setSavedBerichtId] = useState<string | null>(null)
   const [savedNr, setSavedNr] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
@@ -783,15 +785,24 @@ export default function PruefeWizardPage() {
                 Der Bericht wurde in der Datenbank gesichert.
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <a
-                  href={`/api/qm/pdf/${savedBerichtId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
                   className="pk-btn"
-                  style={{ background: QM_COLOR, border: 'none', fontSize: 13, textDecoration: 'none' }}
+                  disabled={generatingPdf}
+                  onClick={async () => {
+                    if (!savedBerichtId) return
+                    setGeneratingPdf(true)
+                    try {
+                      await generateQmPruefberichtPDF(savedBerichtId)
+                    } catch (e) {
+                      showToast(e instanceof Error ? e.message : 'PDF fehlgeschlagen', false)
+                    } finally {
+                      setGeneratingPdf(false)
+                    }
+                  }}
+                  style={{ background: QM_COLOR, border: 'none', fontSize: 13 }}
                 >
-                  📥 PDF herunterladen
-                </a>
+                  {generatingPdf ? '⏳ Erstelle PDF…' : '📥 PDF herunterladen'}
+                </button>
                 <button
                   className="pk-btn-ghost"
                   onClick={() => router.push('/dashboard/qm')}
