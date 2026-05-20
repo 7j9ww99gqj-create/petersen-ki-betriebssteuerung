@@ -37,16 +37,12 @@ export function TabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) 
 // Fixed-position Toast (bottom-right)
 export function Toast({ msg, error }: { msg: string; error?: boolean }) {
   if (!msg) return null
+  // .pk-toast-Klasse → Position/Animation/Größe aus User-Prefs (globals.css)
   return (
-    <div style={{
-      position: 'fixed', bottom: 90, right: 24, zIndex: 9999,
-      padding: '14px 18px', borderRadius: 12, maxWidth: 360,
+    <div className="pk-toast" style={{
       background: error ? 'rgba(255,80,80,.15)' : 'rgba(37,211,102,.12)',
       border: `1px solid ${error ? 'rgba(255,80,80,.3)' : 'rgba(37,211,102,.3)'}`,
       color: error ? '#ff8080' : '#4ddb7e',
-      fontSize: 14, fontWeight: 600,
-      boxShadow: '0 8px 32px rgba(0,0,0,.4)',
-      animation: 'fadeIn .2s ease',
     }}>{msg}</div>
   )
 }

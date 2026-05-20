@@ -1927,7 +1927,7 @@ function FertigungsleitstandTab({ isDemo, karten, setKarten, mitarbeiterNamen }:
   return (
     <div>
       {toast && (
-        <div style={{ position: 'fixed', bottom: 90, right: 24, zIndex: 9999, padding: '14px 20px', borderRadius: 12, background: 'rgba(37,211,102,.12)', border: '1px solid rgba(37,211,102,.35)', color: '#4ddb7e', fontSize: 14, fontWeight: 600 }}>
+        <div className="pk-toast" style={{ background: 'rgba(37,211,102,.12)', border: '1px solid rgba(37,211,102,.35)', color: '#4ddb7e' }}>
           {toast}
         </div>
       )}

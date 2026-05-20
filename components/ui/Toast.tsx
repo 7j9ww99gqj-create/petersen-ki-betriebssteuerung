@@ -1,6 +1,12 @@
 'use client'
+// Zentrale Toast-Komponente (DP12-ready).
+// - Nutzt .pk-toast-Klasse → Position/Animation/Größe kommen aus User-Prefs (globals.css)
+// - Bei deaktivierten Personalisierungs-Modulen bleibt der aktuelle Look (bottom-right, fade-in)
+// - useToast-Hook liest die Verweildauer aus DesignPrefs, falls verfügbar
 
 import * as React from 'react'
+import { useDesignPrefs } from '@/lib/design-flag'
+import { playToastSound } from '@/lib/toast-sound'
 
 export type ToastVariant = 'success' | 'error' | 'info'
 
@@ -22,15 +28,13 @@ export function Toast({ msg, variant = 'success' }: ToastProps) {
     <div
       role="status"
       aria-live="polite"
+      className="pk-toast"
       style={{
-        position: 'fixed', bottom: 90, right: 24, zIndex: 9999,
-        padding: '14px 20px', borderRadius: 12, maxWidth: 380,
+        // Visuelle Eigenschaften bleiben inline,
+        // Position/Animation/Größe kommen aus globals.css über .pk-toast
         background: s.bg,
         border: `1px solid ${s.border}`,
         color: s.color,
-        fontSize: 14, fontWeight: 600,
-        boxShadow: '0 8px 32px rgba(0,0,0,.4)',
-        animation: 'fadeIn .2s ease',
       }}
     >
       {msg}
@@ -38,13 +42,20 @@ export function Toast({ msg, variant = 'success' }: ToastProps) {
   )
 }
 
-export function useToast(autoHideMs = 3500) {
+export function useToast(autoHideMs?: number) {
+  const prefs = useDesignPrefs()
   const [state, setState] = React.useState<{ msg: string; variant: ToastVariant } | null>(null)
 
   const show = React.useCallback((msg: string, variant: ToastVariant = 'success') => {
     setState({ msg, variant })
-    if (autoHideMs > 0) window.setTimeout(() => setState(null), autoHideMs)
-  }, [autoHideMs])
+    // Verweildauer: explizit übergeben > Prefs (wenn enabled) > Default 3500ms
+    const duration = autoHideMs ?? (prefs.notifications.enabled ? prefs.notifications.toastDuration : 3500)
+    // Sound, wenn aktiviert
+    if (prefs.notifications.enabled && prefs.notifications.toastSound) {
+      try { playToastSound(variant) } catch { /* ignore */ }
+    }
+    if (duration > 0) window.setTimeout(() => setState(null), duration)
+  }, [autoHideMs, prefs.notifications.enabled, prefs.notifications.toastDuration, prefs.notifications.toastSound])
 
   const toast = state ? <Toast msg={state.msg} variant={state.variant} /> : null
 

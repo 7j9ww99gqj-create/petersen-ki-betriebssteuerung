@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import NotificationBell from '@/components/NotificationBell'
 import GlobalSearch from '@/components/GlobalSearch'
 import SupportButton from '@/components/SupportButton'
+import AppToast from '@/components/AppToast'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase'
 import { hasDemoCookie } from '@/lib/auth'
 import { getAccessProfile } from '@/lib/access'
@@ -17,6 +18,7 @@ import OnboardingWizard from '@/components/OnboardingWizard'
 import DemoBanner from '@/components/DemoBanner'
 import { WhatsNewModal } from '@/components/ui'
 import { useDesignV2 } from '@/lib/design-flag'
+import { useCloudDesignSync } from '@/lib/design-sync'
 import { PilotIcon, type PilotIconName } from '@/components/brand/PilotIcon'
 
 // Icon-Map für Bottom-Nav im Design-V2 (Lucide).
@@ -45,6 +47,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const pathname = usePathname()
   const v2 = useDesignV2()
+  // DP12 — Multi-Device Sync für Design-Prefs (Opt-in, no-op wenn Cloud-Sync aus)
+  useCloudDesignSync()
   const [checked, setChecked] = useState(false)
   const [userName, setUserName] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -367,6 +371,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {isPondruff && <PondruffSheet open={pondruffSheet} onClose={() => setPondruffSheet(false)} />}
 
       <SupportButton />
+      <AppToast />
     </div>
   )
 }

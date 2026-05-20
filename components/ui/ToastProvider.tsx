@@ -1,6 +1,8 @@
 'use client'
 import * as React from 'react'
 import { Toast, type ToastVariant } from './Toast'
+import { useDesignPrefs } from '@/lib/design-flag'
+import { playToastSound } from '@/lib/toast-sound'
 
 type ToastCtx = {
   show: (msg: string, variant?: ToastVariant) => void
@@ -11,13 +13,20 @@ type ToastCtx = {
 
 const Ctx = React.createContext<ToastCtx | null>(null)
 
-export function ToastProvider({ children, autoHideMs = 3500 }: { children: React.ReactNode; autoHideMs?: number }) {
+export function ToastProvider({ children, autoHideMs }: { children: React.ReactNode; autoHideMs?: number }) {
+  const prefs = useDesignPrefs()
   const [state, setState] = React.useState<{ msg: string; variant: ToastVariant } | null>(null)
 
   const show = React.useCallback((msg: string, variant: ToastVariant = 'success') => {
     setState({ msg, variant })
-    if (autoHideMs > 0) window.setTimeout(() => setState(null), autoHideMs)
-  }, [autoHideMs])
+    // Verweildauer: explizit übergeben > User-Prefs (wenn aktiviert) > Default 3500ms
+    const duration = autoHideMs ?? (prefs.notifications.enabled ? prefs.notifications.toastDuration : 3500)
+    // Sound, wenn aktiviert
+    if (prefs.notifications.enabled && prefs.notifications.toastSound) {
+      try { playToastSound(variant) } catch { /* ignore */ }
+    }
+    if (duration > 0) window.setTimeout(() => setState(null), duration)
+  }, [autoHideMs, prefs.notifications.enabled, prefs.notifications.toastDuration, prefs.notifications.toastSound])
 
   const ctx = React.useMemo<ToastCtx>(() => ({
     show,

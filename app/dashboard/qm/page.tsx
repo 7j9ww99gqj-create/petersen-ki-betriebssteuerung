@@ -1725,15 +1725,12 @@ export default function QMPage() {
         </div>
       )}
 
-      {/* Toast */}
+      {/* Toast — nutzt .pk-toast (Position/Animation aus User-Prefs) */}
       {toast && (
-        <div style={{
-          position: 'fixed', bottom: 90, right: 24, zIndex: 9999,
-          padding: '14px 20px', borderRadius: 12, maxWidth: 380,
+        <div className="pk-toast" style={{
           background: toast.ok ? 'rgba(37,211,102,.12)' : 'rgba(255,80,80,.15)',
           border: `1px solid ${toast.ok ? 'rgba(37,211,102,.35)' : 'rgba(255,80,80,.4)'}`,
           color: toast.ok ? '#4ddb7e' : '#ff8080',
-          fontSize: 14, fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,.4)',
         }}>{toast.msg}</div>
       )}
     </div>

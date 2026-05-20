@@ -10,7 +10,9 @@
 // Jedes Modul hat eigenen Master-Toggle „Aktivieren" → bei AUS bleibt aktuelles
 // Design erhalten. „↺ Standard" setzt alle Module zurück (alle disabled).
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { pushAppToast } from '@/components/AppToast'
+import { isCloudSyncEnabled, setCloudSyncEnabled, pushPrefsToCloud, pullPrefsFromCloud } from '@/lib/design-sync'
 import {
   useDesignPrefs,
   patchDesignPrefs,
@@ -252,6 +254,34 @@ export default function DesignCustomizationPanel() {
   const isGlow = prefs.theme === 'glow'
   const [tab, setTab] = useState<PanelTab>('allgemein')
 
+  // DP12 — Cloud-Sync State
+  const [cloudSync, setCloudSync] = useState(false)
+  const [syncBusy, setSyncBusy] = useState(false)
+  useEffect(() => { setCloudSync(isCloudSyncEnabled()) }, [])
+
+  async function handleCloudSyncToggle() {
+    const next = !cloudSync
+    setSyncBusy(true)
+    setCloudSyncEnabled(next)
+    setCloudSync(next)
+    if (next) {
+      const res = await pushPrefsToCloud()
+      if (res.ok) pushAppToast('☁️ Cloud-Sync aktiviert — Einstellungen wurden gesichert', 'success')
+      else        pushAppToast(`❌ Sync-Fehler: ${res.error ?? 'unbekannt'}`, 'error')
+    } else {
+      pushAppToast('☁️ Cloud-Sync deaktiviert — lokale Einstellungen bleiben erhalten', 'info')
+    }
+    setSyncBusy(false)
+  }
+
+  async function handlePullFromCloud() {
+    setSyncBusy(true)
+    const result = await pullPrefsFromCloud()
+    setSyncBusy(false)
+    if (result) pushAppToast('☁️ Einstellungen aus der Cloud geladen', 'success')
+    else        pushAppToast('Keine Cloud-Einstellungen gefunden oder nicht eingeloggt', 'info')
+  }
+
   const reset = () => writeDesignPrefs(DEFAULT_PREFS)
 
   return (
@@ -432,6 +462,55 @@ export default function DesignCustomizationPanel() {
             })}
           </div>
 
+          {/* ── DP12: Cloud-Sync ─────────────────────────────────── */}
+          <SectionTitle>5) ☁️ Cloud-Sync (Multi-Device)</SectionTitle>
+          <div style={{
+            padding: '14px 16px', borderRadius: 12,
+            background: cloudSync ? 'linear-gradient(180deg, rgba(22,132,255,.10), rgba(22,132,255,.02))' : 'rgba(255,255,255,.02)',
+            border: `1px solid ${cloudSync ? 'rgba(22,132,255,.35)' : 'rgba(255,255,255,.06)'}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: cloudSync ? '#6cb6ff' : '#f8fbff' }}>
+                  {cloudSync ? '✅ Cloud-Sync aktiv' : 'Cloud-Sync aktivieren'}
+                </div>
+                <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 4, lineHeight: 1.5 }}>
+                  Speichert deine Design-Einstellungen auf allen Geräten. Lokale Einstellungen bleiben primärer Cache (offline funktioniert weiter).
+                </div>
+              </div>
+              <button
+                type="button" role="switch" aria-checked={cloudSync}
+                onClick={handleCloudSyncToggle}
+                disabled={syncBusy}
+                style={{
+                  position: 'relative', width: 52, height: 28, flexShrink: 0,
+                  borderRadius: 999,
+                  border: `1px solid ${cloudSync ? 'rgba(22,132,255,.7)' : 'rgba(255,255,255,.2)'}`,
+                  background: cloudSync ? 'rgba(22,132,255,.55)' : 'rgba(255,255,255,.06)',
+                  cursor: syncBusy ? 'wait' : 'pointer', transition: 'all .15s',
+                  opacity: syncBusy ? .6 : 1,
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 2, left: cloudSync ? 26 : 2,
+                  width: 22, height: 22, borderRadius: '50%',
+                  background: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,.3)',
+                  transition: 'left .15s',
+                }} />
+              </button>
+            </div>
+            {cloudSync && (
+              <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="pk-btn-ghost" onClick={handlePullFromCloud} disabled={syncBusy} style={{ fontSize: 12, padding: '6px 12px' }}>
+                  ⬇️ Aus Cloud laden
+                </button>
+                <button className="pk-btn-ghost" onClick={() => { void pushPrefsToCloud().then(r => pushAppToast(r.ok ? '☁️ Erfolgreich hochgeladen' : `Fehler: ${r.error}`, r.ok ? 'success' : 'error')) }} disabled={syncBusy} style={{ fontSize: 12, padding: '6px 12px' }}>
+                  ⬆️ Manuell hochladen
+                </button>
+              </div>
+            )}
+          </div>
+
           <div style={{ fontSize: 11, color: '#6c7a8c', marginTop: 16, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.04)' }}>
             💡 Direkt-Umschaltung per URL:{' '}
             <code style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,.06)', padding: '1px 5px', borderRadius: 4 }}>?design=classic</code>{', '}
@@ -510,6 +589,39 @@ export default function DesignCustomizationPanel() {
                 label="Sound bei Benachrichtigung"
                 desc="Spielt einen kurzen Ton ab, wenn ein Toast erscheint (nur in unterstützten Browsern)."
               />
+            </div>
+
+            <SectionTitle>🔔 Live-Vorschau</SectionTitle>
+            <div style={{
+              padding: '14px 16px', borderRadius: 10,
+              background: 'rgba(22,132,255,.05)', border: '1px solid rgba(22,132,255,.15)',
+            }}>
+              <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 10, lineHeight: 1.5 }}>
+                Teste deine Einstellungen — Position, Animation, Größe, Dauer und Sound werden direkt angewendet.
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  className="pk-btn-ghost"
+                  onClick={() => pushAppToast('✅ Aktion erfolgreich ausgeführt', 'success')}
+                  style={{ fontSize: 12, padding: '8px 14px', borderColor: 'rgba(37,211,102,.4)', color: '#4ddb7e' }}
+                >
+                  ✅ Erfolg testen
+                </button>
+                <button
+                  className="pk-btn-ghost"
+                  onClick={() => pushAppToast('⚠️ Fehler — Bitte erneut versuchen', 'error')}
+                  style={{ fontSize: 12, padding: '8px 14px', borderColor: 'rgba(255,80,80,.4)', color: '#ff8080' }}
+                >
+                  ⚠️ Fehler testen
+                </button>
+                <button
+                  className="pk-btn-ghost"
+                  onClick={() => pushAppToast('ℹ️ Information zur Benachrichtigung', 'info')}
+                  style={{ fontSize: 12, padding: '8px 14px', borderColor: 'rgba(22,132,255,.4)', color: '#6cb6ff' }}
+                >
+                  ℹ️ Info testen
+                </button>
+              </div>
             </div>
 
             <div style={{ marginTop: 16 }}>

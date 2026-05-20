@@ -1753,16 +1753,12 @@ export default function LagerPilotPage() {
         />
       )}
 
-      {/* Toast */}
+      {/* Toast — nutzt .pk-toast-Klasse (Position/Animation aus User-Prefs) */}
       {toast && (
-        <div style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 300,
-          padding: '14px 20px', borderRadius: 12, fontWeight: 600, fontSize: 14,
+        <div className="pk-toast" style={{
           background: toast.ok ? 'rgba(37,211,102,.15)' : 'rgba(255,80,80,.15)',
           border: `1px solid ${toast.ok ? 'rgba(37,211,102,.4)' : 'rgba(255,80,80,.4)'}`,
           color: toast.ok ? '#4ddb7e' : '#ff8080',
-          boxShadow: '0 8px 32px rgba(0,0,0,.4)',
-          animation: 'fadeIn .2s ease',
         }}>{toast.msg}</div>
       )}
 

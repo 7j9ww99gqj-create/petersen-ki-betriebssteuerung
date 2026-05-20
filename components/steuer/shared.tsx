@@ -153,14 +153,12 @@ export function calcNetto(brutto: number, satz: number): number {
 export function Toast({ msg, type = 'success' }: { msg: string; type?: 'success' | 'error' }) {
   if (!msg) return null
   const isErr = type === 'error'
+  // .pk-toast-Klasse → Position/Animation/Größe aus User-Prefs (globals.css)
   return (
-    <div style={{
-      position: 'fixed', bottom: 90, right: 24, zIndex: 9999,
-      padding: '14px 20px', borderRadius: 12, maxWidth: 360,
+    <div className="pk-toast" style={{
       background: isErr ? 'rgba(255,80,80,.15)' : 'rgba(37,211,102,.12)',
       border: `1px solid ${isErr ? 'rgba(255,80,80,.4)' : 'rgba(37,211,102,.35)'}`,
       color: isErr ? '#ff8080' : '#4ddb7e',
-      fontSize: 14, fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,.4)',
     }}>{msg}</div>
   )
 }

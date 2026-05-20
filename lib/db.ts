@@ -3067,3 +3067,37 @@ export async function createCloudBackup(_label = 'Manuell'): Promise<CloudBackup
   }
   return res.json() as Promise<CloudBackup>
 }
+
+// ─── DP12: User-Design-Prefs Sync (Multi-Device) ─────────────────────────
+// Tabelle: public.user_design_prefs (user_id uuid PK, prefs jsonb, updated_at)
+// RLS: nur eigener User. Demo-Modus: Supabase wird komplett übersprungen.
+
+export async function getUserDesignPrefs(): Promise<{ prefs: unknown; updated_at: string } | null> {
+  const { hasDemoCookie } = await import('./auth')
+  if (hasDemoCookie()) return null
+  const sb = createSupabaseClient()
+  if (!sb) return null
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) return null
+  const { data, error } = await sb
+    .from('user_design_prefs')
+    .select('prefs, updated_at')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (error || !data) return null
+  return data as { prefs: unknown; updated_at: string }
+}
+
+export async function saveUserDesignPrefs(prefs: unknown): Promise<{ ok: boolean; error?: string }> {
+  const { hasDemoCookie } = await import('./auth')
+  if (hasDemoCookie()) return { ok: false, error: 'Demo-Modus: Sync deaktiviert' }
+  const sb = createSupabaseClient()
+  if (!sb) return { ok: false, error: 'Supabase nicht konfiguriert' }
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) return { ok: false, error: 'Nicht eingeloggt' }
+  const { error } = await sb
+    .from('user_design_prefs')
+    .upsert({ user_id: user.id, prefs: prefs as never, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}

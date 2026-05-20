@@ -1435,6 +1435,8 @@ body[data-pers-layout="on"][data-density="spacious"] .pk-btn-ghost { padding: 14
    Bestehende inline-styled Toasts bleiben unverändert (kein Konflikt). */
 .pk-toast {
   position: fixed;
+  bottom: 90px;
+  right: 24px;
   z-index: 9999;
   padding: 14px 20px;
   border-radius: 12px;
