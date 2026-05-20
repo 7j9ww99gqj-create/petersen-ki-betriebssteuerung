@@ -641,6 +641,136 @@ function drawStatusLines(doc: DocLike, y: number) {
   }
 }
 
+// ─── Kompakter Meta-Label (1 Zeile, mehrere Spalten) ────────────────────
+function drawCompactMeta(doc: DocLike, label: string, value: string, x: number, y: number, colW: number) {
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(6)
+  doc.setTextColor(120, 120, 120)
+  doc.text(label, x, y)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.5)
+  doc.setTextColor(20, 20, 20)
+  const lines = doc.splitTextToSize(value || '—', colW - 1)
+  doc.text(lines[0] || '—', x, y + 3.5)
+}
+
+// ─── Mini-Checkbox für die kompakten Positions-Zellen ───────────────────
+function drawMiniCheck(doc: DocLike, checked: boolean, label: string, x: number, y: number, maxW: number) {
+  const bx = x, by = y - 2.2, bsize = 2.5
+  doc.setDrawColor(80, 80, 80)
+  doc.setLineWidth(0.25)
+  doc.rect(bx, by, bsize, bsize)
+  if (checked) {
+    doc.setDrawColor(229, 9, 9)
+    doc.setLineWidth(0.5)
+    doc.line(bx + 0.3, by + 1.3, bx + 1, by + bsize - 0.3)
+    doc.line(bx + 1, by + bsize - 0.3, bx + bsize - 0.2, by + 0.3)
+  }
+  doc.setFont('helvetica', checked ? 'bold' : 'normal')
+  doc.setFontSize(6.5)
+  doc.setTextColor(checked ? 20 : 110, checked ? 20 : 110, checked ? 20 : 110)
+  const labelLines = doc.splitTextToSize(label, Math.max(8, maxW - bsize - 2))
+  doc.text(labelLines[0] || label, bx + bsize + 1, y)
+}
+
+// ─── Positions-Zelle (kompakt, im 3×2 Grid) ─────────────────────────────
+function drawPositionCell(doc: DocLike, p: ArbeitskartePosition, x: number, y: number, w: number, h: number) {
+  // Zellen-Rahmen
+  doc.setDrawColor(220, 220, 220)
+  doc.setLineWidth(0.25)
+  doc.rect(x, y, w, h)
+
+  // Header-Leiste
+  doc.setFillColor(238, 238, 238)
+  doc.rect(x, y, w, 5, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.5)
+  doc.setTextColor(229, 9, 9)
+  doc.text(`Pos. ${p.position_nr}`, x + 1.5, y + 3.6)
+  doc.setTextColor(20, 20, 20)
+  const nameStr = `${p.menge ? p.menge + '× ' : ''}${p.artikelbezeichnung || '—'}`
+  const nameLines = doc.splitTextToSize(nameStr, w - 12)
+  doc.text(nameLines[0] || '', x + 10.5, y + 3.6)
+
+  let cy = y + 8
+
+  // Maße
+  const masse = p.form === 'Rund'
+    ? `Ø${p.durchmesser || '?'}×${p.durchmesser_laenge || '?'}mm`
+    : `${p.laenge || '?'}×${p.breite || '?'}×${p.hoehe || '?'}mm`
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7)
+  doc.setTextColor(60, 60, 60)
+  doc.text(`Maße: ${masse}`, x + 1.5, cy)
+  cy += 3.4
+
+  // Beschichtung
+  const beschichtung = p.beschichtung && p.beschichtung !== 'Keine' ? p.beschichtung : 'Keine'
+  const isCoated = beschichtung !== 'Keine'
+  doc.setFont('helvetica', isCoated ? 'bold' : 'normal')
+  doc.setFontSize(7)
+  if (isCoated) doc.setTextColor(229, 9, 9)
+  else doc.setTextColor(100, 100, 100)
+  doc.text(`Beschichtung: ${beschichtung}`, x + 1.5, cy)
+  cy += 4.2
+
+  // Services: 2 Spalten × 3 Zeilen, sehr eng beieinander
+  const svcColW = (w - 3) / 2
+  const svcs: { key: keyof ArbeitskartePosition; label: string }[] = [
+    { key: 'polieren', label: 'Polieren' },
+    { key: 'entschichtung', label: 'Entschichtung' },
+    { key: 'microstrahlen', label: 'Microstrahlen' },
+    { key: 'laeppstrahlen', label: 'Läppstrahlen' },
+    { key: 'polierstrahlen', label: 'Polierstrahlen' },
+  ]
+  svcs.forEach((s, si) => {
+    const col = si % 2
+    const row = Math.floor(si / 2)
+    const sx = x + 1.5 + col * svcColW
+    const sy = cy + row * 3.4
+    drawMiniCheck(doc, p[s.key] === 'Ja', s.label, sx, sy, svcColW - 1)
+  })
+  cy += Math.ceil(svcs.length / 2) * 3.4 + 1
+
+  // Polieren-Ort (wenn gesetzt) + Weitere Infos in einer Zeile, wenn möglich
+  if (p.polieren === 'Ja' && p.polieren_wo && cy < y + h - 2) {
+    doc.setFont('helvetica', 'italic')
+    doc.setFontSize(6.5)
+    doc.setTextColor(100, 100, 100)
+    const polLines = doc.splitTextToSize(`→ Pol: ${p.polieren_wo}`, w - 3)
+    doc.text(polLines[0] || '', x + 1.5, cy)
+    cy += 3
+  }
+
+  // Weitere Infos (max 2 Zeilen, abgeschnitten)
+  if (Array.isArray(p.weitere_infos) && p.weitere_infos.length > 0 && cy < y + h - 2) {
+    const wiText = p.weitere_infos.filter(w => w.key).map(w => `${w.key}:${w.value}`).join(' · ')
+    if (wiText) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(6)
+      doc.setTextColor(130, 130, 130)
+      const wiLines = doc.splitTextToSize(wiText, w - 3)
+      const remaining = Math.floor((y + h - cy) / 2.6)
+      const showLines = wiLines.slice(0, Math.min(remaining, 2))
+      doc.text(showLines, x + 1.5, cy)
+    }
+  }
+}
+
+// ─── Kompakter Meta-Header (1 Zeile, 5 Spalten) ─────────────────────────
+function drawCompactMetaBlock(doc: DocLike, we: ArbeitskarteData, dateStr: string) {
+  const y = HEADER_H + 4
+  const col5W = CONTENT_W / 5
+  drawCompactMeta(doc, 'Kunde', we.customer || '—', MARGIN, y, col5W)
+  drawCompactMeta(doc, 'Bestell-Nr.', we.purchase_order || we.delivery_id || '—', MARGIN + col5W, y, col5W)
+  drawCompactMeta(doc, 'Eingelagert am', dateStr, MARGIN + col5W * 2, y, col5W)
+  drawCompactMeta(doc, 'Lieferbedingungen', we.lieferbedingungen || '—', MARGIN + col5W * 3, y, col5W)
+  drawCompactMeta(doc, 'Eingelagert von', we.eingelagert_von || '—', MARGIN + col5W * 4, y, col5W)
+  doc.setDrawColor(200, 200, 200)
+  doc.setLineWidth(0.3)
+  doc.line(MARGIN, y + 7, A5_W - MARGIN, y + 7)
+}
+
 export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<void> {
   const { default: JsPDF } = await import('jspdf')
   const doc = new JsPDF({ unit: 'mm', format: 'a5', orientation: 'landscape' }) as unknown as DocLike
@@ -653,140 +783,50 @@ export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<voi
     ? new Date(we.eingelagert_am).toLocaleDateString('de-DE')
     : new Date().toLocaleDateString('de-DE')
 
-  // ── Meta-Block ──────────────────────────────────────────────────────────
-  let y = HEADER_H + 7
-  const col3W = CONTENT_W / 3
-  metaLabel(doc, 'Kunde', we.customer || '—', MARGIN, y, col3W)
-  metaLabel(doc, 'Bestell-/Lieferschein-Nr.', we.purchase_order || we.delivery_id || '—', MARGIN + col3W, y, col3W)
-  metaLabel(doc, 'Eingelagert am', dateStr, MARGIN + col3W * 2, y, col3W)
-  y += 12
-  const col2W = CONTENT_W / 2
-  metaLabel(doc, 'Lieferbedingungen', we.lieferbedingungen || '—', MARGIN, y, col2W)
-  metaLabel(doc, 'Eingelagert von', we.eingelagert_von || '—', MARGIN + col2W, y, col2W)
-  y += 10
+  drawCompactMetaBlock(doc, we, dateStr)
 
-  doc.setDrawColor(200, 200, 200)
-  doc.setLineWidth(0.3)
-  doc.line(MARGIN, y, A5_W - MARGIN, y)
-  y += 5
+  // ── Positionen im 3×2 Grid (6 pro Seite) ──────────────────────────────
+  const STATUS_H = 34
+  const POS_PER_PAGE = 6
+  const COLS = 3
+  const GAP = 2
+  const POS_TOP = HEADER_H + 13            // = 35
+  const POS_BOTTOM = A5_H - STATUS_H - 2   // = 112
+  const cellW = (CONTENT_W - GAP * (COLS - 1)) / COLS
+  const cellH = (POS_BOTTOM - POS_TOP - GAP) / 2
 
-  // ── Positionen ──────────────────────────────────────────────────────────
   if (pos.length === 0) {
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
+    doc.setFontSize(9)
     doc.setTextColor(150, 150, 150)
-    doc.text('Keine Positionen erfasst.', MARGIN, y + 4)
-    y += 8
+    doc.text('Keine Positionen erfasst.', MARGIN, POS_TOP + 10)
   }
-
-  const SERVICES = [
-    { key: 'polieren', label: 'Polieren' },
-    { key: 'entschichtung', label: 'Entschichtung' },
-    { key: 'microstrahlen', label: 'Microstrahlen' },
-    { key: 'laeppstrahlen', label: 'Läppstrahlen' },
-    { key: 'polierstrahlen', label: 'Polierstrahlen' },
-  ] as const
 
   for (let i = 0; i < pos.length; i++) {
-    const p = pos[i]
+    const onPageIdx = i % POS_PER_PAGE
+    const col = onPageIdx % COLS
+    const row = Math.floor(onPageIdx / COLS)
 
-    if (y > A5_H - 14) {
+    if (i > 0 && onPageIdx === 0) {
       doc.addPage()
       drawArbeitskartePage(doc, banner)
-      y = HEADER_H + 10
+      drawCompactMetaBlock(doc, we, dateStr)
     }
 
-    const masse = p.form === 'Rund'
-      ? `Ø ${p.durchmesser || '?'} × ${p.durchmesser_laenge || '?'} mm`
-      : `${p.laenge || '?'} × ${p.breite || '?'} × ${p.hoehe || '?'} mm`
-
-    const beschichtung = p.beschichtung && p.beschichtung !== 'Keine' ? p.beschichtung : 'Keine'
-
-    const weitereInfoStr = Array.isArray(p.weitere_infos) && p.weitere_infos.length > 0
-      ? p.weitere_infos.filter(w => w.key).map(w => `${w.key}: ${w.value}`).join('  |  ')
-      : ''
-
-    // Position header bar
-    doc.setFillColor(240, 240, 240)
-    doc.rect(MARGIN, y - 1, CONTENT_W, 6.5, 'F')
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8.5)
-    doc.setTextColor(229, 9, 9)
-    doc.text(`Pos. ${p.position_nr}`, MARGIN + 2, y + 4)
-    doc.setTextColor(20, 20, 20)
-    doc.text(`${p.menge ? p.menge + ' ×  ' : ''}${p.artikelbezeichnung || '—'}`, MARGIN + 14, y + 4)
-    y += 8.5
-
-    // Maße + Beschichtung row
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7.5)
-    doc.setTextColor(60, 60, 60)
-    doc.text(
-      `Maße: ${masse}${p.raw_dimension_text ? `  (Beleg: ${p.raw_dimension_text})` : ''}`,
-      MARGIN + 2, y
-    )
-    doc.setFont('helvetica', beschichtung !== 'Keine' ? 'bold' : 'normal')
-    doc.setTextColor(beschichtung !== 'Keine' ? 229 : 120, beschichtung !== 'Keine' ? 9 : 120, 9)
-    doc.text(`Beschichtung: ${beschichtung}`, MARGIN + 2 + CONTENT_W / 2, y)
-    y += 5.5
-
-    // Service-Checkboxen (3 pro Zeile)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.setTextColor(60, 60, 60)
-    const cbColW = CONTENT_W / 3
-    SERVICES.forEach((s, si) => {
-      const col = si % 3
-      const row = Math.floor(si / 3)
-      const cx = MARGIN + 2 + col * cbColW
-      const cy = y + row * 5.5
-      drawCheckItem(doc, p[s.key] === 'Ja', s.label, cx, cy)
-    })
-    const cbRows = Math.ceil(SERVICES.length / 3)
-    y += cbRows * 5.5
-
-    // Polieren-Ort (wenn gesetzt)
-    if (p.polieren === 'Ja' && p.polieren_wo) {
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(7)
-      doc.setTextColor(100, 100, 100)
-      doc.text(`Polieren: ${p.polieren_wo}`, MARGIN + 2, y)
-      y += 4.5
-    }
-
-    // Weitere Infos
-    if (weitereInfoStr) {
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(7)
-      doc.setTextColor(100, 100, 100)
-      const wiLines = doc.splitTextToSize(weitereInfoStr, CONTENT_W - 4)
-      doc.text(wiLines, MARGIN + 2, y)
-      y += wiLines.length * 4
-    }
-
-    y += 3
-
-    if (i < pos.length - 1) {
-      doc.setDrawColor(220, 220, 220)
-      doc.setLineWidth(0.2)
-      doc.line(MARGIN, y, A5_W - MARGIN, y)
-      y += 4
-    }
+    const cx = MARGIN + col * (cellW + GAP)
+    const cy = POS_TOP + row * (cellH + GAP)
+    drawPositionCell(doc, pos[i], cx, cy, cellW, cellH)
   }
 
-  // ── Status-Zeilen am Ende der letzten Seite ──────────────────────────────
-  const STATUS_H = 34
-  if (y + STATUS_H > A5_H - 8) {
-    doc.addPage()
-    drawArbeitskartePage(doc, banner)
-    y = HEADER_H + 10
-  }
-  drawStatusLines(doc, A5_H - STATUS_H)
-
-  // ── Footer auf allen Seiten ──────────────────────────────────────────────
+  // ── Status-Zeilen am unteren Rand jeder Seite ─────────────────────────
   const pageCount = doc.getNumberOfPages()
   for (let pg = 1; pg <= pageCount; pg++) {
     doc.setPage(pg)
+    // Status-Zeilen NUR auf der letzten Seite (oder wenn nur 1 Seite)
+    if (pg === pageCount) {
+      drawStatusLines(doc, A5_H - STATUS_H)
+    }
+    // Footer auf allen Seiten
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(6.5)
     doc.setTextColor(160, 160, 160)
