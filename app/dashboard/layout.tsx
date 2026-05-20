@@ -35,7 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [userName, setUserName] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [role, setRoleState] = useState<AppRole>('Admin')
-  const [allowedPilotIds, setAllowedPilotIds] = useState<string[]>(['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer'])
+  const [allowedPilotIds, setAllowedPilotIds] = useState<string[]>(['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer', 'qm'])
   const [isPondruff, setIsPondruff] = useState(false)
   const [pondruffSheet, setPondruffSheet] = useState(false)
   const [companyChecked, setCompanyChecked] = useState(false)
@@ -91,7 +91,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Auth check
   useEffect(() => {
-    if (hasDemoCookie()) { setUserName('Demo'); setAllowedPilotIds(['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer']); setChecked(true); return }
+    if (hasDemoCookie()) { setUserName('Demo'); setAllowedPilotIds(['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer', 'qm']); setChecked(true); return }
     if (!isSupabaseConfigured()) { router.push('/login'); return }
 
     let subscription: { unsubscribe: () => void } | null = null

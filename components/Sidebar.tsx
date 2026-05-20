@@ -23,6 +23,7 @@ const pilots = [
   { id: 'analyse',   label: 'AnalysePilot',   icon: '📊', href: '/dashboard/analyse' },
   { id: 'planung',   label: 'PlanungPilot',   icon: '📅', href: '/dashboard/planung' },
   { id: 'steuer',    label: 'SteuerPilot',    icon: '🧾', href: '/dashboard/steuer' },
+  { id: 'qm',        label: 'QM-Pilot',       icon: '🔬', href: '/dashboard/qm' },
 ]
 
 const navItems = [

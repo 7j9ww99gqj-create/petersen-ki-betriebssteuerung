@@ -2,7 +2,7 @@ type AuthMetadata = Record<string, unknown>
 
 export type AccessStatus = 'pending' | 'active' | 'suspended'
 export type AccessMode = 'standard' | 'demo'
-export type AccessPilotId = 'lager' | 'buero' | 'werkstatt' | 'marketing' | 'analyse' | 'planung' | 'steuer'
+export type AccessPilotId = 'lager' | 'buero' | 'werkstatt' | 'marketing' | 'analyse' | 'planung' | 'steuer' | 'qm'
 export type AccessRole = 'Inhaber' | 'Admin' | 'Mitarbeiter' | 'Büro' | 'Werkstatt' | 'Lager'
 
 type MetadataCarrier = {
@@ -10,15 +10,15 @@ type MetadataCarrier = {
   user_metadata?: AuthMetadata | null
 }
 
-const ACCESS_PILOTS: AccessPilotId[] = ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer']
+const ACCESS_PILOTS: AccessPilotId[] = ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer', 'qm']
 const ACCESS_ROLES: AccessRole[] = ['Inhaber', 'Admin', 'Mitarbeiter', 'Büro', 'Werkstatt', 'Lager']
 
 const DEFAULT_ROLE_PILOTS: Record<AccessRole, AccessPilotId[]> = {
-  Inhaber: ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer'],
-  Admin: ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer'],
-  Mitarbeiter: ['lager', 'buero', 'werkstatt', 'analyse', 'planung'],
+  Inhaber: ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer', 'qm'],
+  Admin: ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer', 'qm'],
+  Mitarbeiter: ['lager', 'buero', 'werkstatt', 'analyse', 'planung', 'qm'],
   Büro: ['buero', 'analyse', 'steuer'],
-  Werkstatt: ['werkstatt', 'lager', 'planung'],
+  Werkstatt: ['werkstatt', 'lager', 'planung', 'qm'],
   Lager: ['lager'],
 }
 

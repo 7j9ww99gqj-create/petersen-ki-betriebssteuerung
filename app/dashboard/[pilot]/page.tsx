@@ -91,6 +91,23 @@ const pilotData: Record<string, {
       { name: 'Kalender & Termine', desc: 'Teamkalender, Erinnerungen', icon: '📅' },
     ],
   },
+  qm: {
+    label: 'QM-Pilot', icon: '🔬', color: '#14b8a6',
+    desc: 'Digitales Qualitätsmanagementsystem — Zeichnungsanalyse, Prüfberichte, Messwerterfassung und Archivierung.',
+    features: ['Zeichnungen hochladen & KI-Analyse', 'Automatische Maß- & Toleranzextraktion', 'Prüfberichte erstellen (6-Schritt-Wizard)', 'Messwert-Ampel (Grün/Orange/Rot)', 'Foto-Dokumentation', 'PDF-Export druckfertig', 'Prüfberichte-Archiv & Suche', 'KI-Sichtprüfung (Oberflächenanalyse)', 'Team-Management & Rollen', 'Statistik-Dashboard & Fehlertrends'],
+    stats: [
+      { label: 'Prüfberichte gesamt', value: '48', icon: '📋' },
+      { label: 'Bestanden diese Woche', value: '12', icon: '✅' },
+      { label: 'Fehlerquote', value: '2,5%', icon: '📊' },
+      { label: 'Ø Prüfzeit', value: '18 min', icon: '⏱️' },
+    ],
+    modules: [
+      { name: 'Zeichnungs-Analyse', desc: 'KI liest Maße, Toleranzen & Material automatisch aus', icon: '🖼️' },
+      { name: 'Prüfbericht-Wizard', desc: '6-Schritt-Formular mit Live-Ampel & Foto-Upload', icon: '📋' },
+      { name: 'Messwert-Ampel', desc: 'Grün/Orange/Rot nach Toleranzabweichung, PDF-Export', icon: '🟢' },
+      { name: 'Archiv & Statistiken', desc: 'Suche, Filter, Fehlerquoten, Prüfer-Performance', icon: '📈' },
+    ],
+  },
 }
 
 export default function PilotPage({ params }: { params: { pilot: string } }) {
