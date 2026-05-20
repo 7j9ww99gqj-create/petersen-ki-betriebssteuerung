@@ -7,6 +7,7 @@ import { generateQmPruefberichtPDF } from '@/lib/qm-pdf'
 import {
   getQmPruefberichte,
   getQmPruefberichtIdsMitKiAnalyse,
+  getQmMesswerte,
   getQmTeamMitglieder,
   deleteQmTeamMitglied,
   upsertQmTeamMitglied,
@@ -157,6 +158,9 @@ export default function QMPage() {
   // PDF generation state
   const [pdfLoading, setPdfLoading] = useState<string | null>(null)
 
+  // CSV export state
+  const [csvLoadingBericht, setCsvLoadingBericht] = useState<string | null>(null)
+
   // Statistik state
   const [statsZeitraum, setStatsZeitraum] = useState<QmStatistikZeitraum>('monat')
   const [statsLoading, setStatsLoading] = useState(false)
@@ -244,6 +248,64 @@ export default function QMPage() {
       showToast(e instanceof Error ? e.message : 'PDF fehlgeschlagen', false)
     } finally {
       setPdfLoading(null)
+    }
+  }
+
+  function exportCsvBerichte() {
+    if (filteredBerichte.length === 0) return
+    const rows = filteredBerichte.map(b => ({
+      'Bericht-Nr': b.pruefbericht_nr,
+      'Bauteil-ID': b.bauteil_id ?? '',
+      'Zeichnung': b.zeichnung_id ?? '',
+      'Datum': b.pruef_datum ?? '',
+      'Prüfer': b.pruefer_name ?? '',
+      'Status': b.gesamtstatus ?? '',
+      'Charge': b.chargennummer ?? '',
+      'Anzahl geprüft': String(b.anzahl_geprueft),
+      'Bemerkungen': b.bemerkungen ?? '',
+    }))
+    const header = Object.keys(rows[0]).join(';')
+    const lines = rows.map(r => Object.values(r).map(v => `"${v.replace(/"/g, '""')}"`).join(';'))
+    const csv = [header, ...lines].join('\r\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `qm-pruefberichte-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function exportCsvMesswerte(b: QmPruefbericht) {
+    if (isDemo) { showToast('Demo: Keine Messwerte verfügbar', false); return }
+    setCsvLoadingBericht(b.id)
+    try {
+      const messwerte = await getQmMesswerte(b.id)
+      if (messwerte.length === 0) { showToast('Keine Messwerte für diesen Bericht', false); return }
+      const rows = messwerte.map(m => ({
+        'Messstelle': m.messstelle,
+        'Sollwert': String(m.sollwert ?? ''),
+        'Tol+': String(m.toleranz_plus ?? ''),
+        'Tol-': String(m.toleranz_minus ?? ''),
+        'Istwert': String(m.istwert ?? ''),
+        'Abweichung': String(m.abweichung ?? ''),
+        'Status': m.status ?? '',
+        'Prüfmittel': m.pruefmittel ?? '',
+      }))
+      const header = Object.keys(rows[0]).join(';')
+      const lines = rows.map(r => Object.values(r).map(v => `"${v.replace(/"/g, '""')}"`).join(';'))
+      const csv = [header, ...lines].join('\r\n')
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `messwerte-${b.pruefbericht_nr}-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'CSV-Export fehlgeschlagen', false)
+    } finally {
+      setCsvLoadingBericht(null)
     }
   }
 
@@ -454,7 +516,7 @@ export default function QMPage() {
         <div>
           <div className="pk-card" style={{ marginBottom: 14 }}>
             {/* Filter-Row */}
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
               <input
                 className="pk-input"
                 placeholder="Bauteil-ID, Bericht-Nr., Prüfer suchen…"
@@ -483,6 +545,15 @@ export default function QMPage() {
                 <option value="ausschuss">Ausschuss</option>
                 <option value="offen">Offen</option>
               </select>
+              <button
+                className="pk-btn-ghost"
+                onClick={exportCsvBerichte}
+                disabled={filteredBerichte.length === 0}
+                title="Gefilterte Berichte als CSV exportieren"
+                style={{ fontSize: 13, padding: '8px 14px', whiteSpace: 'nowrap' }}
+              >
+                📥 CSV Export
+              </button>
             </div>
 
             {loading ? (
@@ -504,6 +575,7 @@ export default function QMPage() {
                       <th>Prüfer</th>
                       <th>Status</th>
                       <th>PDF</th>
+                      <th>CSV</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -539,6 +611,17 @@ export default function QMPage() {
                               style={{ fontSize: 11, padding: '4px 8px' }}
                             >
                               {pdfLoading === b.id ? '⏳' : '📥'}
+                            </button>
+                          </td>
+                          <td onClick={e => e.stopPropagation()}>
+                            <button
+                              className="pk-btn-ghost"
+                              disabled={csvLoadingBericht === b.id}
+                              onClick={() => void exportCsvMesswerte(b)}
+                              title="Messwerte als CSV exportieren"
+                              style={{ fontSize: 11, padding: '4px 8px' }}
+                            >
+                              {csvLoadingBericht === b.id ? '⏳' : '📊'}
                             </button>
                           </td>
                         </tr>
