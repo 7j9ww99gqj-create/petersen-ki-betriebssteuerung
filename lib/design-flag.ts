@@ -31,7 +31,7 @@
 
 import { useEffect, useState } from 'react'
 
-export type DesignTheme = 'classic' | 'modern' | 'glow'
+export type DesignTheme = 'classic' | 'modern' | 'glow' | 'light'
 export type DesignAccent = 'blue' | 'cyan' | 'purple' | 'green' | 'orange' | 'red'
 export type GlowIntensity = 'off' | 'subtle' | 'medium' | 'strong'
 
@@ -44,6 +44,8 @@ export interface DesignFeatures {
   smoothSidebar: boolean     // P3
   lightBackground: boolean   // P4
 }
+
+export type FontFamily = 'system' | 'inter' | 'roboto' | 'mono' | 'georgia'
 
 // ─── DP12: Personalisierungs-Module ───────────────────────────────────────
 export type ToastPosition = 'top-right' | 'top-center' | 'bottom-right' | 'bottom-center'
@@ -73,6 +75,7 @@ export interface TypographyPrefs {
   lineHeight: LineHeight
   letterSpacing: LetterSpacing
   buttonFontSize: ButtonFontSize
+  fontFamily: FontFamily
 }
 
 export type AnimationSpeed = 'none' | 'slow' | 'normal' | 'fast'
@@ -122,6 +125,7 @@ export interface LayoutPrefs {
 
 export interface DesignPrefs {
   theme: DesignTheme
+  autoTheme: boolean           // true → prefers-color-scheme wählt classic↔light automatisch
   accent: DesignAccent
   glowIntensity: GlowIntensity
   features: DesignFeatures
@@ -140,6 +144,7 @@ export interface DesignPrefs {
 // Reset → alles enabled:false → 100% aktueller Stand.
 export const DEFAULT_PREFS: DesignPrefs = {
   theme: 'classic',
+  autoTheme: false,
   accent: 'blue',
   glowIntensity: 'medium',
   features: {
@@ -166,6 +171,7 @@ export const DEFAULT_PREFS: DesignPrefs = {
     lineHeight: 1.5,
     letterSpacing: 0,
     buttonFontSize: 'normal',
+    fontFamily: 'system',
   },
   effects: {
     enabled: false,
@@ -201,7 +207,7 @@ const LS_KEY_THEME = 'pk_design_theme'
 const LS_KEY_LEGACY = 'pk_design_v2'
 const URL_KEY = 'design'
 
-const VALID_THEMES: DesignTheme[] = ['classic', 'modern', 'glow']
+const VALID_THEMES: DesignTheme[] = ['classic', 'modern', 'glow', 'light']
 const VALID_ACCENTS: DesignAccent[] = ['blue', 'cyan', 'purple', 'green', 'orange', 'red']
 const VALID_INTENSITIES: GlowIntensity[] = ['off', 'subtle', 'medium', 'strong']
 
@@ -225,6 +231,7 @@ const VALID_ICON_STYLES: IconStyle[] = ['emoji', 'svg', 'text']
 const VALID_ICON_SIZES: IconSize[] = ['small', 'normal', 'large']
 const VALID_STATUS_INDICATORS: StatusIndicator[] = ['dot', 'circle', 'dot-text', 'icon']
 const VALID_DENSITIES: LayoutDensity[] = ['compact', 'comfortable', 'spacious']
+const VALID_FONT_FAMILIES: FontFamily[] = ['system', 'inter', 'roboto', 'mono', 'georgia']
 
 const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i
 
@@ -264,6 +271,7 @@ function sanitizePrefs(raw: unknown): DesignPrefs {
   // Basis
   const t = normalizeTheme(r.theme)
   if (t) out.theme = t
+  if (typeof r.autoTheme === 'boolean') out.autoTheme = r.autoTheme
   if (typeof r.accent === 'string' && VALID_ACCENTS.includes(r.accent as DesignAccent)) out.accent = r.accent as DesignAccent
   if (typeof r.glowIntensity === 'string' && VALID_INTENSITIES.includes(r.glowIntensity as GlowIntensity)) out.glowIntensity = r.glowIntensity as GlowIntensity
 
@@ -295,6 +303,7 @@ function sanitizePrefs(raw: unknown): DesignPrefs {
     out.typography.lineHeight = pickEnum(ty.lineHeight, VALID_LINE_HEIGHTS, out.typography.lineHeight)
     out.typography.letterSpacing = pickEnum(ty.letterSpacing, VALID_LETTER_SPACINGS, out.typography.letterSpacing)
     out.typography.buttonFontSize = pickEnum(ty.buttonFontSize, VALID_BUTTON_SIZES, out.typography.buttonFontSize)
+    out.typography.fontFamily = pickEnum(ty.fontFamily, VALID_FONT_FAMILIES, out.typography.fontFamily)
   }
 
   // DP12 — Effects
@@ -417,9 +426,14 @@ export function patchDesignPrefs(
 function applyBodyAttrs(prefs: DesignPrefs) {
   if (typeof document === 'undefined') return
   const b = document.body
-  // Theme
-  if (prefs.theme === 'classic') b.removeAttribute('data-design')
-  else b.setAttribute('data-design', prefs.theme)
+  // Theme — autoTheme wählt via prefers-color-scheme zwischen classic und light
+  let effectiveTheme: DesignTheme = prefs.theme
+  if (prefs.autoTheme) {
+    const prefersDark = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+    effectiveTheme = prefersDark ? 'classic' : 'light'
+  }
+  if (effectiveTheme === 'classic') b.removeAttribute('data-design')
+  else b.setAttribute('data-design', effectiveTheme)
   // Accent
   b.setAttribute('data-accent', prefs.accent)
   // Glow-Intensität
@@ -486,6 +500,12 @@ function applyBodyAttrs(prefs: DesignPrefs) {
   } else {
     b.removeAttribute('data-density')
   }
+  // Font-Family (Typography-Modul) als Body-Attribut für CSS-Targeting
+  if (prefs.typography.enabled && prefs.typography.fontFamily !== 'system') {
+    b.setAttribute('data-font', prefs.typography.fontFamily)
+  } else {
+    b.removeAttribute('data-font')
+  }
 }
 
 // ─── DP12: CSS-Variablen dynamisch setzen ────────────────────────────────
@@ -503,12 +523,21 @@ function applyCssVars(prefs: DesignPrefs) {
     const btnPx = prefs.typography.buttonFontSize === 'small' ? '12px'
               : prefs.typography.buttonFontSize === 'large' ? '16px' : '14px'
     r.setProperty('--user-btn-font-size', btnPx)
+    const fontFamilyMap: Record<FontFamily, string> = {
+      system:  '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif',
+      inter:   '"Inter", "Inter Var", system-ui, sans-serif',
+      roboto:  '"Roboto", "Roboto Flex", system-ui, sans-serif',
+      mono:    '"JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace',
+      georgia: 'Georgia, "Palatino Linotype", "Times New Roman", serif',
+    }
+    r.setProperty('--user-font-family', fontFamilyMap[prefs.typography.fontFamily])
   } else {
     r.removeProperty('--user-font-base')
     r.removeProperty('--user-heading-scale')
     r.removeProperty('--user-line-height')
     r.removeProperty('--user-letter-spacing')
     r.removeProperty('--user-btn-font-size')
+    r.removeProperty('--user-font-family')
   }
 
   // Effects
@@ -613,11 +642,21 @@ export function useDesignPrefs(): DesignPrefs {
         applyCssVars(next)
       }
     }
+    // prefers-color-scheme Listener — für autoTheme (System-Mode)
+    const mq = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)') : null
+    const onMqChange = () => {
+      const next = readDesignPrefs()
+      setPrefs(next)
+      applyBodyAttrs(next)
+      applyCssVars(next)
+    }
     window.addEventListener('pk-design-change', onChange as EventListener)
     window.addEventListener('storage', onStorage)
+    mq?.addEventListener('change', onMqChange)
     return () => {
       window.removeEventListener('pk-design-change', onChange as EventListener)
       window.removeEventListener('storage', onStorage)
+      mq?.removeEventListener('change', onMqChange)
     }
   }, [])
 

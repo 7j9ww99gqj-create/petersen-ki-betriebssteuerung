@@ -1489,4 +1489,117 @@ body[data-pers-notif="on"][data-toast-size="large"]   .pk-toast { padding: 18px 
 body[data-pers-icons="on"][data-status-ind="circle"]   .pk-status-dot { background: transparent !important; border: 2px solid currentColor; }
 body[data-pers-icons="on"][data-status-ind="dot-text"] .pk-status-dot::after { content: attr(data-label); margin-left: 6px; font-size: 11px; }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIGHT THEME  (data-design="light")
+   Alle Regeln rein additiv — kein Einfluss auf classic/modern/glow
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* CSS-Custom-Properties überschreiben — alle Komponenten erben automatisch */
+body[data-design="light"] {
+  --bg:     #f0f4f8;
+  --panel:  #ffffff;
+  --card:   #ffffff;
+  --blue:   #1060cc;
+  --blue2:  #0891b2;
+  --text:   #1a2436;
+  --muted:  #5a6a7e;
+  --line:   rgba(0,0,0,.10);
+  background:
+    radial-gradient(circle at 12% -6%, rgba(22,100,200,.07), transparent 36%),
+    radial-gradient(circle at 92% 0%, rgba(0,145,178,.05), transparent 28%),
+    linear-gradient(180deg, #f0f4f8, #e8eef6) !important;
+  color: var(--text);
+}
+
+/* Karten */
+body[data-design="light"] .pk-card {
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,.09);
+  box-shadow: 0 2px 12px rgba(0,0,0,.06);
+  color: var(--text);
+}
+body[data-design="light"] .pk-card * { color: inherit; }
+
+/* Scrollbar im Light-Mode */
+body[data-design="light"] ::-webkit-scrollbar-track { background: #e8eef6; }
+body[data-design="light"] ::-webkit-scrollbar-thumb { background: rgba(22,96,204,.4); }
+
+/* Buttons */
+body[data-design="light"] .pk-btn {
+  background: #1684ff;
+  color: #ffffff;
+  border-color: transparent;
+}
+body[data-design="light"] .pk-btn:hover { background: #1060cc; }
+body[data-design="light"] .pk-btn-ghost {
+  background: rgba(0,0,0,.04);
+  border-color: rgba(0,0,0,.14);
+  color: #1a2436;
+}
+body[data-design="light"] .pk-btn-ghost:hover { background: rgba(0,0,0,.08); }
+
+/* Inputs */
+body[data-design="light"] .pk-input {
+  background: #f8fafc;
+  border-color: rgba(0,0,0,.14);
+  color: #1a2436;
+}
+body[data-design="light"] .pk-input::placeholder { color: #8a9ab0; }
+
+/* Tabellen */
+body[data-design="light"] .pk-table th {
+  background: #f1f5f9;
+  color: #5a6a7e;
+  border-bottom-color: rgba(0,0,0,.08);
+}
+body[data-design="light"] .pk-table td {
+  border-bottom-color: rgba(0,0,0,.05);
+  color: #1a2436;
+}
+body[data-design="light"] .pk-table tr:hover td { background: rgba(22,132,255,.04); }
+
+/* Badges */
+body[data-design="light"] .badge         { background: rgba(0,0,0,.07); color: #1a2436; }
+body[data-design="light"] .badge-green   { background: rgba(16,185,129,.12); color: #065f46; }
+body[data-design="light"] .badge-blue    { background: rgba(22,132,255,.12); color: #1060cc; }
+body[data-design="light"] .badge-orange  { background: rgba(249,115,22,.12);  color: #92400e; }
+body[data-design="light"] .badge-red     { background: rgba(239,68,68,.12);   color: #991b1b; }
+body[data-design="light"] .badge-purple  { background: rgba(167,139,250,.15); color: #5b21b6; }
+body[data-design="light"] .badge-gray    { background: rgba(0,0,0,.07);        color: #4a5568; }
+
+/* Tab-Bar */
+body[data-design="light"] .pk-tab-bar { border-bottom-color: rgba(0,0,0,.08); }
+
+/* Bottom Nav */
+body[data-design="light"] .bottom-nav {
+  background: rgba(255,255,255,.92);
+  border-top-color: rgba(0,0,0,.08);
+}
+
+/* Muted-Texte / Labels explizit */
+body[data-design="light"] [style*="color: #aeb9c8"],
+body[data-design="light"] [style*="color:#aeb9c8"]   { color: #5a6a7e !important; }
+body[data-design="light"] [style*="color: #6c7a8c"],
+body[data-design="light"] [style*="color:#6c7a8c"]   { color: #7a8a9e !important; }
+
+/* ─── Typografie: Font-Family (Typography-Modul, wenn aktiviert) ──────────── */
+body[data-pers-typo="on"]                            { font-family: var(--user-font-family, inherit); }
+body[data-pers-typo="on"][data-font="inter"]   { font-family: "Inter", "Inter Var", system-ui, sans-serif; }
+body[data-pers-typo="on"][data-font="roboto"]  { font-family: "Roboto", "Roboto Flex", system-ui, sans-serif; }
+body[data-pers-typo="on"][data-font="mono"]    { font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace; }
+body[data-pers-typo="on"][data-font="georgia"] { font-family: Georgia, "Palatino Linotype", "Times New Roman", serif; }
+
+/* ─── Barrierefreiheit: prefers-reduced-motion ────────────────────────────── */
+/* Respektiert OS-Einstellung; überschreibt auch User-Animations-Prefs */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .pk-toast  { animation: none !important; transition: none !important; }
+  .fade-in, .fade-in-scale { animation: none !important; }
+}
+
 

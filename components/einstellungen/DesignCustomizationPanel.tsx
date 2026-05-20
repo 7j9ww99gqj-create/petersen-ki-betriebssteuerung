@@ -18,6 +18,7 @@ import {
   patchDesignPrefs,
   writeDesignPrefs,
   DEFAULT_PREFS,
+  type DesignPrefs,
   type DesignTheme,
   type DesignAccent,
   type GlowIntensity,
@@ -27,6 +28,7 @@ import {
   type ToastDuration,
   type ToastSize,
   type FontBase,
+  type FontFamily,
   type HeadingScale,
   type LineHeight,
   type LetterSpacing,
@@ -43,12 +45,33 @@ import {
   type LayoutDensity,
 } from '@/lib/design-flag'
 
-// ── Theme-Optionen ───────────────────────────────────────────────────────
+// ── Theme-Optionen (inkl. Hell + Auto) ──────────────────────────────────
 const THEME_OPTIONS: Array<{ id: DesignTheme; title: string; emoji: string; description: string; gradient: string }> = [
-  { id: 'classic', title: 'Klassisch', emoji: '🌑', description: 'Bewährtes Design mit Emoji-Icons, ohne Glow.', gradient: 'linear-gradient(135deg, #1a2436, #0a121e)' },
-  { id: 'modern',  title: 'Modern',    emoji: '✨', description: 'Lucide-SVG-Icons, neues Logo, Illustrationen, sanfte Modals.', gradient: 'linear-gradient(135deg, #1684ff, #20c8ff)' },
-  { id: 'glow',    title: 'Modern + Glow', emoji: '💎', description: 'Modern plus leuchtende Akzente: Gradient-Buttons, glühende Karten, Push-Effekt.', gradient: 'linear-gradient(135deg, #20c8ff, #1684ff 50%, #0d5cbf)' },
+  { id: 'classic', title: 'Klassisch',     emoji: '🌑', description: 'Bewährtes Dark-Design mit Emoji-Icons, ohne Glow.',           gradient: 'linear-gradient(135deg, #1a2436, #0a121e)' },
+  { id: 'modern',  title: 'Modern',        emoji: '✨', description: 'Lucide-Icons, sanfte Modals, dezente Akzente.',                gradient: 'linear-gradient(135deg, #1684ff, #20c8ff)' },
+  { id: 'glow',    title: 'Glow',          emoji: '💎', description: 'Modern + leuchtende Akzente, Gradient-Buttons.',              gradient: 'linear-gradient(135deg, #20c8ff, #1684ff 50%, #0d5cbf)' },
+  { id: 'light',   title: 'Hell',          emoji: '☀️', description: 'Helles Layout — ideal für Tageslicht und helle Monitore.',    gradient: 'linear-gradient(135deg, #e8eef6, #f0f4f8)' },
 ]
+
+// ── Farb-Presets ─────────────────────────────────────────────────────────
+type ColorPreset = { id: string; label: string; emoji: string; primary: string; secondary: string; error: string; success: string; bg: BackgroundColor }
+const COLOR_PRESETS: ColorPreset[] = [
+  { id: 'default', label: 'Standard',  emoji: '🔵', primary: '#1684ff', secondary: '#20c8ff', error: '#ff5050', success: '#25d366', bg: 'standard'   },
+  { id: 'emerald', label: 'Smaragd',   emoji: '🟢', primary: '#10b981', secondary: '#34d399', error: '#ef4444', success: '#6ee7b7', bg: 'standard'   },
+  { id: 'purple',  label: 'Lila',      emoji: '💜', primary: '#a78bfa', secondary: '#c4b5fd', error: '#f87171', success: '#34d399', bg: 'standard'   },
+  { id: 'sunset',  label: 'Sunset',    emoji: '🟠', primary: '#f97316', secondary: '#fb923c', error: '#ef4444', success: '#22c55e', bg: 'warm-tint'  },
+  { id: 'arctic',  label: 'Arktis',    emoji: '🩵', primary: '#0ea5e9', secondary: '#38bdf8', error: '#f43f5e', success: '#4ade80', bg: 'ultra-dark' },
+  { id: 'rose',    label: 'Rose',      emoji: '🌸', primary: '#f43f5e', secondary: '#fb7185', error: '#dc2626', success: '#22c55e', bg: 'standard'   },
+]
+
+// ── WCAG-Kontrastprüfung gegen Weiß ──────────────────────────────────────
+function wcagContrastVsWhite(hex: string): number {
+  const m = hex.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i)
+  if (!m) return 21
+  const lin = (c: number) => { const s = c / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4 }
+  const L = 0.2126 * lin(parseInt(m[1], 16)) + 0.7152 * lin(parseInt(m[2], 16)) + 0.0722 * lin(parseInt(m[3], 16))
+  return parseFloat(((1.05) / (L + 0.05)).toFixed(2))
+}
 
 // ── Akzentfarben (CSS-Hex-Vorschau) ──────────────────────────────────────
 const ACCENT_OPTIONS: Array<{ id: DesignAccent; title: string; color: string }> = [
@@ -90,6 +113,59 @@ const PANEL_TABS: Array<{ id: PanelTab; label: string; icon: string }> = [
   { id: 'farben',             label: 'Farben',             icon: '🌈' },
   { id: 'icons-layout',       label: 'Icons & Layout',     icon: '📐' },
 ]
+
+// ── Font-Family-Optionen ─────────────────────────────────────────────────
+const FONT_OPTIONS: Array<{ id: FontFamily; label: string; sub: string; sample: string }> = [
+  { id: 'system',  label: 'System',  sub: 'Standard',   sample: 'Aa' },
+  { id: 'inter',   label: 'Inter',   sub: 'Modern',     sample: 'Aa' },
+  { id: 'roboto',  label: 'Roboto',  sub: 'Rund',       sample: 'Aa' },
+  { id: 'mono',    label: 'Mono',    sub: 'Code-Stil',  sample: 'Aa' },
+  { id: 'georgia', label: 'Georgia', sub: 'Serif',      sample: 'Aa' },
+]
+
+const FONT_FAMILY_PREVIEW: Record<FontFamily, string> = {
+  system:  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  inter:   '"Inter", system-ui, sans-serif',
+  roboto:  '"Roboto", system-ui, sans-serif',
+  mono:    '"JetBrains Mono", Consolas, monospace',
+  georgia: 'Georgia, serif',
+}
+
+// ── Live-Vorschau-Karte ───────────────────────────────────────────────────
+function LivePreview({ prefs }: { prefs: DesignPrefs }) {
+  const isLight = prefs.theme === 'light' ||
+    (prefs.autoTheme && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches)
+  const bgOuter   = isLight ? '#e8eef6'  : 'rgba(255,255,255,.03)'
+  const bgCard    = isLight ? '#ffffff'  : '#101a28'
+  const borderC   = isLight ? 'rgba(0,0,0,.09)' : 'rgba(255,255,255,.07)'
+  const textMain  = isLight ? '#1a2436'  : '#f8fbff'
+  const textMuted = isLight ? '#5a6a7e'  : '#aeb9c8'
+  const primary   = prefs.colors.enabled ? prefs.colors.primaryAccent   : '#1684ff'
+  const success   = prefs.colors.enabled ? prefs.colors.successColor    : '#25d366'
+  const error     = prefs.colors.enabled ? prefs.colors.errorColor      : '#ff5050'
+  const fSize     = prefs.typography.enabled ? prefs.typography.baseFontSize : 14
+  const fontFam   = prefs.typography.enabled ? FONT_FAMILY_PREVIEW[prefs.typography.fontFamily] : 'inherit'
+  return (
+    <div style={{ padding: 12, borderRadius: 10, background: bgOuter, border: `1px solid ${borderC}`, marginBottom: 16 }}>
+      <div style={{ fontSize: 10, color: textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>
+        ◉ Live-Vorschau
+      </div>
+      <div style={{ background: bgCard, borderRadius: 8, padding: 14, border: `1px solid ${borderC}`, fontFamily: fontFam }}>
+        <div style={{ fontSize: fSize + 2, fontWeight: 800, color: textMain, marginBottom: 4 }}>Beispiel-Karte</div>
+        <div style={{ fontSize: Math.max(fSize - 1, 11), color: textMuted, marginBottom: 12, lineHeight: 1.5 }}>
+          So sehen Text und Elemente in deiner App aus.
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ padding: '6px 14px', borderRadius: 8, background: primary, color: '#fff', fontSize: Math.max(fSize - 2, 11), fontWeight: 700, cursor: 'default', boxShadow: `0 4px 14px ${primary}40` }}>
+            Primär-Button
+          </div>
+          <span style={{ padding: '3px 8px', borderRadius: 6, background: `${success}22`, color: success, fontSize: 11, fontWeight: 700 }}>● Aktiv</span>
+          <span style={{ padding: '3px 8px', borderRadius: 6, background: `${error}22`,   color: error,   fontSize: 11, fontWeight: 700 }}>● Fehler</span>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -291,14 +367,16 @@ export default function DesignCustomizationPanel() {
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontWeight: 800, fontSize: 15 }}>🎨 Design & Erscheinungsbild</div>
           <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 4, lineHeight: 1.5 }}>
-            Stelle dein Design individuell ein — alle Module sind <strong>einzeln ein-/ausschaltbar</strong>.
-            Bei ausgeschaltetem Modul bleibt der aktuelle Look erhalten. Wirkt nur in deinem Browser.
+            Alle Module sind <strong>einzeln ein-/ausschaltbar</strong> — bei AUS bleibt der aktuelle Look erhalten.
           </div>
         </div>
         <button className="pk-btn-ghost" onClick={reset} style={{ fontSize: 12, padding: '6px 12px' }}>
           ↺ Alles zurücksetzen
         </button>
       </div>
+
+      {/* Live-Vorschau */}
+      <LivePreview prefs={prefs} />
 
       {/* Tabs — Mobile: natives Select, Desktop: Pill-Grid */}
       {/* Native Select für Mobile (≤640px) — keine Scroll-Probleme */}
@@ -411,7 +489,17 @@ export default function DesignCustomizationPanel() {
             })}
           </div>
 
-          <SectionTitle>2) Akzentfarbe {!isGlow && <span style={{ color: '#6c7a8c', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(nur im Glow-Theme aktiv)</span>}</SectionTitle>
+          <SectionTitle>2) Auto-Theme (System)</SectionTitle>
+          <Toggle
+            checked={prefs.autoTheme}
+            onChange={() => patchDesignPrefs({ autoTheme: !prefs.autoTheme })}
+            label="Folgt dem Betriebssystem"
+            desc={`Bei aktiviertem Dunkelmodus → Klassisch (dunkel). Sonst → Hell. Überschreibt die manuelle Theme-Wahl. Aktuell: ${
+              (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? '🌑 Dunkelmodus erkannt' : '☀️ Hellmodus erkannt'
+            }`}
+          />
+
+          <SectionTitle>3) Akzentfarbe {!isGlow && <span style={{ color: '#6c7a8c', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(nur im Glow-Theme aktiv)</span>}</SectionTitle>
           <div role="radiogroup" aria-label="Akzentfarbe" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', opacity: isGlow ? 1 : .5 }}>
             {ACCENT_OPTIONS.map(opt => {
               const active = prefs.accent === opt.id
@@ -437,7 +525,7 @@ export default function DesignCustomizationPanel() {
             })}
           </div>
 
-          <SectionTitle>3) Lichteffekt-Intensität {!isGlow && <span style={{ color: '#6c7a8c', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(nur im Glow-Theme aktiv)</span>}</SectionTitle>
+          <SectionTitle>4) Lichteffekt-Intensität {!isGlow && <span style={{ color: '#6c7a8c', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(nur im Glow-Theme aktiv)</span>}</SectionTitle>
           <div role="radiogroup" aria-label="Glow-Intensität" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', opacity: isGlow ? 1 : .5 }}>
             {INTENSITY_OPTIONS.map(opt => {
               const active = prefs.glowIntensity === opt.id
@@ -462,7 +550,7 @@ export default function DesignCustomizationPanel() {
             })}
           </div>
 
-          <SectionTitle>4) Feinabstimmung (alle einzeln schaltbar)</SectionTitle>
+          <SectionTitle>5) Feinabstimmung (alle einzeln schaltbar)</SectionTitle>
           <div style={{ display: 'grid', gap: 8 }}>
             {FEATURE_OPTIONS.map(opt => {
               const active = prefs.features[opt.id]
@@ -506,7 +594,7 @@ export default function DesignCustomizationPanel() {
           </div>
 
           {/* ── DP12: Cloud-Sync ─────────────────────────────────── */}
-          <SectionTitle>5) ☁️ Cloud-Sync (Multi-Device)</SectionTitle>
+          <SectionTitle>6) ☁️ Cloud-Sync (Multi-Device)</SectionTitle>
           <div style={{
             padding: '14px 16px', borderRadius: 12,
             background: cloudSync ? 'linear-gradient(180deg, rgba(22,132,255,.10), rgba(22,132,255,.02))' : 'rgba(255,255,255,.02)',
@@ -748,6 +836,34 @@ export default function DesignCustomizationPanel() {
               onChange={v => set({ buttonFontSize: v })}
             />
 
+            <SectionTitle>Schriftfamilie</SectionTitle>
+            <div role="radiogroup" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', opacity: !ty.enabled ? .45 : 1 }}>
+              {FONT_OPTIONS.map(opt => {
+                const active = ty.fontFamily === opt.id
+                return (
+                  <button
+                    key={opt.id} role="radio" aria-checked={active}
+                    disabled={!ty.enabled}
+                    onClick={() => set({ fontFamily: opt.id })}
+                    style={{
+                      all: 'unset', cursor: !ty.enabled ? 'not-allowed' : 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                      padding: '10px 8px', borderRadius: 10, textAlign: 'center',
+                      border: `2px solid ${active ? '#1684ff' : 'rgba(255,255,255,.08)'}`,
+                      background: active ? 'rgba(22,132,255,.10)' : 'rgba(255,255,255,.02)',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <div style={{ fontSize: 18, fontFamily: FONT_FAMILY_PREVIEW[opt.id], fontWeight: 700, color: active ? '#6cb6ff' : '#f8fbff' }}>
+                      {opt.sample}
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 700 }}>{opt.label}</div>
+                    <div style={{ fontSize: 10, color: '#aeb9c8' }}>{opt.sub}</div>
+                  </button>
+                )
+              })}
+            </div>
+
             <div style={{ marginTop: 16 }}>
               <button className="pk-btn-ghost" onClick={reset} style={{ fontSize: 12, padding: '6px 12px' }}>
                 ↺ Modul zurücksetzen
@@ -864,13 +980,59 @@ export default function DesignCustomizationPanel() {
               description="Wenn AUS: Standard-Farben (#1684ff usw.) bleiben. Wenn AN: deine eigenen Farben werden für Akzente und Status-Indikatoren genutzt."
             />
 
-            <SectionTitle>Akzent-Farben</SectionTitle>
+            <SectionTitle>Schnell-Presets</SectionTitle>
+            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', opacity: !co.enabled ? .45 : 1 }}>
+              {COLOR_PRESETS.map(preset => {
+                const isActive = co.primaryAccent === preset.primary && co.backgroundColor === preset.bg
+                return (
+                  <button
+                    key={preset.id}
+                    disabled={!co.enabled}
+                    onClick={() => set({ primaryAccent: preset.primary, secondaryAccent: preset.secondary, errorColor: preset.error, successColor: preset.success, backgroundColor: preset.bg })}
+                    style={{
+                      all: 'unset', cursor: !co.enabled ? 'not-allowed' : 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                      padding: '10px 8px', borderRadius: 10, textAlign: 'center',
+                      border: `2px solid ${isActive ? preset.primary : 'rgba(255,255,255,.08)'}`,
+                      background: isActive ? `${preset.primary}18` : 'rgba(255,255,255,.02)',
+                      boxShadow: isActive ? `0 4px 14px ${preset.primary}30` : 'none',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: 3 }}>
+                      <div style={{ width: 14, height: 14, borderRadius: '50%', background: preset.primary }} />
+                      <div style={{ width: 14, height: 14, borderRadius: '50%', background: preset.secondary }} />
+                      <div style={{ width: 14, height: 14, borderRadius: '50%', background: preset.success }} />
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 700 }}>{preset.label}</div>
+                  </button>
+                )
+              })}
+            </div>
+
+            <SectionTitle>Eigene Akzent-Farben</SectionTitle>
             <div style={{ display: 'grid', gap: 8 }}>
               <ColorField label="Primär (Aktionen, Buttons)" value={co.primaryAccent}   disabled={!co.enabled} onChange={v => set({ primaryAccent: v })} />
               <ColorField label="Sekundär (Info, Hervorhebung)" value={co.secondaryAccent} disabled={!co.enabled} onChange={v => set({ secondaryAccent: v })} />
               <ColorField label="Fehler / Warnung"            value={co.errorColor}     disabled={!co.enabled} onChange={v => set({ errorColor: v })} />
               <ColorField label="Erfolg / Bestätigung"        value={co.successColor}   disabled={!co.enabled} onChange={v => set({ successColor: v })} />
             </div>
+
+            {/* Kontrast-Warnung — WCAG AA (4.5:1 für Normal-Text) */}
+            {co.enabled && (() => {
+              const ratio = wcagContrastVsWhite(co.primaryAccent)
+              const ok = ratio >= 4.5
+              return !ok ? (
+                <div style={{
+                  marginTop: 10, padding: '10px 14px', borderRadius: 8,
+                  background: 'rgba(255,150,0,.10)', border: '1px solid rgba(255,150,0,.35)',
+                  fontSize: 12, color: '#f59e0b', lineHeight: 1.5,
+                }}>
+                  ⚠️ <strong>Kontrast-Warnung:</strong> Die Primärfarbe hat nur {ratio}:1 Kontrast zu Weiß
+                  (WCAG AA benötigt 4.5:1 für Fließtext). Button-Beschriftungen könnten schwer lesbar sein.
+                </div>
+              ) : null
+            })()}
 
             <SectionTitle>Hintergrund-Variante</SectionTitle>
             <PillRadio<BackgroundColor>
