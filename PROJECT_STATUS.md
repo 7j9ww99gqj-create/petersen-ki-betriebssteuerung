@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **QM Phase 2A (4/5 Aufgaben)**: Team-Management (qm_team_mitglieder, Tab 👥), Push-Alerts Cron, Prüfplan-Generator (Regel-Engine, Drucken), Statistik-Dashboard mit echten Supabase-Queries + Recharts-Charts (PieChart, LineChart, BarChart). HEAD `f3d85e4` (nach Merge mit WE-Features).
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **Arbeitskarte kompakt 3×2 Grid + WE-Workflow-Erweiterungen**: 6 Positionen/Seite statt 2 (3 Spalten × 2 Reihen), Service-Checkboxen 2×3 eng, Meta-Header 1-zeilig; WE-Löschen mit Bestätigung; Büro/WISO: 📦 Archivieren + 💶 AB-Konvertierung (Preis aus Maßen); Archiv zeigt nur archivierte WEs mit 🖨️-Button. HEAD `f9228ce`.
+- Davor: **QM Phase 2A (4/5 Aufgaben)**: Team-Management (qm_team_mitglieder, Tab 👥), Push-Alerts Cron, Prüfplan-Generator (Regel-Engine, Drucken), Statistik-Dashboard mit echten Supabase-Queries + Recharts-Charts (PieChart, LineChart, BarChart). HEAD `f3d85e4` (nach Merge mit WE-Features).
 - Davor: **Mobile-Fix Arbeitskarte PDF**: `window.open` → `doc.save()` — PDF lädt jetzt als direkter Download auf iOS/Android. HEAD `cc8f743`.
 - Davor: **QM-Pilot Phase 1 VOLLSTÄNDIG** (8 Commits `9cef745` → `ccb4389`): DB-Schema + Storage-Buckets + CRUD (`lib/db/qm.ts`), Zeichnungs-Upload mit KI-Analyse, Zeichnungs-Detail + Edit, Prüfbericht-Wizard 6 Schritte (Messwert-Ampel + Mobile-Fotos + Sichtprüfung + DB-Speicherung), PDF-Export (`lib/qm-pdf.ts`), Archiv + Dashboard-KPIs aus echter Supabase-DB. Alle 13 Phase-1-Aufgaben ✅.
 - Davor: `2026-05-20`, `main`, **QM-Pilot Konzept + Access-Grundgerüst** (2 Commits `d94a1e7` + `34056cc`): QM als buchbares Modul, Sidebar-Eintrag, Pricing (40€), Enterprise-Paket (279€), Demo-Dashboard 4 Tabs. Vollständiges Konzept-Dokument: `QM_PILOT_KONZEPT.md`.
