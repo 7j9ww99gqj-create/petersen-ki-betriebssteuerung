@@ -76,7 +76,8 @@ type WerkstattStoerung = {
   created_at?: string; updated_at?: string
 }
 
-// ── Demo-Daten ────────────────────────────────────────────────────────────────
+// ── Demo-Daten (nach 20D-Migration unused, als Referenz belassen) ─────────────
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 const demoKarten: Arbeitskarte[] = [
   { id: 'AK-2025-041', auftragsnr: 'A-2025-034', beschreibung: 'Wartung Hydraulikpresse Station 3', mitarbeiter: 'K. Meier', prioritaet: 'Hoch', status: 'In Arbeit', erstellt: '02.05.2025', geplant: '07.05.2025', stunden: 4, fortschritt: 60, maschine: 'HP-Station-3' },
@@ -137,6 +138,7 @@ const demoStoerungen: WerkstattStoerung[] = [
   { id: 'ST-002', maschine: 'CNC-Fräse-1', titel: 'Kühlmittelstand niedrig', prioritaet: 'Mittel', status: 'in_bearbeitung', gemeldet_von: 'M. Fischer', gemeldet_am: '2026-05-10' },
   { id: 'ST-003', maschine: 'HP-Station-3', titel: 'Drucksensor kalibriert', prioritaet: 'Niedrig', status: 'behoben', gemeldet_von: 'K. Meier', gemeldet_am: '2026-05-03', behoben_am: '2026-05-04' },
 ]
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -300,13 +302,13 @@ type NewKarteParams = { auftragsnr?: string; beschreibung?: string }
 type BueroAuftragRef = { id: string; titel?: string; beschreibung?: string; ab_nummer?: string }
 
 function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKarteParams, bueroAuftraege }: { isDemo: boolean; mitarbeiterNamen: string[]; bereichNamen: string[]; newKarteParams?: NewKarteParams; bueroAuftraege: BueroAuftragRef[] }) {
-  const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
+  const [karten, setKarten] = useState<Arbeitskarte[]>([])
   const [showForm, setShowForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>('Alle')
   const [filterPrio, setFilterPrio] = useState<string>('Alle')
   const toast = useGlobalToast()
   const [errorMsg, setErrorMsg] = useState('')
-  const [loading, setLoading] = useState(!isDemo)
+  const [loading, setLoading] = useState(true)
   const [retryKey, setRetryKey] = useState(0)
   const [editKarte, setEditKarte] = useState<Arbeitskarte | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -318,13 +320,6 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
   })
 
   useEffect(() => {
-    if (isDemo) {
-      // Demo: berechne Ist-Stunden aus demoZeit
-      const map: Record<string, number> = {}
-      demoZeit.forEach(b => { map[b.auftragsnr] = (map[b.auftragsnr] ?? 0) + b.stunden })
-      setZeitIstMap(map)
-      return
-    }
     setLoading(true); setErrorMsg('')
     Promise.all([
       getWerkstattKarten(),
@@ -338,7 +333,7 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
       })
       .catch(() => setErrorMsg('Arbeitskarten konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
-  }, [isDemo, retryKey])
+  }, [retryKey])
 
   useEffect(() => {
     if (newKarteParams?.auftragsnr || newKarteParams?.beschreibung) {
@@ -378,11 +373,9 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
       erstellt: today, geplant: form.geplant || '—', stunden: Number(form.stunden) || 0,
       fortschritt: 0, maschine: form.maschine || '—',
     }
-    if (!isDemo) {
-      try {
-        await upsertWerkstattKarte({ ...newKarte, buero_auftrag_id: form.buero_auftrag_id || null })
-      } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try {
+      await upsertWerkstattKarte({ ...newKarte, buero_auftrag_id: form.buero_auftrag_id || null })
+    } catch { showToast('Fehler beim Speichern', true); return }
     setKarten(prev => [newKarte, ...prev])
     setForm({ auftragsnr: '', beschreibung: '', mitarbeiter: '', prioritaet: 'Mittel', status: 'Offen', geplant: '', stunden: '', maschine: '', buero_auftrag_id: '' })
     setShowForm(false)
@@ -391,7 +384,7 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
 
   const handleStatusChange = async (id: string, status: AKStatus) => {
     const karte = karten.find(k => k.id === id)
-    if (!isDemo && karte) {
+    if (karte) {
       const updated = { ...karte, status, fortschritt: status === 'Fertig' ? 100 : karte.fortschritt }
       try { await upsertWerkstattKarte(updated) } catch { showToast('Fehler beim Speichern', true); return }
     }
@@ -403,18 +396,14 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
   }
 
   const handleEditSave = async (updated: Arbeitskarte) => {
-    if (!isDemo) {
-      try { await upsertWerkstattKarte(updated) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertWerkstattKarte(updated) } catch { showToast('Fehler beim Speichern', true); return }
     setKarten(prev => prev.map(k => k.id === updated.id ? updated : k))
     setEditKarte(null)
     showToast(`✅ Arbeitskarte ${updated.id} gespeichert`)
   }
 
   const handleDelete = async (id: string) => {
-    if (!isDemo) {
-      try { await deleteWerkstattKarte(id) } catch { showToast('Fehler beim Löschen', true); return }
-    }
+    try { await deleteWerkstattKarte(id) } catch { showToast('Fehler beim Löschen', true); return }
     setKarten(prev => prev.filter(k => k.id !== id))
     setDeleteConfirm(null)
     showToast(`🗑️ Arbeitskarte ${id} gelöscht`)
@@ -429,9 +418,7 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
     const karte = karten.find(k => k.id === id)
     if (!karte) return
     const updated = { ...karte, fortschritt: value }
-    if (!isDemo) {
-      try { await upsertWerkstattKarte(updated) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertWerkstattKarte(updated) } catch { showToast('Fehler beim Speichern', true); return }
     setKarten(prev => prev.map(k => k.id === id ? updated : k))
     const newSlider = { ...sliderValues }
     delete newSlider[id]
@@ -712,22 +699,21 @@ function ArbeitskartentTab({ isDemo, mitarbeiterNamen, bereichNamen, newKartePar
 // ── Zeiterfassung-Tab ─────────────────────────────────────────────────────────
 
 function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeiterNamen: string[] }) {
-  const [buchungen, setBuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])
+  const [buchungen, setBuchungen] = useState<Zeitbuchung[]>([])
   const [form, setForm] = useState({ mitarbeiter: '', auftragsnr: '', stunden: '', taetigkeit: '' })
   const toast = useGlobalToast()
   const [errorMsg, setErrorMsg] = useState('')
-  const [loading, setLoading] = useState(!isDemo)
+  const [loading, setLoading] = useState(true)
   const [retryKey, setRetryKey] = useState(0)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
   useEffect(() => {
-    if (isDemo) return
     setLoading(true); setErrorMsg('')
     getWerkstattZeitbuchungen()
       .then(data => setBuchungen(data as Zeitbuchung[]))
       .catch(() => setErrorMsg('Zeitbuchungen konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
-  }, [isDemo, retryKey])
+  }, [retryKey])
 
   const showToast = (msg: string, error = false) => {
     if (error) toast.error(msg); else toast.success(msg)
@@ -740,9 +726,7 @@ function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitar
   const handleSave = async () => {
     if (!form.mitarbeiter || !form.auftragsnr || !form.stunden) return
     const newBuchung: Zeitbuchung = { id: Date.now(), ...form, stunden: Number(form.stunden), datum: today }
-    if (!isDemo) {
-      try { await insertWerkstattZeitbuchung(newBuchung) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await insertWerkstattZeitbuchung(newBuchung) } catch { showToast('Fehler beim Speichern', true); return }
     setBuchungen(prev => [newBuchung, ...prev])
     setForm({ mitarbeiter: '', auftragsnr: '', stunden: '', taetigkeit: '' })
     showToast(`✅ ${form.stunden}h für ${form.mitarbeiter} auf ${form.auftragsnr} gebucht`)
@@ -864,18 +848,17 @@ function ZeiterfassungTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitar
 // ── Materialverbrauch-Tab ────────────────────────────────────────────────────
 
 function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeiterNamen: string[] }) {
-  const [material, setMaterial] = useState<Materialverbrauch[]>(isDemo ? demoMaterial : [])
+  const [material, setMaterial] = useState<Materialverbrauch[]>([])
   const [form, setForm] = useState({ artikel: '', menge: '', einheit: 'Stk', auftragsnr: '', mitarbeiter: '' })
   const toast = useGlobalToast()
   const [errorMsg, setErrorMsg] = useState('')
-  const [loading, setLoading] = useState(!isDemo)
+  const [loading, setLoading] = useState(true)
   const [retryKey, setRetryKey] = useState(0)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [lagerArtikel, setLagerArtikel] = useState<{ id: string; name: string; bestand: number; einheit: string }[]>([])
   const [lagerSyncMsg, setLagerSyncMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isDemo) return
     setLoading(true); setErrorMsg('')
     Promise.all([
       getWerkstattMaterial(),
@@ -887,7 +870,7 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
       })
       .catch(() => setErrorMsg('Materialverbrauch konnte nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
-  }, [isDemo, retryKey])
+  }, [retryKey])
 
   const showToast = (msg: string, error = false) => {
     if (error) toast.error(msg); else toast.success(msg)
@@ -897,29 +880,27 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
     if (!form.artikel || !form.menge || !form.auftragsnr) return
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     const newEntry: Materialverbrauch = { id: Date.now(), ...form, menge: Number(form.menge), datum: today }
-    if (!isDemo) {
-      try { await insertWerkstattMaterial(newEntry) } catch { showToast('Fehler beim Speichern', true); return }
-      // Lager-Sync: Bestand reduzieren
-      try {
-        await syncWerkstattMaterialToLager({
-          artikelName: form.artikel,
-          menge: Number(form.menge),
-          einheit: form.einheit,
-          auftragsnr: form.auftragsnr,
-          mitarbeiter: form.mitarbeiter,
-        })
-        // Lager-Artikel-Bestand lokal aktualisieren
-        setLagerArtikel(prev => prev.map(a => {
-          if (a.name.toLowerCase() === form.artikel.toLowerCase()) {
-            const newBestand = Math.max(0, a.bestand - Number(form.menge))
-            return { ...a, bestand: newBestand }
-          }
-          return a
-        }))
-        setLagerSyncMsg(`📦 Lager: ${form.artikel} um ${form.menge} ${form.einheit} reduziert`)
-        setTimeout(() => setLagerSyncMsg(null), 5000)
-      } catch { /* Lager-Sync ist best-effort */ }
-    }
+    try { await insertWerkstattMaterial(newEntry) } catch { showToast('Fehler beim Speichern', true); return }
+    // Lager-Sync: Bestand reduzieren
+    try {
+      await syncWerkstattMaterialToLager({
+        artikelName: form.artikel,
+        menge: Number(form.menge),
+        einheit: form.einheit,
+        auftragsnr: form.auftragsnr,
+        mitarbeiter: form.mitarbeiter,
+      })
+      // Lager-Artikel-Bestand lokal aktualisieren
+      setLagerArtikel(prev => prev.map(a => {
+        if (a.name.toLowerCase() === form.artikel.toLowerCase()) {
+          const newBestand = Math.max(0, a.bestand - Number(form.menge))
+          return { ...a, bestand: newBestand }
+        }
+        return a
+      }))
+      setLagerSyncMsg(`📦 Lager: ${form.artikel} um ${form.menge} ${form.einheit} reduziert`)
+      setTimeout(() => setLagerSyncMsg(null), 5000)
+    } catch { /* Lager-Sync ist best-effort */ }
     setMaterial(prev => [newEntry, ...prev])
     setForm({ artikel: '', menge: '', einheit: 'Stk', auftragsnr: '', mitarbeiter: '' })
     showToast(`✅ Verbrauch "${form.artikel}" (${form.menge} ${form.einheit}) gebucht`)
@@ -1070,22 +1051,21 @@ function MaterialverbrauchTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; m
 // ── Qualitätskontrolle-Tab ────────────────────────────────────────────────────
 
 function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeiterNamen: string[] }) {
-  const [protokolle, setProtokolle] = useState<Pruefprotokoll[]>(isDemo ? demoPruefung : [])
+  const [protokolle, setProtokolle] = useState<Pruefprotokoll[]>([])
   const [form, setForm] = useState({ auftragsnr: '', pruefpunkt: '', pruefer: '' })
   const toast = useGlobalToast()
   const [errorMsg, setErrorMsg] = useState('')
-  const [loading, setLoading] = useState(!isDemo)
+  const [loading, setLoading] = useState(true)
   const [retryKey, setRetryKey] = useState(0)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
   useEffect(() => {
-    if (isDemo) return
     setLoading(true); setErrorMsg('')
     getWerkstattPruefprotokolle()
       .then(data => setProtokolle(data as Pruefprotokoll[]))
       .catch(() => setErrorMsg('Prüfprotokolle konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
-  }, [isDemo, retryKey])
+  }, [retryKey])
 
   const showToast = (msg: string, error = false) => {
     if (error) toast.error(msg); else toast.success(msg)
@@ -1093,11 +1073,9 @@ function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeit
 
   const handleErgebnis = async (id: number, ergebnis: 'OK' | 'Fehler' | 'Offen') => {
     const today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    if (!isDemo) {
-      const p = protokolle.find(p => p.id === id)
-      if (p) {
-        try { await insertWerkstattPruefprotokoll({ ...p, ergebnis, datum: ergebnis === 'Offen' ? '—' : today }) } catch { showToast('Fehler beim Speichern', true); return }
-      }
+    const p = protokolle.find(p => p.id === id)
+    if (p) {
+      try { await insertWerkstattPruefprotokoll({ ...p, ergebnis, datum: ergebnis === 'Offen' ? '—' : today }) } catch { showToast('Fehler beim Speichern', true); return }
     }
     setProtokolle(prev => prev.map(p => p.id === id ? { ...p, ergebnis, datum: ergebnis === 'Offen' ? '—' : today } : p))
     if (ergebnis === 'OK') showToast('✅ Prüfpunkt bestanden')
@@ -1108,9 +1086,7 @@ function QualitaetTab({ isDemo, mitarbeiterNamen }: { isDemo: boolean; mitarbeit
   const handleAdd = async () => {
     if (!form.auftragsnr || !form.pruefpunkt) return
     const newP: Pruefprotokoll = { id: Date.now(), ...form, ergebnis: 'Offen', datum: '—' }
-    if (!isDemo) {
-      try { await insertWerkstattPruefprotokoll(newP) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await insertWerkstattPruefprotokoll(newP) } catch { showToast('Fehler beim Speichern', true); return }
     setProtokolle(prev => [newP, ...prev])
     setForm({ auftragsnr: '', pruefpunkt: '', pruefer: '' })
     showToast('✅ Prüfpunkt hinzugefügt')
@@ -1337,18 +1313,14 @@ function MitarbeiterTab({ isDemo, mitarbeiter, setMitarbeiter }: {
       aktiv: form.aktiv,
       notiz: form.notiz || undefined,
     }
-    if (!isDemo) {
-      try { await upsertWerkstattMitarbeiter(payload) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertWerkstattMitarbeiter(payload) } catch { showToast('Fehler beim Speichern', true); return }
     setMitarbeiter(prev => editId ? prev.map(m => m.id === editId ? payload : m) : [payload, ...prev])
     reset()
     showToast(editId ? '✅ Mitarbeiter aktualisiert' : '✅ Mitarbeiter angelegt')
   }
 
   const remove = async (id: string) => {
-    if (!isDemo) {
-      try { await deleteWerkstattMitarbeiter(id) } catch { showToast('Fehler beim Entfernen', true); return }
-    }
+    try { await deleteWerkstattMitarbeiter(id) } catch { showToast('Fehler beim Entfernen', true); return }
     setMitarbeiter(prev => prev.filter(m => m.id !== id))
     setDeleteId(null)
     showToast('🗑️ Mitarbeiter entfernt')
@@ -1469,18 +1441,14 @@ function BereicheTab({ isDemo, bereiche, setBereiche }: {
       aktiv: form.aktiv,
       notiz: form.notiz || undefined,
     }
-    if (!isDemo) {
-      try { await upsertWerkstattBereich(payload) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertWerkstattBereich(payload) } catch { showToast('Fehler beim Speichern', true); return }
     setBereiche(prev => editId ? prev.map(b => b.id === editId ? payload : b) : [payload, ...prev])
     reset()
     showToast(editId ? '✅ Bereich aktualisiert' : '✅ Bereich angelegt')
   }
 
   const remove = async (id: string) => {
-    if (!isDemo) {
-      try { await deleteWerkstattBereich(id) } catch { showToast('Fehler beim Löschen', true); return }
-    }
+    try { await deleteWerkstattBereich(id) } catch { showToast('Fehler beim Löschen', true); return }
     setBereiche(prev => prev.filter(b => b.id !== id))
     setDeleteId(null)
     showToast('🗑️ Bereich entfernt')
@@ -1599,26 +1567,20 @@ function WartungTab({ isDemo, bereiche, mitarbeiterNamen, wartungen, setWartunge
       status,
       notiz: form.notiz || undefined,
     }
-    if (!isDemo) {
-      try { await upsertWerkstattWartung(payload) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertWerkstattWartung(payload) } catch { showToast('Fehler beim Speichern', true); return }
     setWartungen(prev => editId ? prev.map(w => w.id === editId ? payload : w) : [payload, ...prev])
     reset()
     showToast(editId ? '✅ Wartung aktualisiert' : '✅ Wartung angelegt')
   }
   const remove = async (id: string) => {
-    if (!isDemo) {
-      try { await deleteWerkstattWartung(id) } catch { showToast('Fehler beim Löschen', true); return }
-    }
+    try { await deleteWerkstattWartung(id) } catch { showToast('Fehler beim Löschen', true); return }
     setWartungen(prev => prev.filter(w => w.id !== id))
     setDeleteId(null)
     showToast('🗑️ Wartung gelöscht')
   }
   const markDone = async (w: WerkstattWartung) => {
     const payload = { ...w, status: 'erledigt' as WartungStatus, letzte_wartung: isoToday() }
-    if (!isDemo) {
-      try { await upsertWerkstattWartung(payload) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertWerkstattWartung(payload) } catch { showToast('Fehler beim Speichern', true); return }
     setWartungen(prev => prev.map(x => x.id === w.id ? payload : x))
     showToast('✅ Wartung erledigt')
   }
@@ -1752,25 +1714,19 @@ function StoerungenTab({ isDemo, bereiche, mitarbeiterNamen, stoerungen, setStoe
       gemeldet_am: isoToday(),
       notiz: form.notiz || undefined,
     }
-    if (!isDemo) {
-      try { await upsertWerkstattStoerung(payload) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertWerkstattStoerung(payload) } catch { showToast('Fehler beim Speichern', true); return }
     setStoerungen(prev => [payload, ...prev])
     setForm({ maschine: '', titel: '', beschreibung: '', prioritaet: 'Mittel', gemeldet_von: '', notiz: '' })
     showToast('✅ Störung gemeldet')
   }
   const setStatus = async (s: WerkstattStoerung, status: StoerungStatus) => {
     const payload = { ...s, status, behoben_am: status === 'behoben' ? isoToday() : undefined }
-    if (!isDemo) {
-      try { await upsertWerkstattStoerung(payload) } catch { showToast('Fehler beim Speichern', true); return }
-    }
+    try { await upsertWerkstattStoerung(payload) } catch { showToast('Fehler beim Speichern', true); return }
     setStoerungen(prev => prev.map(x => x.id === s.id ? payload : x))
     showToast(`✅ Störung auf "${stoerungLabel[status]}" gesetzt`)
   }
   const remove = async (id: string) => {
-    if (!isDemo) {
-      try { await deleteWerkstattStoerung(id) } catch { showToast('Fehler beim Löschen', true); return }
-    }
+    try { await deleteWerkstattStoerung(id) } catch { showToast('Fehler beim Löschen', true); return }
     setStoerungen(prev => prev.filter(s => s.id !== id))
     setDeleteId(null)
     showToast('🗑️ Störung gelöscht')
@@ -1953,13 +1909,11 @@ function FertigungsleitstandTab({ isDemo, karten, setKarten, mitarbeiterNamen }:
   const handleBatchStatusChange = async () => {
     if (!batchAction || selected.size === 0) return
     const ids = Array.from(selected)
-    if (!isDemo) {
-      await Promise.allSettled(ids.map(id => {
-        const k = karten.find(k => k.id === id)
-        if (!k) return Promise.resolve()
-        return upsertWerkstattKarte({ ...k, status: batchAction })
-      }))
-    }
+    await Promise.allSettled(ids.map(id => {
+      const k = karten.find(k => k.id === id)
+      if (!k) return Promise.resolve()
+      return upsertWerkstattKarte({ ...k, status: batchAction })
+    }))
     setKarten(prev => prev.map(k => selected.has(k.id) ? { ...k, status: batchAction } : k))
     showToast(`✅ ${ids.length} Karte${ids.length > 1 ? 'n' : ''} → "${batchAction}"`)
     setSelected(new Set())
@@ -2114,14 +2068,14 @@ export default function WerkstattPilotPage() {
   const WERKSTATT_TABS: Tab[] = ['karten', 'zeit', 'material', 'qualitaet', 'wartung', 'stoerungen', 'mitarbeiter', 'bereiche']
   useSwipeTabs(WERKSTATT_TABS, tab, (t) => setTab(t as Tab))
   const [newKarteParams, setNewKarteParams] = useState<NewKarteParams | undefined>(undefined)
-  const [karten, setKarten] = useState<Arbeitskarte[]>(isDemo ? demoKarten : [])
-  const [zeitbuchungen, setZeitbuchungen] = useState<Zeitbuchung[]>(isDemo ? demoZeit : [])
-  const [mitarbeiter, setMitarbeiter] = useState<Mitarbeiter[]>(isDemo ? demoMitarbeiter : [])
-  const [bereiche, setBereiche] = useState<WerkstattBereich[]>(isDemo ? demoBereiche : [])
-  const [wartungen, setWartungen] = useState<WerkstattWartung[]>(isDemo ? demoWartungen : [])
-  const [stoerungen, setStoerungen] = useState<WerkstattStoerung[]>(isDemo ? demoStoerungen : [])
+  const [karten, setKarten] = useState<Arbeitskarte[]>([])
+  const [zeitbuchungen, setZeitbuchungen] = useState<Zeitbuchung[]>([])
+  const [mitarbeiter, setMitarbeiter] = useState<Mitarbeiter[]>([])
+  const [bereiche, setBereiche] = useState<WerkstattBereich[]>([])
+  const [wartungen, setWartungen] = useState<WerkstattWartung[]>([])
+  const [stoerungen, setStoerungen] = useState<WerkstattStoerung[]>([])
   const [bueroAuftraege, setBueroAuftraege] = useState<BueroAuftragRef[]>([])
-  const [loading, setLoading] = useState(!isDemo)
+  const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
@@ -2135,7 +2089,6 @@ export default function WerkstattPilotPage() {
   }, [])
 
   useEffect(() => {
-    if (isDemo) return
     trackVisit({ href: '/dashboard/werkstatt', label: 'WerkstattPilot', icon: '🔧' })
     Promise.all([getWerkstattKarten(), getWerkstattZeitbuchungen(), getWerkstattMitarbeiter(), getWerkstattBereiche(), getWerkstattWartungen(), getWerkstattStoerungen(), getBueroAuftraege()])
       .then(([k, z, m, b, w, s, auftraege]) => {
@@ -2149,7 +2102,7 @@ export default function WerkstattPilotPage() {
       })
       .catch(() => setErrorMsg('Fehler beim Laden der Daten'))
       .finally(() => setLoading(false))
-  }, [isDemo])
+  }, [])
 
   const offeneKarten = karten.filter(k => k.status !== 'Fertig' && k.status !== 'Storniert').length
   const kritisch = karten.filter(k => k.prioritaet === 'Kritisch' && k.status !== 'Fertig').length
