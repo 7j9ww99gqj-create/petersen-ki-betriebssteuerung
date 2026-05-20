@@ -794,6 +794,6 @@ export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<voi
     doc.text(`Seite ${pg} / ${pageCount}`, A5_W - MARGIN, A5_H - 3, { align: 'right' })
   }
 
-  const blobUrl = doc.output('bloburl')
-  window.open(blobUrl, '_blank')
+  const filename = `Arbeitskarte_${(we.customer || 'Pondruff').replace(/[^a-zA-Z0-9_\-]/g, '_')}_${(we.purchase_order || we.delivery_id || we.id?.slice(0, 8) || 'WE').replace(/[^a-zA-Z0-9_\-]/g, '_')}.pdf`
+  doc.save(filename)
 }
