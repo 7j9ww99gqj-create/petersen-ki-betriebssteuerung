@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **Wareneingang-Workflow-Redesign**: KI-Modus + Manuell-Modus, neue OCR-API, Positions-Details, Büro/WISO-Detailansicht. HEAD `b6f97eb`.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **Arbeitskarte PDF + Büropilot-Sync**: A5-Arbeitskarte druckbar, alle WE-Daten vollständig. HEAD `0d485c6`.
+- Davor: **Wareneingang-Workflow-Redesign**: KI-Modus + Manuell-Modus, neue OCR-API, Positions-Details, Büro/WISO-Detailansicht. HEAD `b6f97eb`.
 - Davor: **API-Konsolidierung**: Anthropic vollständig entfernt, alles über OpenAI (`gpt-4o-mini`). HEAD `fbbd1b1`.
 - Davor: **BUGFIX-SPRINT-2** (P1-1 bis P1-8): 8 wichtige P1-Bugs behoben. HEAD `55821e3`.
 - Davor: `2026-05-20`, `main`, **BUGFIX-SPRINT-1** (P0-1 bis P0-10): Alle 10 Release-Blocker behoben. HEAD `2b0fa7f`.
