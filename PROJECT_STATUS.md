@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **5 Wareneingang-Optimierungen**: Multi-Image-OCR (bis 6 Fotos), Post-Save-Druckbutton, WE-Liste am Seitenende, visuelle Checkboxen auf Arbeitskarte, Status-Zeilen (Eingang/Bearbeitung/Ausgabe). HEAD `3fd88a8`.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **QM-Pilot Konzept + Access-Grundgerüst** (2 Commits `d94a1e7` + `34056cc`): QM als buchbares Modul, Sidebar-Eintrag, Pricing (40€), Enterprise-Paket (279€), Demo-Dashboard 4 Tabs. Vollständiges Konzept-Dokument: `QM_PILOT_KONZEPT.md`. Phase 1 (DB + Wizard + KI + PDF) steht an.
+- Davor: **5 Wareneingang-Optimierungen**: Multi-Image-OCR (bis 6 Fotos), Post-Save-Druckbutton, WE-Liste am Seitenende, visuelle Checkboxen auf Arbeitskarte, Status-Zeilen. HEAD `3fd88a8`.
 - Davor: **Arbeitskarte PDF + Büropilot-Sync**: A5-Arbeitskarte druckbar, alle WE-Daten vollständig. HEAD `0d485c6`.
 - Davor: **Wareneingang-Workflow-Redesign**: KI-Modus + Manuell-Modus, neue OCR-API, Positions-Details, Büro/WISO-Detailansicht. HEAD `b6f97eb`.
 - Davor: **API-Konsolidierung**: Anthropic vollständig entfernt, alles über OpenAI (`gpt-4o-mini`). HEAD `fbbd1b1`.
@@ -430,11 +431,11 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-19, **Dual-Sprint A+B+C** (Pondruff Datenverlust-Fix + UX, Owner-Härtung) — 10 Aufgaben, HEAD `dcf29bb`  
-**Letzte Session:** Pondruff-Härtung (raw_dimension_text persistiert, Büro-Sync idempotent, Doppel-Klick-Schutz WISO, OCR-Fehlerdetail, Operator/Status durchgereicht, Zurück-Button, Mobile-Kamera, Preistabellen-Admin-Panel Teil-Lösung) + Owner-Härtung (case-insensitive Mail-Check, owner_audit_log Tabelle + UI-Viewer, OpenAI-Usage 1h-Cache + Refresh-Button)  
-**Nächster Focus:** UI-Test in Production, Inhaber-Workflow Sprint-D (CSV-Export, Pending-Payment-Reminder)  
+**Letzter Stand:** 2026-05-20, **QM-Pilot Grundgerüst** (Konzept + Access + Pricing + Demo-Dashboard) — HEAD `34056cc`  
+**Letzte Session:** QM-Pilot als buchbares Modul eingerichtet: Sidebar-Eintrag, Access-System (nur bei Buchung sichtbar), Pricing 40€/Monat, Enterprise-Paket 279€, Demo-Dashboard 4 Tabs, vollständiges Konzept in `QM_PILOT_KONZEPT.md`  
+**Nächster Focus:** QM-Pilot Phase 1 — DB-Schema + Zeichnungs-Upload + OpenAI Vision + Prüfbericht-Wizard + PDF-Export (siehe `QM_PILOT_KONZEPT.md` Abschnitt „Phase 1 — Noch zu implementieren")  
 **Blocker:** Keine  
-**Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
+**Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur/QM-Wizard
 
 ## 1. Kurzüberblick
 - Zweck: modulare Betriebssteuerung/ERP-ähnliche Web-App für Lager, Büro, Werkstatt, Steuer, Planung, Marketing, Dokumente und KI-gestützte Erfassung.
@@ -449,6 +450,17 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+
+- **Zuletzt erledigt (2026-05-20 — QM-Pilot Grundgerüst, HEAD `34056cc`, 2 Commits):**
+  - `lib/access.ts`: `'qm'` als neuer `AccessPilotId` — nur bei expliziter Buchung sichtbar (NICHT in DEFAULT_ROLE_PILOTS)
+  - `components/Sidebar.tsx`: QM-Pilot 🔬 am Ende der KI-Piloten-Liste → `/dashboard/qm`
+  - `app/dashboard/layout.tsx`: Demo-Nutzer sieht QM, echte User nur nach Buchung
+  - `app/dashboard/[pilot]/page.tsx`: QM Landing-Page (Features, 4 Stats, 4 Module) für Nutzer ohne Zugang
+  - `app/dashboard/qm/page.tsx`: Demo-Dashboard (4 Tabs: Dashboard/Zeichnungen/Archiv/Statistiken, Teal-Farbe `#14b8a6`)
+  - `lib/pricingConfig.ts`: QM als buchbarer PilotId (40€/85€/149€/Anfrage), Enterprise 249→279€
+  - `app/dashboard/einstellungen/page.tsx`: MANAGED_PILOT_OPTIONS + PILOT_LABELS + AGB aktualisiert
+  - `QM_PILOT_KONZEPT.md`: Vollständiges Konzept-Dokument (DB-Schema, Wizard, KI-Analyse, Ampel-Logik, PDF, Phasen)
+  - **Phase 1 (DB + Zeichnungs-Upload + KI + Wizard + PDF) steht als nächstes an**
 
 - **Zuletzt erledigt (2026-05-20 — Wareneingang-Workflow-Redesign, HEAD `b6f97eb`):**
   - Neue Moduswahl-Kacheln: "KI-Wareneingang" und "Wareneingang manuell erfassen"
