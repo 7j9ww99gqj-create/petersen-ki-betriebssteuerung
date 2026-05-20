@@ -22,15 +22,41 @@ type Saved = {
   synced_wiso_at: string | null
 }
 
+type WEPosEntry = {
+  position_nr: number
+  menge: string
+  artikelbezeichnung: string
+  form: string
+  laenge?: string
+  breite?: string
+  hoehe?: string
+  durchmesser?: string
+  durchmesser_laenge?: string
+  raw_dimension_text?: string
+  weitere_infos?: { key: string; value: string }[]
+  polieren?: string
+  polieren_wo?: string
+  entschichtung?: string
+  microstrahlen?: string
+  laeppstrahlen?: string
+  polierstrahlen?: string
+  beschichtung?: string
+}
+
 type SavedWE = {
   id: string
   created_at: string
   delivery_id: string | null
   customer: string | null
+  purchase_order: string | null
   operator: string | null
   status: string | null
   note: string | null
   ai_data: Record<string, unknown> | null
+  positionen: WEPosEntry[] | null
+  lieferbedingungen: string | null
+  eingelagert_am: string | null
+  eingelagert_von: string | null
   synced_buero_dokument_id: string | null
   synced_buero_at: string | null
 }
@@ -59,6 +85,7 @@ export default function BueroWisoPage() {
   const toast = useGlobalToast()
   const [delConfirm, setDelConfirm] = useState<string | null>(null)
   const [resyncConfirm, setResyncConfirm] = useState<string | null>(null)
+  const [selectedWeId, setSelectedWeId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [wisoDebug, setWisoDebug] = useState<Record<string, unknown> | null>(null)
   const [wisoDebugBusy, setWisoDebugBusy] = useState(false)
@@ -322,32 +349,99 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
             <div className="pk-table-wrap" style={{ overflowX: 'auto' }}>
               <table className="pk-table" style={{ width: '100%', fontSize: 12 }}>
                 <thead><tr>
-                  <th>Datum</th><th>Lieferschein</th><th>Kunde</th><th>Status</th><th>Notiz</th>
+                  <th>Datum</th><th>Bestell-Nr.</th><th>Kunde</th><th>Pos.</th>
+                  <th>Lieferbedingungen</th><th>Eingelagert von</th>
                   <th>BüroPilot</th><th>WISO</th><th>Aktion</th>
                 </tr></thead>
                 <tbody>{visibleWE.map(w => {
                   const wisoSynced = !!(w.ai_data as { wiso?: { synced_at?: string } } | null)?.wiso?.synced_at
+                  const posCount = Array.isArray(w.positionen) ? w.positionen.length : 0
                   return (
-                    <tr key={w.id}>
-                      <td>{new Date(w.created_at).toLocaleDateString('de-DE')}</td>
-                      <td>{w.delivery_id || '—'}</td>
-                      <td>{w.customer || '—'}</td>
-                      <td>{w.status || 'offen'}</td>
-                      <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.note || ''}</td>
-                      <td>
-                        {w.synced_buero_dokument_id
-                          ? <span style={{ color: '#4ddb7e', fontSize: 11 }}>✓ {w.synced_buero_dokument_id}</span>
-                          : <button className="pk-btn-ghost" disabled={busy} onClick={() => syncBueroWE(w)} style={{ fontSize: 11 }}>→ BüroPilot</button>}
-                      </td>
-                      <td>
-                        {wisoSynced
-                          ? <span style={{ color: '#4ddb7e', fontSize: 11 }}>✓ WISO</span>
-                          : <button className="pk-btn-ghost" disabled={busy || !wisoEnabled} title={wisoEnabled ? undefined : 'WISO-Sync ist durch den Inhaber deaktiviert'} onClick={() => exportWisoWE(w)} style={{ fontSize: 11 }}>{wisoEnabled ? '→ WISO' : '🚫 WISO'}</button>}
-                      </td>
-                      <td>
-                        <button className="pk-btn-ghost" onClick={() => delWE(w.id)} style={{ fontSize: 11 }}>🗑️</button>
-                      </td>
-                    </tr>
+                    <>
+                      <tr key={w.id}
+                        style={{ background: selectedWeId === w.id ? 'rgba(22,132,255,.07)' : undefined, cursor: 'pointer' }}
+                        onClick={() => setSelectedWeId(selectedWeId === w.id ? null : w.id)}>
+                        <td>{new Date(w.created_at).toLocaleDateString('de-DE')}</td>
+                        <td>{w.purchase_order || w.delivery_id || '—'}</td>
+                        <td>{w.customer || '—'}</td>
+                        <td>{posCount > 0 ? <span style={{ color: '#20c8ff' }}>{posCount}</span> : '—'}</td>
+                        <td>{w.lieferbedingungen || '—'}</td>
+                        <td>{w.eingelagert_von || w.operator || '—'}</td>
+                        <td onClick={e => e.stopPropagation()}>
+                          {w.synced_buero_dokument_id
+                            ? <span style={{ color: '#4ddb7e', fontSize: 11 }}>✓ {w.synced_buero_dokument_id}</span>
+                            : <button className="pk-btn-ghost" disabled={busy} onClick={() => syncBueroWE(w)} style={{ fontSize: 11 }}>→ BüroPilot</button>}
+                        </td>
+                        <td onClick={e => e.stopPropagation()}>
+                          {wisoSynced
+                            ? <span style={{ color: '#4ddb7e', fontSize: 11 }}>✓ WISO</span>
+                            : <button className="pk-btn-ghost" disabled={busy || !wisoEnabled} title={wisoEnabled ? undefined : 'WISO-Sync ist durch den Inhaber deaktiviert'} onClick={() => exportWisoWE(w)} style={{ fontSize: 11 }}>{wisoEnabled ? '→ WISO' : '🚫 WISO'}</button>}
+                        </td>
+                        <td onClick={e => e.stopPropagation()}>
+                          <button className="pk-btn-ghost" onClick={() => delWE(w.id)} style={{ fontSize: 11 }}>🗑️</button>
+                        </td>
+                      </tr>
+                      {selectedWeId === w.id && (
+                        <tr key={`${w.id}-detail`}>
+                          <td colSpan={9} style={{ padding: 0 }}>
+                            <div style={{ padding: '12px 16px', background: 'rgba(22,132,255,.04)', borderTop: '1px solid rgba(22,132,255,.12)' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 12, fontSize: 12 }}>
+                                <div><span style={{ color: '#aeb9c8' }}>Kunde:</span> <b>{w.customer || '—'}</b></div>
+                                <div><span style={{ color: '#aeb9c8' }}>Bestell-Nr.:</span> <b>{w.purchase_order || w.delivery_id || '—'}</b></div>
+                                <div><span style={{ color: '#aeb9c8' }}>Lieferbedingungen:</span> <b>{w.lieferbedingungen || '—'}</b></div>
+                                <div><span style={{ color: '#aeb9c8' }}>Eingelagert am:</span> <b>{w.eingelagert_am ? new Date(w.eingelagert_am).toLocaleDateString('de-DE') : '—'}</b></div>
+                                <div><span style={{ color: '#aeb9c8' }}>Eingelagert von:</span> <b>{w.eingelagert_von || w.operator || '—'}</b></div>
+                              </div>
+                              {posCount > 0 && (
+                                <div style={{ overflowX: 'auto' }}>
+                                  <table className="pk-table" style={{ width: '100%', fontSize: 11 }}>
+                                    <thead>
+                                      <tr>
+                                        <th>Pos.</th><th>Menge</th><th>Artikel</th><th>Maße</th>
+                                        <th>Polieren</th><th>Entschichtung</th><th>Micro</th><th>Läpp</th><th>Polierstr.</th><th>Beschichtung</th><th>Weitere Infos</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {(w.positionen as WEPosEntry[]).map((p, pi) => {
+                                        const masse = p.form === 'Rund'
+                                          ? `Ø${p.durchmesser || '?'} × ${p.durchmesser_laenge || '?'} mm`
+                                          : `${p.laenge || '?'} × ${p.breite || '?'} × ${p.hoehe || '?'} mm`
+                                        const weitereStr = Array.isArray(p.weitere_infos)
+                                          ? p.weitere_infos.map(wi => `${wi.key}: ${wi.value}`).join(', ')
+                                          : ''
+                                        return (
+                                          <tr key={pi}>
+                                            <td>{p.position_nr}</td>
+                                            <td>{p.menge}</td>
+                                            <td>{p.artikelbezeichnung || '—'}</td>
+                                            <td style={{ whiteSpace: 'nowrap' }}>
+                                              {masse}
+                                              {p.raw_dimension_text && <div style={{ color: '#fbbf24', fontSize: 10 }}>📝 {p.raw_dimension_text}</div>}
+                                            </td>
+                                            <td>{p.polieren === 'Ja' ? <span style={{ color: '#4ddb7e' }}>✓{p.polieren_wo ? ` (${p.polieren_wo})` : ''}</span> : '—'}</td>
+                                            <td>{p.entschichtung === 'Ja' ? <span style={{ color: '#4ddb7e' }}>✓</span> : '—'}</td>
+                                            <td>{p.microstrahlen === 'Ja' ? <span style={{ color: '#4ddb7e' }}>✓</span> : '—'}</td>
+                                            <td>{p.laeppstrahlen === 'Ja' ? <span style={{ color: '#4ddb7e' }}>✓</span> : '—'}</td>
+                                            <td>{p.polierstrahlen === 'Ja' ? <span style={{ color: '#4ddb7e' }}>✓</span> : '—'}</td>
+                                            <td>{p.beschichtung || '—'}</td>
+                                            <td style={{ maxWidth: 180, wordBreak: 'break-word' }}>{weitereStr || '—'}</td>
+                                          </tr>
+                                        )
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                              {posCount === 0 && (
+                                <div style={{ color: '#aeb9c8', fontSize: 12 }}>
+                                  {w.note || 'Keine Positionsdaten (alter Wareneingang)'}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   )
                 })}</tbody>
               </table>

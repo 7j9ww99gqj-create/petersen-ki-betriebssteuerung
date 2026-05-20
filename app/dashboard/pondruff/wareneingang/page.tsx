@@ -1,99 +1,168 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
-import { compressImageDataUrl } from '@/lib/pondruff'
+import { compressImageDataUrl, WE_COATINGS } from '@/lib/pondruff'
 import { usePondruffFlags } from '@/components/pondruff/usePondruffFlags'
 import { useGlobalToast } from '@/components/ui/ToastProvider'
 import type { SupabaseClient } from '@supabase/supabase-js'
+const BEDINGUNGEN = ['Versand', 'Kunde holt selber ab', 'Wir liefern aus']
+const EINLAGERER = ['Kevin', 'Julian', 'Frank', 'Tobi', 'Tim', 'Christian']
 
-type Entry = {
-  id: string
-  created_at: string
-  delivery_id: string | null
-  customer: string | null
-  operator: string | null
-  status: string | null
-  receipt_url: string | null
-  parts_url: string | null
-  packaging_url: string | null
-  note: string | null
+type WEPos = {
+  position_nr: number
+  menge: string
+  artikelbezeichnung: string
+  form: 'Rund' | 'Eckig'
+  laenge: string
+  breite: string
+  hoehe: string
+  durchmesser: string
+  durchmesser_laenge: string
+  raw_dimension_text: string
+  weitere_infos: { key: string; value: string }[]
+  polieren: 'Ja' | 'Nein'
+  polieren_wo: string
+  entschichtung: 'Ja' | 'Nein'
+  microstrahlen: 'Ja' | 'Nein'
+  laeppstrahlen: 'Ja' | 'Nein'
+  polierstrahlen: 'Ja' | 'Nein'
+  beschichtung: string
 }
 
-const STATUS = ['offen', 'in Bearbeitung', 'fertig']
+function emptyPos(nr: number): WEPos {
+  return {
+    position_nr: nr, menge: '', artikelbezeichnung: '',
+    form: 'Eckig', laenge: '', breite: '', hoehe: '',
+    durchmesser: '', durchmesser_laenge: '',
+    raw_dimension_text: '', weitere_infos: [],
+    polieren: 'Nein', polieren_wo: '',
+    entschichtung: 'Nein', microstrahlen: 'Nein',
+    laeppstrahlen: 'Nein', polierstrahlen: 'Nein',
+    beschichtung: 'Keine',
+  }
+}
+
+function ocrToPos(p: Record<string, unknown>, idx: number): WEPos {
+  return {
+    position_nr: Number(p.position_nr ?? idx + 1),
+    menge: String(p.menge ?? ''),
+    artikelbezeichnung: String(p.artikelbezeichnung ?? ''),
+    form: String(p.form ?? '') === 'Rund' ? 'Rund' : 'Eckig',
+    laenge: String(p.laenge ?? ''),
+    breite: String(p.breite ?? ''),
+    hoehe: String(p.hoehe ?? ''),
+    durchmesser: String(p.durchmesser ?? ''),
+    durchmesser_laenge: String(p.durchmesser_laenge ?? ''),
+    raw_dimension_text: String(p.raw_dimension_text ?? ''),
+    weitere_infos: Array.isArray(p.weitere_infos)
+      ? (p.weitere_infos as { key: string; value: string }[])
+      : [],
+    polieren: p.polieren === 'Ja' ? 'Ja' : 'Nein',
+    polieren_wo: String(p.polieren_wo ?? ''),
+    entschichtung: p.entschichtung === 'Ja' ? 'Ja' : 'Nein',
+    microstrahlen: p.microstrahlen === 'Ja' ? 'Ja' : 'Nein',
+    laeppstrahlen: p.laeppstrahlen === 'Ja' ? 'Ja' : 'Nein',
+    polierstrahlen: p.polierstrahlen === 'Ja' ? 'Ja' : 'Nein',
+    beschichtung: String(p.beschichtung ?? 'Keine'),
+  }
+}
+
+const lbl: React.CSSProperties = { fontSize: 11, color: '#aeb9c8', marginBottom: 4 }
+const sep: React.CSSProperties = { borderTop: '1px solid rgba(255,255,255,.06)', margin: '14px 0' }
+const posCard: React.CSSProperties = {
+  background: 'rgba(22,132,255,.04)', border: '1px solid rgba(22,132,255,.15)',
+  borderRadius: 10, padding: '12px 14px', marginBottom: 10,
+}
 
 export default function WareneingangPage() {
-  const router = useRouter()
-  const [entries, setEntries] = useState<Entry[]>([])
-  const [busy, setBusy] = useState(false)
   const toast = useGlobalToast()
-  const [form, setForm] = useState({
-    delivery_id: '', customer: '', operator: '', status: 'offen', note: '',
-  })
-  const [receiptFiles, setReceiptFiles] = useState<File[]>([])
-  const [files, setFiles] = useState<{ parts?: File; packaging?: File }>({})
-  const [ocrBusy, setOcrBusy] = useState(false)
   const { flags: pondFlags } = usePondruffFlags()
   const ocrEnabled = pondFlags.ocr_wareneingang
-  const [aiData, setAiData] = useState<Record<string, unknown> | null>(null)
-  const [aiPositions, setAiPositions] = useState<Record<string, unknown>[]>([])
 
-  function showToast(msg: string, ok = true) {
-    if (ok) toast.success(msg); else toast.error(msg)
+  const [mode, setMode] = useState<'ki' | 'manual' | null>(null)
+  const [ocrDone, setOcrDone] = useState(false)
+  const [ocrBusy, setOcrBusy] = useState(false)
+  const [saveBusy, setSaveBusy] = useState(false)
+
+  const [receiptFiles, setReceiptFiles] = useState<File[]>([])
+  const [partsFile, setPartsFile] = useState<File | null>(null)
+  const [packagingFile, setPackagingFile] = useState<File | null>(null)
+
+  const [kunde, setKunde] = useState('')
+  const [bestellnummer, setBestellnummer] = useState('')
+  const [positionen, setPositionen] = useState<WEPos[]>([])
+  const [lieferbedingungen, setLieferbedingungen] = useState('')
+  const [eingelagert_am, setEingelagert_am] = useState(new Date().toISOString().slice(0, 10))
+  const [eingelagert_von, setEingelagert_von] = useState('')
+
+  const canSave = !!lieferbedingungen && !!eingelagert_von
+
+  function resetAll() {
+    setMode(null); setOcrDone(false)
+    setReceiptFiles([]); setPartsFile(null); setPackagingFile(null)
+    setKunde(''); setBestellnummer(''); setPositionen([])
+    setLieferbedingungen(''); setEingelagert_am(new Date().toISOString().slice(0, 10))
+    setEingelagert_von('')
   }
 
-  async function load() {
-    const supabase = createSupabaseClient()
-    const { data, error } = await supabase.from('pondruff_wareneingaenge').select('*').order('created_at', { ascending: false }).limit(100)
-    if (!error && data) setEntries(data as Entry[])
+  function updatePos(idx: number, patch: Partial<WEPos>) {
+    setPositionen(ps => ps.map((p, i) => i === idx ? { ...p, ...patch } : p))
   }
-  useEffect(() => { load() }, [])
+
+  function addPos() {
+    setPositionen(ps => [...ps, emptyPos(ps.length + 1)])
+  }
+
+  function removePos(idx: number) {
+    setPositionen(ps => ps.filter((_, i) => i !== idx).map((p, i) => ({ ...p, position_nr: i + 1 })))
+  }
+
+  function updateWeitereInfo(posIdx: number, infoIdx: number, key: string, value: string) {
+    setPositionen(ps => ps.map((p, i) => {
+      if (i !== posIdx) return p
+      const wi = [...p.weitere_infos]
+      wi[infoIdx] = { key, value }
+      return { ...p, weitere_infos: wi }
+    }))
+  }
+
+  function addWeitereInfo(posIdx: number) {
+    setPositionen(ps => ps.map((p, i) =>
+      i !== posIdx ? p : { ...p, weitere_infos: [...p.weitere_infos, { key: '', value: '' }] }
+    ))
+  }
+
+  function removeWeitereInfo(posIdx: number, infoIdx: number) {
+    setPositionen(ps => ps.map((p, i) =>
+      i !== posIdx ? p : { ...p, weitere_infos: p.weitere_infos.filter((_, j) => j !== infoIdx) }
+    ))
+  }
 
   async function runOcr() {
-    if (!receiptFiles.length) { showToast('Bitte mindestens ein Lieferschein-Bild auswählen', false); return }
+    if (!receiptFiles.length) { toast.error('Bitte Lieferschein-Bild auswählen'); return }
     setOcrBusy(true)
     try {
-      const images = await Promise.all(receiptFiles.map(f => compressImageDataUrl(f)))
-      // Bei mehreren Bildern: nutzen die Preis-OCR (Multi-File-fähig + Positionen)
-      const endpoint = images.length > 1 ? '/api/pondruff/ocr-price' : '/api/pondruff/ocr-lieferschein'
-      const body = images.length > 1 ? { images } : { image: images[0] }
-      const resp = await fetch(endpoint, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      const image = await compressImageDataUrl(receiptFiles[0])
+      const resp = await fetch('/api/pondruff/ocr-wareneingang', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image }),
       })
       const data = await resp.json()
       if (!resp.ok) throw new Error(data?.error || 'OCR fehlgeschlagen')
-      setAiData(data)
-      const positions = Array.isArray(data.positions) ? data.positions : []
-      setAiPositions(positions)
-      setForm(f => ({
-        ...f,
-        delivery_id: f.delivery_id || String(data.id || data.delivery_id || ''),
-        customer: f.customer || String(data.customer || ''),
-        note: f.note || String(data.description || data.ocr_note || ''),
-      }))
-      const detail = positions.length ? `${positions.length} Position(en)` : (data.article_no || '—')
-      showToast(`Erkannt: ${data.customer || '—'} · ${detail}`)
+      setKunde(String(data.kunde || ''))
+      setBestellnummer(String(data.bestellnummer || ''))
+      const pos = Array.isArray(data.positionen)
+        ? (data.positionen as Record<string, unknown>[]).map(ocrToPos)
+        : [emptyPos(1)]
+      setPositionen(pos)
+      setOcrDone(true)
+      toast.success(`Erkannt: ${data.kunde || '—'} · ${pos.length} Position(en)`)
     } catch (e) {
-      showToast((e instanceof Error ? e.message : String(e)) || 'OCR-Fehler', false)
+      toast.error((e instanceof Error ? e.message : String(e)) || 'OCR-Fehler')
     } finally { setOcrBusy(false) }
   }
 
-  function openInPriceCalc() {
-    // Stellt OCR-Daten in sessionStorage und navigiert zum Preisrechner
-    if (typeof window === 'undefined') return
-    sessionStorage.setItem('pondruff_prefill', JSON.stringify({
-      customer: form.customer,
-      delivery_id: form.delivery_id,
-      operator: form.operator,
-      status: form.status,
-      positions: aiPositions,
-      ai_data: aiData,
-    }))
-    router.push('/dashboard/pondruff/preisrechner?prefill=1')
-  }
-
   async function uploadFile(supabase: SupabaseClient, userId: string, folder: string, f: File): Promise<string | null> {
-    if (!f) return null
     const ext = f.name.split('.').pop() || 'jpg'
     const path = `${userId}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
     const { error } = await supabase.storage.from('pondruff').upload(path, f, { upsert: false })
@@ -102,146 +171,349 @@ export default function WareneingangPage() {
   }
 
   async function save() {
-    if (!form.delivery_id.trim() && !form.customer.trim()) {
-      showToast('Lieferschein-ID oder Kunde nötig', false); return
-    }
-    setBusy(true)
+    setSaveBusy(true)
     try {
       const supabase = createSupabaseClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Nicht eingeloggt')
+
       const [receiptPaths, parts_url, packaging_url] = await Promise.all([
         Promise.all(receiptFiles.map(f => uploadFile(supabase, user.id, 'receipt', f))),
-        files.parts ? uploadFile(supabase, user.id, 'parts', files.parts) : Promise.resolve(null),
-        files.packaging ? uploadFile(supabase, user.id, 'packaging', files.packaging) : Promise.resolve(null),
+        partsFile ? uploadFile(supabase, user.id, 'parts', partsFile) : Promise.resolve(null),
+        packagingFile ? uploadFile(supabase, user.id, 'packaging', packagingFile) : Promise.resolve(null),
       ])
       const receipt_url = receiptPaths.filter(Boolean).join('|') || null
+
       const { data: ins, error } = await supabase.from('pondruff_wareneingaenge').insert({
-        user_id: user.id, ...form, receipt_url, parts_url, packaging_url, ai_data: { ...aiData, positions: aiPositions },
+        user_id: user.id,
+        customer: kunde || null,
+        purchase_order: bestellnummer || null,
+        delivery_id: bestellnummer || null,
+        positionen,
+        lieferbedingungen: lieferbedingungen || null,
+        eingelagert_am: eingelagert_am || null,
+        eingelagert_von: eingelagert_von || null,
+        receipt_url,
+        parts_url,
+        packaging_url,
+        status: 'offen',
+        ai_data: mode === 'ki' ? { ocr_mode: 'ki-wareneingang' } : { ocr_mode: 'manual' },
       }).select().single()
       if (error) throw error
-      // Bauteil-Asset speichern (für KI-Suche) + Embedding generieren
+
       if (parts_url && ins) {
         const { data: bt } = await supabase.from('pondruff_bauteile').insert({
           user_id: user.id,
-          customer: form.customer || null,
-          delivery_id: form.delivery_id || null,
-          article_no: String((aiData as Record<string, unknown> | null)?.article_no || ''),
-          description: String((aiData as Record<string, unknown> | null)?.description || form.note || ''),
+          customer: kunde || null,
+          delivery_id: bestellnummer || null,
+          article_no: positionen[0]?.artikelbezeichnung || '',
+          description: positionen.map(p => p.artikelbezeichnung).filter(Boolean).join(', '),
           image_url: parts_url,
           wareneingang_id: ins.id,
-          note: form.note || null,
         }).select().single()
         if (bt?.id) {
-          // Embedding im Hintergrund — Fehler nicht aufhalten lassen
           fetch('/api/pondruff/embed-bauteil', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: bt.id }),
           }).catch(() => {})
         }
       }
-      setForm({ delivery_id: '', customer: '', operator: '', status: 'offen', note: '' })
-      setReceiptFiles([])
-      setFiles({})
-      setAiData(null)
-      setAiPositions([])
-      showToast('Wareneingang gespeichert')
-      load()
+
+      toast.success('Wareneingang gespeichert')
+      resetAll()
     } catch (e) {
-      showToast((e instanceof Error ? e.message : String(e)) || 'Fehler', false)
-    } finally { setBusy(false) }
+      toast.error((e instanceof Error ? e.message : String(e)) || 'Fehler')
+    } finally { setSaveBusy(false) }
   }
 
-  async function del(id: string) {
-    if (!confirm('Wirklich löschen?')) return
-    const supabase = createSupabaseClient()
-    await supabase.from('pondruff_wareneingaenge').delete().eq('id', id)
-    load()
+  if (mode === null) {
+    return (
+      <div>
+        <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 800 }}>Neuer Wareneingang</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+          <button
+            onClick={() => { if (ocrEnabled) setMode('ki'); else toast.error('OCR ist durch den Inhaber deaktiviert') }}
+            style={{
+              background: ocrEnabled ? 'linear-gradient(135deg, rgba(22,132,255,.18), rgba(32,200,255,.1))' : 'rgba(255,255,255,.04)',
+              border: `2px solid ${ocrEnabled ? 'rgba(22,132,255,.5)' : 'rgba(255,255,255,.08)'}`,
+              borderRadius: 16, padding: '32px 24px', cursor: ocrEnabled ? 'pointer' : 'not-allowed',
+              color: ocrEnabled ? '#f8fbff' : '#aeb9c8', textAlign: 'left', transition: 'all .15s',
+            }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>🤖</div>
+            <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>KI-Wareneingang</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', lineHeight: 1.5 }}>
+              {ocrEnabled
+                ? 'Lieferschein hochladen — KI liest alle Daten automatisch aus'
+                : 'Funktion aktuell durch den Inhaber deaktiviert'}
+            </div>
+          </button>
+          <button
+            onClick={() => { setMode('manual'); setPositionen([emptyPos(1)]) }}
+            style={{
+              background: 'rgba(255,255,255,.03)', border: '2px solid rgba(255,255,255,.12)',
+              borderRadius: 16, padding: '32px 24px', cursor: 'pointer',
+              color: '#f8fbff', textAlign: 'left', transition: 'all .15s',
+            }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>✍️</div>
+            <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>Wareneingang manuell erfassen</div>
+            <div style={{ fontSize: 12, color: '#aeb9c8', lineHeight: 1.5 }}>
+              Alle Felder leer — manuell ausfüllen
+            </div>
+          </button>
+        </div>
+      </div>
+    )
   }
 
-  const lbl: React.CSSProperties = { fontSize: 11, color: '#aeb9c8', marginBottom: 4 }
+  const showForm = mode === 'manual' || (mode === 'ki' && ocrDone)
 
   return (
     <div>
-      <div className="pk-card" style={{ marginBottom: 14 }}>
-        <h3 style={{ margin: '0 0 10px', fontSize: 15, fontWeight: 800 }}>Neuer Wareneingang</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-          <label><div style={lbl}>Lieferschein-ID</div><input className="pk-input" value={form.delivery_id} onChange={e => setForm({ ...form, delivery_id: e.target.value })} /></label>
-          <label><div style={lbl}>Kunde</div><input className="pk-input" value={form.customer} onChange={e => setForm({ ...form, customer: e.target.value })} /></label>
-          <label><div style={lbl}>Bediener</div><input className="pk-input" value={form.operator} onChange={e => setForm({ ...form, operator: e.target.value })} /></label>
-          <label><div style={lbl}>Status</div>
-            <select className="pk-input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-              {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </label>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginTop: 10 }}>
-          <label><div style={lbl}>Lieferschein-Bild(er) — mehrere möglich</div><input type="file" accept="image/*" multiple onChange={e => setReceiptFiles(Array.from(e.target.files || []))} /></label>
-          <label><div style={lbl}>Bauteile-Bild</div><input type="file" accept="image/*" onChange={e => setFiles(f => ({ ...f, parts: e.target.files?.[0] }))} /></label>
-          <label><div style={lbl}>Verpackung-Bild</div><input type="file" accept="image/*" onChange={e => setFiles(f => ({ ...f, packaging: e.target.files?.[0] }))} /></label>
-        </div>
-        {receiptFiles.length > 0 && <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 6 }}>{receiptFiles.length} Lieferschein-Bild(er) ausgewählt</div>}
-        {!ocrEnabled && (
-          <div style={{ marginTop: 8, fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 8, padding: 8 }}>
-            ℹ️ Lieferschein-OCR ist aktuell durch den Inhaber deaktiviert. Lieferscheine können weiterhin manuell erfasst werden.
-          </div>
-        )}
-
-        <div style={{ display: 'grid', gridTemplateColumns: aiPositions.length ? '1fr 1fr' : '1fr', gap: 10, marginTop: 10 }}>
-          <button className="pk-btn-ghost" disabled={ocrBusy || !receiptFiles.length || !ocrEnabled} onClick={runOcr} style={{ width: '100%' }}>
-            {ocrBusy ? '⏳ GPT-4 liest…' : ocrEnabled ? `🤖 GPT-4 Lieferschein auslesen${receiptFiles.length > 1 ? ' (mehrere)' : ''}` : '🚫 Funktion deaktiviert'}
-          </button>
-          {aiPositions.length > 0 && (
-            <button className="pk-btn" onClick={openInPriceCalc} style={{ width: '100%', background: 'linear-gradient(180deg,#e50909,#b80000)', border: '1px solid rgba(229,9,9,.6)' }}>
-              💶 In Preisrechner öffnen ({aiPositions.length} Pos.)
-            </button>
-          )}
-        </div>
-        {aiData && (
-          <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(22,132,255,.08)', border: '1px solid rgba(22,132,255,.25)', fontSize: 11 }}>
-            <b>KI-Erkennung:</b> Kunde <b>{String(aiData.customer || '—')}</b>
-            {aiPositions.length > 0
-              ? <> · {aiPositions.length} Positionen erkannt</>
-              : <> · Artikel-Nr. {String(aiData.article_no || '—')}{aiData.description ? ' · ' + String(aiData.description) : ''}</>}
-            {aiData.ocr_note ? <div style={{ marginTop: 4, color: '#aeb9c8' }}>ℹ️ {String(aiData.ocr_note)}</div> : null}
-          </div>
-        )}
-
-        <label style={{ display: 'block', marginTop: 10 }}>
-          <div style={lbl}>Notiz</div>
-          <textarea className="pk-input" rows={2} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
-        </label>
-
-        <button className="pk-btn" disabled={busy} onClick={save} style={{ marginTop: 10, width: '100%' }}>
-          {busy ? '⏳ Speichere…' : '💾 Speichern'}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <button onClick={resetAll} style={{ background: 'none', border: 'none', color: '#aeb9c8', cursor: 'pointer', fontSize: 13 }}>
+          ← Zurück
         </button>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>
+          {mode === 'ki' ? '🤖 KI-Wareneingang' : '✍️ Wareneingang manuell erfassen'}
+        </h3>
       </div>
 
-      <div className="pk-card">
-        <h3 style={{ margin: '0 0 10px', fontSize: 15, fontWeight: 800 }}>Gespeicherte Wareneingänge ({entries.length})</h3>
-        {entries.length === 0 ? (
-          <div style={{ color: '#aeb9c8', fontSize: 13 }}>Noch keine Wareneingänge.</div>
-        ) : (
-          <div className="pk-table-wrap" style={{ overflowX: 'auto' }}>
-            <table className="pk-table" style={{ width: '100%', fontSize: 12 }}>
-              <thead><tr><th>Datum</th><th>Lieferschein</th><th>Kunde</th><th>Bediener</th><th>Status</th><th>Notiz</th><th></th></tr></thead>
-              <tbody>{entries.map(e => (
-                <tr key={e.id}>
-                  <td>{new Date(e.created_at).toLocaleDateString('de-DE')}</td>
-                  <td>{e.delivery_id || '—'}</td>
-                  <td>{e.customer || '—'}</td>
-                  <td>{e.operator || '—'}</td>
-                  <td>{e.status || '—'}</td>
-                  <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.note || ''}</td>
-                  <td><button className="pk-btn-ghost" onClick={() => del(e.id)} style={{ fontSize: 11 }}>🗑️</button></td>
-                </tr>
-              ))}</tbody>
-            </table>
+      {mode === 'ki' && !ocrDone && (
+        <div className="pk-card">
+          <h4 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 700 }}>Schritt 1 — Dokument hochladen</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+            <label>
+              <div style={lbl}>Lieferschein (Pflicht)</div>
+              <input type="file" accept="image/*" capture="environment"
+                onChange={e => setReceiptFiles(e.target.files ? [e.target.files[0]] : [])} />
+            </label>
+            <label>
+              <div style={lbl}>Bauteil-Foto (optional)</div>
+              <input type="file" accept="image/*" capture="environment"
+                onChange={e => setPartsFile(e.target.files?.[0] ?? null)} />
+            </label>
+            <label>
+              <div style={lbl}>Verpackung-Foto (optional)</div>
+              <input type="file" accept="image/*" capture="environment"
+                onChange={e => setPackagingFile(e.target.files?.[0] ?? null)} />
+            </label>
           </div>
-        )}
-      </div>
+          {receiptFiles.length > 0 && (
+            <div style={{ fontSize: 11, color: '#4ddb7e', marginTop: 6 }}>✓ {receiptFiles[0].name}</div>
+          )}
+          <button className="pk-btn" disabled={ocrBusy || !receiptFiles.length}
+            onClick={runOcr} style={{ marginTop: 14, width: '100%' }}>
+            {ocrBusy ? '⏳ KI liest Lieferschein aus…' : '🤖 Lieferschein auslesen'}
+          </button>
+        </div>
+      )}
 
+      {showForm && (
+        <div className="pk-card">
+          {mode === 'ki' && (
+            <div style={{ marginBottom: 14, padding: '8px 12px', borderRadius: 8, background: 'rgba(37,211,102,.08)', border: '1px solid rgba(37,211,102,.2)', fontSize: 12, color: '#4ddb7e' }}>
+              ✓ Lieferschein ausgelesen — alle Felder prüfen und ggf. korrigieren
+            </div>
+          )}
+
+          <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700 }}>Kopfdaten</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 14 }}>
+            <label>
+              <div style={lbl}>Kunde (Firmenname)</div>
+              <input className="pk-input" value={kunde} onChange={e => setKunde(e.target.value)} />
+            </label>
+            <label>
+              <div style={lbl}>Bestell-/Auftrags-/Lieferschein-Nr.</div>
+              <input className="pk-input" value={bestellnummer} onChange={e => setBestellnummer(e.target.value)} />
+            </label>
+            <label>
+              <div style={lbl}>Anzahl Positionen</div>
+              <input className="pk-input" value={positionen.length} readOnly style={{ background: 'rgba(255,255,255,.04)', cursor: 'default' }} />
+            </label>
+          </div>
+
+          <div style={sep} />
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Positionen ({positionen.length})</h4>
+            <button className="pk-btn-ghost" onClick={addPos} style={{ fontSize: 12 }}>+ Position hinzufügen</button>
+          </div>
+
+          {positionen.map((pos, idx) => (
+            <div key={idx} style={posCard}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#20c8ff' }}>Position {pos.position_nr}</span>
+                {positionen.length > 1 && (
+                  <button onClick={() => removePos(idx)}
+                    style={{ background: 'none', border: 'none', color: '#aeb9c8', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8, marginBottom: 10 }}>
+                <label>
+                  <div style={lbl}>Menge</div>
+                  <input className="pk-input" value={pos.menge}
+                    onChange={e => updatePos(idx, { menge: e.target.value })} />
+                </label>
+                <label style={{ gridColumn: 'span 2' }}>
+                  <div style={lbl}>Artikelbezeichnung</div>
+                  <input className="pk-input" value={pos.artikelbezeichnung}
+                    onChange={e => updatePos(idx, { artikelbezeichnung: e.target.value })} />
+                </label>
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <div style={lbl}>Form / Maße</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  {(['Eckig', 'Rund'] as const).map(f => (
+                    <button key={f} onClick={() => updatePos(idx, { form: f })}
+                      style={{
+                        padding: '5px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                        border: `1px solid ${pos.form === f ? 'rgba(22,132,255,.6)' : 'rgba(255,255,255,.12)'}`,
+                        background: pos.form === f ? 'rgba(22,132,255,.18)' : 'rgba(255,255,255,.03)',
+                        color: pos.form === f ? '#20c8ff' : '#aeb9c8',
+                      }}>{f}</button>
+                  ))}
+                </div>
+                {pos.form === 'Eckig' ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                    <label><div style={lbl}>Länge (mm)</div><input className="pk-input" value={pos.laenge} onChange={e => updatePos(idx, { laenge: e.target.value })} /></label>
+                    <label><div style={lbl}>Breite (mm)</div><input className="pk-input" value={pos.breite} onChange={e => updatePos(idx, { breite: e.target.value })} /></label>
+                    <label><div style={lbl}>Höhe (mm)</div><input className="pk-input" value={pos.hoehe} onChange={e => updatePos(idx, { hoehe: e.target.value })} /></label>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                    <label><div style={lbl}>Durchmesser (mm)</div><input className="pk-input" value={pos.durchmesser} onChange={e => updatePos(idx, { durchmesser: e.target.value })} /></label>
+                    <label><div style={lbl}>Länge (mm)</div><input className="pk-input" value={pos.durchmesser_laenge} onChange={e => updatePos(idx, { durchmesser_laenge: e.target.value })} /></label>
+                  </div>
+                )}
+                {pos.raw_dimension_text && (
+                  <div style={{ fontSize: 10, color: '#fbbf24', marginTop: 4 }}>
+                    📝 KI las vom Beleg: <b>{pos.raw_dimension_text}</b>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={lbl}>Weitere Informationen</div>
+                  <button onClick={() => addWeitereInfo(idx)} style={{ background: 'none', border: 'none', color: '#1684ff', cursor: 'pointer', fontSize: 11 }}>+ Feld</button>
+                </div>
+                {pos.weitere_infos.map((wi, wi_idx) => (
+                  <div key={wi_idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 6, marginBottom: 4 }}>
+                    <input className="pk-input" placeholder="Schlüssel" value={wi.key} style={{ fontSize: 12 }}
+                      onChange={e => updateWeitereInfo(idx, wi_idx, e.target.value, wi.value)} />
+                    <input className="pk-input" placeholder="Wert" value={wi.value} style={{ fontSize: 12 }}
+                      onChange={e => updateWeitereInfo(idx, wi_idx, wi.key, e.target.value)} />
+                    <button onClick={() => removeWeitereInfo(idx, wi_idx)}
+                      style={{ background: 'none', border: 'none', color: '#aeb9c8', cursor: 'pointer', fontSize: 14 }}>✕</button>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 10 }}>
+                {([
+                  { key: 'polieren', label: 'Polieren?' },
+                  { key: 'entschichtung', label: 'Entschichtung?' },
+                  { key: 'microstrahlen', label: 'Microstrahlen?' },
+                  { key: 'laeppstrahlen', label: 'Läppstrahlen?' },
+                  { key: 'polierstrahlen', label: 'Polierstrahlen?' },
+                ] as { key: keyof WEPos; label: string }[]).map(({ key, label }) => (
+                  <label key={key}>
+                    <div style={lbl}>{label}</div>
+                    <select className="pk-input" value={pos[key] as string}
+                      onChange={e => updatePos(idx, { [key]: e.target.value as 'Ja' | 'Nein' })}>
+                      <option value="Nein">Nein</option>
+                      <option value="Ja">Ja</option>
+                    </select>
+                  </label>
+                ))}
+              </div>
+
+              {pos.polieren === 'Ja' && (
+                <label style={{ display: 'block', marginBottom: 10 }}>
+                  <div style={lbl}>Wo polieren?</div>
+                  <input className="pk-input" value={pos.polieren_wo}
+                    onChange={e => updatePos(idx, { polieren_wo: e.target.value })} />
+                </label>
+              )}
+
+              <label>
+                <div style={lbl}>Welche Beschichtung?</div>
+                <select className="pk-input" value={pos.beschichtung}
+                  onChange={e => updatePos(idx, { beschichtung: e.target.value })}>
+                  {WE_COATINGS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </label>
+            </div>
+          ))}
+
+          {mode === 'manual' && (
+            <>
+              <div style={sep} />
+              <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700 }}>Fotos (optional)</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 14 }}>
+                <label>
+                  <div style={lbl}>Lieferschein-Foto</div>
+                  <input type="file" accept="image/*" capture="environment"
+                    onChange={e => setReceiptFiles(e.target.files ? Array.from(e.target.files) : [])} />
+                </label>
+                <label>
+                  <div style={lbl}>Bauteil-Foto</div>
+                  <input type="file" accept="image/*" capture="environment"
+                    onChange={e => setPartsFile(e.target.files?.[0] ?? null)} />
+                </label>
+                <label>
+                  <div style={lbl}>Verpackung-Foto</div>
+                  <input type="file" accept="image/*" capture="environment"
+                    onChange={e => setPackagingFile(e.target.files?.[0] ?? null)} />
+                </label>
+              </div>
+            </>
+          )}
+
+          <div style={sep} />
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 16 }}>
+            <label>
+              <div style={lbl}>Lieferbedingungen <span style={{ color: '#ff8080' }}>*</span></div>
+              <select className="pk-input" value={lieferbedingungen}
+                onChange={e => setLieferbedingungen(e.target.value)}>
+                <option value="">— bitte wählen —</option>
+                {BEDINGUNGEN.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </label>
+            <label>
+              <div style={lbl}>Eingelagert am</div>
+              <input type="date" className="pk-input" value={eingelagert_am}
+                onChange={e => setEingelagert_am(e.target.value)} />
+            </label>
+            <label>
+              <div style={lbl}>Eingelagert von <span style={{ color: '#ff8080' }}>*</span></div>
+              <select className="pk-input" value={eingelagert_von}
+                onChange={e => setEingelagert_von(e.target.value)}>
+                <option value="">— bitte wählen —</option>
+                {EINLAGERER.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+          </div>
+
+          {!canSave && (
+            <div style={{ fontSize: 12, color: '#fbbf24', marginBottom: 8 }}>
+              ⚠️ Pflichtfelder: Lieferbedingungen und Eingelagert von
+            </div>
+          )}
+
+          <button className="pk-btn" disabled={saveBusy || !canSave} onClick={save}
+            style={{
+              width: '100%',
+              opacity: canSave ? 1 : 0.4,
+              cursor: canSave ? 'pointer' : 'not-allowed',
+            }}>
+            {saveBusy ? '⏳ Speichere…' : '💾 Wareneingang erfassen & speichern'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

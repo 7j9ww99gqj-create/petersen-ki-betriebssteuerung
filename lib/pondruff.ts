@@ -425,3 +425,8 @@ export async function compressImageDataUrl(file: File, maxSide = 2400, quality =
     return dataUrl
   }
 }
+
+export const WE_COATINGS = [
+  'LamCoat', 'AlTiN-Multi', 'Duplex Meta-VA', 'Meta-CAX', 'Meta-S',
+  'AlCrN', 'CrN-RB', 'TiAlN', 'CrN-DLC', 'CrN', 'TiCN', 'TiN', 'Keine',
+] as const

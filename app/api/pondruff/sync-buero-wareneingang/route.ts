@@ -30,20 +30,29 @@ export async function POST(req: NextRequest) {
 
   // Idempotent: bestehende Dokument-ID wiederverwenden, statt jedes Mal neu zu erzeugen
   const dokId: string = (src.synced_buero_dokument_id as string | null) || `WE-${Date.now().toString(36).toUpperCase()}`
-  const ai = (src.ai_data as Record<string, unknown> | null) || null
+  const positionen = Array.isArray(src.positionen) ? (src.positionen as { artikelbezeichnung?: string; menge?: string; beschichtung?: string }[]) : []
+  const posLines = positionen.map((p, i) =>
+    `Pos. ${i + 1}: ${p.menge || ''} × ${p.artikelbezeichnung || '—'}${p.beschichtung && p.beschichtung !== 'Keine' ? ` [${p.beschichtung}]` : ''}`
+  ).join('\n')
   const beschreibung = [
-    src.delivery_id ? `Lieferschein-ID: ${src.delivery_id}` : '',
+    src.purchase_order ? `Bestell-Nr.: ${src.purchase_order}` : '',
+    src.delivery_id && src.delivery_id !== src.purchase_order ? `Lieferschein-ID: ${src.delivery_id}` : '',
     src.customer ? `Kunde: ${src.customer}` : '',
+    src.lieferbedingungen ? `Lieferbedingungen: ${src.lieferbedingungen}` : '',
+    src.eingelagert_von ? `Eingelagert von: ${src.eingelagert_von}` : '',
+    src.eingelagert_am ? `Eingelagert am: ${src.eingelagert_am}` : '',
     src.operator ? `Bediener: ${src.operator}` : '',
+    posLines || '',
     src.note || '',
-    ai?.ocr_note ? `KI: ${ai.ocr_note}` : '',
   ].filter(Boolean).join('\n')
 
   const { error: e2 } = await sb.from('buero_dokumente').upsert({
     id: dokId,
     user_id: access.user.id,
     kategorie: 'Wareneingang',
-    titel: src.delivery_id ? `Wareneingang ${src.delivery_id}` : `Wareneingang ${src.customer || ''}`,
+    titel: src.purchase_order
+      ? `Wareneingang ${src.purchase_order}`
+      : src.delivery_id ? `Wareneingang ${src.delivery_id}` : `Wareneingang ${src.customer || ''}`,
     kunde: src.customer,
     datum: new Date().toISOString().slice(0, 10),
     beschreibung,
