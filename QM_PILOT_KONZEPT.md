@@ -373,3 +373,65 @@ Badge-Stile (wie andere Piloten):
 | Demo-Modus | `lib/auth.ts` → `hasDemoCookie()` |
 | Signed URL 1h | Überall: `supabase.storage.from().createSignedUrl(path, 3600)` |
 | exec_sql für Migration | `source .env.local && curl ... exec_sql` |
+
+---
+
+## Zugriffs- & Feature-Flag-System (ab 2026-05-20)
+
+### 4 Zugangs-Klassen
+
+| Klasse | QM-Pilot sichtbar? | KI-Features | Steuerung |
+|--------|-------------------|-------------|-----------|
+| **Inhaber** (`info@petersen-ki-pilot.de`) | Immer ✅ | Beide immer AN | Auto-Override in `getAccessProfile()` + `getServerQmKiSettings()` |
+| **Pondruff** (`info@pondruffpolierservice.de`) | Immer ✅ | Beide immer AN | Auto-Override (gleiche Logik) |
+| **Normaler Kunde** | Nur bei Buchung (`allowed_pilot_ids: ['qm']`) | Default AUS | Owner schaltet manuell per Toggle frei |
+| **Demo-Account** | Immer ✅ | Beide immer AN | `hasDemoCookie()` → Mock-Response |
+
+### Implementierung
+
+**Pilot-Zugang** (`lib/access.ts` → `getAccessProfile()`):
+- Email wird aus `user.email` oder `user_metadata.email` gelesen
+- Inhaber oder Pondruff → `'qm'` wird zu `allowedPilotIds` hinzugefügt, auch ohne DB-Buchung
+
+**Feature-Flags in DB** (`firma_einstellungen`):
+```sql
+qm_ki_zeichnungs_analyse boolean DEFAULT false
+qm_ki_sichtpruefung      boolean DEFAULT false
+```
+
+**Server-Side Check** (`lib/ai-settings.ts` → `getServerQmKiSettings(userId, email?)`):
+1. Email = Inhaber oder Pondruff → `{ true, true }` sofort
+2. Service-Role liest `firma_einstellungen` für `userId`
+3. Bei Fehler / fehlendem Key → `{ false, false }` (fail-closed)
+
+**Client-Side Check** (`lib/db.ts` → `getQmKiSettings()`):
+1. Demo-Cookie → `{ true, true }`
+2. Email = Inhaber/Pondruff → `{ true, true }`
+3. Sonst DB lesen (via Browser-Supabase-Client)
+
+**API-Route-Guard** (Reihenfolge in QM-KI-Routen):
+```
+Auth → Demo-Mock-Return → Feature-Flag-Check (403) → Rate-Limit → Cost-Limit → Body-Validation → OpenAI
+```
+
+**Owner-Steuerung**:
+- UI: `components/billing/OwnerAiControlPanel.tsx` → QM-Pilot-Sektion mit Kunden-Dropdown
+- API: `GET/PATCH /api/owner/qm-ki-flags`
+- Schutz: Inhaber/Pondruff-User können nicht per Toggle gesteuert werden (400 Bad Request)
+- Audit-Log: `qm_ki_zeichnungs_analyse.toggle` / `qm_ki_sichtpruefung.toggle`
+
+### Cost-Implikation
+
+| KI-Feature | Modell | Kosten/Aufruf |
+|-----------|--------|--------------|
+| Zeichnungs-Analyse | `gpt-4o-mini` | ~0,002–0,005 € |
+| KI-Sichtprüfung | `gpt-4o` | ~0,005–0,010 € |
+
+Zusätzlich greift das bestehende 5 €/Monat-Cost-Limit aus `lib/ai-usage.ts`.
+
+### Aktivierungs-Workflow für neue Kunden
+
+1. Kunde bucht QM-Pilot → `allowed_pilot_ids` wird auf `['qm']` gesetzt
+2. KI-Features sind noch deaktiviert (Default false)
+3. Owner öffnet Einstellungen → KI-Funktionen → QM-Pilot KI-Features → Kunden auswählen → Toggle AN
+4. Kunde sieht sofort aktive Buttons nach Browser-Refresh

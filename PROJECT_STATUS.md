@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **AB-Rabatt-Klarstellung**: User-Klarstellung — AB hat 2 Rows pro Position (Beschichtung + Polieren) mit selber Pos.-Nr, Beschichtungs-Row zeigt literalen Rabatt% (z.B. 10), Polier-Row hat 0% Rabatt; im AB-PDF neue Rabatt-Summenzeile vor Netto ("Rabatt 10% auf Beschichtungen: -9,00 €"); PDFPosition Type um listenpreis + rabatt_pct erweitert. HEAD `ae798e4`.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **QM-KI Feature-Flags + Auto-Access Inhaber/Pondruff** (Aufgaben 1–8 + 10, Commits `3e122ee`–`a7bb87e`): Inhaber + Pondruff auto-QM-Pilot-Zugang in `getAccessProfile()`, SQL-Migration `qm_ki_zeichnungs_analyse/qm_ki_sichtpruefung` DEFAULT false, `getQmKiSettings()` + `updateQmKiSettings()` in `lib/db.ts`, `getServerQmKiSettings()` in `lib/ai-settings.ts`, API-Guards in beiden QM-KI-Routen (Demo-Mock → Feature-Flag → Rate/Cost), Client-seitige UI-Sperre (disabled Button + Teal-Hinweis-Box), QM-KI-Sektion im `OwnerAiControlPanel` mit Kunden-Dropdown + Teal-Toggles + Auto-Lock für Inhaber/Pondruff, Owner-API `GET/PATCH /api/owner/qm-ki-flags` mit Auto-Schutz + Audit-Log. Manuelle E2E-Tests (Aufgabe 9) in Production ausstehend. HEAD `a7bb87e`.
+- Davor: **AB-Rabatt-Klarstellung**: User-Klarstellung — AB hat 2 Rows pro Position (Beschichtung + Polieren) mit selber Pos.-Nr, Beschichtungs-Row zeigt literalen Rabatt% (z.B. 10), Polier-Row hat 0% Rabatt; im AB-PDF neue Rabatt-Summenzeile vor Netto ("Rabatt 10% auf Beschichtungen: -9,00 €"); PDFPosition Type um listenpreis + rabatt_pct erweitert. HEAD `ae798e4`.
 - Davor: **WE-AB-Fix: 1 Row pro Position + Art.-Nr. im PDF + Datei-Picker + Arbeitskarte-Layout**: AB-Konvertierung kombiniert Beschichtung + Polieren in 1 Row (multi-line Beschreibung) statt 2 separate Rows; Artikelnummer wird im AB-PDF "Art.-Nr.: ABC" vor Beschreibung prepended; Foto-Inputs öffnen jetzt OS-Picker (Galerie+Kamera) statt nur Kamera; Arbeitskarte: GAP_Y 1.5→4mm zwischen Reihen, BOTTOM_H 30→28mm, kompaktere Zeilen damit Zusatzinfos in Pos.1 nicht in Pos.3 ragen. HEAD `ffb5d46`.
 - Davor: **QM Phase 3B: SPC-Trend-Analyse (Cp/Cpk)**: API `/api/qm/spc-daten`, `calculateSPC()` mit Cp/Cpk/CPU/CPL/Trend (lineare Regression), SPC-Panel im Statistiken-Tab (Bauteil/Messstelle-Dropdown, 4 KPI-Karten, LineChart mit USL/LSL/Soll/Ø), Cpk-Warn-Karte im Dashboard (< 1.0), Demo-Modus mit 20 statischen Messwerten. HEAD `299b4b1`.
 - Davor: **WE-Workflow: Artikelnummer, Polierkosten, AB-Rabatt**. HEAD `04fd0d7`.
@@ -468,6 +469,18 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+
+- **Zuletzt erledigt (2026-05-20 — QM-KI Feature-Flags + Auto-Access, Commits `3e122ee`→`a7bb87e`):**
+  - **Aufgabe 1** (`3e122ee`): `lib/access.ts` — `getAccessProfile()` erkennt Inhaber + Pondruff-Email, fügt `'qm'` automatisch zu `allowedPilotIds` hinzu. `MetadataCarrier` um `.email?` erweitert.
+  - **Aufgabe 2** (`c9034e9`): SQL-Migration `20260522100000_qm_ki_flags.sql` — `firma_einstellungen` um `qm_ki_zeichnungs_analyse boolean DEFAULT false` + `qm_ki_sichtpruefung boolean DEFAULT false` erweitert. Migration via exec_sql ausgeführt.
+  - **Aufgabe 3** (`63e8f99`): `lib/db.ts` — `QmKiSettings`-Typ + `getQmKiSettings()` (mit Demo/Inhaber/Pondruff-Auto-Override) + `updateQmKiSettings()`. `FirmaEinstellungen` Typ erweitert.
+  - **Aufgabe 4** (`6b350df`): `lib/ai-settings.ts` — `getServerQmKiSettings(userId, email?)` mit Auto-Override für Inhaber/Pondruff, fail-closed bei fehlendem Service-Role-Key.
+  - **Aufgabe 5** (`642df25`): API-Guards in `app/api/qm/analyse-zeichnung/route.ts` + `app/api/qm/sichtpruefung/route.ts` — Reihenfolge: Demo-Mock → Feature-Flag-Check (403 + `feature_disabled: true`) → Rate/Cost-Limit.
+  - **Aufgabe 6** (`1789691`): Client-Side UI-Sperre — `zeichnungen/[id]/page.tsx` + `pruefen/page.tsx`: `useEffect → getQmKiSettings()`, Buttons disabled + Opacity bei fehlendem Flag, Teal-Hinweis-Box „KI-Analyse nicht freigeschaltet".
+  - **Aufgabe 7** (`fbcb916`): `OwnerAiControlPanel.tsx` — neue QM-KI-Sektion (Teal #14b8a6), Kunden-Dropdown aus `listBillingSubscriptionsForOwner`, PATCH `/api/owner/qm-ki-flags`, grüner Lock für Inhaber/Pondruff-User.
+  - **Aufgabe 8** (`a7bb87e`): `app/api/owner/qm-ki-flags/route.ts` — GET (aktuelle Flags) + PATCH (Upsert + Validierung), Auto-Account-Schutz (400), Audit-Log (`qm_ki_zeichnungs_analyse.toggle` / `qm_ki_sichtpruefung.toggle`). `lib/audit-log.ts` OwnerAuditAction-Typ erweitert.
+  - **Aufgabe 9**: E2E-Tests in Production — manuell ausstehend (Checkliste in `QM_PILOT_KONZEPT.md`).
+  - **Aufgabe 10**: Dokumentation (`PROJECT_STATUS.md` + `QM_PILOT_KONZEPT.md`).
 
 - **Zuletzt erledigt (2026-05-20 — QM Phase 3A: 4 Aufgaben, HEAD `7ce3a3d`, Commits `2c4a7fb`→`7ce3a3d`):**
   - **Aufgabe 1 CSV-Export** (`2c4a7fb`): Archiv-Tab: Button "📥 CSV Export" exportiert gefilterte Berichte als Semikolon-CSV (UTF-8-BOM, deutsches Excel). Per Zeile: "📊"-Button exportiert Messwerte des Berichts als CSV (Messstelle/Sollwert/Tol±/Istwert/Abweichung/Status/Prüfmittel). Demo: DEMO_BERICHTE-Export / Messwerte-Toast.
