@@ -950,3 +950,83 @@ body[data-design="glow"] .pk-card.fade-in-scale {
     animation: none !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ── G3 Blue-Glow für Navigation (Sidebar + Bottom-Nav) ───────────────────
+   Sidebar-Buttons und Bottom-Nav-Items bekommen im Glow-Modus den charak-
+   teristischen "Push"-Effekt mit Gradient-Hintergrund und Box-Shadow.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Sidebar-Container: dunklerer Gradient + Inner-Glow am Rand */
+body[data-design="glow"] .sidebar {
+  background: linear-gradient(180deg, #07111f, #030812) !important;
+  border-right: 1px solid rgba(22,132,255,.18) !important;
+  box-shadow: 4px 0 36px rgba(0,0,0,.55), inset -1px 0 0 rgba(22,132,255,.06);
+}
+
+/* Sidebar-Nav-Buttons im normalen Zustand: leichter Hover-Glow */
+body[data-design="glow"] .sidebar button {
+  transition: background .2s, color .2s, border-color .2s, box-shadow .2s, transform .15s !important;
+}
+body[data-design="glow"] .sidebar button:hover {
+  box-shadow: 0 0 16px rgba(22,132,255,.18) inset, 0 2px 12px rgba(22,132,255,.12);
+  transform: translateX(2px);
+}
+
+/* Aktiver Sidebar-Button: Gradient + Glow + Border-Highlight */
+body[data-design="glow"] .sidebar button[data-active="true"],
+body[data-design="glow"] .sidebar button[style*="rgba(22,132,255,.15)"] {
+  background: linear-gradient(90deg, rgba(22,132,255,.30), rgba(22,132,255,.08)) !important;
+  border-left: 2px solid #20c8ff !important;
+  box-shadow:
+    inset 0 0 24px rgba(22,132,255,.18),
+    0 4px 18px rgba(22,132,255,.18) !important;
+  color: #e0efff !important;
+  text-shadow: 0 0 12px rgba(108,182,255,.45);
+}
+
+/* Logo-Container in Sidebar mit Glow-Ring */
+body[data-design="glow"] .sidebar > div:first-child > button > div:first-child {
+  border-color: rgba(22,132,255,.55) !important;
+  box-shadow: 0 0 24px rgba(22,132,255,.45), 0 0 0 1px rgba(32,200,255,.20) !important;
+}
+
+/* Bottom-Nav: Glas-Effekt + Blau-Akzent oben */
+body[data-design="glow"] .bottom-nav {
+  background: linear-gradient(180deg, rgba(8,14,24,.92), rgba(4,8,14,.96)) !important;
+  border-top: 1px solid rgba(22,132,255,.22) !important;
+  box-shadow: 0 -8px 32px rgba(22,132,255,.10), 0 -1px 0 rgba(22,132,255,.18) inset !important;
+  backdrop-filter: blur(14px);
+}
+
+/* Bottom-Nav-Item: Glow-Push beim Klick */
+body[data-design="glow"] .bottom-nav-item {
+  transition: color .2s, transform .15s, filter .15s !important;
+}
+body[data-design="glow"] .bottom-nav-item:active {
+  filter: brightness(1.4) drop-shadow(0 0 10px rgba(22,132,255,.55));
+}
+
+/* Aktives Bottom-Nav-Item: Glow + Lift */
+body[data-design="glow"] .bottom-nav-item.active {
+  color: #6cb6ff !important;
+  filter: drop-shadow(0 0 8px rgba(108,182,255,.55));
+}
+body[data-design="glow"] .bottom-nav-item.active .bn-icon {
+  transform: translateY(-2px) scale(1.06);
+  filter: drop-shadow(0 0 6px rgba(108,182,255,.65));
+}
+
+/* Tab-Bar (z.B. innerhalb Piloten) auch mit Push */
+body[data-design="glow"] .pk-tab-bar .pk-btn-ghost {
+  position: relative;
+}
+body[data-design="glow"] .pk-tab-bar .pk-btn-ghost:hover {
+  text-shadow: 0 0 10px rgba(108,182,255,.45);
+}
+
+/* Notification-Bell + GlobalSearch-Trigger Glow */
+body[data-design="glow"] [aria-label*="enachricht"]:hover,
+body[data-design="glow"] [aria-label*="uche"]:hover {
+  filter: drop-shadow(0 0 8px rgba(108,182,255,.45));
+}

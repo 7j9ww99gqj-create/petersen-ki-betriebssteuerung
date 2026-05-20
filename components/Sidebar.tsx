@@ -162,6 +162,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         <div style={{ fontSize: 10, color: '#4a5568', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: 700, padding: '4px 8px', marginBottom: 4 }}>Navigation</div>
         {visibleNavItems.map(item => (
           <button key={item.href} onClick={() => navigate(item.href)} style={navBtnStyle(isActive(item.href))}
+            data-active={isActive(item.href) ? 'true' : 'false'}
             onMouseEnter={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.05)' }}
             onMouseLeave={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
             <NavIcon v2={v2} href={item.href} emoji={item.icon} size={16} />{item.label}
@@ -175,6 +176,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <div style={{ fontSize: 10, color: '#e50909', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: 700, padding: '4px 8px', marginBottom: 4 }}>Pondruff Polier-Service</div>
           {pondruffNav.map(item => (
             <button key={item.href} onClick={() => navigate(item.href)}
+              data-active={isActive(item.href) ? 'true' : 'false'}
               style={{ ...navBtnStyle(isActive(item.href)), color: isActive(item.href) ? '#ff6b6b' : '#f5d4d4', borderLeft: isActive(item.href) ? '2px solid #e50909' : '2px solid transparent', background: isActive(item.href) ? 'rgba(229,9,9,.15)' : 'transparent' }}
               onMouseEnter={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(229,9,9,.08)' }}
               onMouseLeave={e => { if (!isActive(item.href)) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
@@ -189,6 +191,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         <div style={{ fontSize: 10, color: '#4a5568', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: 700, padding: '4px 8px', marginBottom: 4 }}>KI-Piloten</div>
         {visiblePilots.map(pilot => (
           <button key={pilot.id} onClick={() => navigate(pilot.href)}
+            data-active={isActive(pilot.href) ? 'true' : 'false'}
             style={{ ...navBtnStyle(isActive(pilot.href)), color: isActive(pilot.href) ? '#6cb6ff' : '#d0d9e8' }}
             onMouseEnter={e => { if (!isActive(pilot.href)) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,.05)' }}
             onMouseLeave={e => { if (!isActive(pilot.href)) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
