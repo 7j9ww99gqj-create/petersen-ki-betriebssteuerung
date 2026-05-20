@@ -8,6 +8,7 @@ KI-gestütztes Warenwirtschaftssystem als produktive SaaS-WebApp.
 **Repo:** https://github.com/7j9ww99gqj-create/petersen-ki-betriebssteuerung
 
 ### Aktueller Zwischenstand (2026-05-20)
+- **DP12-Phase2 — Toast-Unifikation + Cloud-Sync** (`bb57741`): Alle Piloten-Toasts (Lager/Werkstatt/QM/Büro/Steuer) auf `.pk-toast` umgestellt → Position/Animation/Dauer/Größe folgen jetzt den User-Prefs. Neue `components/AppToast.tsx` mit Event-API `pushAppToast(msg, type)`. WebAudio-Beep über `lib/toast-sound.ts` (Sound für success/error/info). Demo-Buttons im Benachrichtigungen-Tab. Cloud-Sync via `user_design_prefs` (RLS, Opt-in) — `lib/design-sync.ts`.
 - **DP12 — Design-Personalisierung ausgebaut** (`019efae`): 6 neue Module im Einstellungen-Tab „Benachrichtigungen" mit Master-Toggle pro Modul. Bei deaktiviertem Modul bleibt der aktuelle Look 1:1 erhalten. Tab-Layout (`Allgemein / Benachrichtigungen / Typografie / Effekte / Farben / Icons & Layout`). „↺ Alles zurücksetzen" setzt alle Module wieder auf disabled. CSS-Regeln rein additiv (`body[data-pers-*="on"]`), brechen nichts Bestehendes.
 - Büro-/Einkaufsrelationen wurden weiter abgesichert: `kunde_id` und `lieferant_id` laufen jetzt in `lib/db.ts`, Schema und Büro-UI konsistenter mit.
 - Büro-Detailseiten existieren jetzt unter `app/dashboard/buero/[entity]/[id]/page.tsx` für Kunden, Angebote, Aufträge, Rechnungen, Eingangsrechnungen, Dokumente, Lieferanten und Bestellungen.
@@ -60,6 +61,7 @@ npm run dev
 | Werkstatt | `werkstatt_karten`, `werkstatt_zeitbuchungen`, `werkstatt_material`, `werkstatt_pruefprotokolle` |
 | Marketing | `marketing_kampagnen`, `marketing_leads`, `marketing_newsletter` |
 | Planung | `planung_projekte`, `planung_aufgaben`, `planung_termine`, `planung_ressourcen` |
+| Design-Sync | `user_design_prefs` (DP12-Phase2: user_id PK, prefs JSONB, updated_at) |
 
 *) Neue Lager-Tabellen — im Supabase SQL-Editor ausführen!  
 ⚠️) Neue Einkauf-Tabellen — im Supabase SQL-Editor ausführen!
@@ -431,6 +433,45 @@ writeDesignPrefs(DEFAULT_PREFS)        // Gesamtes Reset → alles disabled
 
 **Speicherung:** `localStorage 'pk_design_prefs'` (JSON, sanitized beim Lesen).
 
+### DP12-Phase2 — Toast-System & Cloud-Sync (`bb57741`)
+
+**Toast-Unifikation:**
+- Alle Piloten-Toasts (Lager, Werkstatt, QM, Büro, Steuer) nutzen jetzt `<div className="pk-toast">…</div>`
+- `.pk-toast`-Klasse in `globals.css` hat Default `position: fixed; bottom: 90px; right: 24px`
+- Wenn `notifications.enabled = true` → Position/Animation/Größe aus `body[data-toast-*]`-Attributen
+- Inline-Style für Farben (success/error/info) bleibt — nur Layout-Properties wurden entfernt
+
+**Globale `AppToast`-Komponente:**
+```tsx
+import { pushAppToast } from '@/components/AppToast'
+pushAppToast('Aktion erfolgreich', 'success')  // 'success' | 'error' | 'info'
+```
+- Komponente in `app/dashboard/layout.tsx` einmal gerendert
+- Event-API: `window.dispatchEvent(new CustomEvent('pk-app-toast', { detail }))`
+- Stapelt mehrere Toasts mit Offset, auto-dismiss nach `toastDuration`
+
+**Sound-Helper (`lib/toast-sound.ts`):**
+```ts
+playToastSound('success')  // C5 → E5 (aufsteigend)
+playToastSound('error')    // A4 → F4 (absteigend, triangle wave)
+playToastSound('info')     // E5 einzeln
+```
+- WebAudio-API, kein Asset-Bundle nötig
+- Lazy AudioContext, fail-silent
+
+**Cloud-Sync (`lib/design-sync.ts`):**
+```ts
+isCloudSyncEnabled() / setCloudSyncEnabled(b)
+pullPrefsFromCloud() → DesignPrefs | null
+pushPrefsToCloud()   → { ok, error? }
+useCloudDesignSync()  // Hook in dashboard/layout.tsx
+```
+- Opt-in über localStorage `pk_design_cloud_sync`
+- Tabelle `user_design_prefs` (user_id PK, prefs JSONB, updated_at + Trigger, RLS)
+- Demo-User: Sync wird übersprungen
+- Debounce 1200ms beim Push (sammelt schnelle Pref-Changes)
+- DB-Funktionen `lib/db.ts`: `getUserDesignPrefs()`, `saveUserDesignPrefs()`
+
 ---
 
 ## Lib-Dateien
@@ -443,6 +484,9 @@ writeDesignPrefs(DEFAULT_PREFS)        // Gesamtes Reset → alles disabled
 | `lib/roles.ts` | `AppRole`, `PERMISSIONS`, `useRole()`, `getRole()`, `setRole()` |
 | `lib/warnings.ts` | `getAppWarnings(isDemo)` → Notification Bell |
 | `lib/pdf.ts` | `generateRechnungPDF()`, `generateAngebotPDF()` via jsPDF |
+| `lib/design-flag.ts` | `useDesignPrefs()`, `patchDesignPrefs()`, `writeDesignPrefs()` — alle 6 DP12-Module |
+| `lib/design-sync.ts` | DP12-Phase2 Multi-Device-Sync (opt-in) — `useCloudDesignSync()`, push/pull |
+| `lib/toast-sound.ts` | `playToastSound(type)` — WebAudio-Beep für success/error/info |
 
 ### Rollen-System (`lib/roles.ts`)
 ```ts
@@ -464,6 +508,10 @@ const { role, setRole, permissions } = useRole()
 | `NotificationBell.tsx` | Live-Warnungen (Auto-Refresh 60s), Tabs: Alle/Fehler/Warnung |
 | `GlobalSearch.tsx` | ⌘K Suchmodal |
 | `SupportButton.tsx` | Fixed bottom-right: WhatsApp `+4917656392975`, E-Mail, Telefon |
+| `AppToast.tsx` | DP12-Phase2: globaler Toast-Container, Event-API `pushAppToast(msg, type)` |
+| `ui/Toast.tsx` | Atomare Toast-Komponente (`.pk-toast` Klasse) |
+| `ui/ToastProvider.tsx` | Context-basierter Toast-Hook (`useGlobalToast()`) |
+| `einstellungen/DesignCustomizationPanel.tsx` | 6-Tab-Panel + Cloud-Sync-Toggle + Demo-Vorschau |
 
 ---
 
