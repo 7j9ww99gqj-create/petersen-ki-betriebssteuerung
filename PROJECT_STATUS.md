@@ -85,36 +85,32 @@
 
 ---
 
-## 4. Bekannte Bugs (P0 — aus QA 2026-05-19, verifiziert)
+## 4. Bekannte Bugs (P0 — aus QA 2026-05-19, **verifiziert 2026-05-20**)
 
-### 🔴 Race Condition: Angebots-Nummer
-- **Datei:** `supabase/schema.sql` → Funktion `pk_next_angebot_number()`
-- **Problem:** `SELECT MAX(angebotsnummer) + 1` — nicht-atomar. Bei parallelen Inserts kann dieselbe Nummer doppelt vergeben werden.
-- **Fix:** Umstellen auf `SEQUENCE` oder atomares `UPDATE ... RETURNING`.
+### 🔴 Race Condition: Angebots-Nummer (OFFEN)
+- **Datei:** `supabase/schema.sql` Z. 662–680 → `pk_next_angebot_number()`
+- **Problem:** `select max(...) + 1` — nicht-atomar. Bei parallelen Inserts kann dieselbe Nummer doppelt vergeben werden.
+- **Fix:** Umstellen auf `SEQUENCE` (analog zu `pk_next_invoice_number()`, das bereits eine Counter-Tabelle nutzt).
 
-### 🔴 PDF-Archivierung — Dead Code
-- **Datei:** `lib/db.ts` → `archiveRechnungPdf()` + `archiveAngebotPdf()`
-- **Problem:** Funktionen sind definiert, werden aber nirgendwo aufgerufen. Generierte PDFs landen nicht im Storage.
-- **Fix:** In `lib/pdf.ts` nach jeder PDF-Generierung `archiveRechnungPdf()` / `archiveAngebotPdf()` aufrufen.
+### ✅ PDF-Archivierung (erledigt)
+- `archiveRechnungPdf`/`archiveAngebotPdf` werden über `generateRechnungPDFAuto`/`generateAngebotPDFAuto` (`lib/pondruff-pdf.ts`) aufgerufen.
+- `components/buero/RechnungenTab.tsx` + `AngeboteTab.tsx` nutzen die `*Auto`-Variante mit `{ archive: true }`.
 
-### 🔴 Pondruff: Preiskonfig ignoriert DB
-- **Datei:** `lib/pondruff.ts` → `getPriceConfig()`
-- **Problem:** Gibt statisches JSON aus `lib/pondruff-price-config.json` zurück; die Supabase-Tabelle `pondruff_price_config` und Owner-Panel-Änderungen werden komplett ignoriert.
-- **Fix:** DB-Tabelle lesen, JSON als Fallback.
+### ✅ Pondruff: Preiskonfig (erledigt — heute 2026-05-20)
+- `lib/pondruff.ts` Z. 50–51: „Single source of truth: pondruff-price-config.json — KEINE DB-Überschreibung mehr."
+- DB-Tabelle `pondruff_price_config` ist obsolet; Werte sind im Code fix.
 
-### 🟡 Cloud & Sync: Backup-Backend nicht real
-- **Datei:** `app/dashboard/cloud/page.tsx`
-- **Problem:** „Manuelles Backup erstellen" zeigt nur optimistisches UI ohne echten Backup-Mechanismus. Backup-Einträge in der Historie sind aus lokalen Aktivitäts-Logs berechnet, kein echter Export.
-- **Fix:** Export-Endpoint implementieren oder Feature als „In Entwicklung" kennzeichnen.
+### ✅ Cloud-Backup (erledigt)
+- `app/api/backup/manual/route.ts` existiert: dumpt 25 Tabellen, gzip, lädt in Storage-Bucket `db-backups`.
+- `createCloudBackup()` in `lib/db.ts` ruft diesen Endpoint auf.
 
 ---
 
 ## 5. Offene Aufgaben
 
 ### 🟡 Feature-Vervollständigung
+- [ ] **Angebots-Nummer**: Race Condition mit SEQUENCE/atomarem Update beheben (siehe §4)
 - [ ] **MarketingPilot**: Edit + Delete für Kampagnen/Leads/Newsletter
-- [ ] **PDF-Archivierung**: `archiveRechnungPdf`/`archiveAngebotPdf` aufrufen (Datei-Pfad zurück ins UI)
-- [ ] **Angebots-Nummer**: Race Condition mit SEQUENCE/atomarem Update beheben
 
 ### 🟢 Grafikdesigner-Folge
 - [ ] H1 Schriftart entscheiden (Inter / IBM Plex / System)
@@ -132,10 +128,9 @@
 
 ## 6. Nächste Empfehlung
 
-1. **Angebots-Nummer Race Condition** beheben (Daten-Integrität).
-2. **PDF-Archivierung** aktivieren (2 Aufruf-Zeilen in `lib/pdf.ts`).
-3. **Pondruff Preiskonfig** auf DB-Lesen umstellen.
-4. **MarketingPilot Edit/Delete** als nächste Feature-Iteration.
+1. **Angebots-Nummer Race Condition** beheben (Daten-Integrität, einziger noch offener P0).
+2. **MarketingPilot Edit/Delete** als nächste Feature-Iteration.
+3. **PDF-Vorlagen-Header** mit Logo (Vorbereitung Grafikdesigner-Übergabe).
 
 ---
 
