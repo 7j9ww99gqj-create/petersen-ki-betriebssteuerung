@@ -26,7 +26,8 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **QM-KI Feature-Flags + Auto-Access Inhaber/Pondruff** (Aufgaben 1–8 + 10, Commits `3e122ee`–`a7bb87e`): Inhaber + Pondruff auto-QM-Pilot-Zugang in `getAccessProfile()`, SQL-Migration `qm_ki_zeichnungs_analyse/qm_ki_sichtpruefung` DEFAULT false, `getQmKiSettings()` + `updateQmKiSettings()` in `lib/db.ts`, `getServerQmKiSettings()` in `lib/ai-settings.ts`, API-Guards in beiden QM-KI-Routen (Demo-Mock → Feature-Flag → Rate/Cost), Client-seitige UI-Sperre (disabled Button + Teal-Hinweis-Box), QM-KI-Sektion im `OwnerAiControlPanel` mit Kunden-Dropdown + Teal-Toggles + Auto-Lock für Inhaber/Pondruff, Owner-API `GET/PATCH /api/owner/qm-ki-flags` mit Auto-Schutz + Audit-Log. Manuelle E2E-Tests (Aufgabe 9) in Production ausstehend. HEAD `a7bb87e`.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **Design-Sprint G1–G8 (Grafikdesigner-Vorbereitung)** (8 Commits `7143c2c`–`4a9a980`): Komplett additiv — keine bestehende Komponente/Klasse entfernt. G1: `lucide-react@1.16.0` + `components/brand/PilotIcon.tsx` (semantisches Name-Mapping). G2: Typography-Scale (`pk-h1/h2/h3/h4`, `pk-body`, `pk-body-lg`, `pk-caption`, `pk-label`, `pk-mono`) in `app/globals.css`. G3: `components/brand/Logo.tsx` als reines SVG (Varianten `full`/`mark`/`wordmark`). G4: `components/EmptyStateIllustrated.tsx` mit 12 pilot-spezifischen SVG-Motiven + Akzentfarben. G5: `components/OnboardingProgress.tsx` (numbered/bar/dots, a11y-konform). G6: `docs/DESIGN_HANDOVER.md` als Übergabe-Doku an Grafikdesigner (Marketing-Site separates Repo). G7: Semantische Farb-Tokens `--success/--warning/--danger/--info/--neutral` + Pilot-Tokens + `.pk-status-*` Pill-Klassen. G8: Modal-Animationen (`pk-modal-overlay/card/sheet`, Out-States via `data-state="closing"`, prefers-reduced-motion). HEAD `4a9a980`.
+- Davor: **QM-KI Feature-Flags + Auto-Access Inhaber/Pondruff** (Aufgaben 1–8 + 10, Commits `3e122ee`–`a7bb87e`): Inhaber + Pondruff auto-QM-Pilot-Zugang in `getAccessProfile()`, SQL-Migration `qm_ki_zeichnungs_analyse/qm_ki_sichtpruefung` DEFAULT false, `getQmKiSettings()` + `updateQmKiSettings()` in `lib/db.ts`, `getServerQmKiSettings()` in `lib/ai-settings.ts`, API-Guards in beiden QM-KI-Routen (Demo-Mock → Feature-Flag → Rate/Cost), Client-seitige UI-Sperre (disabled Button + Teal-Hinweis-Box), QM-KI-Sektion im `OwnerAiControlPanel` mit Kunden-Dropdown + Teal-Toggles + Auto-Lock für Inhaber/Pondruff, Owner-API `GET/PATCH /api/owner/qm-ki-flags` mit Auto-Schutz + Audit-Log. Manuelle E2E-Tests (Aufgabe 9) in Production ausstehend. HEAD `a7bb87e`.
 - Davor: **AB-Rabatt-Klarstellung**: User-Klarstellung — AB hat 2 Rows pro Position (Beschichtung + Polieren) mit selber Pos.-Nr, Beschichtungs-Row zeigt literalen Rabatt% (z.B. 10), Polier-Row hat 0% Rabatt; im AB-PDF neue Rabatt-Summenzeile vor Netto ("Rabatt 10% auf Beschichtungen: -9,00 €"); PDFPosition Type um listenpreis + rabatt_pct erweitert. HEAD `ae798e4`.
 - Davor: **WE-AB-Fix: 1 Row pro Position + Art.-Nr. im PDF + Datei-Picker + Arbeitskarte-Layout**: AB-Konvertierung kombiniert Beschichtung + Polieren in 1 Row (multi-line Beschreibung) statt 2 separate Rows; Artikelnummer wird im AB-PDF "Art.-Nr.: ABC" vor Beschreibung prepended; Foto-Inputs öffnen jetzt OS-Picker (Galerie+Kamera) statt nur Kamera; Arbeitskarte: GAP_Y 1.5→4mm zwischen Reihen, BOTTOM_H 30→28mm, kompaktere Zeilen damit Zusatzinfos in Pos.1 nicht in Pos.3 ragen. HEAD `ffb5d46`.
 - Davor: **QM Phase 3B: SPC-Trend-Analyse (Cp/Cpk)**: API `/api/qm/spc-daten`, `calculateSPC()` mit Cp/Cpk/CPU/CPL/Trend (lineare Regression), SPC-Panel im Statistiken-Tab (Bauteil/Messstelle-Dropdown, 4 KPI-Karten, LineChart mit USL/LSL/Soll/Ø), Cpk-Warn-Karte im Dashboard (< 1.0), Demo-Modus mit 20 statischen Messwerten. HEAD `299b4b1`.
@@ -469,6 +470,18 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+
+- **Zuletzt erledigt (2026-05-20 — Design-Sprint G1–G8 für Grafikdesigner-Übergabe, Commits `7143c2c`→`4a9a980`):**
+  - **G1 Icon-Library** (`7143c2c`): `lucide-react@1.16.0` installiert. Neue Komponente `components/brand/PilotIcon.tsx` mit semantischem Namen-Mapping (`lager`/`buero`/`werkstatt`/`marketing`/`analyse`/`planung`/`steuer`/`ki`/`cloud`/`archiv`/`einstellungen`/`qm`/`pondruff` + UI-Icons `suche`/`glocke`/`start`/`menue`/`wareneingang`/`auftrag`/`beleg`/`kunden`/`preis`). Parallel zu bestehenden Emojis nutzbar — keine Migration erzwungen.
+  - **G2 Typography-Scale** (`0fc5072`): `app/globals.css` um `.pk-h1` (28/24px), `.pk-h2` (22/20px), `.pk-h3` (18/17px), `.pk-h4`, `.pk-body`, `.pk-body-lg`, `.pk-caption`, `.pk-label`, `.pk-mono` ergänzt. Responsive Mobile-Breakpoint. Bestehende inline-styles unangetastet.
+  - **G3 Logo-Komponente** (`bbcecb4`): `components/brand/Logo.tsx` mit drei Varianten (`full`/`mark`/`wordmark`). Reines SVG mit Brand-Gradient (`#1684ff` → `#20c8ff`), skaliert verlustfrei. Bestehende PNG-Logos und `/pondruff/banner.png` bleiben.
+  - **G4 Empty-States illustriert** (`cd88f43`): `components/EmptyStateIllustrated.tsx` mit 12 pilot-spezifischen SVG-Motiven (`lager`/`buero`/`werkstatt`/`marketing`/`analyse`/`planung`/`steuer`/`qm`/`cloud`/`archiv`/`suche`/`allgemein`), pilot-eigene Akzentfarben (aus CLAUDE.md Pilot-Farben-Tabelle), Primary + Secondary Action. Bestehende `components/EmptyState.tsx` unverändert.
+  - **G5 Onboarding-Progress** (`632d415`): `components/OnboardingProgress.tsx` mit drei Varianten (`numbered`/`bar`/`dots`), connector-lines zwischen Schritten, a11y (`role=progressbar`, `aria-valuenow`, `aria-current=step`). Bestehender `OnboardingWizard.tsx` bleibt unverändert.
+  - **G6 Design-Handover-Doku** (`31afddd`): `docs/DESIGN_HANDOVER.md` als Übergabe an Grafikdesigner — Repo-Übersicht App vs. Marketing-Site (separates Repo), Token-Inventar, vollständige Liste der ausgelieferten Bausteine, offene H1–H8-Aufgaben (App-Icon, Favicon, PDF-Header, Email-Templates, Bottom-Nav-Migration, Sidebar-Migration), empfohlener Workflow mit `design/refresh`-Branch.
+  - **G7 Semantische Farb-Tokens** (`f9acd0f`): `app/globals.css` um CSS-Variablen `--success/--warning/--danger/--info/--neutral` (jeweils mit `-bg` und `-border` Varianten) ergänzt. Pilot-Tokens `--pilot-lager`, `--pilot-buero`, … aus CLAUDE.md übernommen. Neue `.pk-status` / `.pk-status-{success,warning,danger,info,neutral}` Pill-Klassen. Bestehende `--bg`/`--panel`/`--card`/`--blue`/`--blue2`/`--green`/`--purple` und `.badge-*` Klassen unverändert.
+  - **G8 Modal-Animationen** (`4a9a980`): `app/globals.css` um Keyframes `pk-modal-overlay-in/out`, `pk-modal-card-in/out`, `pk-sheet-in` ergänzt. Neue Klassen `.pk-modal-overlay` / `.pk-modal-card` / `.pk-modal-sheet`, Out-States via `data-state="closing"`, `prefers-reduced-motion` respektiert (A11y). Bestehende `.fade-in` / `.fade-in-scale` bleiben verfügbar.
+  - **Strikt additiv**: Keine bestehende Komponente, Klasse oder Datei wurde gelöscht oder verändert. Migration auf neue Bausteine ist opt-in. Build + tsc beide grün, alle 8 Commits live.
+  - **Folge-Aufgaben** (siehe `docs/DESIGN_HANDOVER.md`): H1 Schriftart-Entscheidung, H2 Produktfotos, H3 App-Icon, H4 Favicon-Set, H5 PDF-Header, H6 Email-Templates, H7 Bottom-Nav-Migration, H8 Sidebar-Migration. Bewusst offen — Designer-Entscheidung mit Live-Vorschau pro Schritt.
 
 - **Zuletzt erledigt (2026-05-20 — QM-KI Feature-Flags + Auto-Access, Commits `3e122ee`→`a7bb87e`):**
   - **Aufgabe 1** (`3e122ee`): `lib/access.ts` — `getAccessProfile()` erkennt Inhaber + Pondruff-Email, fügt `'qm'` automatisch zu `allowedPilotIds` hinzu. `MetadataCarrier` um `.email?` erweitert.
@@ -1136,6 +1149,21 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
 - [x] ~~AnalysePilot auf echte Supabase-Daten umstellen~~ **Erledigt 2026-05-18** (Sprint-Aufgabe 5).
 - [x] ~~`deleteBueroAngebot`/`Auftrag`/`Rechnung` verdrahten~~ **Erledigt 2026-05-18** — Delete-Buttons live.
 
+### Grafikdesign – Folge-Aufgaben aus Design-Sprint (2026-05-20)
+
+Bausteine G1–G8 sind ausgeliefert und additiv. Folgende Schritte sollen vom
+Grafikdesigner mit Live-Vorschau entschieden werden (siehe `docs/DESIGN_HANDOVER.md`):
+
+- [ ] **H1 Schriftart entscheiden** (Inter / IBM Plex / System-Stack) — App-weit.
+- [ ] **H2 Produktfotos** für Hero, OG-Images aktualisieren — Marketing-Site.
+- [ ] **H3 App-Icon** (PWA + Apple-Touch) durch finales Logo ersetzen — `public/`.
+- [ ] **H4 Favicon-Set** generieren (16/32/180/192/512) — `public/`.
+- [ ] **H5 PDF-Vorlagen-Header** (Logo + Briefpapier) prüfen — `lib/pdf.ts`.
+- [ ] **H6 Email-Templates Branding** (Resend) — `lib/`.
+- [ ] **H7 Bottom-Nav Icons** in App von Emoji auf `<PilotIcon />` umstellen — `app/dashboard/layout.tsx`.
+- [ ] **H8 Sidebar Icons** in App von Emoji auf `<PilotIcon />` umstellen — `components/Sidebar.tsx`.
+- [ ] **Marketing-Site Refresh** (separates Repo): Wordmark übernehmen, Farb-Hierarchie synchronisieren, Hero-Redesign, CTA-Konsistenz, Pilot-Cards-Icons.
+
 ### LagerPilot – Offene Optimierungen (Analyse 2026-05-18)
 
 - [ ] 🔴 **Umlagerung atomarisieren**: Supabase-RPC `pk_umlager_artikel` (PL/pgSQL) statt 4 sequentieller Awaits — verhindert Datenverlust bei Teil-Fehlern. Dateien: Migration, `lib/db.ts`.
@@ -1411,7 +1439,12 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
 - Ohne serverseitige Rechteprüfung und Auditierbarkeit ist kein sicherer Mehrbenutzer-Launch ratsam.
 
 ## 15. Nächste Empfehlung
-- Als NÄCHSTES umsetzen:
+- Als NÄCHSTES umsetzen (Pre-Release-Polish, nach Design-Sprint G1–G8):
+  1. **Key-Rotation** (Release-Blocker) — Supabase Service Role Key + Vercel Token rotieren; OpenAI Key prüfen ob committed.
+  2. **Pondruff Preisrechner DB-Live** (Pondruff-Folgesprint) — `getPriceConfig()` async aus `pondruff_price_config` laden statt aus `lib/pondruff-price-config.json`.
+  3. **Grafikdesigner-Übergabe** — `docs/DESIGN_HANDOVER.md` an Designer geben, H1–H8 Folge-Aufgaben einplanen (Schriftart, App-Icon, Favicon, PDF-Header, Email-Templates, Bottom-Nav/Sidebar-Icon-Migration).
+  4. **Manuelle E2E-Tests QM-Pilot** in Production (Aufgabe 9 aus QM-KI-Sprint, offen).
+- Vorher empfohlen (bestehende Reihenfolge):
   1. **QM-Pilot Phase 1 Aufgabe 6** — Prüfbericht-Wizard (`/dashboard/qm/pruefen` + `/dashboard/qm/pruefen/[id]`) mit 6 Schritten: Zeichnung wählen → Bauteil-Infos → Messwerte (Live-Ampel) → Fotos (Drop-Zones inkl. Mobile-Kamera) → Sichtprüfung → Abschluss/Abzeichnung. Detail-Seite verlinkt bereits darauf.
   2. **QM-Pilot Phase 1 Aufgaben 7–9** — Foto-Upload-Inline im Wizard, Messwert-Ampel-Live-Update beim Tippen, Gesamtstatus-Auto-Logik (bestanden/nachbesserung/ausschuss/offen).
   3. **QM-Pilot Phase 1 Aufgabe 10** — `lib/qm-pdf.ts` (jsPDF + jspdf-autotable) mit Seite 1 (Header + Bauteil-Infos + farbige Messwert-Tabelle) und Seite 2 (Sichtprüfung + Foto-Grid + Bemerkungen). `/api/qm/pdf/[id]`-Route.
