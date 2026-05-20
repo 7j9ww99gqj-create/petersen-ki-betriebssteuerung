@@ -11,11 +11,14 @@ import {
   getQmTeamMitglieder,
   insertQmFoto,
   nextQmPruefberichtNummer,
+  updateQmFotoKiAnalyse,
   uploadQmFoto,
+  uploadQmFotoTemp,
   upsertQmMesswert,
   upsertQmPruefbericht,
   type QmFotoTyp,
   type QmGesamtstatus,
+  type QmKiSichtErgebnis,
   type QmMesswertStatus,
   type QmTeamMitglied,
   type QmZeichnung,
@@ -47,7 +50,7 @@ const FOTO_SLOTS: { key: string; label: string; typ: QmFotoTyp }[] = [
   { key: 'referenz',   label: 'Referenz',   typ: 'referenz' },
 ]
 
-type FotoSlot = { key: string; typ: QmFotoTyp; file: File | null; preview: string | null }
+type FotoSlot = { key: string; typ: QmFotoTyp; file: File | null; preview: string | null; uploadedPath: string | null }
 
 type SichtEntgratung = 'ja' | 'nein' | 'nicht_erforderlich'
 type SichtBeschaedigung = 'ja' | 'nein'
@@ -165,7 +168,7 @@ export default function PruefeWizardPage() {
 
   // ── Step 4 state
   const [fotos, setFotos] = useState<FotoSlot[]>(
-    FOTO_SLOTS.map(s => ({ key: s.key, typ: s.typ, file: null, preview: null }))
+    FOTO_SLOTS.map(s => ({ key: s.key, typ: s.typ, file: null, preview: null, uploadedPath: null }))
   )
   const fotoInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -174,6 +177,10 @@ export default function PruefeWizardPage() {
   const [sichtBeschaedigung, setSichtBeschaedigung] = useState<SichtBeschaedigung>('nein')
   const [sichtBeschaedigungText, setSichtBeschaedigungText] = useState('')
   const [sichtErgebnis, setSichtErgebnis] = useState<SichtErgebnis>('')
+  const [kiSichtLoading, setKiSichtLoading] = useState(false)
+  const [kiSichtErgebnis, setKiSichtErgebnis] = useState<QmKiSichtErgebnis | null>(null)
+  const [kiSichtError, setKiSichtError] = useState<string | null>(null)
+  const [kiSichtFotoKey, setKiSichtFotoKey] = useState<string | null>(null)
 
   // ── Step 6 state
   const [pruefer, setPruefer] = useState('')
@@ -305,14 +312,100 @@ export default function PruefeWizardPage() {
       preview = prev2
     } catch { /* keep original */ }
     setFotos(prev => prev.map(s =>
-      s.key === key ? { ...s, file: toUse as File, preview } : s
+      s.key === key ? { ...s, file: toUse as File, preview, uploadedPath: null } : s
     ))
+    if (kiSichtFotoKey === key) {
+      setKiSichtErgebnis(null)
+      setKiSichtFotoKey(null)
+    }
   }
 
   function removeFoto(key: string) {
     setFotos(prev => prev.map(s =>
-      s.key === key ? { ...s, file: null, preview: null } : s
+      s.key === key ? { ...s, file: null, preview: null, uploadedPath: null } : s
     ))
+    if (kiSichtFotoKey === key) {
+      setKiSichtErgebnis(null)
+      setKiSichtFotoKey(null)
+    }
+  }
+
+  // ── KI-Sichtprüfung
+  function mockKiSichtErgebnis(): QmKiSichtErgebnis {
+    return {
+      gesamtbewertung: 'mangelhaft',
+      konfidenz: 84,
+      befunde: [
+        { typ: 'kratzer', schwere: 'mittel', position: 'oben links', beschreibung: 'ca. 3cm Kratzer auf Stirnfläche' },
+        { typ: 'verschmutzung', schwere: 'leicht', position: 'Rand', beschreibung: 'Leichte Ölspuren am Außenrand' },
+      ],
+      empfehlung: 'Nachpolieren empfohlen',
+      hinweise: ['Foto bei Tageslicht aufnehmen für bessere Erkennung'],
+    }
+  }
+
+  async function runKiSichtpruefung() {
+    const ersteFoto = fotos.find(s => s.file)
+    if (!ersteFoto || !ersteFoto.file) {
+      showToast('Bitte zuerst in Schritt 4 ein Foto hochladen', false)
+      return
+    }
+    setKiSichtLoading(true)
+    setKiSichtError(null)
+    setKiSichtErgebnis(null)
+    try {
+      if (isDemo) {
+        await new Promise(r => setTimeout(r, 1500))
+        const mock = mockKiSichtErgebnis()
+        setKiSichtErgebnis(mock)
+        setKiSichtFotoKey(ersteFoto.key)
+        return
+      }
+      let path = ersteFoto.uploadedPath
+      if (!path) {
+        path = await uploadQmFotoTemp(ersteFoto.file, ersteFoto.file.name)
+        const finalPath = path
+        setFotos(prev => prev.map(s => s.key === ersteFoto.key ? { ...s, uploadedPath: finalPath } : s))
+      }
+      const res = await fetch('/api/qm/sichtpruefung', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          foto_path: path,
+          bauteil_beschreibung: bauteilId.trim() || zeichnung?.name || undefined,
+          material: zeichnung?.material || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`)
+      setKiSichtErgebnis(data as QmKiSichtErgebnis)
+      setKiSichtFotoKey(ersteFoto.key)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'KI-Sichtprüfung fehlgeschlagen'
+      setKiSichtError(msg)
+      showToast(msg, false)
+    } finally {
+      setKiSichtLoading(false)
+    }
+  }
+
+  function uebernehmeKiBefund() {
+    if (!kiSichtErgebnis) return
+    // 1) Sichtprüfungs-Ergebnis
+    setSichtErgebnis(kiSichtErgebnis.gesamtbewertung as SichtErgebnis)
+    // 2) Bemerkungen erweitern
+    const befundText = kiSichtErgebnis.befunde.length > 0
+      ? kiSichtErgebnis.befunde.map(b => `• ${b.typ} (${b.schwere}) — ${b.position}: ${b.beschreibung}`).join('\n')
+      : ''
+    const empfehlung = kiSichtErgebnis.empfehlung ? `Empfehlung: ${kiSichtErgebnis.empfehlung}` : ''
+    const block = ['[KI-Sichtprüfung]', befundText, empfehlung].filter(Boolean).join('\n')
+    setBemerkungen(prev => prev.trim() ? `${prev.trim()}\n\n${block}` : block)
+    showToast('KI-Befund übernommen')
+  }
+
+  function ignoreKiBefund() {
+    setKiSichtErgebnis(null)
+    setKiSichtFotoKey(null)
   }
 
   // ── Computed gesamtstatus
@@ -367,13 +460,16 @@ export default function PruefeWizardPage() {
       for (const slot of fotos) {
         const slotMeta = FOTO_SLOTS.find(s => s.key === slot.key)
         if (!slot.file || !slotMeta) continue
-        const path = await uploadQmFoto(slot.file, bericht.id, `${slot.key}_${slot.file.name}`)
-        await insertQmFoto({
+        const path = slot.uploadedPath ?? await uploadQmFoto(slot.file, bericht.id, `${slot.key}_${slot.file.name}`)
+        const foto = await insertQmFoto({
           pruefbericht_id: bericht.id,
           typ: slotMeta.typ,
           datei_pfad: path,
           beschreibung: slotMeta.label,
         })
+        if (kiSichtErgebnis && kiSichtFotoKey === slot.key) {
+          try { await updateQmFotoKiAnalyse(foto.id, kiSichtErgebnis) } catch { /* ignore */ }
+        }
       }
       setSavedBerichtId(bericht.id)
       setSavedNr(nr)
@@ -741,13 +837,87 @@ export default function PruefeWizardPage() {
                 ))}
               </div>
             </Field>
-            {/* Phase 2 KI-Button */}
-            <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(174,185,200,.05)', border: '1px solid rgba(174,185,200,.15)', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <button className="pk-btn-ghost" disabled style={{ fontSize: 13, opacity: 0.5, cursor: 'not-allowed' }}>
-                🔍 KI-Sichtprüfung starten
-              </button>
-              <span style={{ fontSize: 12, color: '#aeb9c8' }}>Kommt in Phase 2 — Foto-Analyse mit OpenAI Vision</span>
-            </div>
+            {/* KI-Sichtprüfung (OpenAI Vision) */}
+            {(() => {
+              const hatFoto = fotos.some(s => s.file)
+              if (kiSichtErgebnis) {
+                const sevColor = kiSichtErgebnis.gesamtbewertung === 'ok' ? '#10b981'
+                  : kiSichtErgebnis.gesamtbewertung === 'mangelhaft' ? '#f59e0b' : '#ef4444'
+                const sevLabel = kiSichtErgebnis.gesamtbewertung === 'ok' ? 'OK ✅'
+                  : kiSichtErgebnis.gesamtbewertung === 'mangelhaft' ? 'MANGELHAFT ⚠️' : 'AUSSCHUSS ❌'
+                return (
+                  <div style={{ padding: '16px 18px', borderRadius: 12, background: `${sevColor}10`, border: `1.5px solid ${sevColor}40` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                      <span style={{ fontSize: 20 }}>🤖</span>
+                      <span style={{ fontWeight: 800, fontSize: 14 }}>KI-Sichtprüfung</span>
+                      <button onClick={ignoreKiBefund} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#aeb9c8', fontSize: 16, cursor: 'pointer' }}>✕</button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+                      <span style={{ fontSize: 13, color: '#aeb9c8' }}>Gesamtbewertung:</span>
+                      <span style={{ padding: '4px 12px', borderRadius: 999, fontSize: 13, fontWeight: 800, background: `${sevColor}20`, color: sevColor }}>{sevLabel}</span>
+                      <span style={{ fontSize: 13, color: '#aeb9c8' }}>Konfidenz: <strong style={{ color: '#f8fbff' }}>{kiSichtErgebnis.konfidenz}%</strong></span>
+                    </div>
+                    {kiSichtErgebnis.befunde.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#aeb9c8', marginBottom: 6 }}>Befunde:</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {kiSichtErgebnis.befunde.map((b, i) => {
+                            const sw = b.schwere === 'schwer' ? '#ef4444' : b.schwere === 'mittel' ? '#f59e0b' : '#aeb9c8'
+                            const icon = b.schwere === 'schwer' ? '🔴' : b.schwere === 'mittel' ? '⚠️' : 'ℹ️'
+                            return (
+                              <div key={i} style={{ fontSize: 13, lineHeight: 1.5 }}>
+                                <span style={{ marginRight: 6 }}>{icon}</span>
+                                <strong style={{ color: sw, textTransform: 'capitalize' }}>{b.typ}</strong>
+                                <span style={{ color: '#aeb9c8' }}> ({b.schwere})</span>
+                                <span style={{ color: '#aeb9c8' }}> — {b.position}</span>
+                                <div style={{ marginLeft: 24, color: '#aeb9c8', fontSize: 12, fontStyle: 'italic' }}>&ldquo;{b.beschreibung}&rdquo;</div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {kiSichtErgebnis.empfehlung && (
+                      <div style={{ fontSize: 13, marginBottom: 12 }}>
+                        <strong style={{ color: '#aeb9c8' }}>Empfehlung:</strong>{' '}
+                        <span style={{ color: '#f8fbff', fontWeight: 600 }}>{kiSichtErgebnis.empfehlung}</span>
+                      </div>
+                    )}
+                    {kiSichtErgebnis.hinweise && kiSichtErgebnis.hinweise.length > 0 && (
+                      <ul style={{ fontSize: 12, color: '#aeb9c8', margin: '8px 0 12px 18px', padding: 0 }}>
+                        {kiSichtErgebnis.hinweise.map((h, i) => <li key={i}>{h}</li>)}
+                      </ul>
+                    )}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button className="pk-btn" onClick={uebernehmeKiBefund} style={{ background: QM_COLOR, border: 'none', fontSize: 12, padding: '6px 14px' }}>
+                        ✓ Befund übernehmen
+                      </button>
+                      <button className="pk-btn-ghost" onClick={ignoreKiBefund} style={{ fontSize: 12, padding: '6px 14px' }}>
+                        ✗ Ignorieren
+                      </button>
+                    </div>
+                  </div>
+                )
+              }
+              return (
+                <div style={{ padding: '12px 16px', borderRadius: 10, background: `${QM_COLOR}08`, border: `1px solid ${QM_COLOR}25`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <button
+                    className="pk-btn-ghost"
+                    disabled={!hatFoto || kiSichtLoading}
+                    onClick={() => void runKiSichtpruefung()}
+                    style={{ fontSize: 13, opacity: hatFoto && !kiSichtLoading ? 1 : 0.5, cursor: hatFoto && !kiSichtLoading ? 'pointer' : 'not-allowed', color: QM_COLOR, borderColor: `${QM_COLOR}40` }}
+                  >
+                    {kiSichtLoading ? '⏳ KI analysiert Oberfläche…' : '🔍 KI-Sichtprüfung starten'}
+                  </button>
+                  <span style={{ fontSize: 12, color: '#aeb9c8' }}>
+                    {hatFoto ? 'OpenAI Vision analysiert das erste hochgeladene Foto.' : 'Lade zuerst in Schritt 4 mindestens ein Foto hoch.'}
+                  </span>
+                  {kiSichtError && (
+                    <div style={{ width: '100%', fontSize: 12, color: '#ff8080' }}>⚠️ {kiSichtError}</div>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         </div>
       )}

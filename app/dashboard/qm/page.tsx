@@ -6,6 +6,7 @@ import { hasDemoCookie } from '@/lib/auth'
 import { generateQmPruefberichtPDF } from '@/lib/qm-pdf'
 import {
   getQmPruefberichte,
+  getQmPruefberichtIdsMitKiAnalyse,
   getQmTeamMitglieder,
   deleteQmTeamMitglied,
   upsertQmTeamMitglied,
@@ -143,6 +144,7 @@ export default function QMPage() {
   const isDemo = hasDemoCookie()
 
   const [berichte, setBerichte] = useState<QmPruefbericht[]>([])
+  const [kiBerichtIds, setKiBerichtIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
@@ -182,9 +184,14 @@ export default function QMPage() {
     try {
       if (isDemo) {
         setBerichte(DEMO_BERICHTE)
+        setKiBerichtIds(new Set(['PB-2026-011']))
       } else {
-        const rows = await getQmPruefberichte()
+        const [rows, kiIds] = await Promise.all([
+          getQmPruefberichte(),
+          getQmPruefberichtIdsMitKiAnalyse().catch(() => [] as string[]),
+        ])
         setBerichte(rows)
+        setKiBerichtIds(new Set(kiIds))
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Laden fehlgeschlagen.')
@@ -394,9 +401,16 @@ export default function QMPage() {
                               <td style={{ color: '#aeb9c8', fontSize: 13 }}>{fmtDate(b.pruef_datum)}</td>
                               <td style={{ fontSize: 13 }}>{b.pruefer_name ?? '—'}</td>
                               <td>
-                                <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>
-                                  {badge.label}
-                                </span>
+                                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                                  <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>
+                                    {badge.label}
+                                  </span>
+                                  {kiBerichtIds.has(b.id) && (
+                                    <span title="KI-Sichtprüfung durchgeführt" style={{ padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, background: `${QM_COLOR}20`, color: QM_COLOR }}>
+                                      🤖 KI
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td>
                                 <button
@@ -506,9 +520,16 @@ export default function QMPage() {
                           <td style={{ fontSize: 12, color: '#aeb9c8' }}>{fmtDate(b.pruef_datum)}</td>
                           <td style={{ fontSize: 13 }}>{b.pruefer_name ?? '—'}</td>
                           <td>
-                            <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>
-                              {badge.label}
-                            </span>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                              <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>
+                                {badge.label}
+                              </span>
+                              {kiBerichtIds.has(b.id) && (
+                                <span title="KI-Sichtprüfung durchgeführt" style={{ padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, background: `${QM_COLOR}20`, color: QM_COLOR }}>
+                                  🤖 KI
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td onClick={e => e.stopPropagation()}>
                             <button

@@ -74,12 +74,28 @@ export type QmMesswert = {
 
 export type QmFotoTyp = 'gesamt' | 'detail' | 'oberflaeche' | 'referenz'
 
+export type QmKiSichtBefund = {
+  typ: 'kratzer' | 'delle' | 'grat' | 'verschmutzung' | 'polierfehler' | 'beschaedigung' | 'sonstiges'
+  schwere: 'leicht' | 'mittel' | 'schwer'
+  position: string
+  beschreibung: string
+}
+
+export type QmKiSichtErgebnis = {
+  gesamtbewertung: 'ok' | 'mangelhaft' | 'ausschuss'
+  konfidenz: number
+  befunde: QmKiSichtBefund[]
+  empfehlung: string
+  hinweise: string[]
+}
+
 export type QmFoto = {
   id: string
   pruefbericht_id: string
   typ: QmFotoTyp | null
   datei_pfad: string
   beschreibung: string | null
+  ki_analyse_ergebnis: QmKiSichtErgebnis | null
   erstellt_am: string
 }
 
@@ -334,11 +350,49 @@ export async function deleteQmFoto(id: string): Promise<void> {
   if (error) throw error
 }
 
+export async function updateQmFotoKiAnalyse(id: string, ergebnis: QmKiSichtErgebnis): Promise<void> {
+  const { error } = await db()
+    .from('qm_fotos')
+    .update({ ki_analyse_ergebnis: ergebnis })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function getQmPruefberichtHatKiAnalyse(pruefberichtId: string): Promise<boolean> {
+  const { data, error } = await db()
+    .from('qm_fotos')
+    .select('id')
+    .eq('pruefbericht_id', pruefberichtId)
+    .not('ki_analyse_ergebnis', 'is', null)
+    .limit(1)
+  if (error) return false
+  return (data?.length ?? 0) > 0
+}
+
+export async function getQmPruefberichtIdsMitKiAnalyse(): Promise<string[]> {
+  const { data, error } = await db()
+    .from('qm_fotos')
+    .select('pruefbericht_id')
+    .not('ki_analyse_ergebnis', 'is', null)
+  if (error) return []
+  return Array.from(new Set((data ?? []).map(r => r.pruefbericht_id as string)))
+}
+
 export async function uploadQmFoto(file: File | Blob, pruefberichtId: string, filename: string): Promise<string> {
   const supabase = db()
   const userId = await getCurrentUserId()
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
   const path = `${userId}/${pruefberichtId}/${Date.now()}_${safeName}`
+  const { error } = await supabase.storage.from('qm-fotos').upload(path, file, { upsert: false })
+  if (error) throw error
+  return path
+}
+
+export async function uploadQmFotoTemp(file: File | Blob, filename: string): Promise<string> {
+  const supabase = db()
+  const userId = await getCurrentUserId()
+  const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `${userId}/temp_${Date.now()}_${safeName}`
   const { error } = await supabase.storage.from('qm-fotos').upload(path, file, { upsert: false })
   if (error) throw error
   return path
