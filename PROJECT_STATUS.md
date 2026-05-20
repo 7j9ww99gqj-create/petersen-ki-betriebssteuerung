@@ -26,7 +26,7 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **QM-Pilot Phase 1 — Aufgaben 1–5/13** (5 Commits `9cef745` → `52b71ee`): DB-Schema + 2 Storage-Buckets, `lib/db/qm.ts` mit CRUD + Ampel-Logik + Prüfbericht-Nr-Generator, Zeichnungs-Upload-Seite mit Drag&Drop + Komprimierung, OpenAI Vision API-Route (`gpt-4o-mini` + Cost-Tracking + Rate-Limit), Zeichnungs-Detail-Ansicht mit KI-Analyse-Button + editierbarer Maß-Tabelle + „Prüfbericht starten". Aufgaben 6–13 (Wizard + Fotos + PDF + Archiv-DB-Anbindung) noch offen.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **QM-Pilot Phase 1 VOLLSTÄNDIG** (8 Commits `9cef745` → `ccb4389`): DB-Schema + Storage-Buckets + CRUD (`lib/db/qm.ts`), Zeichnungs-Upload mit KI-Analyse, Zeichnungs-Detail + Edit, Prüfbericht-Wizard 6 Schritte (Messwert-Ampel + Mobile-Fotos + Sichtprüfung + DB-Speicherung), PDF-Export (`lib/qm-pdf.ts`), Archiv + Dashboard-KPIs aus echter Supabase-DB. Alle 13 Phase-1-Aufgaben ✅.
 - Davor: `2026-05-20`, `main`, **QM-Pilot Konzept + Access-Grundgerüst** (2 Commits `d94a1e7` + `34056cc`): QM als buchbares Modul, Sidebar-Eintrag, Pricing (40€), Enterprise-Paket (279€), Demo-Dashboard 4 Tabs. Vollständiges Konzept-Dokument: `QM_PILOT_KONZEPT.md`.
 - Davor: **5 Wareneingang-Optimierungen**: Multi-Image-OCR (bis 6 Fotos), Post-Save-Druckbutton, WE-Liste am Seitenende, visuelle Checkboxen auf Arbeitskarte, Status-Zeilen. HEAD `3fd88a8`.
 - Davor: **Arbeitskarte PDF + Büropilot-Sync**: A5-Arbeitskarte druckbar, alle WE-Daten vollständig. HEAD `0d485c6`.
@@ -439,11 +439,11 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-20, **QM-Pilot Phase 1 Aufgaben 1–5 von 13** — HEAD `52b71ee`  
-**Letzte Session:** DB-Schema (4 Tabellen + RLS) + 2 Storage-Buckets (`qm-zeichnungen`, `qm-fotos`) live, `lib/db/qm.ts` (Typen + CRUD + Ampel-Logik + PB-Nr-Auto-Gen), `/dashboard/qm/zeichnungen` (Drag&Drop + Komprimierung + Bibliothek), `/api/qm/analyse-zeichnung` (gpt-4o-mini Vision + Cost-Tracking), `/dashboard/qm/zeichnungen/[id]` (Vorschau + Edit + KI-Analyse-Button + „Prüfbericht starten")  
-**Nächster Focus:** QM-Pilot Phase 1 Aufgaben 6–13 — Prüfbericht-Wizard (6 Schritte), Foto-Upload, PDF-Export (`lib/qm-pdf.ts`), Archiv/Dashboard auf echte DB-Daten umstellen  
-**Blocker:** Keine — die Detail-Seite verlinkt bereits auf `/dashboard/qm/pruefen?zeichnung=ID`; diese Route existiert noch nicht und kommt mit Aufgabe 6 (Wizard).  
-**Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur/QM-Wizard
+**Letzter Stand:** 2026-05-20, **QM-Pilot Phase 1 VOLLSTÄNDIG (Aufgaben 5–13)** — HEAD `ccb4389`  
+**Letzte Session:** Prüfbericht-Wizard 6 Schritte (`/dashboard/qm/pruefen`) mit Zeichnungs-Auswahl, Bauteil-Infos, Live-Ampel-Messwerte, 5 Foto-Drop-Zones (Mobile Kamera), Sichtprüfung, Abschluss + Speichern (PB-Nr auto-generiert, DB-Writes in qm_pruefberichte + qm_messwerte + qm_fotos). PDF-Export `lib/qm-pdf.ts` (jsPDF, 2-seitig, Messwert-Tabelle farbcodiert, Fotos, Abzeichnung). Archiv-Tab + Dashboard-KPIs auf echte Supabase-Queries umgestellt.  
+**Nächster Focus:** QM-Pilot Phase 2 (Team-Management, Push-Notifications, KI-Sichtprüfung) — oder andere Piloten.  
+**Blocker:** Keine — alle Phase-1-Aufgaben abgeschlossen, Build grün.  
+**Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
 ## 1. Kurzüberblick
 - Zweck: modulare Betriebssteuerung/ERP-ähnliche Web-App für Lager, Büro, Werkstatt, Steuer, Planung, Marketing, Dokumente und KI-gestützte Erfassung.
@@ -459,13 +459,18 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
 
 ## 2. Aktueller Arbeitsstand
 
+- **Zuletzt erledigt (2026-05-20 — QM-Pilot Phase 1 Aufgaben 5–13 VOLLSTÄNDIG, HEAD `ccb4389`, 3 Commits):**
+  - **Aufgaben 6–10** (`9168d0f`): `app/dashboard/qm/pruefen/page.tsx` — 6-Schritte-Wizard: Schritt 1 (Zeichnung-Auswahl aus DB, Pre-select via URL `?zeichnung=ID`), Schritt 2 (Bauteil-ID, Zeichnungs-Nr, Revision, Charge, Anzahl), Schritt 3 (Messwert-Tabelle aus `erkannte_masse` vorausgefüllt, Live-Ampel-Farbcodierung Grün/Orange/Rot per `ampelStatus()`), Schritt 4 (5 Foto-Drop-Zones mit `capture="environment"` für Mobile, Komprimierung via `image-compress.ts`), Schritt 5 (Sichtprüfung: Entgratung/Beschädigung/Ergebnis-Buttons, Phase-2-KI-Button disabled), Schritt 6 (Zusammenfassung-Tabelle, Gesamtstatus-Auto-Berechnung, Prüfer/Initialen/Bemerkungen/Sperren). Speichern: `nextQmPruefberichtNummer()` → `upsertQmPruefbericht()` → `upsertQmMesswert()` × N → `uploadQmFoto()` + `insertQmFoto()` × Fotos. Demo-Fallback + Toast.
+  - **Aufgabe 11** (`d63ae2f`): `lib/qm-pdf.ts` — `generateQmPruefberichtPDF(berichtId)` (browser-only, jsPDF ohne autotable). Seite 1: Header-Bar (Teal), Bericht-Nr prominent, Gesamtstatus-Badge (farbig), 2-spaltige Kopfdaten, Messwert-Tabelle mit Status-Zellen farbcodiert (eigene drawTable-Funktion mit alternierenden Zeilen). Seite 2: Fotos 2×2 Grid (signed URLs → base64), Bemerkungen, Abzeichnung (Prüfer/Initialen/Gesamtstatus). Footer auf jeder Seite. Wizard ruft PDF-Funktion direkt client-side auf.
+  - **Aufgaben 12+13** (`ccb4389`): `app/dashboard/qm/page.tsx` — Dashboard-Tab: KPI-Karten (Prüfberichte diese Woche, Bestanden, Nachbesserung, Fehlerquote) aus `getQmPruefberichte()` + `computeKpis()` berechnet; Letzte-Berichte-Tabelle mit PDF-Download. Archiv-Tab: echte Supabase-Query, Filter (Freitext-Suche, Prüfer-Dropdown dynamisch aus DB, Status-Select), Ergebnis-Counter; PDF-Download per `generateQmPruefberichtPDF()`. Statistiken-Tab: Status-Verteilung + Prüfer-Performance aus DB. Header-Buttons zu echten Pages verlinkt. Demo-Fallback via `DEMO_BERICHTE` Konstanten.
+  - **Noch offen aus Phase 1:** Nichts — alle 13 Aufgaben abgeschlossen. ✅
+
 - **Zuletzt erledigt (2026-05-20 — QM-Pilot Phase 1 Aufgaben 1–5/13, HEAD `52b71ee`, 5 Commits):**
-  - **Aufgabe 1** (`9cef745`): `supabase/migrations/20260520600000_qm_schema.sql` mit 4 Tabellen (`qm_zeichnungen`, `qm_pruefberichte`, `qm_messwerte`, `qm_fotos`) + RLS-Policies (user-scoped via `auth.uid()`) + 2 Storage-Buckets (`qm-zeichnungen` 10MB, `qm-fotos` 5MB) mit Path-Prefix-Policies. Via `exec_sql` ausgeführt.
-  - **Aufgabe 2** (`8e737e9`): `lib/db/qm.ts` mit Typen (`QmZeichnung`, `QmPruefbericht`, `QmMesswert`, `QmFoto`, `QmErkanntesMass`) + CRUD-Funktionen + Storage-Helpern (Upload/Signed URL/Delete für beide Buckets) + `nextQmPruefberichtNummer()` (Format `PB-{YYYY}-{NNN}`) + `ampelStatus()` (grün/orange/rot/offen via Soll/Ist/Toleranzband).
-  - **Aufgabe 3** (`59f6eaf`): `app/dashboard/qm/zeichnungen/page.tsx` mit Drag&Drop Upload-Zone, Multi-File-Upload, Bild-Komprimierung (max 2200px, webp 85%), Zeichnungs-Bibliothek mit Vorschau-Thumbnail (signed URL), KI-Konfidenz-Badge, Inline-Delete (2-Klick), Demo-Modus-Fallback, Toast.
-  - **Aufgabe 4** (`5e46226`): `app/api/qm/analyse-zeichnung/route.ts` — `POST { datei_path }` → Pfad-Prefix-Check (RLS-Safety) → Service-Role Signed URL (1h) → OpenAI `gpt-4o-mini` Vision mit `response_format: json_object` → strukturiertes JSON (Maße/Toleranzen/Material/Oberfläche/Beschichtung/Sonderanforderungen/Konfidenz). Rate-Limit `ocr`-Bucket + monatliches Kostenlimit + `logAiUsage()`.
-  - **Aufgabe 5** (`52b71ee`): `app/dashboard/qm/zeichnungen/[id]/page.tsx` mit Datei-Vorschau, editierbaren Stammdaten (Name, Nr, Revision, Material, Oberfläche, Beschichtung, Sonder), editierbare Maß-Tabelle (Add/Edit/Delete + Kritisch-Flag + Konfidenz-Badge), `✨ KI-Analyse starten`-Button (ruft `/api/qm/analyse-zeichnung` und speichert direkt), `📋 Prüfbericht starten`-Button (Navigation zu `/dashboard/qm/pruefen?zeichnung=ID`, Wizard-Route folgt mit Aufgabe 6).
-  - **Noch offen aus Phase 1 (Aufgaben 6–13):** Prüfbericht-Wizard (6 Schritte), Foto-Upload (Mobile-Kamera), Gesamtstatus-Auto-Logik, PDF-Export (`lib/qm-pdf.ts`), Archiv mit echten DB-Abfragen, Dashboard-KPIs aus DB statt Demo-Daten.
+  - **Aufgabe 1** (`9cef745`): `supabase/migrations/20260520600000_qm_schema.sql` mit 4 Tabellen + RLS-Policies + 2 Storage-Buckets via `exec_sql`.
+  - **Aufgabe 2** (`8e737e9`): `lib/db/qm.ts` mit Typen + CRUD + `nextQmPruefberichtNummer()` + `ampelStatus()`.
+  - **Aufgabe 3** (`59f6eaf`): `app/dashboard/qm/zeichnungen/page.tsx` Drag&Drop + Multi-Upload + Bibliothek.
+  - **Aufgabe 4** (`5e46226`): `app/api/qm/analyse-zeichnung/route.ts` OpenAI Vision + Cost-Tracking.
+  - **Aufgabe 5** (`52b71ee`): `app/dashboard/qm/zeichnungen/[id]/page.tsx` Detail + Edit + KI-Analyse-Button.
 
 - **Zuletzt erledigt (2026-05-20 — QM-Pilot Grundgerüst, HEAD `34056cc`, 2 Commits):**
   - `lib/access.ts`: `'qm'` als neuer `AccessPilotId` — nur bei expliziter Buchung sichtbar (NICHT in DEFAULT_ROLE_PILOTS)
