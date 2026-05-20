@@ -26,7 +26,7 @@
 
 ### 0.1 Aktueller Kurzstatus
 - Projekt: modulare Betriebssteuerung/ERP-Web-App mit `Next.js`, `TypeScript`, `Supabase`, `OpenAI`.
-- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **WE-Löschen + Archiv + WE→AB**: Delete mit Bestätigung im Wareneingang; Büro/WISO: BüroPilot-Sync entfernt, 📦 Archivieren + 💶 AB-Konvertierung (Preisberechnung aus Maßen); Archiv zeigt nur archivierte WEs mit 🖨️. HEAD `0dda91e`.
+- Letzter dokumentierter Live-Stand: `2026-05-20`, `main`, **QM Phase 2A (4/5 Aufgaben)**: Team-Management (qm_team_mitglieder, Tab 👥), Push-Alerts Cron, Prüfplan-Generator (Regel-Engine, Drucken), Statistik-Dashboard mit echten Supabase-Queries + Recharts-Charts (PieChart, LineChart, BarChart). HEAD `f3d85e4` (nach Merge mit WE-Features).
 - Davor: **Mobile-Fix Arbeitskarte PDF**: `window.open` → `doc.save()` — PDF lädt jetzt als direkter Download auf iOS/Android. HEAD `cc8f743`.
 - Davor: **QM-Pilot Phase 1 VOLLSTÄNDIG** (8 Commits `9cef745` → `ccb4389`): DB-Schema + Storage-Buckets + CRUD (`lib/db/qm.ts`), Zeichnungs-Upload mit KI-Analyse, Zeichnungs-Detail + Edit, Prüfbericht-Wizard 6 Schritte (Messwert-Ampel + Mobile-Fotos + Sichtprüfung + DB-Speicherung), PDF-Export (`lib/qm-pdf.ts`), Archiv + Dashboard-KPIs aus echter Supabase-DB. Alle 13 Phase-1-Aufgaben ✅.
 - Davor: `2026-05-20`, `main`, **QM-Pilot Konzept + Access-Grundgerüst** (2 Commits `d94a1e7` + `34056cc`): QM als buchbares Modul, Sidebar-Eintrag, Pricing (40€), Enterprise-Paket (279€), Demo-Dashboard 4 Tabs. Vollständiges Konzept-Dokument: `QM_PILOT_KONZEPT.md`.
@@ -441,10 +441,10 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
 - Einige ältere Verlaufs-/Offen-Punkte weiter unten koennen historisch sein; bei Konflikten gilt der neueste Eintrag in `2. Aktueller Arbeitsstand`.
 
 ### 0.4 Quick Status Summary (für Statusabfragen)
-**Letzter Stand:** 2026-05-20, **QM-Pilot Phase 1 VOLLSTÄNDIG (Aufgaben 5–13)** — HEAD `ccb4389`  
-**Letzte Session:** Prüfbericht-Wizard 6 Schritte (`/dashboard/qm/pruefen`) mit Zeichnungs-Auswahl, Bauteil-Infos, Live-Ampel-Messwerte, 5 Foto-Drop-Zones (Mobile Kamera), Sichtprüfung, Abschluss + Speichern (PB-Nr auto-generiert, DB-Writes in qm_pruefberichte + qm_messwerte + qm_fotos). PDF-Export `lib/qm-pdf.ts` (jsPDF, 2-seitig, Messwert-Tabelle farbcodiert, Fotos, Abzeichnung). Archiv-Tab + Dashboard-KPIs auf echte Supabase-Queries umgestellt.  
-**Nächster Focus:** QM-Pilot Phase 2 (Team-Management, Push-Notifications, KI-Sichtprüfung) — oder andere Piloten.  
-**Blocker:** Keine — alle Phase-1-Aufgaben abgeschlossen, Build grün.  
+**Letzter Stand:** 2026-05-20, **QM-Pilot Phase 2A (4/5 Aufgaben)** — Team-Management, Push-Alerts, Prüfplan-Generator, Statistik-Dashboard  
+**Letzte Session:** 4 Phase-2A-Aufgaben: (1) `qm_team_mitglieder` Tabelle + RLS, DB-Funktionen, 👥 Team-Tab mit Rolle-Badges + Modal, Prüfer-Dropdown im Wizard. (2) Cron `/api/cron/qm-alerts` (07:00 täglich, Push für ungeprüfte Zeichnungen). (3) API `/api/qm/pruefplan` (Regel-Engine: Mikrometer/Messschieber/Rauheitsgerät), Prüfplan-Tab auf Detail-Seite + Drucken, Wizard-Integration. (4) 4 echte Supabase-Stat-Queries + Recharts (PieChart/LineChart/BarChart), Zeitraum-Filter.  
+**Nächster Focus:** QM Phase 2B: KI-Sichtprüfung (Foto → OpenAI Vision → Befund) — oder andere Features.  
+**Blocker:** Keine — Build grün, alle 4 Aufgaben committed.  
 **Modell-Tipps:** Haiku für Fixes/Docs | Sonnet für Standard-Features | Opus für Architektur
 
 ## 1. Kurzüberblick
@@ -460,6 +460,13 @@ Status pro Task wird live in der `TaskList` gepflegt (IDs 12-31).
   - Zusatz: Dashboard, KI-Erkennung, Cloud, Archiv, Einstellungen.
 
 ## 2. Aktueller Arbeitsstand
+
+- **Zuletzt erledigt (2026-05-20 — QM Phase 2A: 4 Aufgaben, Commits `227912e`→`a60697a`):**
+  - **Aufgabe 1 Team-Management** (`227912e`): SQL-Migration `qm_team_mitglieder` (RLS), DB-Funktionen `getQmTeamMitglieder/upsertQmTeamMitglied/deleteQmTeamMitglied`, neuer Tab 👥 Team in `app/dashboard/qm/page.tsx` (Tabelle, Rolle-Badges Admin/Prüfer/Viewer, Inline-Delete, Add-Modal), Prüfbericht-Wizard Schritt 6: Prüfer-Dropdown aus DB (Fallback Freitext).
+  - **Aufgabe 2 Push-Benachrichtigungen** (`6ee9e9b`): Neuer Cron-Endpunkt `app/api/cron/qm-alerts/route.ts` (07:00 täglich), sucht Zeichnungen der letzten 24h ohne Prüfbericht, sendet Push via `lib/push.server.ts`, `vercel.json` ergänzt.
+  - **Aufgabe 3 Prüfplan-Generator** (`a60697a`): API `POST /api/qm/pruefplan` (pure Regel-Engine: Toleranz-Mapping → Prüfmittel, Reihenfolge kritisch-zuerst), Zeichnungs-Detail: Prüfplan-Tabelle + 🖨️ Drucken (`window.print`, `@media print` in `globals.css`), Wizard Schritt 1: "Prüfplan laden" befüllt Schritt 3 automatisch.
+  - **Aufgabe 4 Statistik-Dashboard** (in HEAD nach Merge): 4 echte Supabase-Queries in `lib/db/qm.ts` (`getQmStatusVerteilung`, `getQmFehlerquoteTrend`, `getQmHaeufigsteAbweichungen`, `getQmPrueferPerformance`), Zeitraum-Filter (Woche/Monat/Quartal/Gesamt), Recharts-Charts (PieChart, LineChart, BarChart horizontal, Tabelle), Demo-Fallback.
+  - **KI-Sichtprüfung übersprungen** (Aufgabe 3 in Phase-2-Tabelle) — für separate Session.
 
 - **Zuletzt erledigt (2026-05-20 — QM-Pilot Phase 1 Aufgaben 5–13 VOLLSTÄNDIG, HEAD `ccb4389`, 3 Commits):**
   - **Aufgaben 6–10** (`9168d0f`): `app/dashboard/qm/pruefen/page.tsx` — 6-Schritte-Wizard: Schritt 1 (Zeichnung-Auswahl aus DB, Pre-select via URL `?zeichnung=ID`), Schritt 2 (Bauteil-ID, Zeichnungs-Nr, Revision, Charge, Anzahl), Schritt 3 (Messwert-Tabelle aus `erkannte_masse` vorausgefüllt, Live-Ampel-Farbcodierung Grün/Orange/Rot per `ampelStatus()`), Schritt 4 (5 Foto-Drop-Zones mit `capture="environment"` für Mobile, Komprimierung via `image-compress.ts`), Schritt 5 (Sichtprüfung: Entgratung/Beschädigung/Ergebnis-Buttons, Phase-2-KI-Button disabled), Schritt 6 (Zusammenfassung-Tabelle, Gesamtstatus-Auto-Berechnung, Prüfer/Initialen/Bemerkungen/Sperren). Speichern: `nextQmPruefberichtNummer()` → `upsertQmPruefbericht()` → `upsertQmMesswert()` × N → `uploadQmFoto()` + `insertQmFoto()` × Fotos. Demo-Fallback + Toast.

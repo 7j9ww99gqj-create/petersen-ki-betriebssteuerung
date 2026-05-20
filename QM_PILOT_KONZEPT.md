@@ -32,13 +32,13 @@ QM-Pilot ist ein **eigenständiges, zubuchbares Modul** für kleine/mittlere Wer
 
 ### Phase 2 — Quick Wins
 
-| # | Aufgabe | Effort |
-|---|---------|--------|
-| 1 | Team-Management (Prüfer hinzufügen) | Mittel |
-| 2 | Push-Benachrichtigungen (VAPID vorhanden) | Niedrig |
-| 3 | KI-Sichtprüfung (Foto → OpenAI Vision → Befund) | Hoch |
-| 4 | Prüfplan-Generator aus Zeichnungs-Daten | Mittel |
-| 5 | Statistik-Dashboard (Fehlerquoten, Trends) | Mittel |
+| # | Aufgabe | Effort | Status |
+|---|---------|--------|--------|
+| 1 | Team-Management (Prüfer hinzufügen) | Mittel | ✅ 2026-05-20 |
+| 2 | Push-Benachrichtigungen (VAPID vorhanden) | Niedrig | ✅ 2026-05-20 |
+| 3 | KI-Sichtprüfung (Foto → OpenAI Vision → Befund) | Hoch | ⏭️ übersprungen |
+| 4 | Prüfplan-Generator aus Zeichnungs-Daten | Mittel | ✅ 2026-05-20 |
+| 5 | Statistik-Dashboard (Fehlerquoten, Trends) | Mittel | ✅ 2026-05-20 |
 
 ### Phase 3 — Nice-to-Have
 
