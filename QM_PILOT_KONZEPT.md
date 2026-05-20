@@ -44,7 +44,7 @@ QM-Pilot ist ein **eigenständiges, zubuchbares Modul** für kleine/mittlere Wer
 
 | # | Aufgabe | Status |
 |---|---------|--------|
-| 1 | SPC-Trend-Analyse (Cp/Cpk vereinfacht) | — |
+| 1 | SPC-Trend-Analyse (Cp/Cpk vereinfacht) | ✅ 2026-05-20 |
 | 2 | Messmittel-Kalibrierungs-Tracking | ✅ 2026-05-20 |
 | 3 | E-Mail PDF direkt an Kunden | ✅ 2026-05-20 |
 | 4 | Barcode/QR-Code für Bauteil-ID | ✅ 2026-05-20 |
@@ -350,7 +350,7 @@ Badge-Stile (wie andere Piloten):
 
 ### ✅ Phase 1 — Vollständig (alle 13 Aufgaben)
 ### ✅ Phase 2 — Vollständig (alle 5 Aufgaben)
-### ✅ Phase 3A — Vollständig (2026-05-20)
+### ✅ Phase 3A+B — Vollständig (2026-05-20)
 
 | # | Aufgabe | Commit |
 |---|---------|--------|
