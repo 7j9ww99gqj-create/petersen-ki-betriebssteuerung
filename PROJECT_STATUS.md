@@ -22,8 +22,8 @@
 
 ## 1. Aktueller Stand
 
-- **HEAD:** `2831819` (DP13 — Design: Light-Theme, Auto-Theme, Font-Family, LivePreview, FOUC-Fix)
-- **Letzte Iteration:** 2026-05-20 — Design-Panel Phase 3 (Marktreife-Features)
+- **HEAD:** `d4d2c19` + DP14-Refactor Schritt 1 (Einstellungen-Page in Sub-Components)
+- **Letzte Iteration:** 2026-05-20 — Monster-Page-Refactor (XL) startet
 - **TypeScript:** `npx tsc --noEmit` — ✅ 0 Fehler
 - **Tests:** 87 Tests in 7 Files — ✅ alle grün
 - **CI/CD:** Vercel Auto-Deploy auf `main` — ✅
@@ -32,7 +32,18 @@
 
 ## 2. Aktueller Arbeitsstand (letzte 3 Iterationen)
 
-### 2.1 DP13 — Design-System Phase 3: Marktreife (2026-05-20)
+### 2.1 DP14 — Monster-Page-Refactor Schritt 1: Einstellungen (2026-05-20)
+**Scope:** `app/dashboard/einstellungen/page.tsx` 3.773 → 3.450 LOC (−323, −8,6 %)
+
+- **Toggle-Komponente ausgelagert** → `components/einstellungen/Toggle.tsx` (wiederverwendbar)
+- **ProfilTab.tsx** (263 LOC) — eigener State (profil, pwForm, isDemo), eigene Handler (handleProfilSave, handlePwSave), eigenes useEffect für User-Load
+- **BenachrichtigungenTab.tsx** (326 LOC) — eigener State (notif, push*), eigene Handler (handleNotifSave, handlePushToggle), Push-Subscription-Check beim Mount
+- `<ProfilTab>` und `<BenachrichtigungenTab>` werden in `page.tsx` nur noch mit `showToast`-Prop aufgerufen — keine Parent-State-Kopplung mehr
+- Push-Imports + 3 Handler + lokaler Toggle aus page.tsx entfernt
+- **Verhalten identisch** (gleicher State, gleiche Handler, gleiche UI) — reines Refactoring
+- TS 0 Fehler · 87/87 Tests grün
+
+### 2.2 DP13 — Design-System Phase 3: Marktreife (2026-05-20)
 **Commits:** `2831819`
 
 - **Light-Theme** (`body[data-design="light"]`): vollständig in `globals.css` — alle CSS-Vars, .pk-card, .pk-btn, .pk-input, .pk-table, Badges, Scrollbar, Bottom-Nav.
@@ -44,7 +55,7 @@
 - **FOUC-Prevention**: Inline-Sync-Script in `app/layout.tsx` `<head>` setzt Body-Attribute + CSS-Vars vor dem ersten React-Paint — kein Theme-Flash.
 - **`prefers-reduced-motion`**: Global-Catch-All-Block in `globals.css` — alle Animationen/Transitions auf `0.01ms` bei aktivierter Systemeinstellung.
 
-### 2.2 DP12-Phase2 — Toast-Unifikation + Cloud-Sync (2026-05-20)
+### 2.3 DP12-Phase2 — Toast-Unifikation + Cloud-Sync (2026-05-20)
 **Commits:** `bb57741` → `25ce34f`
 
 - Alle Piloten-Toasts (Lager/Werkstatt/QM/Büro/Steuer) auf `.pk-toast`-Klasse umgestellt → Position/Animation/Dauer respektieren User-Prefs.
@@ -53,7 +64,7 @@
 - Demo-Vorschau-Buttons im Benachrichtigungen-Tab.
 - Multi-Device Cloud-Sync via Supabase-Tabelle `user_design_prefs` (RLS, Opt-in via `lib/design-sync.ts`).
 
-### 2.3 DP12 + UI-Polish — Design-Panel + Pilot-Farben + Mobile-Fixes (2026-05-20)
+### 2.4 DP12 + UI-Polish — Design-Panel + Pilot-Farben + Mobile-Fixes (2026-05-20)
 **Commits:** `019efae` → `990e58b` → `79913d9` → `13b02b8` → `31f924a` → `423cba2` → `939e831`
 
 - 6 Personalisierungs-Module mit Master-Toggle: `notifications` · `typography` · `effects` · `colors` · `icons` · `layout`.

@@ -10,6 +10,8 @@ import { type AppRole, APP_ROLES, INHABER_EMAIL, ROLE_LABELS, ROLE_PILOTS, PERMI
 // DesignV2Toggle + DesignThemeSelector bleiben im Codebase (rückwärtskompatibel),
 // werden hier aber nicht mehr gerendert — DesignCustomizationPanel deckt alles ab.
 import DesignCustomizationPanel from '@/components/einstellungen/DesignCustomizationPanel'
+import ProfilTab from '@/components/einstellungen/ProfilTab'
+import BenachrichtigungenTab from '@/components/einstellungen/BenachrichtigungenTab'
 import {
   parseCsvFile, validateImportRows, autoMapColumns, buildImportRows,
   normalizeNumber, normalizeDate,
@@ -33,7 +35,6 @@ import { OwnerOpenAiCostsPanel } from '@/components/billing/OwnerOpenAiCostsPane
 import { OwnerAuditLogPanel } from '@/components/billing/OwnerAuditLogPanel'
 import { OwnerMrrPanel } from '@/components/billing/OwnerMrrPanel'
 import type { PilotId } from '@/lib/pricingConfig'
-import { isPushSupported, subscribeToPush, unsubscribeFromPush, getCurrentPushSubscription } from '@/lib/push'
 
 type NotifSettings = {
   wareneingaenge: boolean; niedrigerBestand: boolean; auftraege: boolean
@@ -160,86 +161,10 @@ export default function EinstellungenPage() {
     }
   }, [])
 
+  // profil.email + setProfil werden noch außerhalb von ProfilTab gebraucht
+  // (isInhaberAccount-Check + Rollen-Section). pwForm/notif/push-State sind in
+  // ProfilTab / BenachrichtigungenTab gewandert.
   const [profil, setProfil] = useState({ name: '', email: '', role: 'Administrator', firma: '' })
-  const [pwForm, setPwForm] = useState({ neu: '', bestaetigung: '' })
-  const [notif, setNotif] = useState<NotifSettings>({
-    wareneingaenge: true, niedrigerBestand: true, auftraege: true,
-    rechnungen: true, cloudSync: false, kiErkennungen: false,
-  })
-
-  // ── Push-Benachrichtigungen State ─────────────────────────────────────────────
-  const [pushSupported, setPushSupported] = useState(false)
-  const [pushEnabled, setPushEnabled] = useState(false)
-  const [pushLoading, setPushLoading] = useState(false)
-  const [pushNotifTypes, setPushNotifTypes] = useState({
-    postfach: true,
-    fehler: true,
-    erinnerungen: true,
-    archiv: false,
-  })
-  const [pushStilleVon, setPushStilleVon] = useState('22:00')
-  const [pushStilleBis, setPushStilleBis] = useState('07:00')
-
-  // Push-Support + aktuelle Subscription prüfen
-  useEffect(() => {
-    const check = async () => {
-      setPushSupported(isPushSupported())
-      if (isPushSupported()) {
-        const sub = await getCurrentPushSubscription()
-        setPushEnabled(!!sub)
-      }
-    }
-    void check()
-  }, [])
-
-  const _showPushToast = (msg: string, type: 'success' | 'error' = 'success') => {
-    setToast(msg); setToastType(type)
-    setTimeout(() => setToast(''), 4000)
-  }
-
-  const handlePushToggle = async () => {
-    if (pushLoading) return
-    setPushLoading(true)
-    try {
-      if (pushEnabled) {
-        // Deaktivieren
-        const ok = await unsubscribeFromPush()
-        if (ok) {
-          await fetch('/api/push', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
-          setPushEnabled(false)
-          _showPushToast('Push-Benachrichtigungen deaktiviert')
-        }
-      } else {
-        // Aktivieren – Permission anfragen
-        const permission = await Notification.requestPermission()
-        if (permission !== 'granted') {
-          _showPushToast('Benachrichtigungen wurden nicht erlaubt', 'error')
-          return
-        }
-        const sub = await subscribeToPush()
-        if (!sub) {
-          _showPushToast('Service Worker nicht verfügbar', 'error')
-          return
-        }
-        const subJson = sub.toJSON()
-        await fetch('/api/push', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            endpoint: sub.endpoint,
-            keys: { p256dh: subJson.keys?.p256dh ?? '', auth: subJson.keys?.auth ?? '' },
-          }),
-        })
-        setPushEnabled(true)
-        _showPushToast('Push-Benachrichtigungen aktiviert!')
-      }
-    } catch (err) {
-      console.error('[push toggle]', err)
-      _showPushToast('Fehler bei Push-Benachrichtigungen', 'error')
-    } finally {
-      setPushLoading(false)
-    }
-  }
 
   // Messaging & Postfach
   const [userMessages, setUserMessages] = useState<{ id: string; subject: string; body: string; is_read: boolean; created_at: string }[]>([])
@@ -266,8 +191,6 @@ export default function EinstellungenPage() {
         firma: (user.user_metadata?.firma as string) || '',
       })
     })
-    const saved = localStorage.getItem('pk_notif')
-    if (saved) setNotif(JSON.parse(saved))
   }, [])
 
   const isInhaberAccount = profil.email.toLowerCase() === INHABER_EMAIL || currentRole === 'Inhaber'
@@ -342,30 +265,7 @@ export default function EinstellungenPage() {
     setTimeout(() => setToast(''), 4000)
   }
 
-  const handleProfilSave = async () => {
-    if (!profil.name || !profil.email) { showToast('Name und E-Mail sind Pflichtfelder', 'error'); return }
-    const supabase = createSupabaseClient()
-    const { error } = await supabase.auth.updateUser({
-      data: { full_name: profil.name, firma: profil.firma },
-    })
-    if (error) { showToast('Fehler beim Speichern: ' + error.message, 'error'); return }
-    showToast('✅ Profil wurde gespeichert')
-  }
-
-  const handlePwSave = async () => {
-    if (pwForm.neu.length < 6) { showToast('Neues Passwort muss mindestens 6 Zeichen lang sein', 'error'); return }
-    if (pwForm.neu !== pwForm.bestaetigung) { showToast('Passwörter stimmen nicht überein', 'error'); return }
-    const supabase = createSupabaseClient()
-    const { error } = await supabase.auth.updateUser({ password: pwForm.neu })
-    if (error) { showToast('Fehler: ' + error.message, 'error'); return }
-    setPwForm({ neu: '', bestaetigung: '' })
-    showToast('✅ Passwort wurde geändert')
-  }
-
-  const handleNotifSave = () => {
-    localStorage.setItem('pk_notif', JSON.stringify(notif))
-    showToast('✅ Benachrichtigungseinstellungen gespeichert')
-  }
+  // handleProfilSave/handlePwSave/handleNotifSave wurden in ProfilTab + BenachrichtigungenTab verlagert
 
   const handleLogout = () => performLogout()
 
@@ -605,25 +505,7 @@ export default function EinstellungenPage() {
     </button>
   )
 
-  const Toggle = ({ checked, onChange, label, desc }: { checked: boolean; onChange: () => void; label: string; desc?: string }) => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-      <div>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{label}</div>
-        {desc && <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>{desc}</div>}
-      </div>
-      <button onClick={onChange} style={{
-        width: 44, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0,
-        background: checked ? 'linear-gradient(135deg, #1684ff, #005bea)' : 'rgba(255,255,255,.1)',
-        transition: 'background .2s',
-      }}>
-        <div style={{
-          position: 'absolute', top: 3, left: checked ? 22 : 2, width: 18, height: 18,
-          borderRadius: '50%', background: 'white', transition: 'left .2s',
-          boxShadow: '0 1px 4px rgba(0,0,0,.3)',
-        }} />
-      </button>
-    </div>
-  )
+  // lokaler Toggle wurde in components/einstellungen/Toggle.tsx ausgelagert
 
   return (
     <div className="fade-in">
@@ -677,68 +559,7 @@ export default function EinstellungenPage() {
         </div>
 
         <div>
-          {section === 'profil' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div className="pk-card">
-                <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 800 }}>👤 Benutzerprofil</h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
-                  <div style={{
-                    width: 64, height: 64, borderRadius: 999,
-                    background: 'linear-gradient(135deg, #1684ff, #005bea)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 28, fontWeight: 900, color: 'white',
-                    boxShadow: '0 0 20px rgba(22,132,255,.3)',
-                  }}>
-                    {profil.name ? profil.name.charAt(0).toUpperCase() : '?'}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 800, fontSize: 18 }}>{profil.name || '–'}</div>
-                    <div style={{ color: '#aeb9c8', fontSize: 13 }}>{profil.role}</div>
-                    {isDemo && <span className="badge badge-orange" style={{ marginTop: 4 }}>● Demo-Modus</span>}
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                  <div>
-                    <label htmlFor="field-name" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Name *</label>
-                    <input id="field-name" className="pk-input" value={profil.name} onChange={e => setProfil(p => ({ ...p, name: e.target.value }))} placeholder="Vollständiger Name" />
-                  </div>
-                  <div>
-                    <label htmlFor="field-e-mail" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>E-Mail</label>
-                    <input id="field-e-mail" className="pk-input" value={profil.email} disabled style={{ opacity: .5, cursor: 'not-allowed' }} />
-                  </div>
-                  <div>
-                    <label htmlFor="field-firma" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Firma</label>
-                    <input id="field-firma" className="pk-input" value={profil.firma} onChange={e => setProfil(p => ({ ...p, firma: e.target.value }))} placeholder="Firmenname" />
-                  </div>
-                  <div>
-                    <label htmlFor="field-rolle" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Rolle</label>
-                    <input id="field-rolle" className="pk-input" value={profil.role} disabled style={{ opacity: .5, cursor: 'not-allowed' }} />
-                  </div>
-                </div>
-                <div style={{ marginTop: 16 }}>
-                  <button className="pk-btn" onClick={handleProfilSave} style={{ fontWeight: 700 }}>Profil speichern</button>
-                </div>
-              </div>
-
-              {!isDemo && (
-                <div className="pk-card">
-                  <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 800 }}>🔑 Passwort ändern</h3>
-                  <div style={{ display: 'grid', gap: 14, maxWidth: 400 }}>
-                    <div>
-                      <label htmlFor="field-neues-passwort" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Neues Passwort</label>
-                      <input id="field-neues-passwort" className="pk-input" type="password" placeholder="Min. 6 Zeichen" value={pwForm.neu} onChange={e => setPwForm(p => ({ ...p, neu: e.target.value }))} />
-                    </div>
-                    <div>
-                      <label htmlFor="field-passwort-besttigen" style={{ display: 'block', fontSize: 12, color: '#aeb9c8', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase' }}>Passwort bestätigen</label>
-                      <input id="field-passwort-besttigen" className="pk-input" type="password" placeholder="Passwort wiederholen" value={pwForm.bestaetigung} onChange={e => setPwForm(p => ({ ...p, bestaetigung: e.target.value }))} />
-                    </div>
-                    <button className="pk-btn" onClick={handlePwSave} style={{ fontWeight: 700, width: 'fit-content' }}>Passwort ändern</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          {section === 'profil' && <ProfilTab showToast={showToast} />}
 
           {section === 'firma' && (
             <CompanySettingsSection isDemo={isDemo} currentRole={currentRole} showToast={showToast} />
@@ -1128,151 +949,7 @@ export default function EinstellungenPage() {
             </div>
           )}
 
-          {section === 'benachrichtigungen' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div className="pk-card">
-                <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>🔔 In-App Benachrichtigungen</h3>
-                <p style={{ margin: '0 0 20px', color: '#aeb9c8', fontSize: 14 }}>Legen Sie fest, welche System-Meldungen Sie erhalten möchten.</p>
-                <Toggle checked={notif.wareneingaenge} onChange={() => setNotif(p => ({ ...p, wareneingaenge: !p.wareneingaenge }))} label="Wareneingänge" desc="Benachrichtigung bei neuen Wareneingängen im LagerPilot" />
-                <Toggle checked={notif.niedrigerBestand} onChange={() => setNotif(p => ({ ...p, niedrigerBestand: !p.niedrigerBestand }))} label="Niedriger Bestand" desc="Alarm wenn Artikel unter den Mindestbestand fallen" />
-                <Toggle checked={notif.auftraege} onChange={() => setNotif(p => ({ ...p, auftraege: !p.auftraege }))} label="Auftrags-Updates" desc="Statusänderungen bei Werkstatt-Aufträgen und Arbeitskarten" />
-                <Toggle checked={notif.rechnungen} onChange={() => setNotif(p => ({ ...p, rechnungen: !p.rechnungen }))} label="Überfällige Rechnungen" desc="Erinnerung bei Zahlungsverzug im BüroPilot" />
-                <Toggle checked={notif.cloudSync} onChange={() => setNotif(p => ({ ...p, cloudSync: !p.cloudSync }))} label="Cloud-Sync Status" desc="Meldungen zu Backup und Synchronisierungsstatus" />
-                <Toggle checked={notif.kiErkennungen} onChange={() => setNotif(p => ({ ...p, kiErkennungen: !p.kiErkennungen }))} label="KI-Assistenten-Auswertungen" desc="Benachrichtigungen nach automatischer Dokumentenanalyse" />
-                <div style={{ marginTop: 20 }}>
-                  <button className="pk-btn" onClick={handleNotifSave} style={{ fontWeight: 700 }}>Einstellungen speichern</button>
-                </div>
-              </div>
-
-              {/* Design-Customization wurde in eigenen Menüpunkt „🎨 Design" verschoben */}
-
-              {/* ── Push-Benachrichtigungen (PWA) ─────────────────────────────────── */}
-              <div className="pk-card">
-                <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>📲 Push-Benachrichtigungen</h3>
-                <p style={{ margin: '0 0 16px', color: '#aeb9c8', fontSize: 14 }}>
-                  Erhalten Sie Benachrichtigungen direkt auf Ihr Gerät, auch wenn die App nicht geöffnet ist.
-                </p>
-
-                {!pushSupported ? (
-                  <div style={{
-                    padding: '12px 16px', borderRadius: 8,
-                    background: 'rgba(255,165,0,.1)', border: '1px solid rgba(255,165,0,.3)',
-                    color: '#fbbf24', fontSize: 13, marginBottom: 16,
-                  }}>
-                    ⚠️ Push-Benachrichtigungen werden von diesem Browser nicht unterstützt. Bitte nutzen Sie Chrome, Firefox oder Safari 16+ als PWA.
-                  </div>
-                ) : (
-                  <>
-                    {/* Haupt-Toggle */}
-                    <div style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '14px 16px', borderRadius: 10,
-                      background: pushEnabled ? 'rgba(22,132,255,.08)' : 'rgba(255,255,255,.03)',
-                      border: `1px solid ${pushEnabled ? 'rgba(22,132,255,.3)' : 'rgba(255,255,255,.1)'}`,
-                      marginBottom: 16, transition: 'all .2s',
-                    }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: pushEnabled ? '#6cb6ff' : '#f8fbff' }}>
-                          {pushEnabled ? '✅ Push aktiviert' : 'Push-Benachrichtigungen aktivieren'}
-                        </div>
-                        <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 2 }}>
-                          {pushEnabled ? 'Klicken zum Deaktivieren' : 'Permission-Anfrage beim Aktivieren'}
-                        </div>
-                      </div>
-                      <button
-                        onClick={handlePushToggle}
-                        disabled={pushLoading}
-                        style={{
-                          padding: '8px 18px', borderRadius: 8, border: 'none',
-                          background: pushEnabled ? 'rgba(244,63,94,.15)' : 'rgba(22,132,255,.2)',
-                          color: pushEnabled ? '#fb7185' : '#6cb6ff',
-                          fontWeight: 700, fontSize: 13, cursor: pushLoading ? 'wait' : 'pointer',
-                          transition: 'all .15s',
-                        }}
-                      >
-                        {pushLoading ? '⏳ Laden…' : pushEnabled ? 'Deaktivieren' : 'Aktivieren'}
-                      </button>
-                    </div>
-
-                    {/* Benachrichtigungstypen */}
-                    {pushEnabled && (
-                      <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: '#aeb9c8' }}>
-                          Welche Benachrichtigungen?
-                        </div>
-                        <Toggle
-                          checked={pushNotifTypes.postfach}
-                          onChange={() => setPushNotifTypes(p => ({ ...p, postfach: !p.postfach }))}
-                          label="Neue Nachrichten im Postfach"
-                          desc="Wenn Sie eine neue Nachricht erhalten"
-                        />
-                        <Toggle
-                          checked={pushNotifTypes.fehler}
-                          onChange={() => setPushNotifTypes(p => ({ ...p, fehler: !p.fehler }))}
-                          label="Fehler & Systemwarnungen"
-                          desc="Kritische Systemfehler und Warnungen"
-                        />
-                        <Toggle
-                          checked={pushNotifTypes.erinnerungen}
-                          onChange={() => setPushNotifTypes(p => ({ ...p, erinnerungen: !p.erinnerungen }))}
-                          label="Erinnerungen & Fälligkeiten"
-                          desc="Fällige Rechnungen, Termine und Deadlines"
-                        />
-                        <Toggle
-                          checked={pushNotifTypes.archiv}
-                          onChange={() => setPushNotifTypes(p => ({ ...p, archiv: !p.archiv }))}
-                          label="Archiv-Updates"
-                          desc="Neue Dokumente im Archiv"
-                        />
-                      </div>
-                    )}
-
-                    {/* Stille Stunden */}
-                    {pushEnabled && (
-                      <div style={{
-                        padding: '12px 14px', borderRadius: 8,
-                        background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)',
-                        marginBottom: 12,
-                      }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>🌙 Stille Stunden</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 12, color: '#aeb9c8' }}>Von</span>
-                          <input
-                            className="pk-input"
-                            type="time"
-                            value={pushStilleVon}
-                            onChange={e => setPushStilleVon(e.target.value)}
-                            style={{ maxWidth: 110 }}
-                          />
-                          <span style={{ fontSize: 12, color: '#aeb9c8' }}>bis</span>
-                          <input
-                            className="pk-input"
-                            type="time"
-                            value={pushStilleBis}
-                            onChange={e => setPushStilleBis(e.target.value)}
-                            style={{ maxWidth: 110 }}
-                          />
-                        </div>
-                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
-                          In dieser Zeit werden keine Push-Benachrichtigungen gesendet.
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Info-Box */}
-                <div style={{
-                  padding: '10px 14px', borderRadius: 8,
-                  background: 'rgba(22,132,255,.06)', border: '1px solid rgba(22,132,255,.15)',
-                  fontSize: 12, color: '#6cb6ff',
-                }}>
-                  💡 <strong>Tipp:</strong> Für beste Push-Unterstützung die App als PWA auf dem Startbildschirm hinzufügen:
-                  Safari → Teilen → &bdquo;Zum Home-Bildschirm hinzufügen&ldquo; · Chrome → Menü → &bdquo;App installieren&ldquo;
-                </div>
-              </div>
-            </div>
-          )}
+          {section === 'benachrichtigungen' && <BenachrichtigungenTab showToast={showToast} />}
 
           {section === 'design' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
