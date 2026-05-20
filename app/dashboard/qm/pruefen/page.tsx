@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import QRCode from 'react-qr-code'
 import { hasDemoCookie } from '@/lib/auth'
 import { compressImage } from '@/lib/image-compress'
 import { generateQmPruefberichtPDF } from '@/lib/qm-pdf'
@@ -203,6 +204,13 @@ export default function PruefeWizardPage() {
     setToast({ msg, ok })
     setTimeout(() => setToast(null), 3500)
   }
+
+  const qrPayload = JSON.stringify({
+    bauteil_id: bauteilId || '—',
+    pruefbericht_nr: savedNr ?? 'offen',
+    datum: new Date().toISOString().slice(0, 10),
+    system: 'petersen-ki-qm',
+  })
 
   // ── Load zeichnungen
   const loadZeichnungen = useCallback(async () => {
@@ -965,6 +973,24 @@ export default function PruefeWizardPage() {
             )})()}
           </div>
 
+          {/* QR-Code */}
+          {bauteilId && (
+            <div className="pk-card" style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 6 }}>📲 Bauteil-QR-Code</div>
+                <div style={{ color: '#aeb9c8', fontSize: 12 }}>
+                  Bauteil-ID: <span style={{ fontFamily: 'monospace', color: '#f8fbff' }}>{bauteilId}</span>
+                </div>
+                <div style={{ color: '#aeb9c8', fontSize: 11, marginTop: 2 }}>
+                  Wird in das PDF eingebettet.
+                </div>
+              </div>
+              <div style={{ background: '#fff', padding: 8, borderRadius: 8, flexShrink: 0 }}>
+                <QRCode value={qrPayload} size={100} />
+              </div>
+            </div>
+          )}
+
           {/* Abzeichnung */}
           <div className="pk-card">
             <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 14 }}>✍️ Abzeichnung</div>
@@ -1027,6 +1053,13 @@ export default function PruefeWizardPage() {
               <div style={{ color: '#aeb9c8', fontSize: 13, marginBottom: 18 }}>
                 Der Bericht wurde in der Datenbank gesichert.
               </div>
+              {bauteilId && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+                  <div style={{ background: '#fff', padding: 8, borderRadius: 8, display: 'inline-block' }}>
+                    <QRCode value={qrPayload} size={120} />
+                  </div>
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button
                   className="pk-btn"

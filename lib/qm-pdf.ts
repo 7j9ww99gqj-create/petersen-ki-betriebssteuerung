@@ -60,6 +60,34 @@ function getFirmenname(): string {
     return (JSON.parse(raw) as { firmenname?: string }).firmenname || 'Petersen KI'
   } catch { return 'Petersen KI' }
 }
+async function generateQrDataUrl(payload: string): Promise<string | null> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return null
+  try {
+    // qr.js is a transitive dep of react-qr-code
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const qrjsMod = await import('qr.js') as any
+    const qrfn = qrjsMod.default ?? qrjsMod
+    const qr = qrfn(payload, { errorCorrectLevel: 'M' })
+    const cells: boolean[][] = qr.modules
+    const cellPx = 4
+    const size = cells.length * cellPx
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, size, size)
+    ctx.fillStyle = '#000000'
+    for (let r = 0; r < cells.length; r++) {
+      for (let c = 0; c < cells[r].length; c++) {
+        if (cells[r][c]) ctx.fillRect(c * cellPx, r * cellPx, cellPx, cellPx)
+      }
+    }
+    return canvas.toDataURL('image/png')
+  } catch { return null }
+}
+
 async function loadDataUrl(url: string): Promise<string | null> {
   if (typeof window === 'undefined') return null
   try {
@@ -157,6 +185,14 @@ export async function generateQmPruefberichtPDF(berichtId: string): Promise<void
   ])
   if (!bericht) throw new Error('Prüfbericht nicht gefunden')
 
+  const qrPayload = JSON.stringify({
+    bauteil_id: bericht.bauteil_id ?? '',
+    pruefbericht_nr: bericht.pruefbericht_nr,
+    datum: (bericht.pruef_datum ?? new Date().toISOString().slice(0, 10)),
+    system: 'petersen-ki-qm',
+  })
+  const qrDataUrl = await generateQrDataUrl(qrPayload)
+
   let zeichnungName = ''
   if (bericht.zeichnung_id) {
     const z = await getQmZeichnung(bericht.zeichnung_id).catch(() => null)
@@ -199,17 +235,27 @@ export async function generateQmPruefberichtPDF(berichtId: string): Promise<void
   doc.setTextColor(...QM_RGB)
   doc.text(bericht.pruefbericht_nr, margin, 30)
 
-  // Gesamtstatus badge
+  // QR-Code (top-right, 22×22mm)
+  const qrSize = 22
+  const qrX = pageW - margin - qrSize
+  const qrY = 20
+  if (qrDataUrl) {
+    doc.setFillColor(255, 255, 255)
+    doc.rect(qrX - 1, qrY - 1, qrSize + 2, qrSize + 2, 'F')
+    doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize)
+  }
+
+  // Gesamtstatus badge (shifted left of QR code)
   const rgb = gsRgb(bericht.gesamtstatus)
   doc.setFillColor(...rgb)
-  doc.rect(pageW - margin - 42, 22, 42, 11, 'F')
+  doc.rect(pageW - margin - qrSize - 44, 22, 42, 11, 'F')
   doc.setFontSize(8.5)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(255, 255, 255)
-  doc.text(gsLabel(bericht.gesamtstatus), pageW - margin - 21, 28.5, { align: 'center' })
+  doc.text(gsLabel(bericht.gesamtstatus), pageW - margin - qrSize - 23, 28.5, { align: 'center' })
 
   // Kopfdaten
-  let y = 40
+  let y = 46
   const col2 = 110
   const kvPairs: [string, string, string, string][] = [
     ['Bauteil-ID', bericht.bauteil_id ?? '—', 'Charge', bericht.chargennummer ?? '—'],
