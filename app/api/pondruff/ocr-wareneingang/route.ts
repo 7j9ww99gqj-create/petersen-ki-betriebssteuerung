@@ -24,7 +24,8 @@ function normalizeWeCoating(val: unknown): string {
 }
 
 const Schema = z.object({
-  image: z.string().max(10_000_000),
+  image: z.string().max(10_000_000).optional(),
+  images: z.array(z.string().max(10_000_000)).max(6).optional(),
 })
 
 export const maxDuration = 60
@@ -47,8 +48,11 @@ export async function POST(req: NextRequest) {
 
   const parsedBody = await parseBody(req, Schema)
   if (!parsedBody.ok) return parsedBody.error
-  const { image } = parsedBody.data
-  if (!image.startsWith('data:')) return NextResponse.json({ error: 'Kein Bild' }, { status: 400 })
+  const { image, images } = parsedBody.data
+  const allImages = images?.length ? images : image ? [image] : []
+  if (!allImages.length || !allImages[0].startsWith('data:')) {
+    return NextResponse.json({ error: 'Kein Bild' }, { status: 400 })
+  }
 
   const coatingList = WE_COATINGS.join(', ')
 
@@ -109,7 +113,7 @@ JSON Schema (gib exakt dieses Format zurück):
   ]
 }`
 
-  const result = await runVisionOcr({ apiKey, prompt, images: [image], maxTokens: 3000 })
+  const result = await runVisionOcr({ apiKey, prompt, images: allImages, maxTokens: 3000 })
   if (!result.ok) return result.response
 
   const parsed = result.data

@@ -592,6 +592,55 @@ function metaLabel(doc: DocLike, label: string, value: string, x: number, y: num
   doc.text(lines[0] || '—', x, y + 4.5)
 }
 
+function drawCheckItem(doc: DocLike, checked: boolean, label: string, x: number, y: number) {
+  const bx = x, by = y - 2.8, bsize = 3.2
+  doc.setDrawColor(80, 80, 80)
+  doc.setLineWidth(0.3)
+  doc.rect(bx, by, bsize, bsize)
+  if (checked) {
+    doc.setDrawColor(229, 9, 9)
+    doc.setLineWidth(0.55)
+    doc.line(bx + 0.4, by + 1.6, bx + 1.3, by + bsize - 0.3)
+    doc.line(bx + 1.3, by + bsize - 0.3, bx + bsize - 0.3, by + 0.4)
+  }
+  doc.setDrawColor(80, 80, 80)
+  doc.setLineWidth(0.3)
+  doc.setFont('helvetica', checked ? 'bold' : 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(checked ? 20 : 130, 20, 20)
+  doc.text(label, bx + bsize + 1.5, y)
+}
+
+function drawStatusLines(doc: DocLike, y: number) {
+  const lineLen = CONTENT_W * 0.55
+  const datumLen = CONTENT_W * 0.28
+  const lineY = y + 4
+  const items = [
+    'Eingang geprüft:',
+    'Bearbeitung fertig:',
+    'Ausgabe an:',
+  ]
+  doc.setDrawColor(150, 150, 150)
+  doc.setLineWidth(0.25)
+  doc.line(MARGIN, y - 2, A5_W - MARGIN, y - 2)
+
+  for (let i = 0; i < items.length; i++) {
+    const iy = lineY + i * 9
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(60, 60, 60)
+    doc.text(items[i], MARGIN, iy)
+    doc.setDrawColor(120, 120, 120)
+    doc.setLineWidth(0.2)
+    doc.line(MARGIN + 30, iy + 0.5, MARGIN + 30 + lineLen, iy + 0.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(6.5)
+    doc.setTextColor(120, 120, 120)
+    doc.text('Datum:', MARGIN + 30 + lineLen + 3, iy)
+    doc.line(MARGIN + 30 + lineLen + 15, iy + 0.5, MARGIN + 30 + lineLen + 15 + datumLen, iy + 0.5)
+  }
+}
+
 export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<void> {
   const { default: JsPDF } = await import('jspdf')
   const doc = new JsPDF({ unit: 'mm', format: 'a5', orientation: 'landscape' }) as unknown as DocLike
@@ -627,12 +676,21 @@ export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<voi
     doc.setFontSize(8)
     doc.setTextColor(150, 150, 150)
     doc.text('Keine Positionen erfasst.', MARGIN, y + 4)
+    y += 8
   }
+
+  const SERVICES = [
+    { key: 'polieren', label: 'Polieren' },
+    { key: 'entschichtung', label: 'Entschichtung' },
+    { key: 'microstrahlen', label: 'Microstrahlen' },
+    { key: 'laeppstrahlen', label: 'Läppstrahlen' },
+    { key: 'polierstrahlen', label: 'Polierstrahlen' },
+  ] as const
 
   for (let i = 0; i < pos.length; i++) {
     const p = pos[i]
 
-    if (y > A5_H - 18) {
+    if (y > A5_H - 14) {
       doc.addPage()
       drawArbeitskartePage(doc, banner)
       y = HEADER_H + 10
@@ -642,18 +700,13 @@ export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<voi
       ? `Ø ${p.durchmesser || '?'} × ${p.durchmesser_laenge || '?'} mm`
       : `${p.laenge || '?'} × ${p.breite || '?'} × ${p.hoehe || '?'} mm`
 
-    const services: string[] = []
-    if (p.polieren === 'Ja') services.push(`Polieren${p.polieren_wo ? ` (${p.polieren_wo})` : ''}`)
-    if (p.entschichtung === 'Ja') services.push('Entschichtung')
-    if (p.microstrahlen === 'Ja') services.push('Microstrahlen')
-    if (p.laeppstrahlen === 'Ja') services.push('Läppstrahlen')
-    if (p.polierstrahlen === 'Ja') services.push('Polierstrahlen')
+    const beschichtung = p.beschichtung && p.beschichtung !== 'Keine' ? p.beschichtung : 'Keine'
 
     const weitereInfoStr = Array.isArray(p.weitere_infos) && p.weitere_infos.length > 0
       ? p.weitere_infos.filter(w => w.key).map(w => `${w.key}: ${w.value}`).join('  |  ')
       : ''
 
-    // Position header
+    // Position header bar
     doc.setFillColor(240, 240, 240)
     doc.rect(MARGIN, y - 1, CONTENT_W, 6.5, 'F')
     doc.setFont('helvetica', 'bold')
@@ -661,34 +714,44 @@ export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<voi
     doc.setTextColor(229, 9, 9)
     doc.text(`Pos. ${p.position_nr}`, MARGIN + 2, y + 4)
     doc.setTextColor(20, 20, 20)
-    const titel = `${p.menge ? p.menge + ' ×  ' : ''}${p.artikelbezeichnung || '—'}`
-    doc.text(titel, MARGIN + 14, y + 4)
+    doc.text(`${p.menge ? p.menge + ' ×  ' : ''}${p.artikelbezeichnung || '—'}`, MARGIN + 14, y + 4)
     y += 8.5
 
-    // Maße + Beschichtung
+    // Maße + Beschichtung row
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7.5)
     doc.setTextColor(60, 60, 60)
-    const col2 = CONTENT_W / 2
-    doc.text(`Maße: ${masse}${p.raw_dimension_text ? `  (Beleg: ${p.raw_dimension_text})` : ''}`, MARGIN + 2, y)
-    const beschichtung = p.beschichtung && p.beschichtung !== 'Keine' ? p.beschichtung : 'Keine'
+    doc.text(
+      `Maße: ${masse}${p.raw_dimension_text ? `  (Beleg: ${p.raw_dimension_text})` : ''}`,
+      MARGIN + 2, y
+    )
     doc.setFont('helvetica', beschichtung !== 'Keine' ? 'bold' : 'normal')
     doc.setTextColor(beschichtung !== 'Keine' ? 229 : 120, beschichtung !== 'Keine' ? 9 : 120, 9)
-    doc.text(`Beschichtung: ${beschichtung}`, MARGIN + 2 + col2, y)
-    doc.setTextColor(60, 60, 60)
-    y += 5
+    doc.text(`Beschichtung: ${beschichtung}`, MARGIN + 2 + CONTENT_W / 2, y)
+    y += 5.5
 
-    // Services
-    if (services.length > 0) {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7.5)
-      doc.setTextColor(20, 20, 20)
-      doc.text('Services: ', MARGIN + 2, y)
+    // Service-Checkboxen (3 pro Zeile)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.setTextColor(60, 60, 60)
+    const cbColW = CONTENT_W / 3
+    SERVICES.forEach((s, si) => {
+      const col = si % 3
+      const row = Math.floor(si / 3)
+      const cx = MARGIN + 2 + col * cbColW
+      const cy = y + row * 5.5
+      drawCheckItem(doc, p[s.key] === 'Ja', s.label, cx, cy)
+    })
+    const cbRows = Math.ceil(SERVICES.length / 3)
+    y += cbRows * 5.5
+
+    // Polieren-Ort (wenn gesetzt)
+    if (p.polieren === 'Ja' && p.polieren_wo) {
       doc.setFont('helvetica', 'normal')
-      doc.setTextColor(60, 60, 60)
-      const serviceLines = doc.splitTextToSize(services.join('  ·  '), CONTENT_W - 22)
-      doc.text(serviceLines, MARGIN + 19, y)
-      y += serviceLines.length * 4.5
+      doc.setFontSize(7)
+      doc.setTextColor(100, 100, 100)
+      doc.text(`Polieren: ${p.polieren_wo}`, MARGIN + 2, y)
+      y += 4.5
     }
 
     // Weitere Infos
@@ -701,7 +764,7 @@ export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<voi
       y += wiLines.length * 4
     }
 
-    y += 2
+    y += 3
 
     if (i < pos.length - 1) {
       doc.setDrawColor(220, 220, 220)
@@ -711,15 +774,24 @@ export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<voi
     }
   }
 
-  // ── Footer ──────────────────────────────────────────────────────────────
+  // ── Status-Zeilen am Ende der letzten Seite ──────────────────────────────
+  const STATUS_H = 34
+  if (y + STATUS_H > A5_H - 8) {
+    doc.addPage()
+    drawArbeitskartePage(doc, banner)
+    y = HEADER_H + 10
+  }
+  drawStatusLines(doc, A5_H - STATUS_H)
+
+  // ── Footer auf allen Seiten ──────────────────────────────────────────────
   const pageCount = doc.getNumberOfPages()
-  for (let p = 1; p <= pageCount; p++) {
-    doc.setPage(p)
+  for (let pg = 1; pg <= pageCount; pg++) {
+    doc.setPage(pg)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(6.5)
     doc.setTextColor(160, 160, 160)
     doc.text('Pondruff Polier- & Beschichtungsservice', MARGIN, A5_H - 3)
-    doc.text(`Seite ${p} / ${pageCount}`, A5_W - MARGIN, A5_H - 3, { align: 'right' })
+    doc.text(`Seite ${pg} / ${pageCount}`, A5_W - MARGIN, A5_H - 3, { align: 'right' })
   }
 
   const blobUrl = doc.output('bloburl')
