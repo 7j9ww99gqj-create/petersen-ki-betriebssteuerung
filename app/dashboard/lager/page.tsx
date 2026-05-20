@@ -897,9 +897,9 @@ export default function LagerPilotPage() {
   const [search, setSearch] = useState('')
   const [filterKat, setFilterKat] = useState('Alle')
   const [bestandStatusFilter, setBestandStatusFilter] = useState<'Alle' | 'ok' | 'niedrig' | 'leer'>('Alle')
-  const [artikel, setArtikel] = useState<Artikel[]>(isDemo ? demoArtikel : [])
-  const [bewegungen, setBewegungen] = useState<Bewegung[]>(isDemo ? demoBewegungen : [])
-  const [loading, setLoading] = useState(!isDemo)
+  const [artikel, setArtikel] = useState<Artikel[]>([])
+  const [bewegungen, setBewegungen] = useState<Bewegung[]>([])
+  const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [retryKey, setRetryKey] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -934,9 +934,9 @@ export default function LagerPilotPage() {
   const [histArtikel, setHistArtikel] = useState<string | null>(null)
 
   // Stellplatz-State
-  const [stellplaetze, setStellplaetze] = useState<Stellplatz[]>(isDemo ? demoStellplaetze : [])
-  const [stellplatzBestand, setStellplatzBestand] = useState<StellplatzBestand[]>(isDemo ? demoStellplatzBestand : [])
-  const [umlagerungen, setUmlagerungen] = useState<Umlagerung[]>(isDemo ? demoUmlagerungen : [])
+  const [stellplaetze, setStellplaetze] = useState<Stellplatz[]>([])
+  const [stellplatzBestand, setStellplatzBestand] = useState<StellplatzBestand[]>([])
+  const [umlagerungen, setUmlagerungen] = useState<Umlagerung[]>([])
   const [spModal, setSpModal] = useState<null | 'new' | Stellplatz>(null)
   const [spDeleteConfirmId, setSpDeleteConfirmId] = useState<string | null>(null)
   const [spSearch, setSpSearch] = useState('')
@@ -969,7 +969,6 @@ export default function LagerPilotPage() {
 
   // Daten laden (Basis: Artikel + Bewegungen)
   useEffect(() => {
-    if (isDemo) return
     trackVisit({ href: '/dashboard/lager', label: 'LagerPilot', icon: '📦' })
     getAiFeatureSettings().then(setAiSettings).catch(() => {})
     setLoading(true); setLoadError('')
@@ -987,7 +986,7 @@ export default function LagerPilotPage() {
       .catch(() => setLoadError('Lagerdaten konnten nicht geladen werden. Bitte Verbindung prüfen.'))
       .finally(() => setLoading(false))
     getEinkaufLieferanten().then(l => setLieferantenListe((l as { id: string; name: string }[]) ?? [])).catch(() => {})
-  }, [isDemo, retryKey])
+  }, [retryKey])
 
   // Sync status filter from URL params
   useEffect(() => {
@@ -999,7 +998,6 @@ export default function LagerPilotPage() {
 
   // Lazy Loading: Stellplätze + Bestand erst bei Tab-Wechsel
   useEffect(() => {
-    if (isDemo) return
     if (tab === 'stellplaetze' || tab === 'lagerbelegung') {
       if (!loadedTabs.has('stellplaetze')) {
         Promise.all([getLagerStellplaetze(), getLagerStellplatzBestand()])
@@ -1022,7 +1020,7 @@ export default function LagerPilotPage() {
       setLoadedTabs(prev => new Set(Array.from(prev).concat('umlagerung')))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, isDemo])
+  }, [tab])
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok })
@@ -1109,19 +1107,14 @@ export default function LagerPilotPage() {
   async function executeBriefAktion(aktion: KiAktion, idx: number) {
     setBriefAktionLoading(idx)
     try {
-      if (isDemo) {
-        await new Promise(r => setTimeout(r, 800))
-        showToast(`Demo: „${aktion.artikel}" simuliert ausgeführt`)
-      } else {
-        const [sps, sb] = await Promise.all([getLagerStellplaetze(), getLagerStellplatzBestand()])
-        const nachSp = sps.find((s: { code: string }) => s.code === aktion.nach)
-        if (!nachSp) throw new Error(`Stellplatz „${aktion.nach}" nicht gefunden`)
-        const vonRow = sb.find((b: { artikelname?: string; lager_stellplaetze?: { code?: string } | null }) =>
-          b.artikelname === aktion.artikel && b.lager_stellplaetze?.code === aktion.von)
-        if (!vonRow) throw new Error(`Bestand für „${aktion.artikel}" auf „${aktion.von}" nicht gefunden`)
-        await umlagerArtikel({ vonBestandId: (vonRow as { id: string }).id, nachStellplatzId: (nachSp as { id: string }).id, menge: aktion.menge ?? 0, grund: 'KI-Tagesbericht', artikelname: aktion.artikel })
-        showToast(`Umlagerung „${aktion.artikel}" erfolgreich ausgeführt`)
-      }
+      const [sps, sb] = await Promise.all([getLagerStellplaetze(), getLagerStellplatzBestand()])
+      const nachSp = sps.find((s: { code: string }) => s.code === aktion.nach)
+      if (!nachSp) throw new Error(`Stellplatz „${aktion.nach}" nicht gefunden`)
+      const vonRow = sb.find((b: { artikelname?: string; lager_stellplaetze?: { code?: string } | null }) =>
+        b.artikelname === aktion.artikel && b.lager_stellplaetze?.code === aktion.von)
+      if (!vonRow) throw new Error(`Bestand für „${aktion.artikel}" auf „${aktion.von}" nicht gefunden`)
+      await umlagerArtikel({ vonBestandId: (vonRow as { id: string }).id, nachStellplatzId: (nachSp as { id: string }).id, menge: aktion.menge ?? 0, grund: 'KI-Tagesbericht', artikelname: aktion.artikel })
+      showToast(`Umlagerung „${aktion.artikel}" erfolgreich ausgeführt`)
       setBriefConfirm(null)
     } catch (err) { showToast(err instanceof Error ? err.message : 'Fehler bei der Aktion', false) }
     setBriefAktionLoading(null)
@@ -1191,8 +1184,8 @@ export default function LagerPilotPage() {
 
     setSaving(true)
 
-    // Bild-Upload (nur Live-Modus) — vor dem Artikel-Upsert, damit bild_path gesetzt werden kann
-    if (!isDemo && form.bildBlob && form.bildExt) {
+    // Bild-Upload — vor dem Artikel-Upsert, damit bild_path gesetzt werden kann
+    if (form.bildBlob && form.bildExt) {
       try {
         bild_path = await uploadLagerArtikelBild({
           artikelId: id,
@@ -1203,21 +1196,19 @@ export default function LagerPilotPage() {
       } catch {
         showToast('Bild-Upload fehlgeschlagen', false); setSaving(false); return
       }
-    } else if (!isDemo && form.bildEntfernen && existing?.bild_path) {
+    } else if (form.bildEntfernen && existing?.bild_path) {
       try { await deleteLagerArtikelBild(existing.bild_path) } catch {}
       bild_path = null
     }
 
     const a: Artikel = { id, name: form.name.trim(), kategorie: form.kategorie, bestand, einheit: form.einheit, lagerplatz, status, mindestbestand, lieferant_id: form.lieferant_id || null, einkaufspreis, bild_path }
 
-    if (!isDemo) {
-      try { await upsertLagerArtikel(a) } catch { showToast('Fehler beim Speichern', false); setSaving(false); return }
-      // Signed URL für die neue/geänderte Bilddatei nachladen
-      if (bild_path) {
-        const map: Record<string, string> = await getLagerBildSignedUrls([bild_path]).catch(() => ({}))
-        const url = map[bild_path]
-        if (url) setBildUrls(prev => ({ ...prev, [bild_path as string]: url }))
-      }
+    try { await upsertLagerArtikel(a) } catch { showToast('Fehler beim Speichern', false); setSaving(false); return }
+    // Signed URL für die neue/geänderte Bilddatei nachladen
+    if (bild_path) {
+      const map: Record<string, string> = await getLagerBildSignedUrls([bild_path]).catch(() => ({}))
+      const url = map[bild_path]
+      if (url) setBildUrls(prev => ({ ...prev, [bild_path as string]: url }))
     }
     setArtikel(prev => isEdit ? prev.map(x => x.id === id ? a : x) : [...prev, a])
     setModal(null)
@@ -1226,9 +1217,7 @@ export default function LagerPilotPage() {
   }
 
   const handleDeleteArtikel = async (id: string) => {
-    if (!isDemo) {
-      try { await deleteLagerArtikel(id) } catch { showToast('Fehler beim Löschen', false); setDeleteConfirmId(null); return }
-    }
+    try { await deleteLagerArtikel(id) } catch { showToast('Fehler beim Löschen', false); setDeleteConfirmId(null); return }
     setArtikel(prev => prev.filter(a => a.id !== id))
     setDeleteConfirmId(null)
     showToast('🗑 Artikel gelöscht')
@@ -1244,25 +1233,17 @@ export default function LagerPilotPage() {
 
     const existing = artikel.find(a => a.name === newEingang.artikel || a.id === newEingang.artikel)
 
-    if (!isDemo) {
-      try {
-        await insertLagerBewegung({ typ: 'Eingang', artikel: newEingang.artikel, menge, mitarbeiter: newEingang.mitarbeiter || '—' })
-        if (existing) {
-          const newBestand = existing.bestand + menge
-          const updated = { ...existing, bestand: newBestand, status: calcStatus(newBestand, existing.mindestbestand ?? 0) }
-          await upsertLagerArtikel(updated)
-          setArtikel(prev => prev.map(a => a.id === existing.id ? updated : a))
-        }
-        const b = await getLagerBewegungen()
-        setBewegungen(b as Bewegung[])
-      } catch { showToast('Fehler beim Buchen', false); setSaving(false); return }
-    } else {
+    try {
+      await insertLagerBewegung({ typ: 'Eingang', artikel: newEingang.artikel, menge, mitarbeiter: newEingang.mitarbeiter || '—' })
       if (existing) {
         const newBestand = existing.bestand + menge
-        setArtikel(prev => prev.map(a => a.id === existing.id ? { ...a, bestand: newBestand, status: calcStatus(newBestand, a.mindestbestand ?? 0) } : a))
+        const updated = { ...existing, bestand: newBestand, status: calcStatus(newBestand, existing.mindestbestand ?? 0) }
+        await upsertLagerArtikel(updated)
+        setArtikel(prev => prev.map(a => a.id === existing.id ? updated : a))
       }
-      setBewegungen(prev => [{ id: Date.now(), typ: 'Eingang', artikel: newEingang.artikel, menge, datum: toDE(new Date()), mitarbeiter: newEingang.mitarbeiter || '—', status: 'Gebucht' }, ...prev])
-    }
+      const b = await getLagerBewegungen()
+      setBewegungen(b as Bewegung[])
+    } catch { showToast('Fehler beim Buchen', false); setSaving(false); return }
 
     showToast(`✅ Eingang: ${menge}× "${newEingang.artikel}" gebucht`)
     setNewEingang({ artikel: '', menge: '', lagerplatz: '', mitarbeiter: '' })
@@ -1282,25 +1263,17 @@ export default function LagerPilotPage() {
     }
     setSaving(true)
 
-    if (!isDemo) {
-      try {
-        await insertLagerBewegung({ typ: 'Ausgang', artikel: newAusgang.artikel, menge, mitarbeiter: newAusgang.mitarbeiter || '—' })
-        if (existing) {
-          const newBestand = Math.max(0, existing.bestand - menge)
-          const updated = { ...existing, bestand: newBestand, status: calcStatus(newBestand, existing.mindestbestand ?? 0) }
-          await upsertLagerArtikel(updated)
-          setArtikel(prev => prev.map(a => a.id === existing.id ? updated : a))
-        }
-        const b = await getLagerBewegungen()
-        setBewegungen(b as Bewegung[])
-      } catch { showToast('Fehler beim Buchen', false); setSaving(false); return }
-    } else {
+    try {
+      await insertLagerBewegung({ typ: 'Ausgang', artikel: newAusgang.artikel, menge, mitarbeiter: newAusgang.mitarbeiter || '—' })
       if (existing) {
         const newBestand = Math.max(0, existing.bestand - menge)
-        setArtikel(prev => prev.map(a => a.id === existing.id ? { ...a, bestand: newBestand, status: calcStatus(newBestand, a.mindestbestand ?? 0) } : a))
+        const updated = { ...existing, bestand: newBestand, status: calcStatus(newBestand, existing.mindestbestand ?? 0) }
+        await upsertLagerArtikel(updated)
+        setArtikel(prev => prev.map(a => a.id === existing.id ? updated : a))
       }
-      setBewegungen(prev => [{ id: Date.now(), typ: 'Ausgang', artikel: newAusgang.artikel, menge, datum: toDE(new Date()), mitarbeiter: newAusgang.mitarbeiter || '—', status: 'Gebucht' }, ...prev])
-    }
+      const b = await getLagerBewegungen()
+      setBewegungen(b as Bewegung[])
+    } catch { showToast('Fehler beim Buchen', false); setSaving(false); return }
 
     showToast(`✅ Ausgang: ${menge}× "${newAusgang.artikel}" gebucht`)
     if (existing) {
@@ -1329,19 +1302,15 @@ export default function LagerPilotPage() {
     if (updates.length === 0) { showToast('Keine Änderungen', false); return }
 
     setSaving(true)
-    if (!isDemo) {
-      try { await Promise.all(updates.map(a => upsertLagerArtikel(a))) }
-      catch { showToast('Fehler beim Speichern', false); setSaving(false); return }
-    }
+    try { await Promise.all(updates.map(a => upsertLagerArtikel(a))) }
+    catch { showToast('Fehler beim Speichern', false); setSaving(false); return }
     setArtikel(prev => prev.map(a => updates.find(u => u.id === a.id) ?? a))
     setInventurWerte({})
     setSaving(false)
     showToast(`✅ Inventur gespeichert – ${updates.length} Artikel aktualisiert`)
-    if (!isDemo) {
-      await Promise.all(updates.map(a =>
-        insertLagerBewegung({ typ: 'Inventur', artikel: a.name, menge: a.bestand, mitarbeiter: 'Inventur' }).catch(() => {})
-      ))
-    }
+    await Promise.all(updates.map(a =>
+      insertLagerBewegung({ typ: 'Inventur', artikel: a.name, menge: a.bestand, mitarbeiter: 'Inventur' }).catch(() => {})
+    ))
   }
 
   // ── Stellplatz CRUD ──────────────────────────────────────────────────────────
@@ -1355,9 +1324,7 @@ export default function LagerPilotPage() {
     const duplicate = stellplaetze.find(sp => sp.code.toUpperCase() === codeNorm && sp.id !== editId)
     if (duplicate) { showToast(`⚠️ Code "${codeNorm}" existiert bereits`, false); return }
 
-    const id = editId ?? (isDemo
-      ? `SP-${Date.now().toString(36).toUpperCase()}`
-      : crypto.randomUUID())
+    const id = editId ?? crypto.randomUUID()
 
     const payload: Stellplatz = {
       id,
@@ -1372,29 +1339,27 @@ export default function LagerPilotPage() {
     }
 
     setSaving(true)
-    if (!isDemo) {
-      try {
-        await upsertLagerStellplatz({
-          id,
-          code: codeNorm,
-          name: form.name || undefined,
-          bereich: form.bereich || undefined,
-          zone: form.zone || undefined,
-          gang: form.gang || undefined,
-          regal: form.regal || undefined,
-          ebene: form.ebene || undefined,
-          fach: form.fach || undefined,
-          typ: form.typ || undefined,
-          warengruppe: form.warengruppe || undefined,
-          warenobergruppe: form.warenobergruppe || undefined,
-          temperaturzone: form.temperaturzone || undefined,
-          max_gewicht: form.max_gewicht ? parseFloat(form.max_gewicht) : undefined,
-          max_volumen: form.max_volumen ? parseFloat(form.max_volumen) : undefined,
-          aktiv: form.aktiv,
-          notiz: form.notiz || undefined,
-        })
-      } catch { showToast('Fehler beim Speichern', false); setSaving(false); return }
-    }
+    try {
+      await upsertLagerStellplatz({
+        id,
+        code: codeNorm,
+        name: form.name || undefined,
+        bereich: form.bereich || undefined,
+        zone: form.zone || undefined,
+        gang: form.gang || undefined,
+        regal: form.regal || undefined,
+        ebene: form.ebene || undefined,
+        fach: form.fach || undefined,
+        typ: form.typ || undefined,
+        warengruppe: form.warengruppe || undefined,
+        warenobergruppe: form.warenobergruppe || undefined,
+        temperaturzone: form.temperaturzone || undefined,
+        max_gewicht: form.max_gewicht ? parseFloat(form.max_gewicht) : undefined,
+        max_volumen: form.max_volumen ? parseFloat(form.max_volumen) : undefined,
+        aktiv: form.aktiv,
+        notiz: form.notiz || undefined,
+      })
+    } catch { showToast('Fehler beim Speichern', false); setSaving(false); return }
 
     setStellplaetze(prev => isEdit ? prev.map(sp => sp.id === id ? payload : sp) : [...prev, payload])
     setSpModal(null)
@@ -1403,10 +1368,8 @@ export default function LagerPilotPage() {
   }
 
   const handleDeleteStellplatz = async (id: string) => {
-    if (!isDemo) {
-      try { await deleteLagerStellplatz(id) }
-      catch { showToast('Fehler beim Löschen', false); setSpDeleteConfirmId(null); return }
-    }
+    try { await deleteLagerStellplatz(id) }
+    catch { showToast('Fehler beim Löschen', false); setSpDeleteConfirmId(null); return }
     setStellplaetze(prev => prev.filter(sp => sp.id !== id))
     setSpDeleteConfirmId(null)
     showToast('🗑 Stellplatz gelöscht')
@@ -1423,10 +1386,8 @@ export default function LagerPilotPage() {
   }
 
   const handleDeleteStellplatzBestand = async (id: string) => {
-    if (!isDemo) {
-      try { await deleteLagerStellplatzBestand(id) }
-      catch { showToast('Fehler beim Entfernen', false); setLbDeleteConfirmId(null); return }
-    }
+    try { await deleteLagerStellplatzBestand(id) }
+    catch { showToast('Fehler beim Entfernen', false); setLbDeleteConfirmId(null); return }
     setStellplatzBestand(prev => prev.filter(sb => sb.id !== id))
     setLbDeleteConfirmId(null)
     showToast('🗑 Bestand-Position entfernt')
@@ -1575,7 +1536,7 @@ export default function LagerPilotPage() {
         (sb.mhd ?? '') === (lbBuchungModal.mhd || '')
       )
       const row: StellplatzBestand = {
-        id: existing?.id ?? (isDemo ? `SB-${Date.now().toString(36).toUpperCase()}` : crypto.randomUUID()),
+        id: existing?.id ?? crypto.randomUUID(),
         stellplatz_id: sp.id,
         artikel_id: a.id,
         artikelnummer: a.id,
@@ -1591,16 +1552,14 @@ export default function LagerPilotPage() {
       }
 
       setSaving(true)
-      if (!isDemo) {
-        try {
-          const { lager_stellplaetze: _displayOnly, ...persistableRow } = row
-          void _displayOnly
-          await upsertLagerStellplatzBestand(persistableRow)
-          await persistArtikelBestand(a.id, menge)
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Fehler beim Einlagern'
-          showToast(message, false); setSaving(false); return
-        }
+      try {
+        const { lager_stellplaetze: _displayOnly, ...persistableRow } = row
+        void _displayOnly
+        await upsertLagerStellplatzBestand(persistableRow)
+        await persistArtikelBestand(a.id, menge)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Fehler beim Einlagern'
+        showToast(message, false); setSaving(false); return
       }
       setStellplatzBestand(prev => existing ? prev.map(sb => sb.id === existing.id ? row : sb) : [row, ...prev])
       updateArtikelBestandLocal(a.id, menge)
@@ -1616,18 +1575,16 @@ export default function LagerPilotPage() {
     const artikelId = source.artikel_id || source.artikelnummer || ''
 
     setSaving(true)
-    if (!isDemo) {
-      try {
-        if (source.menge === menge) await deleteLagerStellplatzBestand(source.id)
-        else {
-          const { lager_stellplaetze: _ignored, ...persistable } = source
-          void _ignored
-          await upsertLagerStellplatzBestand({ ...persistable, menge: source.menge - menge })
-        }
-        if (artikelId) await persistArtikelBestand(artikelId, -menge)
-      } catch {
-        showToast('Fehler beim Entnehmen', false); setSaving(false); return
+    try {
+      if (source.menge === menge) await deleteLagerStellplatzBestand(source.id)
+      else {
+        const { lager_stellplaetze: _ignored, ...persistable } = source
+        void _ignored
+        await upsertLagerStellplatzBestand({ ...persistable, menge: source.menge - menge })
       }
+      if (artikelId) await persistArtikelBestand(artikelId, -menge)
+    } catch {
+      showToast('Fehler beim Entnehmen', false); setSaving(false); return
     }
     setStellplatzBestand(prev => source.menge === menge
       ? prev.filter(sb => sb.id !== source.id)
@@ -1659,71 +1616,23 @@ export default function LagerPilotPage() {
 
     setSaving(true)
 
-    if (!isDemo) {
-      try {
-        await umlagerArtikel({
-          vonBestandId,
-          nachStellplatzId,
-          menge,
-          grund: grund || undefined,
-          notiz: notiz || undefined,
-        })
-        const [sp, sb, uml] = await Promise.all([
-          getLagerStellplaetze(), getLagerStellplatzBestand(), getLagerUmlagerungen(),
-        ])
-        setStellplaetze(sp as Stellplatz[])
-        setStellplatzBestand(sb as StellplatzBestand[])
-        setUmlagerungen(uml as Umlagerung[])
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Fehler bei Umlagerung'
-        showToast(msg, false); setSaving(false); return
-      }
-    } else {
-      // Demo: lokalen State simulieren
-      setStellplatzBestand(prev => {
-        let next = [...prev]
-        // Quelle reduzieren oder entfernen
-        if (vonBestand.menge === menge) {
-          next = next.filter(sb => sb.id !== vonBestandId)
-        } else {
-          next = next.map(sb => sb.id === vonBestandId ? { ...sb, menge: sb.menge - menge } : sb)
-        }
-        // Ziel: bestehende Position gleicher Artikel+Charge aufstocken oder neu anlegen
-        const ziel = next.find(sb =>
-          sb.stellplatz_id === nachStellplatzId &&
-          sb.artikelnummer === vonBestand.artikelnummer &&
-          (sb.charge ?? '') === (vonBestand.charge ?? '')
-        )
-        const nachSp = stellplaetze.find(sp => sp.id === nachStellplatzId)
-        if (ziel) {
-          next = next.map(sb => sb.id === ziel.id ? { ...sb, menge: sb.menge + menge } : sb)
-        } else {
-          next.push({
-            id: `SB-${Date.now().toString(36).toUpperCase()}`,
-            stellplatz_id: nachStellplatzId,
-            artikelnummer: vonBestand.artikelnummer,
-            artikelname: vonBestand.artikelname,
-            charge: vonBestand.charge,
-            mhd: vonBestand.mhd,
-            menge,
-            einheit: vonBestand.einheit,
-            status: 'Verfügbar',
-            eingelagert_am: new Date().toISOString().slice(0, 10),
-            lager_stellplaetze: nachSp ? { code: nachSp.code, bereich: nachSp.bereich } : undefined,
-          })
-        }
-        return next
-      })
-      setUmlagerungen(prev => [{
-        id: `UML-${Date.now().toString(36).toUpperCase()}`,
-        artikelname: vonBestand.artikelname,
-        artikelnummer: vonBestand.artikelnummer,
-        von_stellplatz_id: vonBestand.stellplatz_id,
-        nach_stellplatz_id: nachStellplatzId,
+    try {
+      await umlagerArtikel({
+        vonBestandId,
+        nachStellplatzId,
         menge,
         grund: grund || undefined,
-        datum: new Date().toISOString(),
-      }, ...prev])
+        notiz: notiz || undefined,
+      })
+      const [sp, sb, uml] = await Promise.all([
+        getLagerStellplaetze(), getLagerStellplatzBestand(), getLagerUmlagerungen(),
+      ])
+      setStellplaetze(sp as Stellplatz[])
+      setStellplatzBestand(sb as StellplatzBestand[])
+      setUmlagerungen(uml as Umlagerung[])
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Fehler bei Umlagerung'
+      showToast(msg, false); setSaving(false); return
     }
 
     const vonSp = stellplaetze.find(sp => sp.id === vonBestand.stellplatz_id)
@@ -1751,7 +1660,7 @@ export default function LagerPilotPage() {
     if (menge) setBestellMengen(prev => ({ ...prev, [id]: menge }))
     setBestellModal(null)
     showToast(`✅ Bestellung für "${bestellModal?.name}" (${menge} ${bestellModal?.einheit}) wurde ausgelöst`)
-    if (!isDemo && bestellModal) {
+    if (bestellModal) {
       const a = bestellModal
       upsertEinkaufBestellung({
         id: genId('BS'),
