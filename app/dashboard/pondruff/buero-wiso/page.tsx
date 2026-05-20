@@ -29,6 +29,7 @@ type Saved = {
 
 type WEPosEntry = {
   position_nr: number
+  artikelnummer?: string
   menge: string
   artikelbezeichnung: string
   form: string
@@ -41,6 +42,7 @@ type WEPosEntry = {
   weitere_infos?: { key: string; value: string }[]
   polieren?: string
   polieren_wo?: string
+  polier_kosten?: string
   entschichtung?: string
   microstrahlen?: string
   laeppstrahlen?: string
@@ -94,6 +96,7 @@ export default function BueroWisoPage() {
   const [weDelConfirm, setWeDelConfirm] = useState<string | null>(null)
   const [weArchiveConfirm, setWeArchiveConfirm] = useState<string | null>(null)
   const [weConvertConfirm, setWeConvertConfirm] = useState<string | null>(null)
+  const [weRabattState, setWeRabattState] = useState<{ id: string; value: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [wisoDebug, setWisoDebug] = useState<Record<string, unknown> | null>(null)
   const [wisoDebugBusy, setWisoDebugBusy] = useState(false)
@@ -211,7 +214,7 @@ export default function BueroWisoPage() {
     load(); setWeArchiveConfirm(null)
   }
 
-  async function weToAuftrag(w: SavedWE) {
+  async function weToAuftrag(w: SavedWE, rabattPct: number) {
     setBusy(true)
     try {
       const sb = createSupabaseClient()
@@ -219,23 +222,40 @@ export default function BueroWisoPage() {
       if (!user) throw new Error('Nicht eingeloggt')
       const cfg = await getPriceConfig(user.id)
 
-      const pricePositions: PricePosition[] = (w.positionen || []).map((p, idx) => {
+      const rabatt = Math.max(0, Math.min(100, rabattPct || 0))
+      const rows: WisoOrderRow[] = []
+
+      ;(w.positionen || []).forEach((p, idx) => {
         const isRund = p.form === 'Rund'
-        const rawCoating = p.beschichtung && p.beschichtung !== 'Keine' ? p.beschichtung : 'TiCN'
-        const coating = normalizePriceCoating(rawCoating)
-        const services = [
-          p.polieren === 'Ja' && `Polieren${p.polieren_wo ? ` (${p.polieren_wo})` : ''}`,
+        const qty = Math.max(1, parseDecimal(p.menge) || 1)
+        const posNr = String(p.position_nr || idx + 1).padStart(2, '0')
+        const articleNo = p.artikelnummer || ''
+        const artName = p.artikelbezeichnung || 'Bauteil'
+        const masse = isRund
+          ? `Ø${p.durchmesser || '?'}×${p.durchmesser_laenge || '?'}mm`
+          : `${p.laenge || '?'}×${p.breite || '?'}×${p.hoehe || '?'}mm`
+
+        // ── Beschichtungs-Zeile (mit Rabatt) ─────────────────────────
+        const hasCoating = p.beschichtung && p.beschichtung !== 'Keine'
+        const coating = normalizePriceCoating(hasCoating ? p.beschichtung || '' : 'TiCN')
+        const otherServices = [
           p.entschichtung === 'Ja' && 'Entschichtung',
           p.microstrahlen === 'Ja' && 'Microstrahlen',
           p.laeppstrahlen === 'Ja' && 'Läppstrahlen',
           p.polierstrahlen === 'Ja' && 'Polierstrahlen',
-        ].filter(Boolean).join(', ')
-        return {
-          description: [p.artikelbezeichnung || 'Beschichtung', services].filter(Boolean).join(' · '),
-          article_no: '', position_no: String(p.position_nr || idx + 1),
+        ].filter(Boolean) as string[]
+        const beschParts = [artName, masse]
+        if (hasCoating) beschParts.push(`${p.beschichtung} beschichtet`)
+        if (otherServices.length) beschParts.push(`(${otherServices.join(', ')})`)
+        const beschDesc = beschParts.join(' ')
+
+        const pricePos: PricePosition = {
+          description: beschDesc,
+          article_no: articleNo,
+          position_no: posNr,
           order_no: '', cost_center: '',
           purchase_order: w.purchase_order || w.delivery_id || '',
-          quantity: Math.max(1, parseDecimal(p.menge) || 1),
+          quantity: qty,
           shape: (isRund ? 'Rund' : 'Eckig') as 'Rund' | 'Eckig',
           coating,
           factor: cfg.coating_factors[coating] ?? priceDefaultFactor(coating),
@@ -243,30 +263,47 @@ export default function BueroWisoPage() {
           length: isRund ? parseDecimal(p.durchmesser_laenge) : parseDecimal(p.laenge),
           width: isRund ? 0 : parseDecimal(p.breite),
           height: isRund ? 0 : parseDecimal(p.hoehe),
-          discount: 0, note: '', source: 'wareneingang',
+          discount: rabatt, // Rabatt NUR auf Beschichtung
+          note: '', source: 'wareneingang',
           raw_dimension_text: p.raw_dimension_text,
+        }
+        const result = calcPricePosition(pricePos, cfg)
+        const singleAfter = money(result.final_total / qty)
+
+        rows.push({
+          'Pos.': posNr,
+          Menge: qty,
+          'Artikel-Nr.': articleNo,
+          Einheit: '',
+          Beschreibung: beschDesc,
+          Liefertermin: '',
+          Listenpreis: result.unit_price.toFixed(2),
+          'Rabatt (%)': String(rabatt),
+          Einzelpreis: singleAfter.toFixed(2),
+          Gesamtpreis: result.final_total.toFixed(2),
+        })
+
+        // ── Polier-Zeile (kein Rabatt) ────────────────────────────────
+        if (p.polieren === 'Ja') {
+          const polierEinzel = parseDecimal(p.polier_kosten) || 0
+          const polierTotal = money(polierEinzel * qty)
+          const polierDescParts = [artName, masse, 'poliert']
+          if (p.polieren_wo) polierDescParts.push(`(${p.polieren_wo})`)
+          rows.push({
+            'Pos.': posNr, // selbe Pos.-Nr.
+            Menge: qty,
+            'Artikel-Nr.': articleNo,
+            Einheit: '',
+            Beschreibung: polierDescParts.join(' '),
+            Liefertermin: '',
+            Listenpreis: polierEinzel.toFixed(2),
+            'Rabatt (%)': '0',
+            Einzelpreis: polierEinzel.toFixed(2),
+            Gesamtpreis: polierTotal.toFixed(2),
+          })
         }
       })
 
-      const globalPO = w.purchase_order || w.delivery_id || ''
-      // Build rows with user's price config
-      const rows: WisoOrderRow[] = pricePositions.map((pos, i) => {
-        const result = calcPricePosition(pos, cfg)
-        const qty = Math.max(1, Math.floor(parseDecimal(pos.quantity) || 1))
-        const singleAfter = money(result.final_total / qty)
-        return {
-          'Pos.': String(i + 1).padStart(2, '0'),
-          Menge: qty,
-          'Artikel-Nr.': pos.article_no || '',
-          Einheit: '',
-          Beschreibung: pos.description,
-          Liefertermin: '',
-          Listenpreis: result.unit_price.toFixed(2),
-          'Rabatt (%)': '0',
-          Einzelpreis: singleAfter.toFixed(2),
-          Gesamtpreis: result.final_total.toFixed(2),
-        }
-      })
       const total = money(rows.reduce((s, r) => s + parseFloat(r.Gesamtpreis), 0))
       const now = new Date()
       const pad = (n: number) => String(n).padStart(2, '0')
@@ -279,20 +316,21 @@ export default function BueroWisoPage() {
         project: w.purchase_order || w.delivery_id || null,
         purchase_order: w.purchase_order || w.delivery_id || null,
         total,
-        positions: pricePositions,
+        positions: w.positionen, // Original-WE-Positionen
         rows,
         status: 'auftragsbestaetigung',
         confirmed_at: now.toISOString(),
       }).select().single()
       if (error) throw error
 
-      // Link WE → Auftrag
       await sb.from('pondruff_wareneingaenge').update({
-        ai_data: { ...(w.ai_data || {}), converted_to_auftrag_id: ins.id, converted_at: now.toISOString() },
+        ai_data: { ...(w.ai_data || {}), converted_to_auftrag_id: ins.id, converted_at: now.toISOString(), rabatt_beschichtung: rabatt },
       }).eq('id', w.id)
 
-      showToast(`✓ Auftragsbestätigung ${orderId} erstellt — ${total.toFixed(2)} € Netto`)
+      const rabattInfo = rabatt > 0 ? ` (Rabatt ${rabatt}% auf Beschichtungen)` : ''
+      showToast(`✓ Auftragsbestätigung ${orderId} — ${total.toFixed(2)} € Netto${rabattInfo}`)
       setWeConvertConfirm(null)
+      setWeRabattState(null)
       load()
       setSection('auftraege')
     } catch (e) {
@@ -478,11 +516,29 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
                         <td>{w.eingelagert_von || w.operator || '—'}</td>
                         <td onClick={e => e.stopPropagation()}>
                           {weConvertConfirm === w.id ? (
-                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                              <span style={{ fontSize: 10, color: '#fbbf24' }}>→ AB erstellen?</span>
-                              <button onClick={() => weToAuftrag(w)} disabled={busy} style={{ ...confirmYes, background: '#16a34a' }}>Ja</button>
-                              <button onClick={() => setWeConvertConfirm(null)} style={confirmNo}>X</button>
-                            </div>
+                            weRabattState?.id === w.id ? (
+                              // Step 2: Kundenrabatt eingeben
+                              <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 10, color: '#fbbf24', whiteSpace: 'nowrap' }}>Rabatt Beschicht. %:</span>
+                                <input type="number" min="0" max="100" step="1" value={weRabattState.value}
+                                  onChange={e => setWeRabattState({ id: w.id, value: e.target.value })}
+                                  ref={el => { if (el && document.activeElement !== el) setTimeout(() => el.focus(), 0) }}
+                                  style={{ width: 50, fontSize: 11, padding: '3px 5px', borderRadius: 4, border: '1px solid rgba(245,158,11,.5)', background: 'rgba(0,0,0,.4)', color: '#fff' }}
+                                  placeholder="0" />
+                                <button onClick={() => weToAuftrag(w, parseDecimal(weRabattState.value) || 0)}
+                                  disabled={busy}
+                                  style={{ ...confirmYes, background: '#16a34a' }}>Erstellen</button>
+                                <button onClick={() => { setWeRabattState(null); setWeConvertConfirm(null) }} style={confirmNo}>X</button>
+                              </div>
+                            ) : (
+                              // Step 1: AB erstellen Ja/Nein
+                              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                <span style={{ fontSize: 10, color: '#fbbf24' }}>AB erstellen?</span>
+                                <button onClick={() => setWeRabattState({ id: w.id, value: '0' })}
+                                  style={{ ...confirmYes, background: '#16a34a' }}>Ja</button>
+                                <button onClick={() => setWeConvertConfirm(null)} style={confirmNo}>Nein</button>
+                              </div>
+                            )
                           ) : weArchiveConfirm === w.id ? (
                             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                               <span style={{ fontSize: 10, color: '#fbbf24' }}>Archivieren?</span>
@@ -527,8 +583,8 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
                                   <table className="pk-table" style={{ width: '100%', fontSize: 11 }}>
                                     <thead>
                                       <tr>
-                                        <th>Pos.</th><th>Menge</th><th>Artikel</th><th>Maße</th>
-                                        <th>Polieren</th><th>Entschichtung</th><th>Micro</th><th>Läpp</th><th>Polierstr.</th><th>Beschichtung</th><th>Weitere Infos</th>
+                                        <th>Pos.</th><th>Menge</th><th>Art.-Nr.</th><th>Artikel</th><th>Maße</th>
+                                        <th>Polieren</th><th>Polierkosten</th><th>Entschichtung</th><th>Micro</th><th>Läpp</th><th>Polierstr.</th><th>Beschichtung</th><th>Weitere Infos</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -543,12 +599,14 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
                                           <tr key={pi}>
                                             <td>{p.position_nr}</td>
                                             <td>{p.menge}</td>
+                                            <td style={{ fontFamily: 'monospace', fontSize: 10 }}>{p.artikelnummer || '—'}</td>
                                             <td>{p.artikelbezeichnung || '—'}</td>
                                             <td style={{ whiteSpace: 'nowrap' }}>
                                               {masse}
                                               {p.raw_dimension_text && <div style={{ color: '#fbbf24', fontSize: 10 }}>📝 {p.raw_dimension_text}</div>}
                                             </td>
                                             <td>{p.polieren === 'Ja' ? <span style={{ color: '#4ddb7e' }}>✓{p.polieren_wo ? ` (${p.polieren_wo})` : ''}</span> : '—'}</td>
+                                            <td style={{ whiteSpace: 'nowrap' }}>{p.polier_kosten ? <span style={{ color: '#f59e0b' }}>{p.polier_kosten} €</span> : '—'}</td>
                                             <td>{p.entschichtung === 'Ja' ? <span style={{ color: '#4ddb7e' }}>✓</span> : '—'}</td>
                                             <td>{p.microstrahlen === 'Ja' ? <span style={{ color: '#4ddb7e' }}>✓</span> : '—'}</td>
                                             <td>{p.laeppstrahlen === 'Ja' ? <span style={{ color: '#4ddb7e' }}>✓</span> : '—'}</td>
@@ -585,20 +643,18 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
           <h3 style={{ margin: '0 0 10px', fontSize: 15, fontWeight: 800 }}>Auftrag {selected.order_id} · Detail</h3>
           <div className="pk-table-wrap" style={{ overflowX: 'auto', marginBottom: 10 }}>
             <table className="pk-table" style={{ width: '100%', fontSize: 12 }}>
-              <thead><tr>{['Pos.','Menge','Artikel-Nr.','Beschreibung','Listenpreis','Rabatt %','Einzelpreis','Gesamt'].map(h => <th key={h}>{h}</th>)}</tr></thead>
+              <thead><tr>{['Pos.','Artikel-Nr.','Artikelbezeichnung','Menge','Listenpreis','Rabatt %','Einzelpreis','Gesamt'].map(h => <th key={h}>{h}</th>)}</tr></thead>
               <tbody>{(selected.rows || []).map((r, i) => {
-                const posArr = Array.isArray(selected.positions) ? selected.positions as Record<string, unknown>[] : []
-                const rawDim = typeof posArr[i]?.raw_dimension_text === 'string' ? String(posArr[i].raw_dimension_text) : ''
                 return (
                   <tr key={i}>
-                    <td>{r['Pos.']}</td><td>{r.Menge}</td><td>{r['Artikel-Nr.']}</td>
-                    <td style={{ whiteSpace: 'pre-line' }}>
-                      {r.Beschreibung}
-                      {rawDim && (
-                        <div style={{ marginTop: 4, fontSize: 11, color: '#fbbf24' }}>📝 KI las vom Beleg: <b>{rawDim}</b></div>
-                      )}
-                    </td>
-                    <td>{r.Listenpreis}</td><td>{r['Rabatt (%)']}</td><td>{r.Einzelpreis}</td><td>{r.Gesamtpreis}</td>
+                    <td>{r['Pos.']}</td>
+                    <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{r['Artikel-Nr.'] || '—'}</td>
+                    <td style={{ whiteSpace: 'pre-line' }}>{r.Beschreibung}</td>
+                    <td>{r.Menge}</td>
+                    <td>{r.Listenpreis} €</td>
+                    <td>{r['Rabatt (%)']}</td>
+                    <td>{r.Einzelpreis} €</td>
+                    <td><b>{r.Gesamtpreis} €</b></td>
                   </tr>
                 )
               })}</tbody>

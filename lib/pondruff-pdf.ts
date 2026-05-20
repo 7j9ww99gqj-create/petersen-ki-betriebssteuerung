@@ -522,6 +522,7 @@ export async function generatePondruffOrderPDF(o: PondPreisauftrag, returnBase64
 
 export type ArbeitskartePosition = {
   position_nr: number
+  artikelnummer?: string
   menge: string
   artikelbezeichnung: string
   form: string
@@ -534,6 +535,7 @@ export type ArbeitskartePosition = {
   weitere_infos?: { key: string; value: string }[]
   polieren?: string
   polieren_wo?: string
+  polier_kosten?: string
   entschichtung?: string
   microstrahlen?: string
   laeppstrahlen?: string
@@ -650,8 +652,16 @@ function drawPositionCell(doc: DocLike, p: ArbeitskartePosition, x: number, y: n
   const nameLines = doc.splitTextToSize(nameStr, Math.max(20, nameMaxW))
   doc.text(nameLines[0] || '', x + 11, y + 4)
 
-  // Maße
+  // Artikelnummer (wenn gesetzt) und Maße
   let cy = y + 9
+  if (p.artikelnummer) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(40, 40, 40)
+    const artLines = doc.splitTextToSize(`Art.-Nr.: ${p.artikelnummer}`, w - 3)
+    doc.text(artLines[0] || '', x + 1.5, cy)
+    cy += 3.5
+  }
   const masse = p.form === 'Rund'
     ? `Ø${p.durchmesser || '?'}×${p.durchmesser_laenge || '?'}mm`
     : `${p.laenge || '?'}×${p.breite || '?'}×${p.hoehe || '?'}mm`

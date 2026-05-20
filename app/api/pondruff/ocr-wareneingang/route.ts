@@ -70,7 +70,8 @@ REGELN:
 
 PRO POSITION erkenne:
 - position_nr: Positionsnummer (1, 2, 3...)
-- menge: Stückzahl (Zahl)
+- artikelnummer: Artikelnummer / Art.-Nr. / Artikel-Nr. / Material-Nr. / Item-No. — übernimm exakt wie auf Beleg (alphanumerisch). Wenn nicht vorhanden: ""
+- menge: Stückzahl als Zahl. Erkenne sowohl Spalten/Bezeichnungen "Menge" als auch "Stück", "Stk.", "Stk", "Anzahl", "Qty", "Quantity", "Pcs"
 - artikelbezeichnung: Artikelname (Stempel, Matrize, Kern etc.)
 - form: "Rund" (wenn Ø/Durchmesser angegeben) ODER "Eckig" (Länge×Breite×Höhe)
 - Für "Rund": durchmesser (mm), durchmesser_laenge (mm = die Länge bei Rundteilen)
@@ -92,6 +93,7 @@ JSON Schema (gib exakt dieses Format zurück):
   "positionen": [
     {
       "position_nr": 1,
+      "artikelnummer": "",
       "menge": 1,
       "artikelbezeichnung": "",
       "form": "Eckig",
@@ -122,6 +124,7 @@ JSON Schema (gib exakt dieses Format zurück):
     parsed.positionen = parsed.positionen.map((p: Record<string, unknown>, idx: number) => ({
       ...p,
       position_nr: Number(p.position_nr || idx + 1),
+      artikelnummer: String(p.artikelnummer ?? ''),
       form: String(p.form || '').toLowerCase() === 'rund' ? 'Rund' : 'Eckig',
       polieren: p.polieren === 'Ja' ? 'Ja' : 'Nein',
       entschichtung: p.entschichtung === 'Ja' ? 'Ja' : 'Nein',

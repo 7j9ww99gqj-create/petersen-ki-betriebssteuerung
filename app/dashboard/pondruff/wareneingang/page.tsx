@@ -12,6 +12,7 @@ const EINLAGERER = ['Kevin', 'Julian', 'Frank', 'Tobi', 'Tim', 'Christian']
 
 type WEPos = {
   position_nr: number
+  artikelnummer: string
   menge: string
   artikelbezeichnung: string
   form: 'Rund' | 'Eckig'
@@ -24,6 +25,7 @@ type WEPos = {
   weitere_infos: { key: string; value: string }[]
   polieren: 'Ja' | 'Nein'
   polieren_wo: string
+  polier_kosten: string
   entschichtung: 'Ja' | 'Nein'
   microstrahlen: 'Ja' | 'Nein'
   laeppstrahlen: 'Ja' | 'Nein'
@@ -45,11 +47,11 @@ type WEEntry = {
 
 function emptyPos(nr: number): WEPos {
   return {
-    position_nr: nr, menge: '', artikelbezeichnung: '',
+    position_nr: nr, artikelnummer: '', menge: '', artikelbezeichnung: '',
     form: 'Eckig', laenge: '', breite: '', hoehe: '',
     durchmesser: '', durchmesser_laenge: '',
     raw_dimension_text: '', weitere_infos: [],
-    polieren: 'Nein', polieren_wo: '',
+    polieren: 'Nein', polieren_wo: '', polier_kosten: '',
     entschichtung: 'Nein', microstrahlen: 'Nein',
     laeppstrahlen: 'Nein', polierstrahlen: 'Nein',
     beschichtung: 'Keine',
@@ -59,6 +61,7 @@ function emptyPos(nr: number): WEPos {
 function ocrToPos(p: Record<string, unknown>, idx: number): WEPos {
   return {
     position_nr: Number(p.position_nr ?? idx + 1),
+    artikelnummer: String(p.artikelnummer ?? ''),
     menge: String(p.menge ?? ''),
     artikelbezeichnung: String(p.artikelbezeichnung ?? ''),
     form: String(p.form ?? '') === 'Rund' ? 'Rund' : 'Eckig',
@@ -73,6 +76,7 @@ function ocrToPos(p: Record<string, unknown>, idx: number): WEPos {
       : [],
     polieren: p.polieren === 'Ja' ? 'Ja' : 'Nein',
     polieren_wo: String(p.polieren_wo ?? ''),
+    polier_kosten: String(p.polier_kosten ?? ''),
     entschichtung: p.entschichtung === 'Ja' ? 'Ja' : 'Nein',
     microstrahlen: p.microstrahlen === 'Ja' ? 'Ja' : 'Nein',
     laeppstrahlen: p.laeppstrahlen === 'Ja' ? 'Ja' : 'Nein',
@@ -465,10 +469,14 @@ export default function WareneingangPage() {
                 )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8, marginBottom: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginBottom: 10 }}>
                 <label>
                   <div style={lbl}>Menge</div>
                   <input className="pk-input" value={pos.menge} onChange={e => updatePos(idx, { menge: e.target.value })} />
+                </label>
+                <label>
+                  <div style={lbl}>Artikelnummer</div>
+                  <input className="pk-input" value={pos.artikelnummer} onChange={e => updatePos(idx, { artikelnummer: e.target.value })} placeholder="z.B. ABC-123" />
                 </label>
                 <label style={{ gridColumn: 'span 2' }}>
                   <div style={lbl}>Artikelbezeichnung</div>
@@ -545,10 +553,18 @@ export default function WareneingangPage() {
               </div>
 
               {pos.polieren === 'Ja' && (
-                <label style={{ display: 'block', marginBottom: 10 }}>
-                  <div style={lbl}>Wo polieren?</div>
-                  <input className="pk-input" value={pos.polieren_wo} onChange={e => updatePos(idx, { polieren_wo: e.target.value })} />
-                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8, marginBottom: 10, padding: '8px 10px', background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.25)', borderRadius: 8 }}>
+                  <label>
+                    <div style={lbl}>Wo polieren?</div>
+                    <input className="pk-input" value={pos.polieren_wo} onChange={e => updatePos(idx, { polieren_wo: e.target.value })} placeholder="z.B. Vorne, Innenseite..." />
+                  </label>
+                  <label>
+                    <div style={lbl}>💰 Polierkosten pro Stück (€)</div>
+                    <input className="pk-input" type="text" inputMode="decimal" value={pos.polier_kosten}
+                      onChange={e => updatePos(idx, { polier_kosten: e.target.value })}
+                      placeholder="0,00" />
+                  </label>
+                </div>
               )}
 
               <label>
