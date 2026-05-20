@@ -7,7 +7,8 @@ KI-gestütztes Warenwirtschaftssystem als produktive SaaS-WebApp.
 **Live:** https://petersen-ki-betriebssteuerung.vercel.app  
 **Repo:** https://github.com/7j9ww99gqj-create/petersen-ki-betriebssteuerung
 
-### Aktueller Zwischenstand (2026-05-12)
+### Aktueller Zwischenstand (2026-05-20)
+- **DP12 — Design-Personalisierung ausgebaut** (`019efae`): 6 neue Module im Einstellungen-Tab „Benachrichtigungen" mit Master-Toggle pro Modul. Bei deaktiviertem Modul bleibt der aktuelle Look 1:1 erhalten. Tab-Layout (`Allgemein / Benachrichtigungen / Typografie / Effekte / Farben / Icons & Layout`). „↺ Alles zurücksetzen" setzt alle Module wieder auf disabled. CSS-Regeln rein additiv (`body[data-pers-*="on"]`), brechen nichts Bestehendes.
 - Büro-/Einkaufsrelationen wurden weiter abgesichert: `kunde_id` und `lieferant_id` laufen jetzt in `lib/db.ts`, Schema und Büro-UI konsistenter mit.
 - Büro-Detailseiten existieren jetzt unter `app/dashboard/buero/[entity]/[id]/page.tsx` für Kunden, Angebote, Aufträge, Rechnungen, Eingangsrechnungen, Dokumente, Lieferanten und Bestellungen.
 - `app/api/chat/route.ts` und `app/api/document-ai/route.ts` sind serverseitig über `lib/server-auth.ts` gehärtet; Dokument-KI erlaubt jetzt auch die im UI sichtbaren Rollen `Werkstatt` und `Lager`.
@@ -398,6 +399,37 @@ CSS-Klassen:
 | AnalysePilot | Grün | `#10b981` |
 | PlanungPilot | Pink/Rot | `#f43f5e` / `#e11d48` |
 | KI-Assistent | Lila | `#7c3aed` / `#a78bfa` |
+
+### DP12 — Personalisierungs-Module (`lib/design-flag.ts` + `DesignCustomizationPanel.tsx`)
+
+Jedes Modul hat einen eigenen Master-Toggle (`enabled: boolean`). Bei `enabled: false` werden **keine** CSS-Variablen / Body-Attribute gesetzt → der aktuelle Standard-Look bleibt 1:1 erhalten.
+
+| Modul | Felder | Body-Attribute | CSS-Variablen |
+|-------|--------|----------------|---------------|
+| `notifications` | toastPosition, toastAnimation, toastDuration, toastSize, toastSound | `data-pers-notif`, `data-toast-pos`, `data-toast-anim`, `data-toast-size` | `--user-toast-duration` |
+| `typography` | baseFontSize (12/14/16/18), headingScale, lineHeight, letterSpacing, buttonFontSize | `data-pers-typo` | `--user-font-base`, `--user-heading-scale`, `--user-line-height`, `--user-letter-spacing`, `--user-btn-font-size` |
+| `effects` | animationSpeed, blurIntensity, shadowDepth, glassmorphism, scrollEffects, hoverAction | `data-pers-effects`, `data-anim-speed`, `data-blur`, `data-shadow`, `data-hover`, `data-scroll-fx`, `data-glass` | `--user-anim-speed`, `--user-blur`, `--user-shadow` |
+| `colors` | primaryAccent, secondaryAccent, errorColor, successColor, backgroundColor | `data-pers-colors`, `data-bg-variant` | `--user-primary`, `--user-secondary`, `--user-error`, `--user-success`, `--user-bg` |
+| `icons` | style (emoji/svg/text), size, statusIndicator | `data-pers-icons`, `data-icon-style`, `data-icon-size`, `data-status-ind` | `--user-icon-size` |
+| `layout` | density (compact/comfortable/spacious) | `data-pers-layout`, `data-density` | `--user-density-padding`, `--user-density-gap` |
+
+**APIs:**
+```ts
+const prefs = useDesignPrefs()        // Live-Hook, alle Module
+patchDesignPrefs({ typography: { enabled: true, baseFontSize: 16 } })
+writeDesignPrefs(DEFAULT_PREFS)        // Gesamtes Reset → alles disabled
+```
+
+**Reset-Logik:**
+- Pro Modul: „↺ Modul zurücksetzen" → setzt nur dieses Modul auf Defaults (enabled=false)
+- Global: „↺ Alles zurücksetzen" → `writeDesignPrefs(DEFAULT_PREFS)` → alle Module disabled
+
+**CSS-Regeln (globals.css ab Ende der Datei):**
+- Alle Regeln im Schema `body[data-pers-MODUL="on"]` → greifen **nur** wenn aktiviert
+- Rein additiv, brechen nichts Bestehendes (Toast-Komponenten mit inline-style funktionieren weiter)
+- `.pk-toast`-Klasse als optionaler Hook für neue Toast-Implementierungen
+
+**Speicherung:** `localStorage 'pk_design_prefs'` (JSON, sanitized beim Lesen).
 
 ---
 
