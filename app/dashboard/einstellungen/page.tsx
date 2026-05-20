@@ -2595,39 +2595,21 @@ const emptyFirma: FirmaEinstellungen = {
   onboarding_completed: false,
 }
 
-function CompanySettingsSection({ isDemo, currentRole, showToast }: {
+function CompanySettingsSection({ isDemo: _isDemo, currentRole, showToast }: {
   isDemo: boolean
   currentRole: AppRole
   showToast: (msg: string, type?: 'success' | 'error') => void
 }) {
+  void _isDemo
   const canEdit = currentRole === 'Admin' || currentRole === 'Inhaber'
-  const [firma, setFirma] = useState<FirmaEinstellungen>(isDemo ? {
-    ...emptyFirma,
-    firmenname: 'Petersen Musterbetrieb GmbH',
-    slogan: 'Betriebssteuerung mit KI',
-    adresse: 'Musterstraße 12',
-    plz: '20095',
-    ort: 'Hamburg',
-    email: 'info@petersen-ki-pilot.de',
-    telefon: '+49 40 123456',
-    website: 'petersen-ki-pilot.de',
-    ust_id: 'DE123456789',
-    bankname: 'Musterbank',
-    iban: 'DE02120300000000202051',
-    bic: 'MUSTDEHHXXX',
-    onboarding_completed: true,
-  } : emptyFirma)
-  const [loading, setLoading] = useState(!isDemo)
+  const [firma, setFirma] = useState<FirmaEinstellungen>(emptyFirma)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [logoUploading, setLogoUploading] = useState(false)
   const [briefpapierUploading, setBriefpapierUploading] = useState(false)
   const [briefpapierDeleting, setBriefpapierDeleting] = useState(false)
 
   useEffect(() => {
-    if (isDemo) {
-      localStorage.setItem('pk_firma_einstellungen', JSON.stringify(firma))
-      return
-    }
     getFirmaEinstellungen()
       .then(data => {
         if (data) {
@@ -2638,7 +2620,7 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
       .catch(() => showToast('Firmendaten konnten nicht geladen werden', 'error'))
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDemo])
+  }, [])
 
   const setField = <K extends keyof FirmaEinstellungen>(key: K, value: FirmaEinstellungen[K]) =>
     setFirma(prev => ({ ...prev, [key]: value }))
@@ -2664,14 +2646,9 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
         },
         onboarding_completed: complete ? true : firma.onboarding_completed,
       }
-      if (isDemo) {
-        setFirma(payload)
-        localStorage.setItem('pk_firma_einstellungen', JSON.stringify(payload))
-      } else {
-        const saved = await upsertFirmaEinstellungen(payload)
-        setFirma({ ...emptyFirma, ...saved, briefpapier_layout: { ...emptyFirma.briefpapier_layout, ...(saved.briefpapier_layout ?? {}) } })
-        localStorage.setItem('pk_firma_einstellungen', JSON.stringify(saved))
-      }
+      const saved = await upsertFirmaEinstellungen(payload)
+      setFirma({ ...emptyFirma, ...saved, briefpapier_layout: { ...emptyFirma.briefpapier_layout, ...(saved.briefpapier_layout ?? {}) } })
+      localStorage.setItem('pk_firma_einstellungen', JSON.stringify(saved))
       showToast('✅ Firmendaten gespeichert')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Fehler beim Speichern', 'error')
@@ -2695,13 +2672,8 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
           // Bei Kompressionsfehler Original verwenden
         }
       }
-      if (isDemo) {
-        const url = URL.createObjectURL(uploadFile)
-        setField('logo_url', url)
-      } else {
-        const uploaded = await uploadFirmenLogo(uploadFile)
-        setField('logo_url', uploaded.url)
-      }
+      const uploaded = await uploadFirmenLogo(uploadFile)
+      setField('logo_url', uploaded.url)
       showToast('✅ Logo hochgeladen')
     } catch {
       showToast('Logo konnte nicht hochgeladen werden', 'error')
@@ -2714,13 +2686,8 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
     if (!file || !canEdit) return
     setBriefpapierUploading(true)
     try {
-      if (isDemo) {
-        const url = URL.createObjectURL(file)
-        setField('briefpapier_url', url)
-      } else {
-        const uploaded = await uploadBriefpapier(file)
-        setField('briefpapier_url', uploaded.url)
-      }
+      const uploaded = await uploadBriefpapier(file)
+      setField('briefpapier_url', uploaded.url)
       showToast('✅ Briefpapier hochgeladen')
     } catch {
       showToast('Briefpapier konnte nicht hochgeladen werden', 'error')
@@ -2733,7 +2700,7 @@ function CompanySettingsSection({ isDemo, currentRole, showToast }: {
     if (!canEdit || !firma.briefpapier_url) return
     setBriefpapierDeleting(true)
     try {
-      if (!isDemo) await deleteBriefpapier(firma.briefpapier_url)
+      await deleteBriefpapier(firma.briefpapier_url)
       setField('briefpapier_url', undefined)
       showToast('✅ Briefpapier entfernt')
     } catch {
@@ -3165,9 +3132,8 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (isDemo) return
     getImportProtokolle().then(d => setProtokolle(d as ImportProtokoll[])).catch(() => {})
-  }, [isDemo])
+  }, [])
 
   const handleFile = useCallback(async (f: File) => {
     if (!f.name.endsWith('.csv') && !f.name.endsWith('.xlsx')) {
@@ -3214,12 +3180,6 @@ function ImportWizard({ isDemo, showToast }: { isDemo: boolean; showToast: (msg:
     setImporting(true)
     // validationResult.valid enthält BEREITS gemappte Zeilen (target-fields) — nicht erneut mappen!
     const builtRows = validationResult.valid
-
-    if (isDemo) {
-      await new Promise(r => setTimeout(r, 800))
-      showToast(`✅ Demo-Import simuliert: ${builtRows.length} Datensätze (Demo)`)
-      setImporting(false); setStep(5); return
-    }
 
     try {
       const result = await runBulkImport(dataType, builtRows)
