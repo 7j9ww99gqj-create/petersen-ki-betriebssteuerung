@@ -1311,3 +1311,158 @@ body[data-bg-light="on"] .pk-input {
   background: rgba(14,22,36,.7);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   DP12 — Personalisierungs-Module
+   Alle Regeln greifen NUR, wenn das Modul per Body-Attribut aktiviert ist
+   (z.B. body[data-pers-typo="on"]). Ohne Aktivierung bleibt der aktuelle
+   Look unverändert. Reset (Module deaktivieren) → Standard-Design.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ─── Typografie ──────────────────────────────────────────────────────── */
+body[data-pers-typo="on"] {
+  font-size: var(--user-font-base, 14px);
+  line-height: var(--user-line-height, 1.5);
+  letter-spacing: var(--user-letter-spacing, 0);
+}
+body[data-pers-typo="on"] h1 { font-size: calc(2rem    * var(--user-heading-scale, 1)); }
+body[data-pers-typo="on"] h2 { font-size: calc(1.5rem  * var(--user-heading-scale, 1)); }
+body[data-pers-typo="on"] h3 { font-size: calc(1.17rem * var(--user-heading-scale, 1)); }
+body[data-pers-typo="on"] h4 { font-size: calc(1rem    * var(--user-heading-scale, 1)); }
+body[data-pers-typo="on"] .pk-btn,
+body[data-pers-typo="on"] .pk-btn-ghost {
+  font-size: var(--user-btn-font-size, 14px);
+}
+
+/* ─── Effekte: Animation-Speed ────────────────────────────────────────── */
+body[data-pers-effects="on"] .fade-in,
+body[data-pers-effects="on"] .fade-in-scale {
+  animation-duration: var(--user-anim-speed, 200ms);
+}
+body[data-pers-effects="on"] .pk-card,
+body[data-pers-effects="on"] .pk-btn,
+body[data-pers-effects="on"] .pk-btn-ghost,
+body[data-pers-effects="on"] .pk-input {
+  transition: all var(--user-anim-speed, 200ms) ease;
+}
+body[data-pers-effects="on"][data-anim-speed="none"] *,
+body[data-pers-effects="on"][data-anim-speed="none"] *::before,
+body[data-pers-effects="on"][data-anim-speed="none"] *::after {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
+
+/* ─── Effekte: Blur (Modals, Backdrop) ────────────────────────────────── */
+body[data-pers-effects="on"][data-blur="off"]     [style*="backdropFilter"] { backdrop-filter: none !important; }
+body[data-pers-effects="on"][data-blur="subtle"]  [style*="backdropFilter"] { backdrop-filter: blur(2px) !important; }
+body[data-pers-effects="on"][data-blur="medium"]  [style*="backdropFilter"] { backdrop-filter: blur(6px) !important; }
+body[data-pers-effects="on"][data-blur="strong"]  [style*="backdropFilter"] { backdrop-filter: blur(12px) !important; }
+
+/* ─── Effekte: Schatten-Tiefe ─────────────────────────────────────────── */
+body[data-pers-effects="on"][data-shadow="none"]     .pk-card { box-shadow: none !important; }
+body[data-pers-effects="on"][data-shadow="flat"]     .pk-card { box-shadow: 0 1px 2px rgba(0,0,0,.2) !important; }
+body[data-pers-effects="on"][data-shadow="medium"]   .pk-card { box-shadow: 0 8px 24px rgba(0,0,0,.4) !important; }
+body[data-pers-effects="on"][data-shadow="dramatic"] .pk-card { box-shadow: 0 16px 48px rgba(0,0,0,.6) !important; }
+
+/* ─── Effekte: Glasmorphismus ─────────────────────────────────────────── */
+body[data-pers-effects="on"][data-glass="on"] .pk-card {
+  background: rgba(16, 26, 40, .55) !important;
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+/* ─── Effekte: Hover-Aktion auf Cards/Buttons ────────────────────────── */
+body[data-pers-effects="on"][data-hover="scale"]     .pk-card:hover,
+body[data-pers-effects="on"][data-hover="scale"]     .pk-btn:hover { transform: scale(1.02); }
+body[data-pers-effects="on"][data-hover="lift"]      .pk-card:hover,
+body[data-pers-effects="on"][data-hover="lift"]      .pk-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(0,0,0,.45); }
+body[data-pers-effects="on"][data-hover="highlight"] .pk-card:hover { background: rgba(22,132,255,.06); border-color: rgba(22,132,255,.25); }
+body[data-pers-effects="on"][data-hover="highlight"] .pk-btn:hover  { filter: brightness(1.12); }
+
+/* ─── Effekte: Scroll-Effekte (initiale Animation on-mount) ──────────── */
+body[data-pers-effects="on"][data-scroll-fx="fade"]  .pk-card { animation: pk-scroll-fade .35s ease both; }
+body[data-pers-effects="on"][data-scroll-fx="scale"] .pk-card { animation: pk-scroll-scale .35s ease both; }
+@keyframes pk-scroll-fade  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pk-scroll-scale { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: scale(1); } }
+
+/* ─── Farben — eigene Akzent-/Status-Farben ──────────────────────────── */
+body[data-pers-colors="on"] .pk-btn {
+  background: var(--user-primary, #1684ff) !important;
+}
+body[data-pers-colors="on"] .pk-btn:hover {
+  background: var(--user-primary, #1684ff) !important;
+  filter: brightness(1.1);
+}
+body[data-pers-colors="on"] .badge-red,
+body[data-pers-colors="on"] .badge.badge-red {
+  background: var(--user-error, #ff5050) !important;
+  color: #fff !important;
+}
+body[data-pers-colors="on"] .badge-green,
+body[data-pers-colors="on"] .badge.badge-green {
+  background: var(--user-success, #25d366) !important;
+  color: #fff !important;
+}
+body[data-pers-colors="on"][data-bg-variant="ultra-dark"] { background: #020409 !important; }
+body[data-pers-colors="on"][data-bg-variant="warm"]       { background: #0f1015 !important; }
+body[data-pers-colors="on"][data-bg-variant="warm-tint"]  { background: #11100c !important; }
+
+/* ─── Icons — Größe global ───────────────────────────────────────────── */
+body[data-pers-icons="on"][data-icon-size="small"]  .pk-icon,
+body[data-pers-icons="on"][data-icon-size="small"]  svg.lucide { width: 14px; height: 14px; }
+body[data-pers-icons="on"][data-icon-size="normal"] .pk-icon,
+body[data-pers-icons="on"][data-icon-size="normal"] svg.lucide { width: 18px; height: 18px; }
+body[data-pers-icons="on"][data-icon-size="large"]  .pk-icon,
+body[data-pers-icons="on"][data-icon-size="large"]  svg.lucide { width: 22px; height: 22px; }
+
+/* ─── Layout-Dichte ──────────────────────────────────────────────────── */
+body[data-pers-layout="on"][data-density="compact"] .pk-card { padding: 10px !important; }
+body[data-pers-layout="on"][data-density="compact"] .stats-grid { gap: 8px; }
+body[data-pers-layout="on"][data-density="compact"] .pk-btn,
+body[data-pers-layout="on"][data-density="compact"] .pk-btn-ghost { padding: 6px 12px !important; min-height: 36px; }
+
+body[data-pers-layout="on"][data-density="comfortable"] .pk-card { padding: 16px !important; }
+body[data-pers-layout="on"][data-density="comfortable"] .stats-grid { gap: 12px; }
+
+body[data-pers-layout="on"][data-density="spacious"] .pk-card { padding: 24px !important; }
+body[data-pers-layout="on"][data-density="spacious"] .stats-grid { gap: 20px; }
+body[data-pers-layout="on"][data-density="spacious"] .pk-btn,
+body[data-pers-layout="on"][data-density="spacious"] .pk-btn-ghost { padding: 14px 22px !important; min-height: 50px; }
+
+/* ─── Benachrichtigungen — Toast-Position + Animationen ──────────────── */
+/* Hilfsklassen für Toast-Komponenten. Komponenten können `.pk-toast` setzen
+   und bekommen dann Position/Animation/Größe gemäß User-Prefs.
+   Bestehende inline-styled Toasts bleiben unverändert (kein Konflikt). */
+.pk-toast {
+  position: fixed;
+  z-index: 9999;
+  padding: 14px 20px;
+  border-radius: 12px;
+  max-width: 380px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+}
+body[data-pers-notif="on"][data-toast-pos="top-right"]     .pk-toast { top: 24px;    right: 24px;  bottom: auto; left: auto; }
+body[data-pers-notif="on"][data-toast-pos="top-center"]    .pk-toast { top: 24px;    left: 50%;    transform: translateX(-50%); bottom: auto; right: auto; }
+body[data-pers-notif="on"][data-toast-pos="bottom-right"]  .pk-toast { bottom: 90px; right: 24px;  top: auto;    left: auto; }
+body[data-pers-notif="on"][data-toast-pos="bottom-center"] .pk-toast { bottom: 90px; left: 50%;    transform: translateX(-50%); top: auto;    right: auto; }
+
+body[data-pers-notif="on"][data-toast-anim="fade"]   .pk-toast { animation: pk-toast-fade   .25s ease both; }
+body[data-pers-notif="on"][data-toast-anim="slide"]  .pk-toast { animation: pk-toast-slide  .3s  ease both; }
+body[data-pers-notif="on"][data-toast-anim="pop"]    .pk-toast { animation: pk-toast-pop    .3s  cubic-bezier(.2,1.4,.4,1) both; }
+body[data-pers-notif="on"][data-toast-anim="bounce"] .pk-toast { animation: pk-toast-bounce .5s  cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes pk-toast-fade   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pk-toast-slide  { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pk-toast-pop    { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+@keyframes pk-toast-bounce { 0% { opacity: 0; transform: translateY(40px); } 60% { transform: translateY(-8px); } 100% { opacity: 1; transform: translateY(0); } }
+
+body[data-pers-notif="on"][data-toast-size="compact"] .pk-toast { padding: 10px 14px; font-size: 12px; max-width: 280px; }
+body[data-pers-notif="on"][data-toast-size="normal"]  .pk-toast { padding: 14px 20px; font-size: 14px; max-width: 380px; }
+body[data-pers-notif="on"][data-toast-size="large"]   .pk-toast { padding: 18px 26px; font-size: 16px; max-width: 480px; }
+
+/* ─── Status-Indikator (Icon-Modul) ───────────────────────────────────── */
+body[data-pers-icons="on"][data-status-ind="circle"]   .pk-status-dot { background: transparent !important; border: 2px solid currentColor; }
+body[data-pers-icons="on"][data-status-ind="dot-text"] .pk-status-dot::after { content: attr(data-label); margin-left: 6px; font-size: 11px; }
+
+

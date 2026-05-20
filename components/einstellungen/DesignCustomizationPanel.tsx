@@ -1,11 +1,16 @@
 'use client'
 // DP11: Vollständiges Design-Customization-Panel.
-// - Theme (Klassisch / Modern / Glow)
-// - Akzentfarbe (6 Optionen, nur wirksam im Glow-Theme)
-// - Glow-Intensität (Aus/Dezent/Mittel/Stark, nur wirksam im Glow-Theme)
-// - 7 Feinabstimmungs-Features (A5/A6/A7/P1/P2/P3/P4)
-// - "Auf Standard zurücksetzen" Button
+// DP12: Erweitert um 6 Personalisierungs-Module mit Master-Toggle pro Modul.
+//   - Allgemein (Theme/Akzent/Glow/Features) — DP11 bleibt erhalten
+//   - Benachrichtigungen (Toast-Stil, Position, Animation, Dauer, Sound)
+//   - Typografie (Schriftgröße, Zeilenhöhe, Letter-Spacing, Button-Größe)
+//   - Effekte (Animation-Speed, Blur, Schatten, Glassmorphism, Hover, Scroll)
+//   - Farben (Primär/Sekundär/Error/Success + BG-Variante)
+//   - Icons & Layout (Icon-Style/Size/Status + Layout-Dichte)
+// Jedes Modul hat eigenen Master-Toggle „Aktivieren" → bei AUS bleibt aktuelles
+// Design erhalten. „↺ Standard" setzt alle Module zurück (alle disabled).
 
+import { useState } from 'react'
 import {
   useDesignPrefs,
   patchDesignPrefs,
@@ -15,6 +20,25 @@ import {
   type DesignAccent,
   type GlowIntensity,
   type DesignFeatures,
+  type ToastPosition,
+  type ToastAnimation,
+  type ToastDuration,
+  type ToastSize,
+  type FontBase,
+  type HeadingScale,
+  type LineHeight,
+  type LetterSpacing,
+  type ButtonFontSize,
+  type AnimationSpeed,
+  type BlurIntensity,
+  type ShadowDepth,
+  type ScrollEffects,
+  type HoverAction,
+  type BackgroundColor,
+  type IconStyle,
+  type IconSize,
+  type StatusIndicator,
+  type LayoutDensity,
 } from '@/lib/design-flag'
 
 // ── Theme-Optionen ───────────────────────────────────────────────────────
@@ -53,6 +77,18 @@ const FEATURE_OPTIONS: Array<{ id: keyof DesignFeatures; title: string; descript
   { id: 'lightBackground', title: 'Helleres Hintergrund-Schema',       description: 'Bühne wird heller, Karten bleiben dunkel — softer Übergang.',  icon: '🌗' },
 ]
 
+// ── DP12: Tab-Definition ─────────────────────────────────────────────────
+type PanelTab = 'allgemein' | 'benachrichtigungen' | 'typografie' | 'effekte' | 'farben' | 'icons-layout'
+
+const PANEL_TABS: Array<{ id: PanelTab; label: string; icon: string }> = [
+  { id: 'allgemein',          label: 'Allgemein',         icon: '🎨' },
+  { id: 'benachrichtigungen', label: 'Benachrichtigungen', icon: '🔔' },
+  { id: 'typografie',         label: 'Typografie',         icon: '🔤' },
+  { id: 'effekte',            label: 'Effekte',            icon: '✨' },
+  { id: 'farben',             label: 'Farben',             icon: '🌈' },
+  { id: 'icons-layout',       label: 'Icons & Layout',     icon: '📐' },
+]
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -62,176 +98,731 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
+function Toggle({
+  checked, onChange, label, desc,
+}: { checked: boolean; onChange: () => void; label: string; desc?: string }) {
+  return (
+    <label
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '10px 14px', borderRadius: 10,
+        border: `1px solid ${checked ? 'rgba(22,132,255,.30)' : 'rgba(255,255,255,.06)'}`,
+        background: checked ? 'rgba(22,132,255,.06)' : 'rgba(255,255,255,.02)',
+        cursor: 'pointer', transition: 'all .15s',
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fbff' }}>{label}</div>
+        {desc && <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>}
+      </div>
+      <button
+        type="button" role="switch" aria-checked={checked} aria-label={label}
+        onClick={onChange}
+        style={{
+          position: 'relative', width: 44, height: 24, flexShrink: 0,
+          borderRadius: 999,
+          border: `1px solid ${checked ? 'rgba(22,132,255,.55)' : 'rgba(255,255,255,.18)'}`,
+          background: checked ? 'rgba(22,132,255,.45)' : 'rgba(255,255,255,.06)',
+          cursor: 'pointer', transition: 'all .15s',
+        }}
+      >
+        <span style={{
+          position: 'absolute', top: 2, left: checked ? 22 : 2,
+          width: 18, height: 18, borderRadius: '50%',
+          background: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,.3)',
+          transition: 'left .15s',
+        }} />
+      </button>
+    </label>
+  )
+}
+
+// Master-Toggle für ein ganzes Modul
+function ModuleMasterToggle({
+  enabled, onToggle, title, description,
+}: { enabled: boolean; onToggle: () => void; title: string; description: string }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+      padding: '14px 16px', borderRadius: 12,
+      background: enabled ? 'linear-gradient(180deg, rgba(22,132,255,.12), rgba(22,132,255,.04))' : 'rgba(255,255,255,.02)',
+      border: `2px solid ${enabled ? 'rgba(22,132,255,.40)' : 'rgba(255,255,255,.08)'}`,
+      marginBottom: 16,
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: enabled ? '#6cb6ff' : '#f8fbff' }}>
+          {enabled ? '✅ ' : ''}{title}
+        </div>
+        <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 4, lineHeight: 1.5 }}>{description}</div>
+      </div>
+      <button
+        type="button" role="switch" aria-checked={enabled}
+        onClick={onToggle}
+        style={{
+          position: 'relative', width: 52, height: 28, flexShrink: 0,
+          borderRadius: 999,
+          border: `1px solid ${enabled ? 'rgba(22,132,255,.7)' : 'rgba(255,255,255,.2)'}`,
+          background: enabled ? 'rgba(22,132,255,.55)' : 'rgba(255,255,255,.06)',
+          cursor: 'pointer', transition: 'all .15s',
+        }}
+      >
+        <span style={{
+          position: 'absolute', top: 2, left: enabled ? 26 : 2,
+          width: 22, height: 22, borderRadius: '50%',
+          background: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,.3)',
+          transition: 'left .15s',
+        }} />
+      </button>
+    </div>
+  )
+}
+
+// Radio-Group im Pill-Stil
+function PillRadio<T extends string | number>({
+  value, options, onChange, disabled = false, minWidth = 90,
+}: {
+  value: T
+  options: Array<{ id: T; label: string; sub?: string }>
+  onChange: (v: T) => void
+  disabled?: boolean
+  minWidth?: number
+}) {
+  return (
+    <div role="radiogroup" style={{
+      display: 'grid', gap: 8,
+      gridTemplateColumns: `repeat(auto-fit, minmax(${minWidth}px, 1fr))`,
+      opacity: disabled ? .45 : 1,
+    }}>
+      {options.map(opt => {
+        const active = value === opt.id
+        return (
+          <button
+            key={String(opt.id)}
+            role="radio" aria-checked={active}
+            disabled={disabled}
+            onClick={() => onChange(opt.id)}
+            style={{
+              all: 'unset', cursor: disabled ? 'not-allowed' : 'pointer',
+              display: 'flex', flexDirection: 'column', gap: 4,
+              padding: '10px 12px', borderRadius: 10,
+              border: `2px solid ${active ? '#1684ff' : 'rgba(255,255,255,.08)'}`,
+              background: active ? 'rgba(22,132,255,.10)' : 'rgba(255,255,255,.02)',
+              textAlign: 'center', transition: 'all .15s',
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800 }}>{opt.label}</div>
+            {opt.sub && <div style={{ fontSize: 10, color: '#aeb9c8' }}>{opt.sub}</div>}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// Color-Picker (nativ + Hex-Input)
+function ColorField({
+  label, value, onChange, disabled = false,
+}: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '10px 14px', borderRadius: 10,
+      border: '1px solid rgba(255,255,255,.08)',
+      background: 'rgba(255,255,255,.02)', opacity: disabled ? .5 : 1,
+    }}>
+      <div style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>{label}</div>
+      <input
+        type="color" value={value} onChange={e => onChange(e.target.value)}
+        disabled={disabled}
+        style={{ width: 38, height: 32, padding: 0, border: 'none', borderRadius: 6, background: 'transparent', cursor: disabled ? 'not-allowed' : 'pointer' }}
+      />
+      <input
+        type="text" value={value} onChange={e => /^#[0-9a-f]{0,6}$/i.test(e.target.value) && onChange(e.target.value)}
+        disabled={disabled}
+        className="pk-input"
+        style={{ width: 90, fontFamily: 'monospace', fontSize: 12, textAlign: 'center' }}
+      />
+    </div>
+  )
+}
+
 // ── Haupt-Panel ──────────────────────────────────────────────────────────
 export default function DesignCustomizationPanel() {
   const prefs = useDesignPrefs()
   const isGlow = prefs.theme === 'glow'
+  const [tab, setTab] = useState<PanelTab>('allgemein')
 
   const reset = () => writeDesignPrefs(DEFAULT_PREFS)
 
   return (
     <div className="pk-card" style={{ padding: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 4 }}>
+      {/* Kopfzeile */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontWeight: 800, fontSize: 15 }}>🎨 Design & Erscheinungsbild</div>
           <div style={{ fontSize: 12, color: '#aeb9c8', marginTop: 4, lineHeight: 1.5 }}>
-            Stelle dein Design individuell ein — Theme, Akzentfarbe, Lichteffekte und 7 Feinjustierungen.
-            Wirkt nur in deinem Browser, jederzeit zurücksetzbar.
+            Stelle dein Design individuell ein — alle Module sind <strong>einzeln ein-/ausschaltbar</strong>.
+            Bei ausgeschaltetem Modul bleibt der aktuelle Look erhalten. Wirkt nur in deinem Browser.
           </div>
         </div>
         <button className="pk-btn-ghost" onClick={reset} style={{ fontSize: 12, padding: '6px 12px' }}>
-          ↺ Standard
+          ↺ Alles zurücksetzen
         </button>
       </div>
 
-      {/* ── Theme ───────────────────────────────────────────────────── */}
-      <SectionTitle>1) Theme</SectionTitle>
-      <div role="radiogroup" aria-label="Design-Theme" style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-        {THEME_OPTIONS.map(opt => {
-          const active = prefs.theme === opt.id
+      {/* Tabs */}
+      <div className="pk-tab-bar" style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
+        {PANEL_TABS.map(t => {
+          const active = tab === t.id
+          // Zeige Indikator wenn Modul aktiviert ist
+          const moduleEnabled =
+            t.id === 'benachrichtigungen' ? prefs.notifications.enabled :
+            t.id === 'typografie' ? prefs.typography.enabled :
+            t.id === 'effekte' ? prefs.effects.enabled :
+            t.id === 'farben' ? prefs.colors.enabled :
+            t.id === 'icons-layout' ? (prefs.icons.enabled || prefs.layout.enabled) :
+            false
           return (
             <button
-              key={opt.id}
-              role="radio"
-              aria-checked={active}
-              onClick={() => patchDesignPrefs({ theme: opt.id })}
+              key={t.id}
+              onClick={() => setTab(t.id)}
               style={{
                 all: 'unset', cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', gap: 6,
-                padding: 12, borderRadius: 12,
-                border: `2px solid ${active ? '#1684ff' : 'rgba(255,255,255,.08)'}`,
-                background: active ? 'linear-gradient(180deg, rgba(22,132,255,.10), rgba(22,132,255,.02))' : 'rgba(255,255,255,.02)',
-                boxShadow: active ? '0 6px 24px rgba(22,132,255,.18)' : 'none',
-                transition: 'all .2s',
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '8px 12px', borderRadius: 10,
+                background: active ? 'rgba(22,132,255,.18)' : 'rgba(255,255,255,.03)',
+                border: `1px solid ${active ? 'rgba(22,132,255,.45)' : 'rgba(255,255,255,.06)'}`,
+                color: active ? '#6cb6ff' : '#aeb9c8',
+                fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap',
+                transition: 'all .15s',
               }}
             >
-              <div style={{ width: '100%', height: 32, borderRadius: 6, background: opt.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
-                {opt.emoji}
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 800 }}>{opt.title}</div>
-              <div style={{ fontSize: 11, color: '#aeb9c8', lineHeight: 1.4 }}>{opt.description}</div>
+              <span>{t.icon}</span>
+              <span>{t.label}</span>
+              {moduleEnabled && t.id !== 'allgemein' && (
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#25d366', boxShadow: '0 0 6px #25d366' }} />
+              )}
             </button>
           )
         })}
       </div>
 
-      {/* ── Akzentfarbe ────────────────────────────────────────────── */}
-      <SectionTitle>2) Akzentfarbe {!isGlow && <span style={{ color: '#6c7a8c', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(nur im Glow-Theme aktiv)</span>}</SectionTitle>
-      <div role="radiogroup" aria-label="Akzentfarbe" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', opacity: isGlow ? 1 : .5 }}>
-        {ACCENT_OPTIONS.map(opt => {
-          const active = prefs.accent === opt.id
-          return (
-            <button
-              key={opt.id}
-              role="radio"
-              aria-checked={active}
-              onClick={() => patchDesignPrefs({ accent: opt.id })}
-              disabled={!isGlow}
-              style={{
-                all: 'unset', cursor: isGlow ? 'pointer' : 'not-allowed',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                padding: 10, borderRadius: 10,
-                border: `2px solid ${active ? opt.color : 'rgba(255,255,255,.08)'}`,
-                background: active ? `${opt.color}1f` : 'rgba(255,255,255,.02)',
-                boxShadow: active ? `0 4px 18px ${opt.color}40` : 'none',
-                transition: 'all .15s',
-              }}
-            >
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: opt.color, boxShadow: active ? `0 0 14px ${opt.color}80` : 'none' }} />
-              <div style={{ fontSize: 11, fontWeight: 700 }}>{opt.title}</div>
-            </button>
-          )
-        })}
-      </div>
+      {/* ─── Tab: Allgemein (DP11 — bestehender Inhalt) ─────────────────── */}
+      {tab === 'allgemein' && (
+        <div>
+          <SectionTitle>1) Theme</SectionTitle>
+          <div role="radiogroup" aria-label="Design-Theme" style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            {THEME_OPTIONS.map(opt => {
+              const active = prefs.theme === opt.id
+              return (
+                <button
+                  key={opt.id} role="radio" aria-checked={active}
+                  onClick={() => patchDesignPrefs({ theme: opt.id })}
+                  style={{
+                    all: 'unset', cursor: 'pointer',
+                    display: 'flex', flexDirection: 'column', gap: 6,
+                    padding: 12, borderRadius: 12,
+                    border: `2px solid ${active ? '#1684ff' : 'rgba(255,255,255,.08)'}`,
+                    background: active ? 'linear-gradient(180deg, rgba(22,132,255,.10), rgba(22,132,255,.02))' : 'rgba(255,255,255,.02)',
+                    boxShadow: active ? '0 6px 24px rgba(22,132,255,.18)' : 'none',
+                    transition: 'all .2s',
+                  }}
+                >
+                  <div style={{ width: '100%', height: 32, borderRadius: 6, background: opt.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                    {opt.emoji}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 800 }}>{opt.title}</div>
+                  <div style={{ fontSize: 11, color: '#aeb9c8', lineHeight: 1.4 }}>{opt.description}</div>
+                </button>
+              )
+            })}
+          </div>
 
-      {/* ── Glow-Intensität ───────────────────────────────────────── */}
-      <SectionTitle>3) Lichteffekt-Intensität {!isGlow && <span style={{ color: '#6c7a8c', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(nur im Glow-Theme aktiv)</span>}</SectionTitle>
-      <div role="radiogroup" aria-label="Glow-Intensität" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', opacity: isGlow ? 1 : .5 }}>
-        {INTENSITY_OPTIONS.map(opt => {
-          const active = prefs.glowIntensity === opt.id
-          return (
-            <button
-              key={opt.id}
-              role="radio"
-              aria-checked={active}
-              onClick={() => patchDesignPrefs({ glowIntensity: opt.id })}
-              disabled={!isGlow}
-              style={{
-                all: 'unset', cursor: isGlow ? 'pointer' : 'not-allowed',
-                display: 'flex', flexDirection: 'column', gap: 4,
-                padding: 10, borderRadius: 10,
-                border: `2px solid ${active ? '#1684ff' : 'rgba(255,255,255,.08)'}`,
-                background: active ? 'rgba(22,132,255,.10)' : 'rgba(255,255,255,.02)',
-                textAlign: 'center',
-                transition: 'all .15s',
-              }}
-            >
-              <div style={{ fontSize: 13, fontWeight: 800 }}>{opt.title}</div>
-              <div style={{ fontSize: 10, color: '#aeb9c8' }}>{opt.description}</div>
-            </button>
-          )
-        })}
-      </div>
+          <SectionTitle>2) Akzentfarbe {!isGlow && <span style={{ color: '#6c7a8c', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(nur im Glow-Theme aktiv)</span>}</SectionTitle>
+          <div role="radiogroup" aria-label="Akzentfarbe" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', opacity: isGlow ? 1 : .5 }}>
+            {ACCENT_OPTIONS.map(opt => {
+              const active = prefs.accent === opt.id
+              return (
+                <button
+                  key={opt.id} role="radio" aria-checked={active}
+                  onClick={() => patchDesignPrefs({ accent: opt.id })}
+                  disabled={!isGlow}
+                  style={{
+                    all: 'unset', cursor: isGlow ? 'pointer' : 'not-allowed',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                    padding: 10, borderRadius: 10,
+                    border: `2px solid ${active ? opt.color : 'rgba(255,255,255,.08)'}`,
+                    background: active ? `${opt.color}1f` : 'rgba(255,255,255,.02)',
+                    boxShadow: active ? `0 4px 18px ${opt.color}40` : 'none',
+                    transition: 'all .15s',
+                  }}
+                >
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: opt.color, boxShadow: active ? `0 0 14px ${opt.color}80` : 'none' }} />
+                  <div style={{ fontSize: 11, fontWeight: 700 }}>{opt.title}</div>
+                </button>
+              )
+            })}
+          </div>
 
-      {/* ── Feinabstimmung ───────────────────────────────────────── */}
-      <SectionTitle>4) Feinabstimmung (alle einzeln schaltbar)</SectionTitle>
-      <div style={{ display: 'grid', gap: 8 }}>
-        {FEATURE_OPTIONS.map(opt => {
-          const active = prefs.features[opt.id]
-          return (
-            <label
-              key={opt.id}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '10px 14px', borderRadius: 10,
-                border: `1px solid ${active ? 'rgba(22,132,255,.30)' : 'rgba(255,255,255,.06)'}`,
-                background: active ? 'rgba(22,132,255,.06)' : 'rgba(255,255,255,.02)',
-                cursor: 'pointer',
-                transition: 'all .15s',
-              }}
-            >
-              <span style={{ fontSize: 20, width: 28, textAlign: 'center', flexShrink: 0 }}>{opt.icon}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fbff' }}>{opt.title}</div>
-                <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2, lineHeight: 1.4 }}>{opt.description}</div>
-              </div>
-              {/* Switch */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={active}
-                aria-label={opt.title}
-                onClick={() => patchDesignPrefs({ features: { [opt.id]: !active } as Partial<DesignFeatures> })}
-                style={{
-                  position: 'relative', width: 44, height: 24, flexShrink: 0,
-                  borderRadius: 999,
-                  border: `1px solid ${active ? 'rgba(22,132,255,.55)' : 'rgba(255,255,255,.18)'}`,
-                  background: active ? 'rgba(22,132,255,.45)' : 'rgba(255,255,255,.06)',
-                  cursor: 'pointer',
-                  transition: 'all .15s',
-                }}
-              >
-                <span style={{
-                  position: 'absolute', top: 2,
-                  left: active ? 22 : 2,
-                  width: 18, height: 18, borderRadius: '50%',
-                  background: '#fff',
-                  boxShadow: '0 2px 4px rgba(0,0,0,.3)',
-                  transition: 'left .15s',
-                }} />
+          <SectionTitle>3) Lichteffekt-Intensität {!isGlow && <span style={{ color: '#6c7a8c', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(nur im Glow-Theme aktiv)</span>}</SectionTitle>
+          <div role="radiogroup" aria-label="Glow-Intensität" style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', opacity: isGlow ? 1 : .5 }}>
+            {INTENSITY_OPTIONS.map(opt => {
+              const active = prefs.glowIntensity === opt.id
+              return (
+                <button
+                  key={opt.id} role="radio" aria-checked={active}
+                  onClick={() => patchDesignPrefs({ glowIntensity: opt.id })}
+                  disabled={!isGlow}
+                  style={{
+                    all: 'unset', cursor: isGlow ? 'pointer' : 'not-allowed',
+                    display: 'flex', flexDirection: 'column', gap: 4,
+                    padding: 10, borderRadius: 10,
+                    border: `2px solid ${active ? '#1684ff' : 'rgba(255,255,255,.08)'}`,
+                    background: active ? 'rgba(22,132,255,.10)' : 'rgba(255,255,255,.02)',
+                    textAlign: 'center', transition: 'all .15s',
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 800 }}>{opt.title}</div>
+                  <div style={{ fontSize: 10, color: '#aeb9c8' }}>{opt.description}</div>
+                </button>
+              )
+            })}
+          </div>
+
+          <SectionTitle>4) Feinabstimmung (alle einzeln schaltbar)</SectionTitle>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {FEATURE_OPTIONS.map(opt => {
+              const active = prefs.features[opt.id]
+              return (
+                <label
+                  key={opt.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 14px', borderRadius: 10,
+                    border: `1px solid ${active ? 'rgba(22,132,255,.30)' : 'rgba(255,255,255,.06)'}`,
+                    background: active ? 'rgba(22,132,255,.06)' : 'rgba(255,255,255,.02)',
+                    cursor: 'pointer', transition: 'all .15s',
+                  }}
+                >
+                  <span style={{ fontSize: 20, width: 28, textAlign: 'center', flexShrink: 0 }}>{opt.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fbff' }}>{opt.title}</div>
+                    <div style={{ fontSize: 11, color: '#aeb9c8', marginTop: 2, lineHeight: 1.4 }}>{opt.description}</div>
+                  </div>
+                  <button
+                    type="button" role="switch" aria-checked={active} aria-label={opt.title}
+                    onClick={() => patchDesignPrefs({ features: { [opt.id]: !active } as Partial<DesignFeatures> })}
+                    style={{
+                      position: 'relative', width: 44, height: 24, flexShrink: 0,
+                      borderRadius: 999,
+                      border: `1px solid ${active ? 'rgba(22,132,255,.55)' : 'rgba(255,255,255,.18)'}`,
+                      background: active ? 'rgba(22,132,255,.45)' : 'rgba(255,255,255,.06)',
+                      cursor: 'pointer', transition: 'all .15s',
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute', top: 2, left: active ? 22 : 2,
+                      width: 18, height: 18, borderRadius: '50%',
+                      background: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,.3)',
+                      transition: 'left .15s',
+                    }} />
+                  </button>
+                </label>
+              )
+            })}
+          </div>
+
+          <div style={{ fontSize: 11, color: '#6c7a8c', marginTop: 16, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.04)' }}>
+            💡 Direkt-Umschaltung per URL:{' '}
+            <code style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,.06)', padding: '1px 5px', borderRadius: 4 }}>?design=classic</code>{', '}
+            <code style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,.06)', padding: '1px 5px', borderRadius: 4 }}>?design=modern</code>{', '}
+            <code style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,.06)', padding: '1px 5px', borderRadius: 4 }}>?design=glow</code>.
+          </div>
+        </div>
+      )}
+
+      {/* ─── Tab: Benachrichtigungen ─────────────────────────────────────── */}
+      {tab === 'benachrichtigungen' && (() => {
+        const n = prefs.notifications
+        const set = (patch: Partial<typeof n>) => patchDesignPrefs({ notifications: patch })
+        const reset = () => patchDesignPrefs({ notifications: { ...DEFAULT_PREFS.notifications } })
+        return (
+          <div>
+            <ModuleMasterToggle
+              enabled={n.enabled}
+              onToggle={() => set({ enabled: !n.enabled })}
+              title="Benachrichtigungs-Design aktivieren"
+              description="Wenn AUS: aktuelles Toast-Design bleibt unverändert. Wenn AN: Position, Animation, Dauer und Größe sind individuell einstellbar."
+            />
+
+            <SectionTitle>Position</SectionTitle>
+            <PillRadio<ToastPosition>
+              value={n.toastPosition} disabled={!n.enabled} minWidth={120}
+              options={[
+                { id: 'top-right',     label: '↗ Oben rechts' },
+                { id: 'top-center',    label: '↑ Oben mitte' },
+                { id: 'bottom-right',  label: '↘ Unten rechts' },
+                { id: 'bottom-center', label: '↓ Unten mitte' },
+              ]}
+              onChange={v => set({ toastPosition: v })}
+            />
+
+            <SectionTitle>Animation</SectionTitle>
+            <PillRadio<ToastAnimation>
+              value={n.toastAnimation} disabled={!n.enabled} minWidth={90}
+              options={[
+                { id: 'fade',   label: 'Fade-In' },
+                { id: 'slide',  label: 'Slide-In' },
+                { id: 'pop',    label: 'Pop' },
+                { id: 'bounce', label: 'Bounce' },
+              ]}
+              onChange={v => set({ toastAnimation: v })}
+            />
+
+            <SectionTitle>Verweildauer</SectionTitle>
+            <PillRadio<ToastDuration>
+              value={n.toastDuration} disabled={!n.enabled} minWidth={90}
+              options={[
+                { id: 3000, label: '3 Sek.' },
+                { id: 5000, label: '5 Sek.' },
+                { id: 8000, label: '8 Sek.' },
+                { id: 0,    label: 'Manuell' },
+              ]}
+              onChange={v => set({ toastDuration: v })}
+            />
+
+            <SectionTitle>Größe</SectionTitle>
+            <PillRadio<ToastSize>
+              value={n.toastSize} disabled={!n.enabled} minWidth={100}
+              options={[
+                { id: 'compact', label: 'Kompakt', sub: 'Klein' },
+                { id: 'normal',  label: 'Normal',  sub: 'Standard' },
+                { id: 'large',   label: 'Groß',    sub: 'Auffällig' },
+              ]}
+              onChange={v => set({ toastSize: v })}
+            />
+
+            <SectionTitle>Sound</SectionTitle>
+            <div style={{ opacity: n.enabled ? 1 : .45, pointerEvents: n.enabled ? 'auto' : 'none' }}>
+              <Toggle
+                checked={n.toastSound}
+                onChange={() => set({ toastSound: !n.toastSound })}
+                label="Sound bei Benachrichtigung"
+                desc="Spielt einen kurzen Ton ab, wenn ein Toast erscheint (nur in unterstützten Browsern)."
+              />
+            </div>
+
+            <div style={{ marginTop: 16 }}>
+              <button className="pk-btn-ghost" onClick={reset} style={{ fontSize: 12, padding: '6px 12px' }}>
+                ↺ Modul zurücksetzen
               </button>
-            </label>
-          )
-        })}
-      </div>
+            </div>
+          </div>
+        )
+      })()}
 
-      {/* ── URL-Tipp ──────────────────────────────────────────────── */}
-      <div style={{ fontSize: 11, color: '#6c7a8c', marginTop: 16, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.04)' }}>
-        💡 Direkt-Umschaltung per URL: {' '}
-        <code style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,.06)', padding: '1px 5px', borderRadius: 4 }}>?design=classic</code>{', '}
-        <code style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,.06)', padding: '1px 5px', borderRadius: 4 }}>?design=modern</code>{', '}
-        <code style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,.06)', padding: '1px 5px', borderRadius: 4 }}>?design=glow</code>. Die anderen Einstellungen bleiben dabei erhalten.
-      </div>
+      {/* ─── Tab: Typografie ─────────────────────────────────────────────── */}
+      {tab === 'typografie' && (() => {
+        const ty = prefs.typography
+        const set = (patch: Partial<typeof ty>) => patchDesignPrefs({ typography: patch })
+        const reset = () => patchDesignPrefs({ typography: { ...DEFAULT_PREFS.typography } })
+        return (
+          <div>
+            <ModuleMasterToggle
+              enabled={ty.enabled}
+              onToggle={() => set({ enabled: !ty.enabled })}
+              title="Typografie-Anpassung aktivieren"
+              description="Wenn AUS: aktuelle Schriftgrößen bleiben unverändert (14px Base). Wenn AN: alle Werte werden global angewendet."
+            />
+
+            <SectionTitle>Basis-Schriftgröße</SectionTitle>
+            <PillRadio<FontBase>
+              value={ty.baseFontSize} disabled={!ty.enabled} minWidth={80}
+              options={[
+                { id: 12, label: '12px', sub: 'Klein' },
+                { id: 14, label: '14px', sub: 'Standard' },
+                { id: 16, label: '16px', sub: 'Groß' },
+                { id: 18, label: '18px', sub: 'Sehr groß' },
+              ]}
+              onChange={v => set({ baseFontSize: v })}
+            />
+
+            <SectionTitle>Überschriften-Skalierung</SectionTitle>
+            <PillRadio<HeadingScale>
+              value={ty.headingScale} disabled={!ty.enabled} minWidth={90}
+              options={[
+                { id: 0.8, label: '0.8×', sub: 'Kleiner' },
+                { id: 1,   label: '1×',   sub: 'Standard' },
+                { id: 1.2, label: '1.2×', sub: 'Größer' },
+                { id: 1.5, label: '1.5×', sub: 'XL' },
+              ]}
+              onChange={v => set({ headingScale: v })}
+            />
+
+            <SectionTitle>Zeilenhöhe</SectionTitle>
+            <PillRadio<LineHeight>
+              value={ty.lineHeight} disabled={!ty.enabled} minWidth={90}
+              options={[
+                { id: 1.4, label: '1.4',  sub: 'Eng' },
+                { id: 1.5, label: '1.5',  sub: 'Standard' },
+                { id: 1.7, label: '1.7',  sub: 'Locker' },
+                { id: 2,   label: '2.0',  sub: 'Sehr locker' },
+              ]}
+              onChange={v => set({ lineHeight: v })}
+            />
+
+            <SectionTitle>Buchstaben-Abstand</SectionTitle>
+            <PillRadio<LetterSpacing>
+              value={ty.letterSpacing} disabled={!ty.enabled} minWidth={90}
+              options={[
+                { id: 0,    label: '0',    sub: 'Eng' },
+                { id: 0.02, label: '0.02', sub: 'Standard' },
+                { id: 0.05, label: '0.05', sub: 'Weit' },
+              ]}
+              onChange={v => set({ letterSpacing: v })}
+            />
+
+            <SectionTitle>Button-Textgröße</SectionTitle>
+            <PillRadio<ButtonFontSize>
+              value={ty.buttonFontSize} disabled={!ty.enabled} minWidth={100}
+              options={[
+                { id: 'small',  label: 'Klein',   sub: '12px' },
+                { id: 'normal', label: 'Normal',  sub: '14px' },
+                { id: 'large',  label: 'Groß',    sub: '16px' },
+              ]}
+              onChange={v => set({ buttonFontSize: v })}
+            />
+
+            <div style={{ marginTop: 16 }}>
+              <button className="pk-btn-ghost" onClick={reset} style={{ fontSize: 12, padding: '6px 12px' }}>
+                ↺ Modul zurücksetzen
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ─── Tab: Effekte ────────────────────────────────────────────────── */}
+      {tab === 'effekte' && (() => {
+        const ef = prefs.effects
+        const set = (patch: Partial<typeof ef>) => patchDesignPrefs({ effects: patch })
+        const reset = () => patchDesignPrefs({ effects: { ...DEFAULT_PREFS.effects } })
+        return (
+          <div>
+            <ModuleMasterToggle
+              enabled={ef.enabled}
+              onToggle={() => set({ enabled: !ef.enabled })}
+              title="Effekte & Animationen aktivieren"
+              description="Wenn AUS: aktuelle Animationen bleiben. Wenn AN: Geschwindigkeit, Blur, Schatten und Hover-Effekte werden gesteuert."
+            />
+
+            <SectionTitle>Animations-Geschwindigkeit</SectionTitle>
+            <PillRadio<AnimationSpeed>
+              value={ef.animationSpeed} disabled={!ef.enabled} minWidth={90}
+              options={[
+                { id: 'none',   label: 'Aus',     sub: '0ms' },
+                { id: 'slow',   label: 'Langsam', sub: '400ms' },
+                { id: 'normal', label: 'Normal',  sub: '200ms' },
+                { id: 'fast',   label: 'Schnell', sub: '100ms' },
+              ]}
+              onChange={v => set({ animationSpeed: v })}
+            />
+
+            <SectionTitle>Blur-Effekt (Modals, Backdrop)</SectionTitle>
+            <PillRadio<BlurIntensity>
+              value={ef.blurIntensity} disabled={!ef.enabled} minWidth={90}
+              options={[
+                { id: 'off',    label: 'Aus',     sub: '0px' },
+                { id: 'subtle', label: 'Dezent',  sub: '2px' },
+                { id: 'medium', label: 'Mittel',  sub: '6px' },
+                { id: 'strong', label: 'Stark',   sub: '12px' },
+              ]}
+              onChange={v => set({ blurIntensity: v })}
+            />
+
+            <SectionTitle>Schatten-Tiefe</SectionTitle>
+            <PillRadio<ShadowDepth>
+              value={ef.shadowDepth} disabled={!ef.enabled} minWidth={100}
+              options={[
+                { id: 'none',     label: 'Kein',      sub: '–' },
+                { id: 'flat',     label: 'Flach',     sub: 'Dezent' },
+                { id: 'medium',   label: 'Mittel',    sub: 'Standard' },
+                { id: 'dramatic', label: 'Dramatisch', sub: 'Stark' },
+              ]}
+              onChange={v => set({ shadowDepth: v })}
+            />
+
+            <SectionTitle>Hover-Aktion</SectionTitle>
+            <PillRadio<HoverAction>
+              value={ef.hoverAction} disabled={!ef.enabled} minWidth={100}
+              options={[
+                { id: 'none',      label: 'Keine' },
+                { id: 'scale',     label: 'Vergrößern' },
+                { id: 'lift',      label: 'Anheben' },
+                { id: 'highlight', label: 'Hervorheben' },
+              ]}
+              onChange={v => set({ hoverAction: v })}
+            />
+
+            <SectionTitle>Scroll-Effekte</SectionTitle>
+            <PillRadio<ScrollEffects>
+              value={ef.scrollEffects} disabled={!ef.enabled} minWidth={100}
+              options={[
+                { id: 'none',     label: 'Keine' },
+                { id: 'parallax', label: 'Parallax' },
+                { id: 'fade',     label: 'Fade-In' },
+                { id: 'scale',    label: 'Scale-In' },
+              ]}
+              onChange={v => set({ scrollEffects: v })}
+            />
+
+            <SectionTitle>Glasmorphismus</SectionTitle>
+            <div style={{ opacity: ef.enabled ? 1 : .45, pointerEvents: ef.enabled ? 'auto' : 'none' }}>
+              <Toggle
+                checked={ef.glassmorphism}
+                onChange={() => set({ glassmorphism: !ef.glassmorphism })}
+                label="Frosted-Glass auf Karten"
+                desc="Karten bekommen einen Milchglas-Effekt (Performance-intensiv auf älteren Geräten)."
+              />
+            </div>
+
+            <div style={{ marginTop: 16 }}>
+              <button className="pk-btn-ghost" onClick={reset} style={{ fontSize: 12, padding: '6px 12px' }}>
+                ↺ Modul zurücksetzen
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ─── Tab: Farben ─────────────────────────────────────────────────── */}
+      {tab === 'farben' && (() => {
+        const co = prefs.colors
+        const set = (patch: Partial<typeof co>) => patchDesignPrefs({ colors: patch })
+        const reset = () => patchDesignPrefs({ colors: { ...DEFAULT_PREFS.colors } })
+        return (
+          <div>
+            <ModuleMasterToggle
+              enabled={co.enabled}
+              onToggle={() => set({ enabled: !co.enabled })}
+              title="Farbschema aktivieren"
+              description="Wenn AUS: Standard-Farben (#1684ff usw.) bleiben. Wenn AN: deine eigenen Farben werden für Akzente und Status-Indikatoren genutzt."
+            />
+
+            <SectionTitle>Akzent-Farben</SectionTitle>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <ColorField label="Primär (Aktionen, Buttons)" value={co.primaryAccent}   disabled={!co.enabled} onChange={v => set({ primaryAccent: v })} />
+              <ColorField label="Sekundär (Info, Hervorhebung)" value={co.secondaryAccent} disabled={!co.enabled} onChange={v => set({ secondaryAccent: v })} />
+              <ColorField label="Fehler / Warnung"            value={co.errorColor}     disabled={!co.enabled} onChange={v => set({ errorColor: v })} />
+              <ColorField label="Erfolg / Bestätigung"        value={co.successColor}   disabled={!co.enabled} onChange={v => set({ successColor: v })} />
+            </div>
+
+            <SectionTitle>Hintergrund-Variante</SectionTitle>
+            <PillRadio<BackgroundColor>
+              value={co.backgroundColor} disabled={!co.enabled} minWidth={110}
+              options={[
+                { id: 'ultra-dark', label: 'Ultra-Dunkel', sub: 'OLED' },
+                { id: 'standard',   label: 'Standard',     sub: 'Aktuell' },
+                { id: 'warm',       label: 'Warm-Dunkel',  sub: 'Sanft' },
+                { id: 'warm-tint',  label: 'Warm-Tint',    sub: 'Gelblich' },
+              ]}
+              onChange={v => set({ backgroundColor: v })}
+            />
+
+            <div style={{ marginTop: 16 }}>
+              <button className="pk-btn-ghost" onClick={reset} style={{ fontSize: 12, padding: '6px 12px' }}>
+                ↺ Modul zurücksetzen
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ─── Tab: Icons & Layout ─────────────────────────────────────────── */}
+      {tab === 'icons-layout' && (() => {
+        const ic = prefs.icons
+        const la = prefs.layout
+        const setIc = (patch: Partial<typeof ic>) => patchDesignPrefs({ icons: patch })
+        const setLa = (patch: Partial<typeof la>) => patchDesignPrefs({ layout: patch })
+        const resetIc = () => patchDesignPrefs({ icons: { ...DEFAULT_PREFS.icons } })
+        const resetLa = () => patchDesignPrefs({ layout: { ...DEFAULT_PREFS.layout } })
+        return (
+          <div>
+            <ModuleMasterToggle
+              enabled={ic.enabled}
+              onToggle={() => setIc({ enabled: !ic.enabled })}
+              title="Icon-Anpassung aktivieren"
+              description="Wenn AUS: Emoji-Icons (Standard) bleiben. Wenn AN: Stil, Größe und Status-Indikatoren werden global angewendet."
+            />
+
+            <SectionTitle>Icon-Stil</SectionTitle>
+            <PillRadio<IconStyle>
+              value={ic.style} disabled={!ic.enabled} minWidth={100}
+              options={[
+                { id: 'emoji', label: 'Emoji',  sub: '📦 🧾 🛠️' },
+                { id: 'svg',   label: 'SVG',    sub: 'Lucide-Icons' },
+                { id: 'text',  label: 'Text',   sub: 'LG / BR / WS' },
+              ]}
+              onChange={v => setIc({ style: v })}
+            />
+
+            <SectionTitle>Icon-Größe</SectionTitle>
+            <PillRadio<IconSize>
+              value={ic.size} disabled={!ic.enabled} minWidth={100}
+              options={[
+                { id: 'small',  label: 'Klein',  sub: '14px' },
+                { id: 'normal', label: 'Normal', sub: '18px' },
+                { id: 'large',  label: 'Groß',   sub: '22px' },
+              ]}
+              onChange={v => setIc({ size: v })}
+            />
+
+            <SectionTitle>Status-Indikator</SectionTitle>
+            <PillRadio<StatusIndicator>
+              value={ic.statusIndicator} disabled={!ic.enabled} minWidth={100}
+              options={[
+                { id: 'dot',      label: 'Punkt',       sub: '●' },
+                { id: 'circle',   label: 'Kreis',       sub: '○' },
+                { id: 'dot-text', label: 'Punkt+Text',  sub: '● ok' },
+                { id: 'icon',     label: 'Icon',        sub: '✓ / ✕' },
+              ]}
+              onChange={v => setIc({ statusIndicator: v })}
+            />
+
+            <div style={{ marginTop: 12 }}>
+              <button className="pk-btn-ghost" onClick={resetIc} style={{ fontSize: 12, padding: '6px 12px' }}>
+                ↺ Icons zurücksetzen
+              </button>
+            </div>
+
+            <div style={{ height: 1, background: 'rgba(255,255,255,.06)', margin: '24px 0' }} />
+
+            <ModuleMasterToggle
+              enabled={la.enabled}
+              onToggle={() => setLa({ enabled: !la.enabled })}
+              title="Layout-Dichte aktivieren"
+              description="Wenn AUS: aktuelles Layout bleibt. Wenn AN: Padding und Abstände werden angepasst."
+            />
+
+            <SectionTitle>Dichte</SectionTitle>
+            <PillRadio<LayoutDensity>
+              value={la.density} disabled={!la.enabled} minWidth={120}
+              options={[
+                { id: 'compact',     label: 'Kompakt',     sub: 'Mehr Daten' },
+                { id: 'comfortable', label: 'Komfortabel', sub: 'Standard' },
+                { id: 'spacious',    label: 'Geräumig',    sub: 'Lesbarer' },
+              ]}
+              onChange={v => setLa({ density: v })}
+            />
+
+            <div style={{ marginTop: 16 }}>
+              <button className="pk-btn-ghost" onClick={resetLa} style={{ fontSize: 12, padding: '6px 12px' }}>
+                ↺ Layout zurücksetzen
+              </button>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
