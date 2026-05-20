@@ -300,39 +300,34 @@ export default function KiErkennungPage() {
     setBriefLoading(true)
     setBriefText(null)
 
-    if (!isDemo) {
-      await new Promise(r => setTimeout(r, 250))
-      setBriefText('Heute liegen für diesen Live-Account noch keine eigenen Auswertungsdaten im KI-Assistenten vor. Legen Sie Lagerartikel, Werkstattkarten oder Rechnungen an; danach kann der Tagesbrief konkrete Hinweise aus Ihren echten Daten anzeigen.')
-      setBriefLoading(false)
-      return
-    }
+    const offeneAufgaben = isDemo ? demoAufgaben.filter(a => a.status === 'Offen' || a.status === 'In Arbeit') : []
+    const kritischeKarten = isDemo ? demoKarten.filter(k => k.status !== 'Fertig' && (k.prioritaet === 'Kritisch' || k.prioritaet === 'Hoch')) : []
+    const nachbestellArtikel = isDemo ? demoArtikel.filter(a => a.status === 'niedrig' || a.status === 'leer') : []
+    const ueberfaelligeRechnungen = isDemo ? demoRechnungen.filter(r => r.status === 'Überfällig' || r.status === 'Mahnung') : []
 
-    const offeneAufgaben = demoAufgaben.filter(a => a.status === 'Offen' || a.status === 'In Arbeit')
-    const kritischeKarten = demoKarten.filter(k => k.status !== 'Fertig' && (k.prioritaet === 'Kritisch' || k.prioritaet === 'Hoch'))
-    const nachbestellArtikel = demoArtikel.filter(a => a.status === 'niedrig' || a.status === 'leer')
-    const ueberfaelligeRechnungen = demoRechnungen.filter(r => r.status === 'Überfällig' || r.status === 'Mahnung')
-
-    const contextStr = `
+    const contextStr = isDemo ? `
 Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
 - Offene/laufende Aufgaben: ${offeneAufgaben.length} (${offeneAufgaben.map(a => a.titel).join(', ')})
 - Kritische/hohe Werkstatt-Arbeitskarten: ${kritischeKarten.length} (${kritischeKarten.map(k => k.titel).join(', ')})
 - Artikel mit Nachbestellbedarf: ${nachbestellArtikel.length} (${nachbestellArtikel.map(a => a.name).join(', ')})
 - Überfällige/gemahnte Rechnungen: ${ueberfaelligeRechnungen.length} (${ueberfaelligeRechnungen.map(r => `${r.rechnungsnummer} – ${r.kunde}`).join(', ')})
-`.trim()
+`.trim() : undefined
 
-    const prompt = `Erstelle einen kurzen, konkreten Tagesbrief (max. 4 Sätze) basierend auf folgenden Daten. Beginne mit "Heute, [Wochentag]," und gib am Ende 1-2 priorisierte Empfehlungen.`
-
-    void contextStr
-    void prompt
-    await new Promise(r => setTimeout(r, 450))
-    setBriefText(buildStaticBrief(offeneAufgaben.length, nachbestellArtikel.length, ueberfaelligeRechnungen.length, kritischeKarten.length))
-
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'Erstelle einen kurzen, konkreten Tagesbrief (max. 4 Sätze) basierend auf den Betriebsdaten. Beginne mit "Heute, [Wochentag]," und gib am Ende 1-2 priorisierte Empfehlungen.' }],
+          context: contextStr,
+        }),
+      })
+      const data = await res.json() as { reply?: string; error?: string }
+      setBriefText(data.reply ?? data.error ?? 'Kein Tagesbrief erhalten.')
+    } catch {
+      setBriefText('Tagesbrief konnte nicht geladen werden. Bitte erneut versuchen.')
+    }
     setBriefLoading(false)
-  }
-
-  function buildStaticBrief(aufgaben: number, artikel: number, rechnungen: number, karten: number) {
-    const tag = new Date().toLocaleDateString('de-DE', { weekday: 'long' })
-    return `Heute, ${tag}, sind ${aufgaben} Aufgaben offen, ${karten} Arbeitskarte${karten !== 1 ? 'n' : ''} kritisch/hoch priorisiert, ${artikel} Artikel müssen nachbestellt werden und ${rechnungen} Rechnung${rechnungen !== 1 ? 'en sind' : ' ist'} überfällig. Empfehlung: Starten Sie mit der kritischen Werkstatt-Arbeitskarte, prüfen Sie dann die überfälligen Rechnungen und lösen Sie den Bestellvorschlag aus.`
   }
 
   // ── Dokumente analysieren ──────────────────────────────────────────────────
@@ -676,8 +671,6 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     }
   }
 
-  // ── Demo-Chat ──────────────────────────────────────────────────────────────
-
   async function sendChat() {
     if (!chatMsg.trim() || chatLoading) return
     const userMsg = chatMsg.trim()
@@ -686,18 +679,24 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
     setChatHistory(newHistory)
     setChatLoading(true)
 
-    await new Promise(r => setTimeout(r, 550))
-    const q = userMsg.toLowerCase()
-    const reply = !isDemo
-      ? 'Dieser Chat bleibt vorerst im Simulationsmodus und verwendet keine Demo-Betriebsdaten für Live-Accounts. Nutzen Sie den Tab „Dokumente" für echte KI-Dokumentenanalyse oder legen Sie eigene Daten in den Piloten an.'
-      : q.includes('bestand') || q.includes('artikel')
-      ? 'Demo-Chat: 4 Artikel haben aktuell niedrigen oder leeren Bestand. Öffnen Sie den LagerPilot für Bestellvorschläge und Mindestbestand-Prüfung.'
-      : q.includes('rechnung') || q.includes('zahlung')
-      ? 'Demo-Chat: 2 Rechnungen sind überfällig oder in Mahnung. Details stehen im BüroPilot.'
-      : q.includes('dokument') || q.includes('scan')
-      ? 'Demo-Chat: Echte KI ist hier nur im Tab „Dokumente" aktiv. Laden Sie dort eine PDF- oder Bilddatei hoch.'
-      : 'Demo-Chat: Ich simuliere den allgemeinen Assistenten weiterhin ohne echte KI-Antworten. Echte OpenAI-Analyse ist nur für Dokumente aktiviert.'
-    setChatHistory(prev => [...prev, { role: 'assistant', content: reply, actions: [] }])
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newHistory.map(m => ({ role: m.role, content: m.content })),
+          structuredOutput: true,
+        }),
+      })
+      const data = await res.json() as { reply?: string; actions?: KiAction[]; error?: string }
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: data.reply ?? data.error ?? 'Keine Antwort erhalten.',
+        actions: data.actions ?? [],
+      }])
+    } catch {
+      setChatHistory(prev => [...prev, { role: 'assistant', content: 'Verbindungsfehler. Bitte erneut versuchen.', actions: [] }])
+    }
     setChatLoading(false)
   }
 
