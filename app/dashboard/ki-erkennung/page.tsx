@@ -259,7 +259,6 @@ export default function KiErkennungPage() {
   }, [])
 
   useEffect(() => {
-    if (isDemo) return
     getAiFeatureSettings()
       .then(setAiSettings)
       .catch(() => {})
@@ -377,28 +376,26 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
       })
       const docId = genId('DOK')
       let storagePath: string | undefined
-      if (!hasDemoCookie()) {
-        const { data: auth } = await createSupabaseClient().auth.getUser()
-        const userId = auth.user?.id
-        if (userId) storagePath = await uploadDokument(file, userId)
-        await insertBueroDokument({
-          id: docId,
-          name: file.name,
-          typ: labelForDocumentType(data.documentType),
-          groesse: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-          datum: new Date().toISOString().slice(0, 10),
-          kategorie: 'KI-Dokument',
-          bezug: data.summary,
-          storage_path: storagePath,
-          status: 'erkannt',
-          document_type: data.documentType,
-          confidence: data.confidence,
-          summary: data.summary,
-          extracted: fields,
-          suggested_actions: data.suggestedActions ?? [],
-          search_text: buildSearchText(file.name, data, fields),
-        })
-      }
+      const { data: auth } = await createSupabaseClient().auth.getUser()
+      const userId = auth.user?.id
+      if (userId) storagePath = await uploadDokument(file, userId)
+      await insertBueroDokument({
+        id: docId,
+        name: file.name,
+        typ: labelForDocumentType(data.documentType),
+        groesse: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        datum: new Date().toISOString().slice(0, 10),
+        kategorie: 'KI-Dokument',
+        bezug: data.summary,
+        storage_path: storagePath,
+        status: 'erkannt',
+        document_type: data.documentType,
+        confidence: data.confidence,
+        summary: data.summary,
+        extracted: fields,
+        suggested_actions: data.suggestedActions ?? [],
+        search_text: buildSearchText(file.name, data, fields),
+      })
       const record = toDocRecord({ id: docId, name: file.name, result: data, fields, storagePath })
       setSavedDocs(prev => [record, ...prev].slice(0, 30))
       setActiveDocId(docId)
@@ -422,9 +419,7 @@ Aktuelle Betriebsdaten (heute, ${new Date().toLocaleDateString('de-DE')}):
 
   async function setDocumentStatus(id: string, status: DocumentStatus) {
     setSavedDocs(prev => prev.map(d => d.id === id ? { ...d, status } : d))
-    if (!hasDemoCookie()) {
-      await updateBueroDokument(id, { status })
-    }
+    await updateBueroDokument(id, { status })
   }
 
   async function openSavedDocument(doc: DocumentWorkflowRecord) {
