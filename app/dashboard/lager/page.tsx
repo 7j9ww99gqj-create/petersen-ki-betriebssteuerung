@@ -2074,6 +2074,7 @@ export default function LagerPilotPage() {
                         aria-label="Alle auswählen"
                       />
                     </th>
+                    <th style={{ width: 44 }}>Bild</th>
                     <th
                       onClick={() => handleSort('id')}
                       style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
@@ -2106,7 +2107,7 @@ export default function LagerPilotPage() {
                 </thead>
                 <tbody>
                   {sorted.length === 0 ? (
-                    <tr><td colSpan={9} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>
+                    <tr><td colSpan={10} style={{ textAlign: 'center', padding: 40, color: '#aeb9c8' }}>
                       {artikel.length === 0 ? '📦 Noch keine Artikel. Lege deinen ersten Artikel an.' : 'Keine Artikel gefunden.'}
                     </td></tr>
                   ) : sorted.map(a => (
