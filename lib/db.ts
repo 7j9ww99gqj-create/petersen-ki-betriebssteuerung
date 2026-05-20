@@ -179,6 +179,8 @@ export type FirmaEinstellungen = {
   openai_mahnungsgenerator_enabled?: boolean
   openai_email_assistent_enabled?: boolean
   openai_monatsbericht_enabled?: boolean
+  qm_ki_zeichnungs_analyse?: boolean
+  qm_ki_sichtpruefung?: boolean
   created_at?: string
   updated_at?: string
 }
@@ -360,6 +362,64 @@ export async function updateOpenAiToolSettings(next: Partial<OpenAiToolSettings>
     openai_mahnungsgenerator_enabled: merged.mahnungsgeneratorEnabled,
     openai_email_assistent_enabled: merged.emailAssistentEnabled,
     openai_monatsbericht_enabled: merged.monatsberichtEnabled,
+  })
+  return merged
+}
+
+export type QmKiSettings = {
+  qm_ki_zeichnungs_analyse: boolean
+  qm_ki_sichtpruefung: boolean
+}
+
+const DEFAULT_QM_KI: QmKiSettings = {
+  qm_ki_zeichnungs_analyse: false,
+  qm_ki_sichtpruefung: false,
+}
+
+export async function getQmKiSettings(): Promise<QmKiSettings> {
+  try {
+    const supabase = db()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData.user
+    if (!user) return DEFAULT_QM_KI
+
+    // Demo-Cookie check (client-side)
+    if (typeof window !== 'undefined') {
+      const { hasDemoCookie } = await import('./auth')
+      if (hasDemoCookie()) return { qm_ki_zeichnungs_analyse: true, qm_ki_sichtpruefung: true }
+    }
+
+    const { INHABER_EMAIL } = await import('./roles')
+    const { isPondruffUser } = await import('./pondruff')
+    const email = (user.email ?? '').toLowerCase()
+    if (email === INHABER_EMAIL.toLowerCase() || isPondruffUser(email)) {
+      return { qm_ki_zeichnungs_analyse: true, qm_ki_sichtpruefung: true }
+    }
+
+    const firma = await getFirmaEinstellungen()
+    if (!firma) return DEFAULT_QM_KI
+    const row = firma as Record<string, unknown>
+    return {
+      qm_ki_zeichnungs_analyse: Boolean(row.qm_ki_zeichnungs_analyse),
+      qm_ki_sichtpruefung: Boolean(row.qm_ki_sichtpruefung),
+    }
+  } catch {
+    return DEFAULT_QM_KI
+  }
+}
+
+export async function updateQmKiSettings(settings: Partial<QmKiSettings>): Promise<QmKiSettings> {
+  const current = await getFirmaEinstellungen()
+  if (!current) throw new Error('Keine Firmeneinstellungen gefunden.')
+  const row = current as Record<string, unknown>
+  const merged: QmKiSettings = {
+    qm_ki_zeichnungs_analyse: settings.qm_ki_zeichnungs_analyse ?? Boolean(row.qm_ki_zeichnungs_analyse),
+    qm_ki_sichtpruefung: settings.qm_ki_sichtpruefung ?? Boolean(row.qm_ki_sichtpruefung),
+  }
+  await upsertFirmaEinstellungen({
+    ...current,
+    qm_ki_zeichnungs_analyse: merged.qm_ki_zeichnungs_analyse,
+    qm_ki_sichtpruefung: merged.qm_ki_sichtpruefung,
   })
   return merged
 }
