@@ -161,6 +161,13 @@ export default function QMPage() {
   // CSV export state
   const [csvLoadingBericht, setCsvLoadingBericht] = useState<string | null>(null)
 
+  // Email state
+  const [emailModal, setEmailModal] = useState<QmPruefbericht | null>(null)
+  const [emailAddr, setEmailAddr] = useState('')
+  const [emailName, setEmailName] = useState('')
+  const [emailSending, setEmailSending] = useState(false)
+  const [resendConfigured, setResendConfigured] = useState<boolean | null>(null)
+
   // Statistik state
   const [statsZeitraum, setStatsZeitraum] = useState<QmStatistikZeitraum>('monat')
   const [statsLoading, setStatsLoading] = useState(false)
@@ -307,6 +314,57 @@ export default function QMPage() {
     } finally {
       setCsvLoadingBericht(null)
     }
+  }
+
+  useEffect(() => {
+    fetch('/api/qm/send-pdf')
+      .then(r => r.json())
+      .then((d: { configured?: boolean }) => setResendConfigured(!!d.configured))
+      .catch(() => setResendConfigured(false))
+  }, [])
+
+  async function handleSendEmail() {
+    if (!emailModal) return
+    if (isDemo) {
+      showToast('E-Mail würde jetzt versendet (Demo)', true)
+      setEmailModal(null)
+      return
+    }
+    if (!emailAddr.trim()) return
+    setEmailSending(true)
+    try {
+      const res = await fetch('/api/qm/send-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bericht_id: emailModal.id,
+          recipient_email: emailAddr.trim(),
+          recipient_name: emailName.trim() || undefined,
+          pruefbericht_nr: emailModal.pruefbericht_nr,
+        }),
+      })
+      const data = await res.json() as { ok?: boolean; error?: string }
+      if (data.ok) {
+        showToast(`E-Mail an ${emailAddr} versendet`)
+        setEmailModal(null)
+        setEmailAddr('')
+        setEmailName('')
+      } else {
+        showToast(data.error ?? 'Fehler beim Versand', false)
+      }
+    } catch {
+      showToast('Netzwerkfehler', false)
+    } finally {
+      setEmailSending(false)
+    }
+  }
+
+  function getMailtoLink(b: QmPruefbericht): string {
+    const subject = encodeURIComponent(`Prüfbericht ${b.pruefbericht_nr} — ${b.bauteil_id ?? ''}`)
+    const body = encodeURIComponent(
+      `Sehr geehrte Damen und Herren,\n\nanbei finden Sie den Prüfbericht ${b.pruefbericht_nr} (Bauteil: ${b.bauteil_id ?? '—'}, Datum: ${fmtDate(b.pruef_datum)}, Status: ${b.gesamtstatus ?? '—'}).\n\nDas PDF können Sie separat herunterladen.\n\nMit freundlichen Grüßen`
+    )
+    return `mailto:?subject=${subject}&body=${body}`
   }
 
   // ── Computed
@@ -576,6 +634,7 @@ export default function QMPage() {
                       <th>Status</th>
                       <th>PDF</th>
                       <th>CSV</th>
+                      <th>Mail</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -622,6 +681,16 @@ export default function QMPage() {
                               style={{ fontSize: 11, padding: '4px 8px' }}
                             >
                               {csvLoadingBericht === b.id ? '⏳' : '📊'}
+                            </button>
+                          </td>
+                          <td onClick={e => e.stopPropagation()}>
+                            <button
+                              className="pk-btn-ghost"
+                              onClick={() => { setEmailModal(b); setEmailAddr(''); setEmailName('') }}
+                              title="Per E-Mail senden"
+                              style={{ fontSize: 11, padding: '4px 8px' }}
+                            >
+                              📧
                             </button>
                           </td>
                         </tr>
@@ -946,6 +1015,64 @@ export default function QMPage() {
           </div>
         )
       })()}
+
+      {/* Email Modal */}
+      {emailModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={() => setEmailModal(null)}>
+          <div className="pk-card fade-in" style={{ width: '100%', maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>📧 Prüfbericht per E-Mail</h3>
+              <button onClick={() => setEmailModal(null)} style={{ background: 'none', border: 'none', color: '#aeb9c8', fontSize: 20, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ color: '#aeb9c8', fontSize: 12, marginBottom: 14 }}>
+              {emailModal.pruefbericht_nr} · {emailModal.bauteil_id ?? '—'} · {fmtDate(emailModal.pruef_datum)}
+            </div>
+
+            {resendConfigured === false && !isDemo ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', color: '#f59e0b', fontSize: 13 }}>
+                  ⚠️ E-Mail-Versand nicht konfiguriert — PDF manuell herunterladen.
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>E-Mail-Adresse (für mailto-Link)</div>
+                  <input className="pk-input" type="email" value={emailAddr} onChange={e => setEmailAddr(e.target.value)} placeholder="kunde@firma.de" />
+                </div>
+                <a
+                  href={emailAddr ? `mailto:${emailAddr}&${getMailtoLink(emailModal).slice(7)}` : getMailtoLink(emailModal)}
+                  className="pk-btn"
+                  style={{ background: QM_COLOR, border: 'none', textDecoration: 'none', textAlign: 'center', padding: '12px 20px' }}
+                  onClick={() => setEmailModal(null)}
+                >
+                  📧 E-Mail vorbereiten
+                </a>
+                <div style={{ fontSize: 11, color: '#aeb9c8' }}>
+                  Kein Anhang via mailto möglich — PDF bitte separat herunterladen und anhängen.
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Empfänger E-Mail *</div>
+                  <input className="pk-input" type="email" value={emailAddr} onChange={e => setEmailAddr(e.target.value)} placeholder="kunde@firma.de" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: '#aeb9c8', marginBottom: 4 }}>Empfänger Name (optional)</div>
+                  <input className="pk-input" value={emailName} onChange={e => setEmailName(e.target.value)} placeholder="Max Mustermann" />
+                </div>
+                <button
+                  className="pk-btn"
+                  disabled={emailSending || !emailAddr.trim()}
+                  onClick={() => void handleSendEmail()}
+                  style={{ background: QM_COLOR, border: 'none', padding: '12px 20px' }}
+                >
+                  {emailSending ? '⏳ Sendet…' : '📧 Per E-Mail senden'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (
