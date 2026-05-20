@@ -918,13 +918,11 @@ function KampagnenTab({
       budget: form.budget ? `${form.budget} €` : '0 €',
     }
 
-    if (!isDemo) {
-      try {
-        await upsertMarketingKampagne(newCampaign)
-      } catch {
-        showToast('Fehler beim Speichern', true)
-        return
-      }
+    try {
+      await upsertMarketingKampagne(newCampaign)
+    } catch {
+      showToast('Fehler beim Speichern', true)
+      return
     }
 
     onChange([newCampaign, ...kampagnen])
@@ -937,7 +935,7 @@ function KampagnenTab({
     const updated = kampagnen.map(item => item.id === id ? { ...item, status } : item)
     const current = updated.find(item => item.id === id)
 
-    if (!isDemo && current) {
+    if (current) {
       try {
         await upsertMarketingKampagne(current)
       } catch {
@@ -951,14 +949,12 @@ function KampagnenTab({
   }
 
   const handleDelete = async (id: string) => {
-    if (!isDemo) {
-      try {
-        await deleteMarketingKampagne(id)
-      } catch {
-        showToast('Fehler beim Löschen', true)
-        setDeleteConfirm(null)
-        return
-      }
+    try {
+      await deleteMarketingKampagne(id)
+    } catch {
+      showToast('Fehler beim Löschen', true)
+      setDeleteConfirm(null)
+      return
     }
     onChange(kampagnen.filter(item => item.id !== id))
     setDeleteConfirm(null)
@@ -988,13 +984,11 @@ function KampagnenTab({
       ende: editForm.ende || '—',
       budget: editForm.budget ? `${editForm.budget} €` : editItem.budget,
     }
-    if (!isDemo) {
-      try {
-        await upsertMarketingKampagne(updated)
-      } catch {
-        showToast('Fehler beim Speichern', true)
-        return
-      }
+    try {
+      await upsertMarketingKampagne(updated)
+    } catch {
+      showToast('Fehler beim Speichern', true)
+      return
     }
     onChange(kampagnen.map(item => item.id === updated.id ? updated : item))
     setEditItem(null)
@@ -1245,13 +1239,11 @@ function LeadsTab({
       betreuer: form.betreuer,
     }
 
-    if (!isDemo) {
-      try {
-        await upsertMarketingLead(newLead)
-      } catch {
-        showToast('Fehler beim Speichern', true)
-        return
-      }
+    try {
+      await upsertMarketingLead(newLead)
+    } catch {
+      showToast('Fehler beim Speichern', true)
+      return
     }
 
     onChange([newLead, ...leads])
@@ -1264,7 +1256,7 @@ function LeadsTab({
     const updated = leads.map(lead => lead.id === id ? { ...lead, status } : lead)
     const current = updated.find(lead => lead.id === id)
 
-    if (!isDemo && current) {
+    if (current) {
       try {
         await upsertMarketingLead(current)
       } catch {
@@ -1278,14 +1270,12 @@ function LeadsTab({
   }
 
   const handleDeleteLead = async (id: string) => {
-    if (!isDemo) {
-      try {
-        await deleteMarketingLead(id)
-      } catch {
-        showToast('Fehler beim Löschen', true)
-        setDeleteConfirm(null)
-        return
-      }
+    try {
+      await deleteMarketingLead(id)
+    } catch {
+      showToast('Fehler beim Löschen', true)
+      setDeleteConfirm(null)
+      return
     }
     onChange(leads.filter(lead => lead.id !== id))
     setDeleteConfirm(null)
@@ -1317,13 +1307,11 @@ function LeadsTab({
       wert: editLeadForm.wert ? `${editLeadForm.wert} €` : editLead.wert,
       betreuer: editLeadForm.betreuer,
     }
-    if (!isDemo) {
-      try {
-        await upsertMarketingLead(updated)
-      } catch {
-        showToast('Fehler beim Speichern', true)
-        return
-      }
+    try {
+      await upsertMarketingLead(updated)
+    } catch {
+      showToast('Fehler beim Speichern', true)
+      return
     }
     onChange(leads.map(lead => lead.id === updated.id ? updated : lead))
     setEditLead(null)
@@ -1567,13 +1555,11 @@ function NewsletterTab({
       klickrate: 0,
     }
 
-    if (!isDemo) {
-      try {
-        await upsertMarketingNewsletter(newItem)
-      } catch {
-        showToast('Fehler beim Speichern', true)
-        return
-      }
+    try {
+      await upsertMarketingNewsletter(newItem)
+    } catch {
+      showToast('Fehler beim Speichern', true)
+      return
     }
 
     onChange([newItem, ...newsletter])
@@ -1587,13 +1573,11 @@ function NewsletterTab({
     if (!current) return
     const updatedItem = updater(current)
 
-    if (!isDemo) {
-      try {
-        await upsertMarketingNewsletter(updatedItem)
-      } catch {
-        showToast('Fehler beim Speichern', true)
-        return
-      }
+    try {
+      await upsertMarketingNewsletter(updatedItem)
+    } catch {
+      showToast('Fehler beim Speichern', true)
+      return
     }
 
     onChange(newsletter.map(item => item.id === id ? updatedItem : item))
@@ -1601,14 +1585,12 @@ function NewsletterTab({
   }
 
   const handleDeleteNewsletter = async (id: string) => {
-    if (!isDemo) {
-      try {
-        await deleteMarketingNewsletter(id)
-      } catch {
-        showToast('Fehler beim Löschen', true)
-        setDeleteConfirm(null)
-        return
-      }
+    try {
+      await deleteMarketingNewsletter(id)
+    } catch {
+      showToast('Fehler beim Löschen', true)
+      setDeleteConfirm(null)
+      return
     }
     onChange(newsletter.filter(item => item.id !== id))
     setDeleteConfirm(null)
@@ -1634,13 +1616,11 @@ function NewsletterTab({
       datum: editNlForm.datum || editNewsletter.datum,
       empfaenger: Number(editNlForm.empfaenger) || editNewsletter.empfaenger,
     }
-    if (!isDemo) {
-      try {
-        await upsertMarketingNewsletter(updated)
-      } catch {
-        showToast('Fehler beim Speichern', true)
-        return
-      }
+    try {
+      await upsertMarketingNewsletter(updated)
+    } catch {
+      showToast('Fehler beim Speichern', true)
+      return
     }
     onChange(newsletter.map(item => item.id === updated.id ? updated : item))
     setEditNewsletter(null)
@@ -2537,19 +2517,18 @@ export default function MarketingPilotPage() {
     params.set('tab', newTab)
     router.replace(`?${params.toString()}`, { scroll: false })
   }
-  const [kampagnen, setKampagnen] = useState<Kampagne[]>(isDemo ? demoKampagnen : [])
-  const [leads, setLeads] = useState<Lead[]>(isDemo ? demoLeads : [])
-  const [newsletter, setNewsletter] = useState<Newsletter[]>(isDemo ? demoNewsletter : [])
-  const [seoKeywords, setSeoKeywords] = useState<SeoKeyword[]>(isDemo ? defaultSeoKeywords : [])
-  const [contentIdeas, setContentIdeas] = useState<ContentIdea[]>(isDemo ? defaultContentIdeas : [])
-  const [postingPlans, setPostingPlans] = useState<PostingPlan[]>(isDemo ? defaultPostingPlans : [])
-  const [automationRules, setAutomationRules] = useState<AutomationRule[]>(isDemo ? defaultAutomationRules : [])
-  const [integrationItems, setIntegrationItems] = useState<IntegrationItem[]>(isDemo ? defaultIntegrationItems : [])
-  const [loading, setLoading] = useState(!isDemo)
+  const [kampagnen, setKampagnen] = useState<Kampagne[]>([])
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [newsletter, setNewsletter] = useState<Newsletter[]>([])
+  const [seoKeywords, setSeoKeywords] = useState<SeoKeyword[]>([])
+  const [contentIdeas, setContentIdeas] = useState<ContentIdea[]>([])
+  const [postingPlans, setPostingPlans] = useState<PostingPlan[]>([])
+  const [automationRules, setAutomationRules] = useState<AutomationRule[]>([])
+  const [integrationItems, setIntegrationItems] = useState<IntegrationItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
 
   const loadData = () => {
-    if (isDemo) return
     trackVisit({ href: '/dashboard/marketing', label: 'MarketingPilot', icon: '📣' })
     setLoading(true)
     setErrorMsg('')
@@ -2580,7 +2559,7 @@ export default function MarketingPilotPage() {
   useEffect(() => {
     loadData()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDemo])
+  }, [])
 
   const saveSeoKeywords = async (next: SeoKeyword[]) => {
     const changedItem = findChangedItem(next, seoKeywords)
@@ -2590,12 +2569,10 @@ export default function MarketingPilotPage() {
       return true
     }
 
-    if (!isDemo) {
-      try {
-        await upsertMarketingSeoKeyword(changedItem)
-      } catch {
-        return false
-      }
+    try {
+      await upsertMarketingSeoKeyword(changedItem)
+    } catch {
+      return false
     }
 
     setSeoKeywords(next)
@@ -2608,12 +2585,10 @@ export default function MarketingPilotPage() {
       setContentIdeas(next)
       return true
     }
-    if (!isDemo) {
-      try {
-        await upsertMarketingContentIdea(changedItem)
-      } catch {
-        return false
-      }
+    try {
+      await upsertMarketingContentIdea(changedItem)
+    } catch {
+      return false
     }
     setContentIdeas(next)
     return true
@@ -2625,12 +2600,10 @@ export default function MarketingPilotPage() {
       setPostingPlans(next)
       return true
     }
-    if (!isDemo) {
-      try {
-        await upsertMarketingPostingPlan(changedItem)
-      } catch {
-        return false
-      }
+    try {
+      await upsertMarketingPostingPlan(changedItem)
+    } catch {
+      return false
     }
     setPostingPlans(next)
     return true
@@ -2642,12 +2615,10 @@ export default function MarketingPilotPage() {
       setAutomationRules(next)
       return true
     }
-    if (!isDemo) {
-      try {
-        await upsertMarketingAutomationRule(changedItem)
-      } catch {
-        return false
-      }
+    try {
+      await upsertMarketingAutomationRule(changedItem)
+    } catch {
+      return false
     }
     setAutomationRules(next)
     return true
@@ -2659,12 +2630,10 @@ export default function MarketingPilotPage() {
       setIntegrationItems(next)
       return true
     }
-    if (!isDemo) {
-      try {
-        await upsertMarketingIntegrationItem(changedItem)
-      } catch {
-        return false
-      }
+    try {
+      await upsertMarketingIntegrationItem(changedItem)
+    } catch {
+      return false
     }
     setIntegrationItems(next)
     return true
