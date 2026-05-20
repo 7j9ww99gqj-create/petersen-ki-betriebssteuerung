@@ -1,5 +1,5 @@
 export type EmployeeTierId = '1-3' | '4-10' | '11-30' | '30+'
-export type PilotId = 'lager' | 'buero' | 'werkstatt' | 'marketing' | 'analyse' | 'planung' | 'steuer' | 'custom'
+export type PilotId = 'lager' | 'buero' | 'werkstatt' | 'marketing' | 'analyse' | 'planung' | 'steuer' | 'qm' | 'custom'
 export type PackageId = 'starter' | 'business' | 'enterprise'
 export type BookingStatus = 'no_subscription' | 'pending_payment' | 'proof_sent' | 'active' | 'rejected' | 'cancelled'
 
@@ -74,6 +74,13 @@ export const PILOT_PRICING: Record<PilotId, {
     description: 'Belege, Steuerdaten und Auswertungen',
     prices: { '1-3': 39, '4-10': 89, '11-30': 149, '30+': 'request' },
   },
+  qm: {
+    id: 'qm',
+    name: 'QM-Pilot',
+    icon: '🔬',
+    description: 'Qualitätsmanagement — Zeichnungsanalyse, Prüfberichte, Messwerterfassung',
+    prices: { '1-3': 40, '4-10': 85, '11-30': 149, '30+': 'request' },
+  },
   custom: {
     id: 'custom',
     name: 'Custom Features',
@@ -116,10 +123,10 @@ export const PACKAGE_PRICING: Record<PackageId, {
     id: 'enterprise',
     name: 'Enterprise',
     icon: '🏢',
-    pilots: ['buero', 'lager', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer'],
-    included: ['BüroPilot', 'LagerPilot', 'WerkstattPilot', 'MarketingPilot', 'AnalysePilot', 'PlanungPilot', 'SteuerPilot', 'KI-Erkennung inklusive'],
-    prices: { '1-3': 249, '4-10': 549, '11-30': 899, '30+': 'request' },
-    singlePrices: { '1-3': 313, '4-10': 663, '11-30': 1153, '30+': 'request' },
+    pilots: ['buero', 'lager', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer', 'qm'],
+    included: ['BüroPilot', 'LagerPilot', 'WerkstattPilot', 'MarketingPilot', 'AnalysePilot', 'PlanungPilot', 'SteuerPilot', 'QM-Pilot', 'KI-Erkennung inklusive'],
+    prices: { '1-3': 279, '4-10': 599, '11-30': 999, '30+': 'request' },
+    singlePrices: { '1-3': 353, '4-10': 748, '11-30': 1302, '30+': 'request' },
   },
 }
 

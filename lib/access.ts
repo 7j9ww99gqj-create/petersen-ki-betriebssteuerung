@@ -14,11 +14,11 @@ const ACCESS_PILOTS: AccessPilotId[] = ['lager', 'buero', 'werkstatt', 'marketin
 const ACCESS_ROLES: AccessRole[] = ['Inhaber', 'Admin', 'Mitarbeiter', 'Büro', 'Werkstatt', 'Lager']
 
 const DEFAULT_ROLE_PILOTS: Record<AccessRole, AccessPilotId[]> = {
-  Inhaber: ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer', 'qm'],
-  Admin: ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer', 'qm'],
-  Mitarbeiter: ['lager', 'buero', 'werkstatt', 'analyse', 'planung', 'qm'],
+  Inhaber: ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer'],
+  Admin: ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer'],
+  Mitarbeiter: ['lager', 'buero', 'werkstatt', 'analyse', 'planung'],
   Büro: ['buero', 'analyse', 'steuer'],
-  Werkstatt: ['werkstatt', 'lager', 'planung', 'qm'],
+  Werkstatt: ['werkstatt', 'lager', 'planung'],
   Lager: ['lager'],
 }
 

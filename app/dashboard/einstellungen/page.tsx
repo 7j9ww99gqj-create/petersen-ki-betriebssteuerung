@@ -77,7 +77,7 @@ const SETTINGS_SECTIONS: SettingsSection[] = ['profil', 'firma', 'billing', 'kun
 
 const ACCESS_STATUS_OPTIONS: AccessStatus[] = ['pending', 'active', 'suspended']
 const ACCESS_MODE_OPTIONS: AccessMode[] = ['standard', 'demo']
-const MANAGED_PILOT_OPTIONS: PilotId[] = ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer']
+const MANAGED_PILOT_OPTIONS: PilotId[] = ['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer', 'qm']
 const ACCESS_STATUS_LABELS: Record<AccessStatus, string> = {
   pending: 'Freigabe ausstehend',
   active: 'Aktiv',
@@ -95,6 +95,7 @@ const PILOT_LABELS: Record<PilotId, string> = {
   analyse: 'AnalysePilot',
   planung: 'PlanungPilot',
   steuer: 'SteuerPilot',
+  qm: 'QM-Pilot',
   custom: 'Custom',
 }
 
@@ -2395,8 +2396,8 @@ function InfoSection({ isDemo }: { isDemo: boolean }) {
               <ul style={{ margin: '8px 0 0', paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <li><strong style={{ color: '#f8fbff' }}>Starter (ab 89 €/Monat):</strong> BüroPilot, LagerPilot, KI-Erkennung — für 1–3 Mitarbeiter</li>
                 <li><strong style={{ color: '#f8fbff' }}>Business (ab 159 €/Monat):</strong> BüroPilot, LagerPilot, WerkstattPilot, MarketingPilot, KI-Erkennung — für 1–3 Mitarbeiter</li>
-                <li><strong style={{ color: '#f8fbff' }}>Enterprise (ab 249 €/Monat):</strong> Alle Module inkl. AnalysePilot, PlanungPilot, SteuerPilot, KI-Erkennung — für 1–3 Mitarbeiter</li>
-                <li><strong style={{ color: '#f8fbff' }}>Einzelmodule:</strong> Buchung einzelner Piloten ab 29 €/Monat möglich</li>
+                <li><strong style={{ color: '#f8fbff' }}>Enterprise (ab 279 €/Monat):</strong> Alle Module inkl. AnalysePilot, PlanungPilot, SteuerPilot, QM-Pilot, KI-Erkennung — für 1–3 Mitarbeiter</li>
+                <li><strong style={{ color: '#f8fbff' }}>Einzelmodule:</strong> Buchung einzelner Piloten ab 29 €/Monat möglich (QM-Pilot ab 40 €/Monat)</li>
                 <li>Preise für größere Teams (4–10, 11–30, 30+ Mitarbeiter) auf Anfrage über das Buchungsportal</li>
               </ul>
               <p style={{ margin: '8px 0 0' }}>Alle Preise inkl. MwSt. Abweichende Preise für größere Teamgrößen — siehe Buchungsbereich.</p>

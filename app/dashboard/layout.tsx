@@ -35,7 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [userName, setUserName] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [role, setRoleState] = useState<AppRole>('Admin')
-  const [allowedPilotIds, setAllowedPilotIds] = useState<string[]>(['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer', 'qm'])
+  const [allowedPilotIds, setAllowedPilotIds] = useState<string[]>(['lager', 'buero', 'werkstatt', 'marketing', 'analyse', 'planung', 'steuer'])
   const [isPondruff, setIsPondruff] = useState(false)
   const [pondruffSheet, setPondruffSheet] = useState(false)
   const [companyChecked, setCompanyChecked] = useState(false)
