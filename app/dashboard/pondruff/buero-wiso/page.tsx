@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { wisoOrderTsv, type WisoOrder, type WisoOrderRow } from '@/lib/pondruff'
-import { generatePondruffOrderPDF, type PondPreisauftrag } from '@/lib/pondruff-pdf'
+import { generatePondruffOrderPDF, generateArbeitskartePDF, type PondPreisauftrag, type ArbeitskarteData } from '@/lib/pondruff-pdf'
 import { usePondruffFlags } from '@/components/pondruff/usePondruffFlags'
 import { useGlobalToast } from '@/components/ui/ToastProvider'
 
@@ -378,7 +378,12 @@ ${order.rows.map(r => `<tr><td>${esc(r['Pos.'])}</td><td>${r.Menge}</td><td>${es
                             : <button className="pk-btn-ghost" disabled={busy || !wisoEnabled} title={wisoEnabled ? undefined : 'WISO-Sync ist durch den Inhaber deaktiviert'} onClick={() => exportWisoWE(w)} style={{ fontSize: 11 }}>{wisoEnabled ? '→ WISO' : '🚫 WISO'}</button>}
                         </td>
                         <td onClick={e => e.stopPropagation()}>
-                          <button className="pk-btn-ghost" onClick={() => delWE(w.id)} style={{ fontSize: 11 }}>🗑️</button>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button className="pk-btn-ghost"
+                              onClick={() => generateArbeitskartePDF(w as unknown as ArbeitskarteData)}
+                              style={{ fontSize: 11 }} title="Arbeitskarte A5 drucken">🖨️</button>
+                            <button className="pk-btn-ghost" onClick={() => delWE(w.id)} style={{ fontSize: 11 }}>🗑️</button>
+                          </div>
                         </td>
                       </tr>
                       {selectedWeId === w.id && (

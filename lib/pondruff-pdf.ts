@@ -155,6 +155,20 @@ type DocLike = {
   output: (type: string) => string
 }
 
+async function loadImage(path: string): Promise<string | null> {
+  try {
+    const r = await fetch(path)
+    if (!r.ok) return null
+    const blob = await r.blob()
+    return await new Promise<string>((res, rej) => {
+      const fr = new FileReader()
+      fr.onload = () => res(fr.result as string)
+      fr.onerror = rej
+      fr.readAsDataURL(blob)
+    })
+  } catch { return null }
+}
+
 interface ContentBlock {
   docType: 'RECHNUNG' | 'AUFTRAGSBESTÄTIGUNG' | 'ANGEBOT'
   docNummer: string
@@ -502,4 +516,212 @@ export async function generatePondruffOrderPDF(o: PondPreisauftrag, returnBase64
     positionen, nettoVal: netto, mwstSatz: satz, steuerVal: steuer, bruttoVal: brutto,
     summenLabel: 'Angebotssumme brutto',
   }, `Angebot_${o.order_id || 'pondruff'}.pdf`, returnBase64)
+}
+
+// ─── ARBEITSKARTE ─────────────────────────────────────────────────────────────
+
+export type ArbeitskartePosition = {
+  position_nr: number
+  menge: string
+  artikelbezeichnung: string
+  form: string
+  laenge?: string
+  breite?: string
+  hoehe?: string
+  durchmesser?: string
+  durchmesser_laenge?: string
+  raw_dimension_text?: string
+  weitere_infos?: { key: string; value: string }[]
+  polieren?: string
+  polieren_wo?: string
+  entschichtung?: string
+  microstrahlen?: string
+  laeppstrahlen?: string
+  polierstrahlen?: string
+  beschichtung?: string
+}
+
+export type ArbeitskarteData = {
+  id: string
+  customer: string | null
+  purchase_order: string | null
+  delivery_id: string | null
+  lieferbedingungen: string | null
+  eingelagert_am: string | null
+  eingelagert_von: string | null
+  positionen: ArbeitskartePosition[] | null
+}
+
+const BANNER_PATH = '/pondruff/banner.png'
+const BANNER_W_PX = 1152
+const BANNER_H_PX = 317
+const A5_W = 210
+const A5_H = 148
+const HEADER_H = 22
+const BANNER_DISPLAY_H = HEADER_H
+const BANNER_DISPLAY_W = BANNER_DISPLAY_H * (BANNER_W_PX / BANNER_H_PX)
+const MARGIN = 8
+const CONTENT_W = A5_W - MARGIN * 2
+
+function drawArbeitskartePage(doc: DocLike, banner: string | null) {
+  doc.setFillColor(20, 20, 20)
+  doc.rect(0, 0, A5_W, HEADER_H, 'F')
+  if (banner) {
+    doc.addImage(banner, 'PNG', 0, 0, BANNER_DISPLAY_W, BANNER_DISPLAY_H)
+  }
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(15)
+  doc.setTextColor(229, 9, 9)
+  doc.text('ARBEITSKARTE', A5_W - MARGIN, 14, { align: 'right' })
+  doc.setDrawColor(229, 9, 9)
+  doc.setLineWidth(0.8)
+  doc.line(0, HEADER_H, A5_W, HEADER_H)
+  doc.setLineWidth(0.3)
+  doc.setDrawColor(60, 60, 60)
+}
+
+function metaLabel(doc: DocLike, label: string, value: string, x: number, y: number, colW: number) {
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7)
+  doc.setTextColor(120, 120, 120)
+  doc.text(label, x, y)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8.5)
+  doc.setTextColor(20, 20, 20)
+  const lines = doc.splitTextToSize(value || '—', colW - 2)
+  doc.text(lines[0] || '—', x, y + 4.5)
+}
+
+export async function generateArbeitskartePDF(we: ArbeitskarteData): Promise<void> {
+  const { default: JsPDF } = await import('jspdf')
+  const doc = new JsPDF({ unit: 'mm', format: 'a5', orientation: 'landscape' }) as unknown as DocLike
+
+  const banner = await loadImage(BANNER_PATH)
+  drawArbeitskartePage(doc, banner)
+
+  const pos = Array.isArray(we.positionen) ? we.positionen : []
+  const dateStr = we.eingelagert_am
+    ? new Date(we.eingelagert_am).toLocaleDateString('de-DE')
+    : new Date().toLocaleDateString('de-DE')
+
+  // ── Meta-Block ──────────────────────────────────────────────────────────
+  let y = HEADER_H + 7
+  const col3W = CONTENT_W / 3
+  metaLabel(doc, 'Kunde', we.customer || '—', MARGIN, y, col3W)
+  metaLabel(doc, 'Bestell-/Lieferschein-Nr.', we.purchase_order || we.delivery_id || '—', MARGIN + col3W, y, col3W)
+  metaLabel(doc, 'Eingelagert am', dateStr, MARGIN + col3W * 2, y, col3W)
+  y += 12
+  const col2W = CONTENT_W / 2
+  metaLabel(doc, 'Lieferbedingungen', we.lieferbedingungen || '—', MARGIN, y, col2W)
+  metaLabel(doc, 'Eingelagert von', we.eingelagert_von || '—', MARGIN + col2W, y, col2W)
+  y += 10
+
+  doc.setDrawColor(200, 200, 200)
+  doc.setLineWidth(0.3)
+  doc.line(MARGIN, y, A5_W - MARGIN, y)
+  y += 5
+
+  // ── Positionen ──────────────────────────────────────────────────────────
+  if (pos.length === 0) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(150, 150, 150)
+    doc.text('Keine Positionen erfasst.', MARGIN, y + 4)
+  }
+
+  for (let i = 0; i < pos.length; i++) {
+    const p = pos[i]
+
+    if (y > A5_H - 18) {
+      doc.addPage()
+      drawArbeitskartePage(doc, banner)
+      y = HEADER_H + 10
+    }
+
+    const masse = p.form === 'Rund'
+      ? `Ø ${p.durchmesser || '?'} × ${p.durchmesser_laenge || '?'} mm`
+      : `${p.laenge || '?'} × ${p.breite || '?'} × ${p.hoehe || '?'} mm`
+
+    const services: string[] = []
+    if (p.polieren === 'Ja') services.push(`Polieren${p.polieren_wo ? ` (${p.polieren_wo})` : ''}`)
+    if (p.entschichtung === 'Ja') services.push('Entschichtung')
+    if (p.microstrahlen === 'Ja') services.push('Microstrahlen')
+    if (p.laeppstrahlen === 'Ja') services.push('Läppstrahlen')
+    if (p.polierstrahlen === 'Ja') services.push('Polierstrahlen')
+
+    const weitereInfoStr = Array.isArray(p.weitere_infos) && p.weitere_infos.length > 0
+      ? p.weitere_infos.filter(w => w.key).map(w => `${w.key}: ${w.value}`).join('  |  ')
+      : ''
+
+    // Position header
+    doc.setFillColor(240, 240, 240)
+    doc.rect(MARGIN, y - 1, CONTENT_W, 6.5, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8.5)
+    doc.setTextColor(229, 9, 9)
+    doc.text(`Pos. ${p.position_nr}`, MARGIN + 2, y + 4)
+    doc.setTextColor(20, 20, 20)
+    const titel = `${p.menge ? p.menge + ' ×  ' : ''}${p.artikelbezeichnung || '—'}`
+    doc.text(titel, MARGIN + 14, y + 4)
+    y += 8.5
+
+    // Maße + Beschichtung
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(60, 60, 60)
+    const col2 = CONTENT_W / 2
+    doc.text(`Maße: ${masse}${p.raw_dimension_text ? `  (Beleg: ${p.raw_dimension_text})` : ''}`, MARGIN + 2, y)
+    const beschichtung = p.beschichtung && p.beschichtung !== 'Keine' ? p.beschichtung : 'Keine'
+    doc.setFont('helvetica', beschichtung !== 'Keine' ? 'bold' : 'normal')
+    doc.setTextColor(beschichtung !== 'Keine' ? 229 : 120, beschichtung !== 'Keine' ? 9 : 120, 9)
+    doc.text(`Beschichtung: ${beschichtung}`, MARGIN + 2 + col2, y)
+    doc.setTextColor(60, 60, 60)
+    y += 5
+
+    // Services
+    if (services.length > 0) {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7.5)
+      doc.setTextColor(20, 20, 20)
+      doc.text('Services: ', MARGIN + 2, y)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      const serviceLines = doc.splitTextToSize(services.join('  ·  '), CONTENT_W - 22)
+      doc.text(serviceLines, MARGIN + 19, y)
+      y += serviceLines.length * 4.5
+    }
+
+    // Weitere Infos
+    if (weitereInfoStr) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(7)
+      doc.setTextColor(100, 100, 100)
+      const wiLines = doc.splitTextToSize(weitereInfoStr, CONTENT_W - 4)
+      doc.text(wiLines, MARGIN + 2, y)
+      y += wiLines.length * 4
+    }
+
+    y += 2
+
+    if (i < pos.length - 1) {
+      doc.setDrawColor(220, 220, 220)
+      doc.setLineWidth(0.2)
+      doc.line(MARGIN, y, A5_W - MARGIN, y)
+      y += 4
+    }
+  }
+
+  // ── Footer ──────────────────────────────────────────────────────────────
+  const pageCount = doc.getNumberOfPages()
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(6.5)
+    doc.setTextColor(160, 160, 160)
+    doc.text('Pondruff Polier- & Beschichtungsservice', MARGIN, A5_H - 3)
+    doc.text(`Seite ${p} / ${pageCount}`, A5_W - MARGIN, A5_H - 3, { align: 'right' })
+  }
+
+  const blobUrl = doc.output('bloburl')
+  window.open(blobUrl, '_blank')
 }
