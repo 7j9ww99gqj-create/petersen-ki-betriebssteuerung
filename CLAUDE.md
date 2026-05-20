@@ -33,6 +33,45 @@ Alles Design-Bezogene ist nach Verantwortung getrennt. Diese Tabelle ist die **S
 
 ---
 
+## ⚙️ Workflow & Automation
+
+### Automatische Hooks (in `.claude/settings.json`)
+
+| Hook | Trigger | Was passiert |
+|------|---------|--------------|
+| `PreToolUse` (Bash `git push*`) | Vor jedem Push | TS-Check (`npx tsc --noEmit`) — Push blockiert bei Fehler |
+| `PostToolUse` (Edit/Write/MultiEdit) | Nach jeder Datei-Änderung | TS-Check im Hintergrund — Warnung bei Fehler |
+| `Stop` (Session-Ende) | Wenn Agent fertig | `.claude/auto-commit.sh` läuft → committet + pusht alle Änderungen, wenn TS grün |
+
+**Auto-Commit-Logik (`.claude/auto-commit.sh`):**
+- Committet nur, wenn Änderungen vorhanden
+- Stagt **nur tracked Files** (`git add -u`) — kein neuer Müll
+- TS muss grün sein, sonst Skip mit Warnung
+- Auto-Push wenn ungepushte Commits da
+- Schlägt **nie** den Chat ab (exit 0 bei Fehler)
+
+### Slash-Commands (in `.claude/commands/`)
+
+| Command | Was |
+|---------|-----|
+| `/status` | HEAD + letzte Commits + ungepusht + offene Tasks (kompakt, < 200 Wörter) |
+| `/sprint <Aufgaben>` | Mehrere Aufgaben autonom abarbeiten: Implementieren → TS-Check → Commit → Push pro Task |
+| `/deploy` | Vercel-Build-Status + Live-URL-Check |
+
+### Dokumentations-Struktur (für Token-sparende Onboarding)
+
+| Datei | Größe | Wird automatisch geladen? | Verantwortlich für |
+|-------|-------|---------------------------|---------------------|
+| `CLAUDE.md` (diese Datei) | ~8 KB | ✅ Claude Code automatisch | Regeln, UI-Patterns, Design-System, DB-Schema |
+| `PROJECT_STATUS.md` | ~5 KB | ⚠️ Nur bei Statusfrage | HEAD + letzte 3 Iterationen + offene Tasks |
+| `PROJECT_STATUS_ARCHIVE.md` | 197 KB | ❌ Niemals beim Onboarding | Vollständige Historie (nur bei expliziter Frage) |
+| `AGENTS.md` | ~3 KB | ⚠️ Nur bei expliziter Anfrage | Multi-Tool-Spec (Codex/Cursor) |
+| Memory `project_petersen_ki.md` | ~2 KB | ✅ Claude Code automatisch | Cross-Session-Pointer auf CLAUDE.md/PROJECT_STATUS.md |
+
+**Token-Budget beim Onboarding:** ~10k (statt vorher ~70k).
+
+---
+
 ### Aktueller Zwischenstand (2026-05-20)
 - **Design-Panel als eigener Menüpunkt + Mobile-Select** (`31f924a`): `DesignCustomizationPanel` aus dem Benachrichtigungen-Tab herausgelöst und unter neuen Menüpunkt `🎨 Design` (`section = 'design'`) verlegt. Tab-Navigation im Panel ist jetzt auf Mobile ein natives `<select>`-Dropdown (≤640px) statt horizontal-scrollender Pills — kein Overflow-Bug mehr. Desktop bleibt Pill-Grid mit `auto-fit minmax(140px, 1fr)`.
 - **UI-Fixes — Mobile, Logo, Piloten-Farben** (`79913d9`): (1) Mobile-Bug Einstellungen → Benachrichtigungen behoben (overflow + responsive padding). (2) Logo-Upload in Firmendaten repariert — `next.config.js` `remotePatterns` für Supabase-Storage + nativer `<img>`-Fallback mit Initialen. (3) `components/brand/Logo.tsx` mark-Variante nutzt jetzt `/public/logo.png` (echtes Hexagon-Logo). (4) `lib/pilot-colors.ts`: zentrale Pilot-Farbpalette. Jeder Pilot-Header hat farbigen Namen (`<span style={{color}}>Lager</span>Pilot`) + Glow-Box. Marketing auf `#f97316`, Steuer auf `#fbbf24` umgestellt.

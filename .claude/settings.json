@@ -13,6 +13,31 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /Users/kevinpetersen/Documents/petersen-ki && npx tsc --noEmit > /tmp/pk-tsc-edit.txt 2>&1 && echo '✅ TS clean' || (echo '⚠️ TS-Fehler nach Edit:'; head -8 /tmp/pk-tsc-edit.txt)",
+            "timeout": 45,
+            "statusMessage": "🔍 TS-Check nach Edit..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/kevinpetersen/Documents/petersen-ki/.claude/auto-commit.sh",
+            "timeout": 120,
+            "statusMessage": "🚀 Auto-Commit + Push wenn grün..."
+          }
+        ]
+      }
     ]
   }
 }
