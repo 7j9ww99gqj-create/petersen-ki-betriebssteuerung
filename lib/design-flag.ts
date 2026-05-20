@@ -148,7 +148,9 @@ export function writeDesignPrefs(prefs: DesignPrefs) {
   }
 }
 
-export function patchDesignPrefs(patch: Partial<DesignPrefs> & { features?: Partial<DesignFeatures> }) {
+export function patchDesignPrefs(
+  patch: Partial<Omit<DesignPrefs, 'features'>> & { features?: Partial<DesignFeatures> },
+) {
   const current = readDesignPrefs()
   const next: DesignPrefs = {
     ...current,

@@ -7,9 +7,9 @@ import { genId } from '@/lib/ids'
 import { isDemoUser, hasDemoCookie, performLogout } from '@/lib/auth'
 import { type AccessMode, type AccessStatus } from '@/lib/access'
 import { type AppRole, APP_ROLES, INHABER_EMAIL, ROLE_LABELS, ROLE_PILOTS, PERMISSIONS, normalizeRole, useRole } from '@/lib/roles'
-// DesignV2Toggle bleibt im Codebase erhalten (rückwärtskompatibel), wird hier
-// aber nicht mehr gerendert — der DesignThemeSelector deckt alle Optionen ab.
-import DesignThemeSelector from '@/components/einstellungen/DesignThemeSelector'
+// DesignV2Toggle + DesignThemeSelector bleiben im Codebase (rückwärtskompatibel),
+// werden hier aber nicht mehr gerendert — DesignCustomizationPanel deckt alles ab.
+import DesignCustomizationPanel from '@/components/einstellungen/DesignCustomizationPanel'
 import {
   parseCsvFile, validateImportRows, autoMapColumns, buildImportRows,
   normalizeNumber, normalizeDate,
@@ -1143,8 +1143,8 @@ export default function EinstellungenPage() {
                 </div>
               </div>
 
-              {/* ── Design-Auswahl (G4: 3-Wege-Selector) ──────────────────────────── */}
-              <DesignThemeSelector />
+              {/* ── Design-Customization (DP11: voll modular) ───────────────────── */}
+              <DesignCustomizationPanel />
 
               {/* ── Push-Benachrichtigungen (PWA) ─────────────────────────────────── */}
               <div className="pk-card">
