@@ -87,10 +87,11 @@
 
 ## 4. Bekannte Bugs (P0 — aus QA 2026-05-19, **verifiziert 2026-05-20**)
 
-### 🔴 Race Condition: Angebots-Nummer (OFFEN)
-- **Datei:** `supabase/schema.sql` Z. 662–680 → `pk_next_angebot_number()`
-- **Problem:** `select max(...) + 1` — nicht-atomar. Bei parallelen Inserts kann dieselbe Nummer doppelt vergeben werden.
-- **Fix:** Umstellen auf `SEQUENCE` (analog zu `pk_next_invoice_number()`, das bereits eine Counter-Tabelle nutzt).
+### ✅ Race Condition Angebots-Nummer (erledigt 2026-05-20)
+- Migration `20260524100000_pk_next_angebot_number_atomic.sql` deployed.
+- `pk_next_angebot_number()` nutzt jetzt atomare `INSERT ... ON CONFLICT` auf `billing_sequences` (analog zu `pk_next_invoice_number`).
+- Pro Jahr mit aktuellem MAX seeded → keine Doppelvergabe möglich.
+- Smoke-Test live: 2× hintereinander → ANG-2026-00001, ANG-2026-00002 ✓
 
 ### ✅ PDF-Archivierung (erledigt)
 - `archiveRechnungPdf`/`archiveAngebotPdf` werden über `generateRechnungPDFAuto`/`generateAngebotPDFAuto` (`lib/pondruff-pdf.ts`) aufgerufen.
@@ -109,7 +110,6 @@
 ## 5. Offene Aufgaben
 
 ### 🟡 Feature-Vervollständigung
-- [ ] **Angebots-Nummer**: Race Condition mit SEQUENCE/atomarem Update beheben (siehe §4)
 - [ ] **MarketingPilot**: Edit + Delete für Kampagnen/Leads/Newsletter
 
 ### 🟢 Grafikdesigner-Folge
@@ -128,9 +128,9 @@
 
 ## 6. Nächste Empfehlung
 
-1. **Angebots-Nummer Race Condition** beheben (Daten-Integrität, einziger noch offener P0).
-2. **MarketingPilot Edit/Delete** als nächste Feature-Iteration.
-3. **PDF-Vorlagen-Header** mit Logo (Vorbereitung Grafikdesigner-Übergabe).
+1. **MarketingPilot Edit/Delete** als nächste Feature-Iteration.
+2. **PDF-Vorlagen-Header** mit Logo (Vorbereitung Grafikdesigner-Übergabe).
+3. **PWA-Push** Service-Worker erweitern.
 
 ---
 

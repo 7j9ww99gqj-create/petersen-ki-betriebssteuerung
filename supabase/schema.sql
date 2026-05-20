@@ -659,24 +659,26 @@ begin
 end;
 $$;
 
+-- Atomar via billing_sequences (verhindert Race Condition bei parallelen Inserts).
+-- Seeding pro Jahr siehe migration 20260524100000_pk_next_angebot_number_atomic.sql
 create or replace function pk_next_angebot_number()
 returns text
 language plpgsql
 security definer
+set search_path = public
 as $$
 declare
-  yr text := to_char(CURRENT_DATE, 'YYYY');
-  prefix text;
-  max_nr int := 0;
+  next_value bigint;
+  current_year text := to_char(now(), 'YYYY');
 begin
-  prefix := 'ANG-' || yr || '-';
-  select coalesce(max(cast(substring(nummer from length(prefix) + 1) as integer)), 0)
-  into max_nr
-  from buero_angebote
-  where nummer like prefix || '%'
-    and length(nummer) = length(prefix) + 5;
+  insert into billing_sequences (key, value, updated_at)
+  values ('angebot:' || current_year, 1, now())
+  on conflict (key) do update set
+    value = billing_sequences.value + 1,
+    updated_at = now()
+  returning value into next_value;
 
-  return prefix || lpad((max_nr + 1)::text, 5, '0');
+  return 'ANG-' || current_year || '-' || lpad(next_value::text, 5, '0');
 end;
 $$;
 
