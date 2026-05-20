@@ -22,8 +22,8 @@
 
 ## 1. Aktueller Stand
 
-- **HEAD:** `d4d2c19` + DP14-Refactor Schritt 1 (Einstellungen-Page in Sub-Components)
-- **Letzte Iteration:** 2026-05-20 — Monster-Page-Refactor (XL) startet
+- **HEAD:** DP14-Refactor Schritt 2 — Einstellungen 3.773 → 1.858 LOC (−50,7 %)
+- **Letzte Iteration:** 2026-05-21 — 4 weitere Sub-Components ausgelagert
 - **TypeScript:** `npx tsc --noEmit` — ✅ 0 Fehler
 - **Tests:** 87 Tests in 7 Files — ✅ alle grün
 - **CI/CD:** Vercel Auto-Deploy auf `main` — ✅
@@ -32,16 +32,24 @@
 
 ## 2. Aktueller Arbeitsstand (letzte 3 Iterationen)
 
-### 2.1 DP14 — Monster-Page-Refactor Schritt 1: Einstellungen (2026-05-20)
-**Scope:** `app/dashboard/einstellungen/page.tsx` 3.773 → 3.450 LOC (−323, −8,6 %)
+### 2.1 DP14 — Monster-Page-Refactor (Aufgabe #1 aus Marktreife-Audit)
+**Scope kumuliert:** `app/dashboard/einstellungen/page.tsx` 3.773 → **1.858 LOC (−50,7 %)**
 
-- **Toggle-Komponente ausgelagert** → `components/einstellungen/Toggle.tsx` (wiederverwendbar)
-- **ProfilTab.tsx** (263 LOC) — eigener State (profil, pwForm, isDemo), eigene Handler (handleProfilSave, handlePwSave), eigenes useEffect für User-Load
-- **BenachrichtigungenTab.tsx** (326 LOC) — eigener State (notif, push*), eigene Handler (handleNotifSave, handlePushToggle), Push-Subscription-Check beim Mount
-- `<ProfilTab>` und `<BenachrichtigungenTab>` werden in `page.tsx` nur noch mit `showToast`-Prop aufgerufen — keine Parent-State-Kopplung mehr
-- Push-Imports + 3 Handler + lokaler Toggle aus page.tsx entfernt
-- **Verhalten identisch** (gleicher State, gleiche Handler, gleiche UI) — reines Refactoring
-- TS 0 Fehler · 87/87 Tests grün
+**Schritt 2 (2026-05-21):** 4 bereits inline definierte Sub-Components in eigene Files verschoben.
+- `InfoSection.tsx` (286 LOC) — App-Info/Datenschutz/Impressum/AGB
+- `AuditLogSection.tsx` (114 LOC) — inkl. `CustomerInvoicePreview` als Named-Export
+- `CompanySettingsSection.tsx` (567 LOC) — Firmenstammdaten + Logo + Briefpapier
+- `ImportWizard.tsx` (652 LOC) — CSV-Import + `runBulkImport` + Types + Demo-Daten
+- page.tsx: nicht mehr benötigte Imports entfernt (`useRef`, `Image`, `genId`, alle Bulk-Import-Funktionen, `FirmaEinstellungen`, `ImportSource`-Typen, `emptyFirma`, `NotifSettings`)
+
+**Schritt 1 (2026-05-20):**
+- `Toggle.tsx` (62 LOC) — wiederverwendbarer iOS-Style-Toggle
+- `ProfilTab.tsx` (263 LOC) — kapselt profil/pwForm/isDemo + Handler + User-Load
+- `BenachrichtigungenTab.tsx` (326 LOC) — kapselt notif/push-State + Handler + Push-Subscription
+
+**Pattern etabliert:** Sections aus page.tsx werden zu eigenständigen Components in `components/einstellungen/`, die nur noch `showToast` (und ggf. minimalste Props) bekommen. Page.tsx wird zur dünnen Tab-Routing-Schicht.
+
+**Status:** TS 0 Fehler · 87/87 Tests grün · Verhalten identisch.
 
 ### 2.2 DP13 — Design-System Phase 3: Marktreife (2026-05-20)
 **Commits:** `2831819`
